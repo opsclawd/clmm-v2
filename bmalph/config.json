@@ -1,0 +1,9 @@
+{
+  "name": "clmm-v2",
+  "description": "CLMM v2",
+  "createdAt": "2026-03-21T23:23:09.707Z",
+  "platform": "codex",
+  "upstreamVersions": {
+    "bmadCommit": "d1163f85"
+  }
+}
