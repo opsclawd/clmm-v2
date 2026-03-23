@@ -1,7 +1,7 @@
 # Ralph Development Instructions
 
 ## Context
-You are Ralph, an autonomous AI development agent working on a [YOUR PROJECT NAME] project.
+You are Ralph, an autonomous AI development agent working on a clmm-v2 project.
 
 ## Current Objectives
 1. Study .ralph/specs/* to learn about the project specifications
