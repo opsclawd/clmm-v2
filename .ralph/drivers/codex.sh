@@ -41,12 +41,14 @@ driver_supports_tool_allowlist() {
 driver_permission_denial_help() {
     echo "  - $DRIVER_DISPLAY_NAME uses its native sandbox and approval model."
     echo "  - ALLOWED_TOOLS in $RALPHRC_FILE is ignored for this driver."
-    echo "  - Ralph already runs Codex with --sandbox workspace-write."
-    echo "  - Review Codex approval settings, then restart the loop."
+    echo "  - Ralph runs Codex with a configurable sandbox mode."
+    echo "  - If commits fail, use RALPH_CODEX_SANDBOX=danger-full-access or commit manually."
 }
 
 # Build Codex CLI command
-# Codex uses: codex exec [--resume <id>] --json "prompt"
+# Current Codex syntax:
+#   fresh run:   codex exec --json --sandbox <mode> "prompt"
+#   resume run:  codex exec resume <session_id> --json --sandbox <mode> "prompt"
 driver_build_command() {
     local prompt_file=$1
     local loop_context=$2
@@ -59,24 +61,28 @@ driver_build_command() {
         return 1
     fi
 
-    # JSON output
-    CLAUDE_CMD_ARGS+=("--json")
-
-    # Sandbox mode - workspace write access
-    CLAUDE_CMD_ARGS+=("--sandbox" "workspace-write")
-
-    # Session resume — gated on CLAUDE_USE_CONTINUE to respect --no-continue flag
-    if [[ "$CLAUDE_USE_CONTINUE" == "true" && -n "$session_id" ]]; then
-        CLAUDE_CMD_ARGS+=("--resume" "$session_id")
-    fi
-
-    # Build prompt with context
     local prompt_content
     prompt_content=$(cat "$prompt_file")
     if [[ -n "$loop_context" ]]; then
         prompt_content="$loop_context
 
 $prompt_content"
+    fi
+
+    # Resume path: codex exec resume --json <SESSION_ID> [PROMPT]
+    if [[ "$CLAUDE_USE_CONTINUE" == "true" && -n "$session_id" ]]; then
+        CLAUDE_CMD_ARGS+=("resume" "--json" "$session_id" "$prompt_content")
+        return 0
+    fi
+
+    # Fresh path: codex exec --json --sandbox <MODE> [--model <MODEL>] [PROMPT]
+    local sandbox_mode="${RALPH_CODEX_SANDBOX:-workspace-write}"
+
+    CLAUDE_CMD_ARGS+=("--json")
+    CLAUDE_CMD_ARGS+=("--sandbox" "$sandbox_mode")
+
+    if [[ -n "$RALPH_CODEX_MODEL" ]]; then
+        CLAUDE_CMD_ARGS+=("--model" "$RALPH_CODEX_MODEL")
     fi
 
     CLAUDE_CMD_ARGS+=("$prompt_content")
