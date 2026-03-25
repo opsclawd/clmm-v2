@@ -1,0 +1,21 @@
+{
+  "expo": {
+    "name": "CLMM V2",
+    "slug": "clmm-v2",
+    "version": "1.0.0",
+    "scheme": "clmmv2",
+    "orientation": "portrait",
+    "platforms": ["ios", "android", "web"],
+    "sdkVersion": "52.0.0",
+    "android": {
+      "adaptiveIcon": {
+        "backgroundColor": "#ffffff"
+      }
+    },
+    "web": {
+      "bundler": "metro",
+      "output": "static"
+    },
+    "plugins": ["expo-router"]
+  }
+}

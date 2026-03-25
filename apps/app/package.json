@@ -1,0 +1,27 @@
+{
+  "name": "@clmm/app",
+  "version": "0.0.1",
+  "private": true,
+  "main": "expo-router/entry",
+  "scripts": {
+    "dev": "expo start",
+    "build": "tsc --noEmit",
+    "typecheck": "tsc --noEmit",
+    "lint": "eslint src app",
+    "boundaries": "depcruise src app --config ../../.dependency-cruiser.cjs"
+  },
+  "dependencies": {
+    "@clmm/application": "workspace:*",
+    "@clmm/ui": "workspace:*",
+    "expo": "~52.0.0",
+    "expo-router": "~4.0.0",
+    "react": "18.3.1",
+    "react-native": "0.76.7"
+  },
+  "devDependencies": {
+    "@clmm/config": "workspace:*",
+    "typescript": "^5.7.0",
+    "eslint": "^9.17.0",
+    "@types/react": "^18.3.0"
+  }
+}

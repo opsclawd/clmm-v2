@@ -1,0 +1,34 @@
+{
+  "name": "@clmm/adapters",
+  "version": "0.0.1",
+  "private": true,
+  "main": "./src/index.ts",
+  "exports": { ".": "./src/index.ts" },
+  "scripts": {
+    "build": "tsc --build",
+    "typecheck": "tsc --noEmit",
+    "lint": "eslint src",
+    "boundaries": "depcruise src --config ../../.dependency-cruiser.cjs",
+    "test": "vitest run --coverage"
+  },
+  "dependencies": {
+    "@clmm/application": "workspace:*",
+    "@clmm/domain": "workspace:*",
+    "@nestjs/core": "^10.4.0",
+    "@nestjs/common": "^10.4.0",
+    "@nestjs/platform-express": "^10.4.0",
+    "reflect-metadata": "^0.2.2",
+    "rxjs": "^7.8.1"
+  },
+  "devDependencies": {
+    "@clmm/config": "workspace:*",
+    "typescript": "^5.7.0",
+    "vitest": "^2.1.0",
+    "@vitest/coverage-v8": "^2.1.0",
+    "eslint": "^9.17.0",
+    "typescript-eslint": "^8.18.0",
+    "eslint-plugin-import-x": "^4.6.0",
+    "@eslint/js": "^9.17.0",
+    "@types/express": "^5.0.0"
+  }
+}
