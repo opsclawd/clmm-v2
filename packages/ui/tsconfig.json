@@ -1,0 +1,14 @@
+{
+  "extends": "../../packages/config/typescript/react-native.json",
+  "compilerOptions": {
+    "rootDir": "src",
+    "outDir": "dist",
+    "paths": {
+      "@clmm/application": ["../application/src/index.ts"]
+    }
+  },
+  "include": ["src"],
+  "references": [
+    { "path": "../application" }
+  ]
+}
