@@ -1,0 +1,20 @@
+{
+  "extends": "../../packages/config/typescript/base.json",
+  "compilerOptions": {
+    "rootDir": "src",
+    "outDir": "dist",
+    "paths": {
+      "@clmm/domain": ["../domain/src/index.ts"],
+      "@clmm/application": ["../application/src/index.ts"],
+      "@clmm/adapters": ["../adapters/src/index.ts"],
+      "@clmm/ui": ["../ui/src/index.ts"]
+    }
+  },
+  "include": ["src"],
+  "references": [
+    { "path": "../domain" },
+    { "path": "../application" },
+    { "path": "../adapters" },
+    { "path": "../ui" }
+  ]
+}
