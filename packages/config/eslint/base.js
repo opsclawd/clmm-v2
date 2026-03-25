@@ -27,8 +27,34 @@ export function createBaseConfig(tsconfigPath) {
         '@typescript-eslint/no-unused-vars': ['error', { argsIgnorePattern: '^_' }],
         // Import ordering
         'import-x/order': ['warn', { 'newlines-between': 'always' }],
-        // Boundary rules added in Task 11
-        // Banned-concept rules added in Task 12
+        // Boundary rules: block cross-layer adapter imports globally.
+        // SDK-specific bans (Solana, NestJS, drizzle) are in react-native.js / enforced by dep-cruiser.
+        'no-restricted-imports': ['error', {
+          patterns: [
+            // No layer should import concrete adapters except the composition root.
+            { group: ['@clmm/adapters', '@clmm/adapters/*'], message: 'Do not import from @clmm/adapters outside the composition root. Use port interfaces.' },
+          ],
+        }],
+        // Banned architectural concepts — any declaration using these names fails CI.
+        // Covers: class, interface, type alias, enum.
+        'no-restricted-syntax': ['error',
+          {
+            selector: 'ClassDeclaration[id.name=/^(Receipt|Attestation|Proof|ClaimVerification|OnChainHistory|CanonicalExecutionCertificate)/]',
+            message: 'Banned concept: Receipt/Attestation/Proof/ClaimVerification/OnChainHistory/CanonicalExecutionCertificate are out of scope.',
+          },
+          {
+            selector: 'TSInterfaceDeclaration[id.name=/^(Receipt|Attestation|Proof|ClaimVerification|OnChainHistory|CanonicalExecutionCertificate)/]',
+            message: 'Banned concept: Receipt/Attestation/Proof/ClaimVerification/OnChainHistory/CanonicalExecutionCertificate are out of scope.',
+          },
+          {
+            selector: 'TSTypeAliasDeclaration[id.name=/^(Receipt|Attestation|Proof|ClaimVerification|OnChainHistory|CanonicalExecutionCertificate)/]',
+            message: 'Banned concept: Receipt/Attestation/Proof/ClaimVerification/OnChainHistory/CanonicalExecutionCertificate are out of scope.',
+          },
+          {
+            selector: 'TSEnumDeclaration[id.name=/^(Receipt|Attestation|Proof|ClaimVerification|OnChainHistory|CanonicalExecutionCertificate)/]',
+            message: 'Banned concept: Receipt/Attestation/Proof/ClaimVerification/OnChainHistory/CanonicalExecutionCertificate are out of scope.',
+          },
+        ],
       },
     },
   );

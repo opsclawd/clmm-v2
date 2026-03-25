@@ -3,12 +3,11 @@ module.exports = {
   forbidden: [
     {
       name: 'domain-no-external',
-      comment: 'packages/domain must not depend on anything outside itself',
+      comment: 'packages/domain must not depend on anything outside itself — no npm packages, no sibling packages',
       severity: 'error',
       from: { path: '^packages/domain/src' },
       to: {
-        pathNot: '^packages/domain/src',
-        dependencyTypes: ['local'],
+        pathNot: ['^packages/domain/src', '^node_modules/typescript/'],
       },
     },
     {

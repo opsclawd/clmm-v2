@@ -1,5 +1,6 @@
 {
   "name": "@clmm/ui",
+  "type": "module",
   "version": "0.0.1",
   "private": true,
   "main": "./src/index.ts",
@@ -8,7 +9,7 @@
     "build": "tsc --build",
     "typecheck": "tsc --noEmit",
     "lint": "eslint src",
-    "boundaries": "depcruise src --config ../../.dependency-cruiser.cjs",
+    "boundaries": "cd ../.. && depcruise packages/ui/src --config .dependency-cruiser.cjs",
     "test": "vitest run --coverage"
   },
   "dependencies": {

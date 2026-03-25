@@ -8,7 +8,7 @@
     "build": "tsc --build",
     "typecheck": "tsc --noEmit",
     "lint": "eslint src",
-    "boundaries": "depcruise src --config ../../.dependency-cruiser.cjs",
+    "boundaries": "cd ../.. && depcruise packages/adapters/src --config .dependency-cruiser.cjs",
     "test": "vitest run --coverage"
   },
   "dependencies": {

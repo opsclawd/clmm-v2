@@ -8,7 +8,7 @@
     "build": "tsc --noEmit",
     "typecheck": "tsc --noEmit",
     "lint": "eslint src app",
-    "boundaries": "depcruise src app --config ../../.dependency-cruiser.cjs"
+    "boundaries": "cd ../.. && depcruise apps/app/src apps/app/app --config .dependency-cruiser.cjs"
   },
   "dependencies": {
     "@clmm/application": "workspace:*",
