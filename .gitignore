@@ -10,3 +10,29 @@ _bmad-output/*
 # Optional: also keep implementation planning artifacts
 !_bmad-output/implementation-artifacts/
 !_bmad-output/implementation-artifacts/**
+
+# Dependencies
+node_modules/
+.pnp
+.pnp.js
+
+# Build outputs
+dist/
+.expo/
+*.tsbuildinfo
+
+# Turbo
+.turbo/
+
+# Testing
+coverage/
+.vitest-cache/
+
+# Env
+.env
+.env.local
+.env.*.local
+
+# OS
+.DS_Store
+*.log
