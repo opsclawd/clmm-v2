@@ -1,0 +1,21 @@
+{
+  "name": "@clmm/config",
+  "version": "0.0.1",
+  "private": true,
+  "main": "./src/index.ts",
+  "exports": {
+    ".": "./src/index.ts",
+    "./typescript/*": "./typescript/*",
+    "./eslint/*": "./eslint/*",
+    "./boundaries/*": "./boundaries/*"
+  },
+  "scripts": {
+    "build": "tsc --build",
+    "typecheck": "tsc --noEmit",
+    "lint": "echo 'no lint for config package'"
+  },
+  "devDependencies": {
+    "typescript": "^5.7.0",
+    "vitest": "^2.1.0"
+  }
+}
