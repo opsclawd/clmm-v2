@@ -24,9 +24,12 @@ export class FakeExecutionSubmissionPort implements ExecutionSubmissionPort {
     confirmedSteps: Array<ExecutionStep['kind']>;
     finalState: ExecutionLifecycleState | null;
   }> {
-    return {
-      confirmedSteps: this._confirmedSteps,
-      finalState: this._confirmedSteps.length === 3 ? { kind: 'confirmed' } : null,
-    };
+    if (this._confirmedSteps.length === 3) {
+      return { confirmedSteps: this._confirmedSteps, finalState: { kind: 'confirmed' } };
+    }
+    if (this._confirmedSteps.length > 0) {
+      return { confirmedSteps: this._confirmedSteps, finalState: { kind: 'partial' } };
+    }
+    return { confirmedSteps: [], finalState: null };
   }
 }
