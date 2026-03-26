@@ -1,0 +1,13 @@
+{
+  "expo": {
+    "name": "CLMM V2",
+    "slug": "clmm-v2",
+    "version": "1.0.0",
+    "scheme": "clmmv2",
+    "platforms": ["ios", "android", "web"],
+    "web": {
+      "bundler": "metro",
+      "output": "static"
+    }
+  }
+}

@@ -21,7 +21,8 @@
   "devDependencies": {
     "@clmm/config": "workspace:*",
     "@clmm/testing": "workspace:*",
-    "vitest": "^1.6.0",
-    "typescript": "^5.4.0"
+    "@types/node": "^25.5.0",
+    "typescript": "^5.4.0",
+    "vitest": "^1.6.0"
   }
 }
