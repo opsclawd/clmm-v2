@@ -1,0 +1,182 @@
+import type {
+  PositionId,
+  WalletId,
+  PoolId,
+  BreachDirection,
+  ClockTimestamp,
+  TokenAmount,
+} from '@clmm/domain';
+import type {
+  LiquidityPosition,
+  RangeState,
+  MonitoringReadiness,
+} from '@clmm/domain';
+import type {
+  ExitTrigger,
+  BreachEpisode,
+  BreachEpisodeId,
+  ExitTriggerId,
+} from '@clmm/domain';
+import type {
+  ExecutionPlan,
+  ExecutionPreview,
+  ExecutionAttempt,
+  ExecutionLifecycleState,
+  TransactionReference,
+  SwapInstruction,
+} from '@clmm/domain';
+import type {
+  HistoryEvent,
+  HistoryTimeline,
+  ExecutionOutcomeSummary,
+} from '@clmm/domain';
+
+// --- Position read ports ---
+
+export interface SupportedPositionReadPort {
+  listSupportedPositions(walletId: WalletId): Promise<LiquidityPosition[]>;
+  getPosition(positionId: PositionId): Promise<LiquidityPosition | null>;
+}
+
+export interface RangeObservationPort {
+  observeRangeState(positionId: PositionId): Promise<{
+    positionId: PositionId;
+    currentPrice: number;
+    observedAt: ClockTimestamp;
+  }>;
+}
+
+// --- Swap + execution ports ---
+
+export interface SwapQuotePort {
+  getQuote(instruction: SwapInstruction): Promise<{
+    estimatedOutputAmount: TokenAmount;
+    priceImpactPercent: number;
+    routeLabel: string;
+    quotedAt: ClockTimestamp;
+  }>;
+}
+
+export interface ExecutionPreparationPort {
+  prepareExecution(plan: ExecutionPlan, walletId: WalletId): Promise<{
+    serializedPayload: Uint8Array;
+    preparedAt: ClockTimestamp;
+  }>;
+}
+
+export interface ExecutionSubmissionPort {
+  submitExecution(signedPayload: Uint8Array): Promise<{
+    references: TransactionReference[];
+    submittedAt: ClockTimestamp;
+  }>;
+  reconcileExecution(references: TransactionReference[]): Promise<{
+    confirmedSteps: Array<ExecutionPlan['steps'][number]['kind']>;
+    finalState: ExecutionLifecycleState | null;
+  }>;
+}
+
+// --- Wallet signing port ---
+
+export interface WalletSigningPort {
+  requestSignature(
+    serializedPayload: Uint8Array,
+    walletId: WalletId,
+  ): Promise<
+    | { kind: 'signed'; signedPayload: Uint8Array }
+    | { kind: 'declined' }
+    | { kind: 'interrupted' }
+  >;
+}
+
+// --- Notification + capability ports ---
+
+export interface NotificationPort {
+  sendActionableAlert(params: {
+    walletId: WalletId;
+    positionId: PositionId;
+    breachDirection: BreachDirection;
+    triggerId: ExitTriggerId;
+  }): Promise<{ deliveredAt: ClockTimestamp | null }>;
+}
+
+export type PlatformCapabilityState = {
+  nativePushAvailable: boolean;
+  browserNotificationAvailable: boolean;
+  nativeWalletAvailable: boolean;
+  browserWalletAvailable: boolean;
+  isMobileWeb: boolean;
+};
+
+export interface PlatformCapabilityPort {
+  getCapabilities(): Promise<PlatformCapabilityState>;
+}
+
+export interface NotificationPermissionPort {
+  getPermissionState(): Promise<'granted' | 'denied' | 'undetermined'>;
+  requestPermission(): Promise<'granted' | 'denied'>;
+}
+
+export type DeepLinkMetadata = {
+  kind: 'trigger' | 'preview' | 'history' | 'unknown';
+  positionId?: PositionId;
+  triggerId?: ExitTriggerId;
+};
+
+export interface DeepLinkEntryPort {
+  parseDeepLink(url: string): DeepLinkMetadata;
+}
+
+// --- Storage repositories ---
+
+export interface TriggerRepository {
+  saveTrigger(trigger: ExitTrigger): Promise<void>;
+  getTrigger(triggerId: ExitTriggerId): Promise<ExitTrigger | null>;
+  listActionableTriggers(walletId: WalletId): Promise<ExitTrigger[]>;
+  getActiveEpisodeTrigger(episodeId: BreachEpisodeId): Promise<ExitTriggerId | null>;
+  saveEpisode(episode: BreachEpisode): Promise<void>;
+}
+
+export interface ExecutionRepository {
+  savePreview(positionId: PositionId, preview: ExecutionPreview): Promise<{ previewId: string }>;
+  getPreview(previewId: string): Promise<ExecutionPreview | null>;
+  saveAttempt(attempt: ExecutionAttempt & { attemptId: string; positionId: PositionId }): Promise<void>;
+  getAttempt(attemptId: string): Promise<(ExecutionAttempt & { attemptId: string; positionId: PositionId }) | null>;
+  updateAttemptState(attemptId: string, state: ExecutionLifecycleState): Promise<void>;
+}
+
+export interface ExecutionSessionRepository {
+  saveSession(params: {
+    sessionId: string;
+    attemptId: string;
+    walletId: WalletId;
+    positionId: PositionId;
+    createdAt: ClockTimestamp;
+  }): Promise<void>;
+  getSession(sessionId: string): Promise<{
+    attemptId: string;
+    walletId: WalletId;
+    positionId: PositionId;
+  } | null>;
+  deleteSession(sessionId: string): Promise<void>;
+}
+
+export interface ExecutionHistoryRepository {
+  appendEvent(event: HistoryEvent): Promise<void>;
+  getTimeline(positionId: PositionId): Promise<HistoryTimeline>;
+  getOutcomeSummary(positionId: PositionId): Promise<ExecutionOutcomeSummary | null>;
+}
+
+// --- Cross-cutting ports ---
+
+export interface ObservabilityPort {
+  log(level: 'info' | 'warn' | 'error', message: string, context?: Record<string, unknown>): void;
+  recordTiming(event: string, durationMs: number, tags?: Record<string, string>): void;
+}
+
+export interface ClockPort {
+  now(): ClockTimestamp;
+}
+
+export interface IdGeneratorPort {
+  generateId(): string;
+}
