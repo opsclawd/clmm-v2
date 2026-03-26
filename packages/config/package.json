@@ -7,5 +7,11 @@
     "./eslint": "./eslint/index.js",
     "./eslint/boundary-rules": "./eslint/boundary-rules.js",
     "./boundaries": "./boundaries/.dependency-cruiser.cjs"
+  },
+  "scripts": {
+    "test": "vitest run ci/"
+  },
+  "devDependencies": {
+    "vitest": "^1.6.0"
   }
 }
