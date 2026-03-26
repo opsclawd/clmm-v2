@@ -12,6 +12,7 @@ export type HistoryEventType =
   | 'preview-expired'
   | 'signature-requested'
   | 'signature-declined'
+  | 'signature-interrupted'
   | 'submitted'
   | 'reconciliation-update'
   | 'confirmed'

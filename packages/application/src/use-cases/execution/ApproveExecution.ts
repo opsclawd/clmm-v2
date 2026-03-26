@@ -74,6 +74,14 @@ export async function approveExecution(params: {
   }
 
   if (sigResult.kind === 'interrupted') {
+    await historyRepo.appendEvent({
+      eventId: ids.generateId(),
+      positionId,
+      eventType: 'signature-interrupted',
+      breachDirection,
+      occurredAt: clock.now(),
+      lifecycleState: { kind: 'awaiting-signature' },
+    });
     return { kind: 'interrupted', attemptId };
   }
 
