@@ -1,0 +1,12 @@
+{
+  "extends": "@clmm/config/tsconfig/base",
+  "compilerOptions": {
+    "rootDir": "src",
+    "outDir": "dist",
+    "paths": {
+      "@clmm/domain": ["../domain/src/index.ts"]
+    }
+  },
+  "include": ["src/**/*"],
+  "references": [{ "path": "../domain" }]
+}

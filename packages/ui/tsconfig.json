@@ -1,0 +1,12 @@
+{
+  "extends": "@clmm/config/tsconfig/react-native",
+  "compilerOptions": {
+    "rootDir": "src",
+    "outDir": "dist",
+    "paths": {
+      "@clmm/application/public": ["../application/src/public/index.ts"]
+    }
+  },
+  "include": ["src/**/*"],
+  "references": [{ "path": "../application" }]
+}

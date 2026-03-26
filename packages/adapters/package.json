@@ -1,0 +1,27 @@
+{
+  "name": "@clmm/adapters",
+  "version": "0.0.1",
+  "private": true,
+  "main": "./src/index.ts",
+  "scripts": {
+    "test": "vitest run",
+    "typecheck": "tsc --noEmit",
+    "build": "tsc -p tsconfig.json",
+    "dev:api": "ts-node -r tsconfig-paths/register src/inbound/http/main.ts",
+    "dev:worker": "ts-node -r tsconfig-paths/register src/inbound/jobs/main.ts"
+  },
+  "dependencies": {
+    "@clmm/application": "workspace:*",
+    "@clmm/domain": "workspace:*",
+    "@nestjs/common": "^10.0.0",
+    "@nestjs/core": "^10.0.0",
+    "@nestjs/platform-fastify": "^10.0.0",
+    "reflect-metadata": "^0.2.0"
+  },
+  "devDependencies": {
+    "@clmm/config": "workspace:*",
+    "@clmm/testing": "workspace:*",
+    "vitest": "^1.6.0",
+    "typescript": "^5.4.0"
+  }
+}

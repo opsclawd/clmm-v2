@@ -1,0 +1,14 @@
+{
+  "extends": "@clmm/config/tsconfig/react-native",
+  "compilerOptions": {
+    "paths": {
+      "@clmm/application/public": ["../../packages/application/src/public/index.ts"],
+      "@clmm/ui": ["../../packages/ui/src/index.ts"]
+    }
+  },
+  "include": ["app/**/*", "src/**/*"],
+  "references": [
+    { "path": "../../packages/ui" },
+    { "path": "../../packages/application" }
+  ]
+}

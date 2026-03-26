@@ -1,0 +1,25 @@
+{
+  "name": "@clmm/application",
+  "version": "0.0.1",
+  "private": true,
+  "main": "./src/public/index.ts",
+  "types": "./src/public/index.ts",
+  "exports": {
+    ".": "./src/index.ts",
+    "./public": "./src/public/index.ts"
+  },
+  "scripts": {
+    "test": "vitest run",
+    "typecheck": "tsc --noEmit",
+    "build": "tsc -p tsconfig.json"
+  },
+  "dependencies": {
+    "@clmm/domain": "workspace:*"
+  },
+  "devDependencies": {
+    "@clmm/config": "workspace:*",
+    "@clmm/testing": "workspace:*",
+    "vitest": "^1.6.0",
+    "typescript": "^5.4.0"
+  }
+}
