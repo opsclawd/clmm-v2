@@ -10,3 +10,11 @@ _bmad-output/*
 # Optional: also keep implementation planning artifacts
 !_bmad-output/implementation-artifacts/
 !_bmad-output/implementation-artifacts/**
+
+node_modules/
+dist/
+.turbo/
+*.tsbuildinfo
+.expo/
+.next/
+coverage/

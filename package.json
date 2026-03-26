@@ -1,0 +1,22 @@
+{
+  "name": "clmm-v2",
+  "private": true,
+  "packageManager": "pnpm@9.0.0",
+  "engines": { "node": ">=20.0.0", "pnpm": ">=9.0.0" },
+  "scripts": {
+    "build": "turbo build",
+    "dev": "turbo dev",
+    "test": "turbo test",
+    "typecheck": "turbo typecheck",
+    "lint": "turbo lint",
+    "boundaries": "turbo boundaries",
+    "test:domain": "pnpm --filter @clmm/domain test",
+    "test:application": "pnpm --filter @clmm/application test",
+    "test:adapters": "pnpm --filter @clmm/adapters test",
+    "test:e2e": "pnpm --filter @clmm/testing test"
+  },
+  "devDependencies": {
+    "turbo": "^2.0.0",
+    "typescript": "^5.4.0"
+  }
+}
