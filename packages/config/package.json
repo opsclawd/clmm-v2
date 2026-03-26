@@ -1,0 +1,11 @@
+{
+  "name": "@clmm/config",
+  "version": "0.0.1",
+  "private": true,
+  "exports": {
+    "./tsconfig/*": "./tsconfig/*.json",
+    "./eslint": "./eslint/index.js",
+    "./eslint/boundary-rules": "./eslint/boundary-rules.js",
+    "./boundaries": "./boundaries/.dependency-cruiser.cjs"
+  }
+}
