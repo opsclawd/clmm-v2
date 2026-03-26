@@ -2,7 +2,6 @@ import { describe, it, expect, beforeEach } from 'vitest';
 import { dispatchActionableNotification } from './DispatchActionableNotification.js';
 import {
   FakeNotificationPort,
-  FakeClockPort,
   FakeIdGeneratorPort,
   FIXTURE_POSITION_ID,
   FIXTURE_WALLET_ID,
@@ -14,12 +13,10 @@ const TRIGGER_ID = 'trigger-1' as ExitTriggerId;
 
 describe('DispatchActionableNotification', () => {
   let notificationPort: FakeNotificationPort;
-  let clock: FakeClockPort;
   let ids: FakeIdGeneratorPort;
 
   beforeEach(() => {
     notificationPort = new FakeNotificationPort();
-    clock = new FakeClockPort();
     ids = new FakeIdGeneratorPort();
   });
 
@@ -30,7 +27,6 @@ describe('DispatchActionableNotification', () => {
       triggerId: TRIGGER_ID,
       breachDirection: LOWER_BOUND_BREACH,
       notificationPort,
-      clock,
     });
     expect(notificationPort.dispatched).toHaveLength(1);
     expect(notificationPort.dispatched[0]?.breachDirection.kind).toBe('lower-bound-breach');
@@ -43,7 +39,6 @@ describe('DispatchActionableNotification', () => {
       triggerId: TRIGGER_ID,
       breachDirection: UPPER_BOUND_BREACH,
       notificationPort,
-      clock,
     });
     expect(notificationPort.dispatched[0]?.breachDirection.kind).toBe('upper-bound-breach');
   });
