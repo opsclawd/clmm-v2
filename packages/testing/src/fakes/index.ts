@@ -1,1 +1,11 @@
-export {};
+export { FakeClockPort } from './FakeClockPort.js';
+export { FakeIdGeneratorPort } from './FakeIdGeneratorPort.js';
+export { FakeTriggerRepository } from './FakeTriggerRepository.js';
+export { FakeExecutionRepository } from './FakeExecutionRepository.js';
+export { FakeExecutionHistoryRepository } from './FakeExecutionHistoryRepository.js';
+export { FakeSupportedPositionReadPort } from './FakeSupportedPositionReadPort.js';
+export { FakeSwapQuotePort } from './FakeSwapQuotePort.js';
+export { FakeWalletSigningPort } from './FakeWalletSigningPort.js';
+export { FakeNotificationPort } from './FakeNotificationPort.js';
+export { FakeExecutionPreparationPort } from './FakeExecutionPreparationPort.js';
+export { FakeExecutionSubmissionPort } from './FakeExecutionSubmissionPort.js';
