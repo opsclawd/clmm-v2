@@ -76,10 +76,8 @@ describe('TriggerQualificationService', () => {
     });
 
     it('does not suppress when no existing trigger for episode', () => {
-      const result = qualifyTrigger({
-        ...baseObservation,
-        existingTriggerIdForEpisode: undefined,
-      });
+      const { existingTriggerIdForEpisode: _unused, ...observationWithoutTriggerId } = baseObservation;
+      const result = qualifyTrigger(observationWithoutTriggerId);
       expect(result.kind).toBe('qualified');
     });
   });

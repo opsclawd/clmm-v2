@@ -67,7 +67,7 @@ describe('ExecutionStateReducer — forbidden transitions', () => {
     'FORBIDDEN: %s → cannot apply %s',
     (fromKind, event) => {
       expect(() =>
-        applyLifecycleTransition(state(fromKind), event),
+        applyLifecycleTransition(state(fromKind), event as 'request-signature' | 'submit' | 'decline' | 'expire' | 'confirm' | 'fail' | 'partial-completion' | 'reset-to-preview'),
       ).toThrow();
     },
   );
