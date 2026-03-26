@@ -27,7 +27,7 @@ export async function qualifyActionableTrigger(params: {
     observedAt: clock.now(),
     episodeId: observation.episodeId,
     consecutiveOutOfRangeCount: consecutiveCount,
-    existingTriggerIdForEpisode: existingId ?? undefined,
+    ...(existingId != null && { existingTriggerIdForEpisode: existingId }),
   });
 
   if (domainResult.kind === 'not-qualified') {
