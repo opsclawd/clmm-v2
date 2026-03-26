@@ -35,17 +35,33 @@ export class OffChainHistoryStorageAdapter implements ExecutionHistoryRepository
       .orderBy(historyEvents.occurredAt);
 
     const events: HistoryEvent[] = rows.map((row) => {
-      const event = {
+      const breachDirection =
+        row.directionKind === 'lower-bound-breach'
+          ? LOWER_BOUND_BREACH
+          : row.directionKind === 'upper-bound-breach'
+            ? UPPER_BOUND_BREACH
+            : (() => {
+                throw new Error(`getTimeline: unknown directionKind ${row.directionKind}`);
+              })();
+
+      const baseEvent = {
         eventId: row.eventId,
         positionId: row.positionId as PositionId,
         eventType: row.eventType as HistoryEvent['eventType'],
-        breachDirection:
-          row.directionKind === 'lower-bound-breach' ? LOWER_BOUND_BREACH : UPPER_BOUND_BREACH,
+        breachDirection,
         occurredAt: makeClockTimestamp(row.occurredAt),
-        ...(row.lifecycleStateKind ? { lifecycleState: { kind: row.lifecycleStateKind } } : {}),
-        ...(row.transactionRefJson ? { transactionReference: row.transactionRefJson } : {}),
       };
-      return event as HistoryEvent;
+
+      const event: HistoryEvent = row.lifecycleStateKind
+        ? Object.assign(baseEvent, {
+            lifecycleState: { kind: row.lifecycleStateKind } as HistoryEvent['lifecycleState'],
+            ...(row.transactionRefJson ? { transactionReference: row.transactionRefJson } : {}),
+          })
+        : row.transactionRefJson
+          ? Object.assign(baseEvent, { transactionReference: row.transactionRefJson })
+          : baseEvent;
+
+      return event;
     });
 
     return { positionId, events };
