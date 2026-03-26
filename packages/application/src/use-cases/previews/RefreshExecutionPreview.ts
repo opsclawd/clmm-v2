@@ -2,6 +2,11 @@ import type { SwapQuotePort, ExecutionRepository, ClockPort, IdGeneratorPort } f
 import type { PositionId, BreachDirection } from '@clmm/domain';
 import { createExecutionPreview, type CreatePreviewResult } from './CreateExecutionPreview.js';
 
+/**
+ * Refresh creates a NEW preview rather than updating the existing one.
+ * This is intentional — previews are append-only for auditability.
+ * The previewId parameter is accepted for interface compatibility but ignored.
+ */
 export async function refreshExecutionPreview(params: {
   previewId: string;
   positionId: PositionId;
