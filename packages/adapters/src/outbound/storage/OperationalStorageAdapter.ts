@@ -22,7 +22,9 @@ import type {
 import { LOWER_BOUND_BREACH, UPPER_BOUND_BREACH, makeClockTimestamp } from '@clmm/domain';
 
 function directionFromKind(kind: string) {
-  return kind === 'lower-bound-breach' ? LOWER_BOUND_BREACH : UPPER_BOUND_BREACH;
+  if (kind === 'lower-bound-breach') return LOWER_BOUND_BREACH;
+  if (kind === 'upper-bound-breach') return UPPER_BOUND_BREACH;
+  throw new Error(`directionFromKind: unknown kind ${kind}`);
 }
 
 export class OperationalStorageAdapter
@@ -52,7 +54,7 @@ export class OperationalStorageAdapter
       .select()
       .from(exitTriggers)
       .where(eq(exitTriggers.triggerId, triggerId));
-    const row = rows[0];
+    const [row] = rows;
     if (!row) return null;
     return {
       triggerId: row.triggerId as ExitTriggerId,
@@ -83,7 +85,7 @@ export class OperationalStorageAdapter
       .select()
       .from(breachEpisodes)
       .where(eq(breachEpisodes.episodeId, episodeId));
-    const row = rows[0];
+    const [row] = rows;
     return (row?.activeTriggerId as ExitTriggerId | undefined) ?? null;
   }
 
@@ -125,7 +127,7 @@ export class OperationalStorageAdapter
       .select()
       .from(executionPreviews)
       .where(eq(executionPreviews.previewId, previewId));
-    const row = rows[0];
+    const [row] = rows;
     if (!row) return null;
     return {
       plan: row.planJson as ExecutionPreview['plan'],
@@ -158,7 +160,7 @@ export class OperationalStorageAdapter
       .select()
       .from(executionAttempts)
       .where(eq(executionAttempts.attemptId, attemptId));
-    const row = rows[0];
+    const [row] = rows;
     if (!row) return null;
     return {
       attemptId: row.attemptId,
@@ -199,7 +201,7 @@ export class OperationalStorageAdapter
       .select()
       .from(executionSessions)
       .where(eq(executionSessions.sessionId, sessionId));
-    const row = rows[0];
+    const [row] = rows;
     if (!row) return null;
     return {
       attemptId: row.attemptId,
