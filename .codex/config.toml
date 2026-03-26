@@ -1,4 +1,0 @@
-# .codex/config.toml
-model = "gpt-5.3-codex"
-approval_policy = "never"
-sandbox_mode = "danger-full-access"
