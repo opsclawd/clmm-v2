@@ -1,2 +1,1 @@
-// Adapters barrel — filled in Epic 4
-export {};
+export { BrowserWalletSigningAdapter } from './outbound/wallet-signing/BrowserWalletSigningAdapter';
