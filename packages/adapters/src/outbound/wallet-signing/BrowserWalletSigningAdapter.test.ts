@@ -1,20 +1,16 @@
 import { describe, it, expect } from 'vitest';
 import { BrowserWalletSigningAdapter } from './BrowserWalletSigningAdapter';
-import { runWalletSigningPortContract } from '@clmm/testing/src/contracts/index.js';
+import { runWalletSigningPortContract } from '@clmm/testing';
 import { makeWalletId } from '@clmm/domain';
 
 runWalletSigningPortContract(() =>
-  BrowserWalletSigningAdapter.create(
-    async ({ transaction }) => ({ signedTransaction: transaction }),
-  ),
+  BrowserWalletSigningAdapter.create(async (tx) => tx),
 );
 
 describe('BrowserWalletSigningAdapter', () => {
   it('returns signed with the bytes from the callback', async () => {
     const signedBytes = new Uint8Array([9, 8, 7]);
-    const adapter = BrowserWalletSigningAdapter.create(
-      async (_config) => ({ signedTransaction: signedBytes }),
-    );
+    const adapter = BrowserWalletSigningAdapter.create(async (_tx) => signedBytes);
     const result = await adapter.requestSignature(
       new Uint8Array([1, 2, 3]),
       makeWalletId('any-wallet'),
