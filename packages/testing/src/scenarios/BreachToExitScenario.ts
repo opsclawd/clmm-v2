@@ -1,0 +1,103 @@
+import type { BreachDirection, PostExitAssetPosture, SwapInstruction } from '@clmm/domain';
+import {
+  makePositionId,
+  makeWalletId,
+  makeClockTimestamp,
+  LOWER_BOUND_BREACH,
+} from '@clmm/domain';
+import { scanPositionsForBreaches } from '@clmm/application';
+import { qualifyActionableTrigger } from '@clmm/application';
+import { createExecutionPreview } from '@clmm/application';
+import { approveExecution } from '@clmm/application';
+import type { ApproveExecutionResult } from '@clmm/application';
+import {
+  FakeSupportedPositionReadPort,
+  FakeClockPort,
+  FakeIdGeneratorPort,
+  FakeTriggerRepository,
+  FakeSwapQuotePort,
+  FakeExecutionRepository,
+  FakeExecutionPreparationPort,
+  FakeWalletSigningPort,
+  FakeExecutionSubmissionPort,
+  FakeExecutionHistoryRepository,
+} from '../fakes/index.js';
+import { FIXTURE_POSITION_BELOW_RANGE, FIXTURE_POSITION_ABOVE_RANGE } from '../fixtures/index.js';
+
+export type ScenarioResult = {
+  previewPosture: PostExitAssetPosture;
+  swapInstruction: SwapInstruction;
+  approvalOutcome: ApproveExecutionResult;
+};
+
+export async function runBreachToExitScenario(params: {
+  direction: BreachDirection;
+}): Promise<ScenarioResult> {
+  const walletId = makeWalletId('scenario-wallet');
+  const positionId = makePositionId('scenario-pos');
+  const clock = new FakeClockPort();
+  const ids = new FakeIdGeneratorPort('scenario');
+
+  const fixturePosition =
+    params.direction.kind === 'lower-bound-breach'
+      ? FIXTURE_POSITION_BELOW_RANGE
+      : FIXTURE_POSITION_ABOVE_RANGE;
+
+  const positionRead = new FakeSupportedPositionReadPort([fixturePosition]);
+  const triggerRepo = new FakeTriggerRepository();
+  const swapQuote = new FakeSwapQuotePort();
+  const executionRepo = new FakeExecutionRepository();
+  const prepPort = new FakeExecutionPreparationPort();
+  const signingPort = new FakeWalletSigningPort();
+  const submissionPort = new FakeExecutionSubmissionPort();
+  const historyRepo = new FakeExecutionHistoryRepository();
+
+  const observations = await scanPositionsForBreaches({
+    walletId,
+    positionReadPort: positionRead,
+    clock,
+    ids,
+  });
+  if (observations.length === 0) throw new Error('No observations from scan');
+  const obs = observations[0]!;
+
+  const qualifyResult = await qualifyActionableTrigger({
+    observation: obs,
+    consecutiveCount: 3,
+    triggerRepo,
+    clock,
+    ids,
+  });
+  if (qualifyResult.kind !== 'trigger-created') {
+    throw new Error(`Expected trigger-created, got ${qualifyResult.kind}`);
+  }
+
+  const previewResult = await createExecutionPreview({
+    positionId: obs.positionId,
+    breachDirection: obs.direction,
+    swapQuotePort: swapQuote,
+    executionRepo,
+    clock,
+    ids,
+  });
+
+  const approvalOutcome = await approveExecution({
+    previewId: previewResult.previewId,
+    walletId,
+    positionId: obs.positionId,
+    breachDirection: obs.direction,
+    executionRepo,
+    prepPort,
+    signingPort,
+    submissionPort,
+    historyRepo,
+    clock,
+    ids,
+  });
+
+  return {
+    previewPosture: previewResult.plan.postExitPosture,
+    swapInstruction: previewResult.plan.swapInstruction,
+    approvalOutcome,
+  };
+}
