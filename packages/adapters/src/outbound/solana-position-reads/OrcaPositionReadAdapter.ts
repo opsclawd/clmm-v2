@@ -9,7 +9,7 @@
  * Uses fetchPositionsForOwner to list positions and fetchWhirlpool to get current tick.
  */
 import { fetchPositionsForOwner } from '@orca-so/whirlpools';
-import { fetchWhirlpool } from '@orca-so/whirlpools-client';
+import { fetchWhirlpool, fetchMaybePosition } from '@orca-so/whirlpools-client';
 import { createSolanaRpc, address } from '@solana/kit';
 import type { SupportedPositionReadPort } from '@clmm/application';
 import type { LiquidityPosition, WalletId, PositionId } from '@clmm/domain';
@@ -17,6 +17,7 @@ import {
   makePositionId,
   makePoolId,
   makeClockTimestamp,
+  makeWalletId,
   evaluateRangeState,
 } from '@clmm/domain';
 import type { MonitoringReadiness } from '@clmm/domain';
@@ -94,6 +95,40 @@ export class OrcaPositionReadAdapter implements SupportedPositionReadPort {
   }
 
   async getPosition(positionId: PositionId): Promise<LiquidityPosition | null> {
-    return null;
+    try {
+      const positionAccount = await fetchMaybePosition(this.rpc, address(positionId));
+      if (!positionAccount.exists) {
+        return null;
+      }
+
+      const posData = positionAccount.data;
+      const decimalsA = 9;
+      const decimalsB = 6;
+
+      const lowerPrice = tickIndexToPrice(posData.tickLowerIndex, decimalsA, decimalsB);
+      const upperPrice = tickIndexToPrice(posData.tickUpperIndex, decimalsA, decimalsB);
+      const currentTick = await this.fetchPoolTick(posData.whirlpool);
+      const currentPrice = tickIndexToPrice(currentTick, decimalsA, decimalsB);
+
+      const bounds = {
+        lowerBound: lowerPrice,
+        upperBound: upperPrice,
+      };
+
+      const rangeState = evaluateRangeState(bounds, currentPrice);
+      const monitoringReadiness: MonitoringReadiness = { kind: 'active' };
+
+      return {
+        positionId,
+        walletId: makeWalletId(positionId),
+        poolId: makePoolId(posData.whirlpool),
+        bounds,
+        lastObservedAt: makeClockTimestamp(Date.now()),
+        rangeState,
+        monitoringReadiness,
+      };
+    } catch {
+      return null;
+    }
   }
 }

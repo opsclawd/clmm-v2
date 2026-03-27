@@ -14,6 +14,7 @@ vi.mock('@orca-so/whirlpools', () => ({
 
 vi.mock('@orca-so/whirlpools-client', () => ({
   fetchWhirlpool: vi.fn(),
+  fetchMaybePosition: vi.fn(),
 }));
 
 // Valid base58 Solana addresses for testing
@@ -169,9 +170,11 @@ describe('OrcaPositionReadAdapter', () => {
 
   describe('getPosition', () => {
     it('returns null when position not found', async () => {
-      const { fetchPositionsForOwner } = await import('@orca-so/whirlpools');
+      const client = await import('@orca-so/whirlpools-client');
 
-      vi.mocked(fetchPositionsForOwner).mockResolvedValue([]);
+      vi.mocked(client.fetchMaybePosition).mockResolvedValue({
+        exists: false,
+      } as any);
 
       const adapter = new OrcaPositionReadAdapter(mockRpcUrl);
       const result = await adapter.getPosition(makePositionId('NonExistent12345678901234567890'));
