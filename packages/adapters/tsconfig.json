@@ -6,12 +6,14 @@
     "paths": {
       "@clmm/application": ["../application/src/index.ts"],
       "@clmm/application/public": ["../application/src/public/index.ts"],
-      "@clmm/domain": ["../domain/src/index.ts"]
+      "@clmm/domain": ["../domain/src/index.ts"],
+      "@clmm/testing": ["../testing/src/index.ts"]
     }
   },
   "include": ["src/**/*"],
   "references": [
     { "path": "../application" },
-    { "path": "../domain" }
+    { "path": "../domain" },
+    { "path": "../testing" }
   ]
 }
