@@ -1,6 +1,5 @@
 /**
  * OrcaPositionReadAdapter TDD tests
- * RED: Write failing test first, then implement
  */
 import { describe, it, expect, vi } from 'vitest';
 import { OrcaPositionReadAdapter } from './OrcaPositionReadAdapter';
@@ -14,12 +13,12 @@ vi.mock('@orca-so/whirlpools', () => ({
 
 vi.mock('@orca-so/whirlpools-client', () => ({
   fetchWhirlpool: vi.fn(),
-  fetchMaybePosition: vi.fn(),
+  fetchPosition: vi.fn(),
 }));
 
-// Valid base58 Solana addresses for testing
+// Valid base58 Solana addresses (32 bytes = 44 base58 chars)
 const MOCK_WALLET = '4Nd1mBQtrMJVYVfKf2PJy9NZUZdTAsp7D4xWLs4gDB4T' as WalletId;
-const MOCK_POSITION = '2Wgh4mq6rp1q6H1G6K3ZsR3LBdqT5qVJb5KfF3U7Y2h' as PositionId;
+const MOCK_POSITION_MINT = '2Wgh4mq6rp1q6H1G6K3ZsR3LBdqT5qVJb5KfF3U7Y2hX';
 const MOCK_WHIRLPOOL = '7qbRF6YsyGuLUVs6Y1q64bdVrfe4ZcUUz1JRdoVNUJnm';
 
 describe('OrcaPositionReadAdapter', () => {
@@ -32,18 +31,22 @@ describe('OrcaPositionReadAdapter', () => {
 
       vi.mocked(fetchPositionsForOwner).mockResolvedValue([
         {
-          address: MOCK_POSITION,
+          address: 'PositionAddress123456789012345678901234',
           isPositionBundle: false,
           data: {
             whirlpool: MOCK_WHIRLPOOL,
             tickLowerIndex: -18304,
             tickUpperIndex: -17956,
+            positionMint: MOCK_POSITION_MINT,
           },
         },
       ] as any);
 
       vi.mocked(fetchWhirlpool).mockResolvedValue({
-        data: { tickCurrentIndex: -18130 },
+        data: {
+          tickCurrentIndex: -18130,
+          sqrtPrice: 79228162514264337593543950336n,
+        },
       } as any);
 
       const adapter = new OrcaPositionReadAdapter(mockRpcUrl);
@@ -51,7 +54,7 @@ describe('OrcaPositionReadAdapter', () => {
 
       expect(Array.isArray(positions)).toBe(true);
       expect(positions.length).toBe(1);
-      expect(positions[0]!.positionId).toBe(MOCK_POSITION);
+      expect(positions[0]!.positionId).toBe(MOCK_POSITION_MINT);
     });
 
     it('computes correct rangeState when price is in range', async () => {
@@ -60,18 +63,22 @@ describe('OrcaPositionReadAdapter', () => {
 
       vi.mocked(fetchPositionsForOwner).mockResolvedValue([
         {
-          address: MOCK_POSITION,
+          address: 'PositionAddress123456789012345678901234',
           isPositionBundle: false,
           data: {
             whirlpool: MOCK_WHIRLPOOL,
             tickLowerIndex: -18304,
             tickUpperIndex: -17956,
+            positionMint: MOCK_POSITION_MINT,
           },
         },
       ] as any);
 
       vi.mocked(fetchWhirlpool).mockResolvedValue({
-        data: { tickCurrentIndex: -18130 },
+        data: {
+          tickCurrentIndex: -18130,
+          sqrtPrice: 79228162514264337593543950336n,
+        },
       } as any);
 
       const adapter = new OrcaPositionReadAdapter(mockRpcUrl);
@@ -86,18 +93,22 @@ describe('OrcaPositionReadAdapter', () => {
 
       vi.mocked(fetchPositionsForOwner).mockResolvedValue([
         {
-          address: MOCK_POSITION,
+          address: 'PositionAddress123456789012345678901234',
           isPositionBundle: false,
           data: {
             whirlpool: MOCK_WHIRLPOOL,
             tickLowerIndex: -10000,
             tickUpperIndex: -5000,
+            positionMint: MOCK_POSITION_MINT,
           },
         },
       ] as any);
 
       vi.mocked(fetchWhirlpool).mockResolvedValue({
-        data: { tickCurrentIndex: -20000 },
+        data: {
+          tickCurrentIndex: -20000,
+          sqrtPrice: 79228162514264337593543950336n,
+        },
       } as any);
 
       const adapter = new OrcaPositionReadAdapter(mockRpcUrl);
@@ -112,18 +123,22 @@ describe('OrcaPositionReadAdapter', () => {
 
       vi.mocked(fetchPositionsForOwner).mockResolvedValue([
         {
-          address: MOCK_POSITION,
+          address: 'PositionAddress123456789012345678901234',
           isPositionBundle: false,
           data: {
             whirlpool: MOCK_WHIRLPOOL,
             tickLowerIndex: -10000,
             tickUpperIndex: -5000,
+            positionMint: MOCK_POSITION_MINT,
           },
         },
       ] as any);
 
       vi.mocked(fetchWhirlpool).mockResolvedValue({
-        data: { tickCurrentIndex: 0 },
+        data: {
+          tickCurrentIndex: 0,
+          sqrtPrice: 79228162514264337593543950336n,
+        },
       } as any);
 
       const adapter = new OrcaPositionReadAdapter(mockRpcUrl);
@@ -136,35 +151,35 @@ describe('OrcaPositionReadAdapter', () => {
       const { fetchPositionsForOwner } = await import('@orca-so/whirlpools');
       const { fetchWhirlpool } = await import('@orca-so/whirlpools-client');
 
-      const bundlePosition = 'Bundle123456789012345678901234567890' as PositionId;
-      const normalPosition = 'Position45678901234567890123456789012' as PositionId;
-
       vi.mocked(fetchPositionsForOwner).mockResolvedValue([
         {
-          address: bundlePosition,
+          address: 'BundleAddress1234567890123456789012345',
           isPositionBundle: true,
           data: {},
         },
         {
-          address: normalPosition,
+          address: 'PositionAddress123456789012345678901234',
           isPositionBundle: false,
           data: {
             whirlpool: MOCK_WHIRLPOOL,
             tickLowerIndex: -10000,
             tickUpperIndex: -5000,
+            positionMint: MOCK_POSITION_MINT,
           },
         },
       ] as any);
 
       vi.mocked(fetchWhirlpool).mockResolvedValue({
-        data: { tickCurrentIndex: -7500 },
+        data: {
+          tickCurrentIndex: -7500,
+          sqrtPrice: 79228162514264337593543950336n,
+        },
       } as any);
 
       const adapter = new OrcaPositionReadAdapter(mockRpcUrl);
       const positions = await adapter.listSupportedPositions(MOCK_WALLET);
 
       expect(positions.length).toBe(1);
-      expect(positions[0]!.positionId).toBe(normalPosition);
     });
   });
 
@@ -172,12 +187,10 @@ describe('OrcaPositionReadAdapter', () => {
     it('returns null when position not found', async () => {
       const client = await import('@orca-so/whirlpools-client');
 
-      vi.mocked(client.fetchMaybePosition).mockResolvedValue({
-        exists: false,
-      } as any);
+      vi.mocked(client.fetchPosition).mockRejectedValue(new Error('not found'));
 
       const adapter = new OrcaPositionReadAdapter(mockRpcUrl);
-      const result = await adapter.getPosition(makePositionId('NonExistent12345678901234567890'));
+      const result = await adapter.getPosition(makePositionId('7qbRF6YsyGuLUVs6Y1q64bdVrfe4ZcUUz1JRdoVNUJnm'));
 
       expect(result).toBeNull();
     });

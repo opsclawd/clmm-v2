@@ -5,130 +5,122 @@
  * This adapter NEVER decides breach direction or target posture.
  * All direction decisions happen in packages/domain via DirectionalExitPolicyService.
  *
- * Docs: @orca-so/whirlpools SDK v7, @orca-so/whirlpools-client, @solana/kit v6
- * Uses fetchPositionsForOwner to list positions and fetchWhirlpool to get current tick.
+ * Docs: @orca-so/whirlpools SDK v7, @orca-so/whirlpools-client, @orca-so/whirlpools-core, @solana/kit v6
  */
-import { fetchPositionsForOwner } from '@orca-so/whirlpools';
-import { fetchWhirlpool, fetchMaybePosition } from '@orca-so/whirlpools-client';
 import { createSolanaRpc, address } from '@solana/kit';
+import type { Address } from '@solana/kit';
+import { fetchPositionsForOwner } from '@orca-so/whirlpools';
+import { fetchWhirlpool, fetchPosition } from '@orca-so/whirlpools-client';
+
 import type { SupportedPositionReadPort } from '@clmm/application';
-import type { LiquidityPosition, WalletId, PositionId } from '@clmm/domain';
+import type { LiquidityPosition, WalletId, PositionId, PoolId } from '@clmm/domain';
 import {
   makePositionId,
   makePoolId,
-  makeClockTimestamp,
   makeWalletId,
+  makeClockTimestamp,
   evaluateRangeState,
 } from '@clmm/domain';
 import type { MonitoringReadiness } from '@clmm/domain';
 
-function tickIndexToPrice(tickIndex: number, decimalsA: number, decimalsB: number): number {
-  return Math.pow(1.0001, tickIndex) * Math.pow(10, decimalsA - decimalsB);
-}
-
 export class OrcaPositionReadAdapter implements SupportedPositionReadPort {
-  private readonly rpc: ReturnType<typeof createSolanaRpc>;
+  constructor(private readonly rpcUrl: string) {}
 
-  constructor(private readonly rpcUrl: string) {
-    this.rpc = createSolanaRpc(this.rpcUrl);
+  private getRpc() {
+    return createSolanaRpc(this.rpcUrl);
   }
 
-  private async fetchPoolTick(whirlpoolAddress: string): Promise<number> {
-    try {
-      const whirlpool = await fetchWhirlpool(this.rpc, address(whirlpoolAddress));
-      return whirlpool.data.tickCurrentIndex;
-    } catch {
-      return 0;
-    }
-  }
-
-  private async mapPosition(
-    positionAddress: string,
-    posData: {
-      whirlpool: string;
-      tickLowerIndex: number;
-      tickUpperIndex: number;
-    },
-    walletId: WalletId,
-  ): Promise<LiquidityPosition> {
-    const decimalsA = 9;
-    const decimalsB = 6;
-
-    const lowerPrice = tickIndexToPrice(posData.tickLowerIndex, decimalsA, decimalsB);
-    const upperPrice = tickIndexToPrice(posData.tickUpperIndex, decimalsA, decimalsB);
-    const currentTick = await this.fetchPoolTick(posData.whirlpool);
-    const currentPrice = tickIndexToPrice(currentTick, decimalsA, decimalsB);
-
-    const bounds = {
-      lowerBound: lowerPrice,
-      upperBound: upperPrice,
-    };
-
-    const rangeState = evaluateRangeState(bounds, currentPrice);
-    const monitoringReadiness: MonitoringReadiness = { kind: 'active' };
-
-    return {
-      positionId: makePositionId(positionAddress),
-      walletId,
-      poolId: makePoolId(posData.whirlpool),
-      bounds,
-      lastObservedAt: makeClockTimestamp(Date.now()),
-      rangeState,
-      monitoringReadiness,
-    };
+  private walletIdToAddress(walletId: WalletId): Address {
+    return address(walletId);
   }
 
   async listSupportedPositions(walletId: WalletId): Promise<LiquidityPosition[]> {
-    const ownerAddress = address(walletId);
-    const positions = await fetchPositionsForOwner(this.rpc, ownerAddress);
+    const rpc = this.getRpc();
+    const ownerAddress = this.walletIdToAddress(walletId);
 
-    const result: LiquidityPosition[] = [];
+    const positions = await fetchPositionsForOwner(rpc, ownerAddress);
 
-    for (const position of positions) {
-      if (position.isPositionBundle) continue;
+    const liquidityPositions: LiquidityPosition[] = [];
 
-      const mapped = await this.mapPosition(position.address, position.data, walletId);
-      result.push(mapped);
-    }
-
-    return result;
-  }
-
-  async getPosition(positionId: PositionId): Promise<LiquidityPosition | null> {
-    try {
-      const positionAccount = await fetchMaybePosition(this.rpc, address(positionId));
-      if (!positionAccount.exists) {
-        return null;
+    for (const positionData of positions) {
+      if (positionData.isPositionBundle) {
+        continue;
       }
 
-      const posData = positionAccount.data;
-      const decimalsA = 9;
-      const decimalsB = 6;
+      const position = positionData.data;
+      const whirlpoolAddress = positionData.data.whirlpool;
 
-      const lowerPrice = tickIndexToPrice(posData.tickLowerIndex, decimalsA, decimalsB);
-      const upperPrice = tickIndexToPrice(posData.tickUpperIndex, decimalsA, decimalsB);
-      const currentTick = await this.fetchPoolTick(posData.whirlpool);
-      const currentPrice = tickIndexToPrice(currentTick, decimalsA, decimalsB);
+      let whirlpoolData;
+      try {
+        whirlpoolData = await fetchWhirlpool(rpc, whirlpoolAddress);
+      } catch {
+        continue;
+      }
+
+      const poolId = makePoolId(whirlpoolAddress.toString()) as PoolId;
+      const positionId = makePositionId(position.positionMint.toString());
 
       const bounds = {
-        lowerBound: lowerPrice,
-        upperBound: upperPrice,
+        lowerBound: position.tickLowerIndex,
+        upperBound: position.tickUpperIndex,
       };
 
-      const rangeState = evaluateRangeState(bounds, currentPrice);
-      const monitoringReadiness: MonitoringReadiness = { kind: 'active' };
+      const currentTick = whirlpoolData.data.tickCurrentIndex;
+      const rangeState = evaluateRangeState(bounds, currentTick);
 
-      return {
+      liquidityPositions.push({
         positionId,
-        walletId: makeWalletId(positionId),
-        poolId: makePoolId(posData.whirlpool),
+        walletId,
+        poolId,
         bounds,
         lastObservedAt: makeClockTimestamp(Date.now()),
         rangeState,
-        monitoringReadiness,
-      };
+        monitoringReadiness: { kind: 'active' },
+      });
+    }
+
+    return liquidityPositions;
+  }
+
+  async getPosition(positionId: PositionId): Promise<LiquidityPosition | null> {
+    const rpc = this.getRpc();
+    const positionAddress = address(positionId);
+
+    let positionAccount;
+    try {
+      positionAccount = await fetchPosition(rpc, positionAddress);
     } catch {
       return null;
     }
+
+    const position = positionAccount.data;
+    const whirlpoolAddress = position.whirlpool;
+
+    let whirlpoolData;
+    try {
+      whirlpoolData = await fetchWhirlpool(rpc, whirlpoolAddress);
+    } catch {
+      return null;
+    }
+
+    const poolId = makePoolId(whirlpoolAddress.toString()) as PoolId;
+
+    const bounds = {
+      lowerBound: position.tickLowerIndex,
+      upperBound: position.tickUpperIndex,
+    };
+
+    const currentTick = whirlpoolData.data.tickCurrentIndex;
+    const rangeState = evaluateRangeState(bounds, currentTick);
+
+    return {
+      positionId,
+      walletId: makeWalletId(position.positionMint.toString()),
+      poolId,
+      bounds,
+      lastObservedAt: makeClockTimestamp(Date.now()),
+      rangeState,
+      monitoringReadiness: { kind: 'active' },
+    };
   }
 }
