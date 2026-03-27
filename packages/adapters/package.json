@@ -17,7 +17,13 @@
     "@nestjs/core": "^10.0.0",
     "@nestjs/platform-fastify": "^10.0.0",
     "@orca-so/whirlpools": "^7.0.2",
+    "@solana-mobile/mobile-wallet-adapter-protocol": "^2.2.6",
+    "@solana-mobile/mobile-wallet-adapter-protocol-web3js": "^2.2.6",
     "@solana/kit": "^6.5.0",
+    "@solana/wallet-adapter-base": "^0.9.27",
+    "@solana/wallet-adapter-react": "^0.15.39",
+    "@solana/wallet-adapter-wallets": "^0.19.37",
+    "@solana/web3.js": "^1.98.4",
     "reflect-metadata": "^0.2.0"
   },
   "devDependencies": {
