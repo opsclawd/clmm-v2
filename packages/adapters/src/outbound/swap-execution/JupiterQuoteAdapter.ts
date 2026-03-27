@@ -34,6 +34,39 @@ export class JupiterQuoteAdapter implements SwapQuotePort {
       );
     }
 
-    throw new Error('JupiterQuoteAdapter.getQuote: invoke solana-adapter-docs skill first for current v6 API params');
+    const amount = instruction.amountBasis?.raw.toString() ?? '1000000';
+    const slippageBps = '50';
+
+    const params = new URLSearchParams({
+      inputMint,
+      outputMint,
+      amount,
+      slippageBps,
+    });
+
+    const url = `${JUPITER_API_BASE}/quote?${params}`;
+    const res = await fetch(url);
+
+    if (!res.ok) {
+      throw new Error(`JupiterQuoteAdapter: Jupiter API error ${res.status}`);
+    }
+
+    const data = await res.json();
+
+    const decimals = instruction.toAsset === 'SOL' ? 9 : instruction.toAsset === 'USDC' ? 6 : 9;
+    const estimatedOutputAmount = makeTokenAmount(
+      BigInt(data.outAmount),
+      decimals,
+      instruction.toAsset,
+    );
+
+    const routeLabel = data.routePlan?.[0]?.swapInfo?.label ?? 'unknown';
+
+    return {
+      estimatedOutputAmount,
+      priceImpactPercent: parseFloat(data.priceImpactPct ?? '0'),
+      routeLabel,
+      quotedAt: makeClockTimestamp(Date.now()),
+    };
   }
 }
