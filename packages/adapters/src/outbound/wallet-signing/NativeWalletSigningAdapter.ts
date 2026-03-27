@@ -40,7 +40,7 @@ export class NativeWalletSigningAdapter implements WalletSigningPort {
         async (wallet: KitMobileWallet) => {
           const authResult = await wallet.authorize({
             identity: APP_IDENTITY,
-            cluster: this.cluster as any,
+            chain: this.cluster as any,
           });
 
           const account = authResult.accounts[0];
