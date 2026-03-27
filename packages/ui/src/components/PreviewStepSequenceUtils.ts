@@ -1,5 +1,5 @@
 import type { BreachDirection } from '@clmm/domain';
-import { renderDirectionalPolicyText } from './DirectionalPolicyCard.js';
+import { renderDirectionalPolicyText } from './DirectionalPolicyCardUtils.js';
 
 export type StepLabel = {
   step: number;

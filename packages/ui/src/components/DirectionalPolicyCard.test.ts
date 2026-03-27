@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { renderDirectionalPolicyText } from './DirectionalPolicyCard.js';
+import { renderDirectionalPolicyText } from './DirectionalPolicyCardUtils.js';
 import { LOWER_BOUND_BREACH, UPPER_BOUND_BREACH } from '@clmm/domain';
 
 describe('DirectionalPolicyCard', () => {

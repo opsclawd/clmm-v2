@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { buildPreviewStepLabels } from './PreviewStepSequence.js';
+import { buildPreviewStepLabels } from './PreviewStepSequenceUtils.js';
 import { LOWER_BOUND_BREACH, UPPER_BOUND_BREACH } from '@clmm/domain';
 
 describe('PreviewStepSequence', () => {
