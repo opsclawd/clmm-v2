@@ -6,20 +6,42 @@
  *
  * Uses @solana/kit for RPC and transaction building, and Orca/Jupiter for instructions.
  * The plan steps translate to:
- * - remove-liquidity: Orca close-position instruction
- * - collect-fees: Orca collect-fees instruction
- * - swap-assets: Jupiter swap instruction
+ * - remove-liquidity: Orca close-position instruction (kit-native via SDK)
+ * - collect-fees: Orca collect-fees instruction (kit-native via SDK)
+ * - swap-assets: Jupiter swap instruction (via /swap/v1/swap returning base64)
+ *
+ * This adapter is fully @solana/kit-native except for:
+ * - Orca SDK returns kit-native Instruction[] (no format conversion needed)
+ * - Jupiter returns base64 transaction (decoded with getTransactionDecoder)
  */
-import { createSolanaRpc, address, pipe } from '@solana/kit';
+import {
+  createSolanaRpc,
+  address,
+  pipe,
+  getTransactionDecoder,
+  getBase64Encoder,
+  getBase64Decoder,
+  getCompiledTransactionMessageDecoder,
+  decompileTransactionMessageFetchingLookupTables,
+  getBase64EncodedWireTransaction,
+  compileTransaction,
+  createTransactionMessage,
+  setTransactionMessageFeePayer,
+  setTransactionMessageLifetimeUsingBlockhash,
+  prependTransactionMessageInstructions,
+} from '@solana/kit';
 import type { Address } from '@solana/kit';
 import { fetchPosition, fetchWhirlpool } from '@orca-so/whirlpools-client';
-import { Transaction, PublicKey } from '@solana/web3.js';
+import { closePositionInstructions } from '@orca-so/whirlpools';
+import type { Instruction } from '@solana/kit';
 import type { ExecutionPreparationPort } from '@clmm/application';
 import type { ExecutionPlan, WalletId, PositionId, ClockTimestamp, LiquidityPosition } from '@clmm/domain';
 import { makeClockTimestamp } from '@clmm/domain';
 
 const JUPITER_API_BASE = 'https://api.jup.ag/swap/v1';
-const ORCA_API_BASE = 'https://api.mainnet.orca.so/v1';
+
+const SOL_MINT = 'So11111111111111111111111111111111111111112';
+const USDC_MINT = 'EPjFWdd5AufqSSqeM2ZbiBci8f9aa211KkZg4fDqM9N';
 
 export class SolanaExecutionPreparationAdapter implements ExecutionPreparationPort {
   constructor(private readonly rpcUrl: string) {}
@@ -47,18 +69,27 @@ export class SolanaExecutionPreparationAdapter implements ExecutionPreparationPo
       throw new Error(`Position not found: ${positionId}`);
     }
 
-    const instructions = await this.planToInstructions(plan, positionData, walletId);
+    const orcaInstructions = await this.buildOrcaInstructions(rpc, positionData, walletId);
+    const swapInstruction = await this.buildSwapInstruction(plan, walletId);
 
-    const transaction = new Transaction();
-    transaction.recentBlockhash = latestBlockhash.blockhash;
-    transaction.feePayer = new PublicKey(walletId);
-    for (const ix of instructions) {
-      transaction.add(ix);
+    const allInstructions: Instruction[] = [...orcaInstructions];
+    if (swapInstruction) {
+      allInstructions.push(swapInstruction);
     }
 
-    const serialized = transaction.serialize();
+    const message = pipe(
+      createTransactionMessage({ version: 0 }),
+      (m) => setTransactionMessageFeePayer(payer, m),
+      (m) => setTransactionMessageLifetimeUsingBlockhash(latestBlockhash, m),
+      (m) => prependTransactionMessageInstructions(allInstructions, m),
+    );
+
+    const transaction = compileTransaction(message);
+    const base64 = getBase64EncodedWireTransaction(transaction);
+    const serializedBytes = Uint8Array.from(Buffer.from(base64, 'base64'));
+
     return {
-      serializedPayload: Uint8Array.from(serialized),
+      serializedPayload: serializedBytes,
       preparedAt: makeClockTimestamp(Date.now()),
     };
   }
@@ -108,139 +139,65 @@ export class SolanaExecutionPreparationAdapter implements ExecutionPreparationPo
     return { kind: 'in-range', currentPrice: currentTick };
   }
 
-  private async planToInstructions(
-    plan: ExecutionPlan,
+  private async buildOrcaInstructions(
+    rpc: ReturnType<typeof createSolanaRpc>,
     positionData: LiquidityPosition,
     walletId: WalletId
-  ): Promise<Transaction['instructions']> {
-    const instructions: Transaction['instructions'] = [];
-
-    for (const step of plan.steps) {
-      if (step.kind === 'remove-liquidity') {
-        const ix = await this.buildRemoveLiquidityInstruction(positionData, walletId);
-        if (ix) instructions.push(ix);
-      } else if (step.kind === 'collect-fees') {
-        const ix = await this.buildCollectFeesInstruction(positionData, walletId);
-        if (ix) instructions.push(ix);
-      } else if (step.kind === 'swap-assets') {
-        const ix = await this.buildSwapInstruction(step.instruction, walletId);
-        if (ix) instructions.push(ix);
-      }
-    }
-
-    return instructions;
-  }
-
-  private async buildRemoveLiquidityInstruction(
-    positionData: LiquidityPosition,
-    walletId: WalletId
-  ): Promise<Transaction['instructions'][number] | null> {
+  ): Promise<Instruction[]> {
     try {
-      const positionMint = positionData.positionId;
-      const response = await fetch(`${ORCA_API_BASE}/position/close-instructions`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          positionMint,
-          wallet: walletId,
-          slippageTolerance: 100,
-        }),
-      });
+      const positionMintAddress = address(positionData.positionId);
 
-      if (!response.ok) {
-        console.error(`Orca close-position API error: ${response.statusText}`);
-        return null;
-      }
+      const orcaResult = await closePositionInstructions(rpc, positionMintAddress, 100);
 
-      const data = await response.json();
-      return this.parseInstruction(data.instruction);
+      return orcaResult.instructions;
     } catch (error) {
-      console.error('Failed to build remove liquidity instruction:', error);
-      return null;
-    }
-  }
-
-  private async buildCollectFeesInstruction(
-    positionData: LiquidityPosition,
-    walletId: WalletId
-  ): Promise<Transaction['instructions'][number] | null> {
-    try {
-      const rpc = this.getRpc();
-      const positionAddress = address(positionData.positionId);
-      const positionAccount = await fetchPosition(rpc, positionAddress);
-      const position = positionAccount.data;
-      const whirlpoolAddress = position.whirlpool;
-      const whirlpoolAccount = await fetchWhirlpool(rpc, whirlpoolAddress);
-      const whirlpool = whirlpoolAccount.data;
-
-      const response = await fetch(`${ORCA_API_BASE}/position/collect-fees`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          whirlpool: whirlpoolAddress.toString(),
-          position: positionAddress.toString(),
-          positionAuthority: walletId,
-          tokenVaultA: whirlpool.tokenVaultA.toString(),
-          tokenVaultB: whirlpool.tokenVaultB.toString(),
-        }),
-      });
-
-      if (!response.ok) {
-        console.error(`Orca collect-fees API error: ${response.statusText}`);
-        return null;
-      }
-
-      const data = await response.json();
-      return this.parseInstruction(data.instruction);
-    } catch (error) {
-      console.error('Failed to build collect fees instruction:', error);
-      return null;
+      console.error('Failed to build Orca instructions:', error);
+      return [];
     }
   }
 
   private async buildSwapInstruction(
-    instruction: { fromAsset: string; toAsset: string; policyReason: string },
+    plan: ExecutionPlan,
     walletId: WalletId
-  ): Promise<Transaction['instructions'][number] | null> {
+  ): Promise<Instruction | null> {
+    const swapStep = plan.steps.find((s) => s.kind === 'swap-assets');
+    if (!swapStep || swapStep.kind !== 'swap-assets') {
+      return null;
+    }
+
     try {
-      const inputMint = instruction.fromAsset === 'SOL'
-        ? 'So11111111111111111111111111111111111111112'
-        : instruction.fromAsset;
-      const outputMint = instruction.toAsset === 'SOL'
-        ? 'So11111111111111111111111111111111111111112'
-        : instruction.toAsset;
+      const inputMint = swapStep.instruction.fromAsset === 'SOL' ? SOL_MINT : swapStep.instruction.fromAsset;
+      const outputMint = swapStep.instruction.toAsset === 'SOL' ? SOL_MINT : swapStep.instruction.toAsset;
 
       const quoteResponse = await this.getJupiterQuote(inputMint, outputMint, '1000000');
       if (!quoteResponse) {
         return null;
       }
 
-      const swapInstructions = await this.getJupiterSwapInstructions(quoteResponse, walletId);
-      if (!swapInstructions || !swapInstructions.swapInstruction) {
+      const swapTransaction = await this.getJupiterSwapTransaction(quoteResponse, walletId);
+      if (!swapTransaction) {
         return null;
       }
 
-      return this.parseInstruction(swapInstructions.swapInstruction);
+      const encoder = getBase64Encoder();
+      const transactionBytes = encoder.encode(swapTransaction);
+      const decoder = getTransactionDecoder();
+      const transaction = decoder.decode(transactionBytes);
+
+      const messageDecoder = getCompiledTransactionMessageDecoder();
+      const compiledMessage = messageDecoder.decode(transaction.messageBytes);
+      const transactionMessage = await decompileTransactionMessageFetchingLookupTables(
+        compiledMessage,
+        this.getRpc(),
+      );
+
+      if (transactionMessage.instructions.length > 0) {
+        return transactionMessage.instructions[0];
+      }
+
+      return null;
     } catch (error) {
       console.error('Failed to build swap instruction:', error);
-      return null;
-    }
-  }
-
-  private parseInstruction(instructionData: any): Transaction['instructions'][number] | null {
-    try {
-      const { programId, keys, data: instructionDataBase64 } = instructionData;
-      return {
-        programId: new (require('@solana/web3.js').PublicKey)(programId),
-        keys: keys.map((key: any) => ({
-          pubkey: new (require('@solana/web3.js').PublicKey)(key.pubkey),
-          isSigner: key.isSigner,
-          isWritable: key.isWritable,
-        })),
-        data: Buffer.from(instructionDataBase64, 'base64'),
-      };
-    } catch (error) {
-      console.error('Failed to parse instruction:', error);
       return null;
     }
   }
@@ -258,9 +215,9 @@ export class SolanaExecutionPreparationAdapter implements ExecutionPreparationPo
     }
   }
 
-  private async getJupiterSwapInstructions(quoteResponse: any, userPublicKey: string): Promise<any | null> {
+  private async getJupiterSwapTransaction(quoteResponse: any, userPublicKey: string): Promise<string | null> {
     try {
-      const response = await fetch(`${JUPITER_API_BASE}/swap-instructions`, {
+      const response = await fetch(`${JUPITER_API_BASE}/swap`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -271,19 +228,14 @@ export class SolanaExecutionPreparationAdapter implements ExecutionPreparationPo
       });
 
       if (!response.ok) {
-        console.error(`Jupiter swap-instructions API error: ${response.statusText}`);
+        console.error(`Jupiter swap API error: ${response.statusText}`);
         return null;
       }
 
       const data = await response.json();
-      if (data.error) {
-        console.error(`Jupiter swap error: ${data.error}`);
-        return null;
-      }
-
-      return data;
+      return data.swapTransaction || null;
     } catch (error) {
-      console.error('Failed to get Jupiter swap instructions:', error);
+      console.error('Failed to get Jupiter swap transaction:', error);
       return null;
     }
   }
