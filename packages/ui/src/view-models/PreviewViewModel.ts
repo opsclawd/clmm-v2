@@ -1,5 +1,5 @@
 import type { ExecutionPreviewDto } from '@clmm/application/public';
-import { renderDirectionalPolicyText } from '../components/DirectionalPolicyCard.js';
+import { renderDirectionalPolicyText } from '../components/DirectionalPolicyCardUtils.js';
 
 export type PreviewViewModel = {
   previewId: string;
