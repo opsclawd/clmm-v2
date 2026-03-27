@@ -4,13 +4,20 @@
  * Submits signed transactions to the Solana network and reconciles
  * the execution state based on on-chain confirmations.
  *
- * Uses @solana/kit for transaction submission as required by AGENTS.md.
+ * Uses @solana/kit for RPC submission. Note: Transaction inspection
+ * requires web3.js Transaction due to MWA wallet compatibility.
  */
 import { createSolanaRpc } from '@solana/kit';
-import { Transaction, PublicKey } from '@solana/web3.js';
+import type { Base64EncodedWireTransaction } from '@solana/kit';
+import { Transaction } from '@solana/web3.js';
 import type { ExecutionSubmissionPort } from '@clmm/application';
 import type { TransactionReference, ExecutionLifecycleState, ClockTimestamp } from '@clmm/domain';
 import { makeClockTimestamp } from '@clmm/domain';
+
+function uint8ArrayToBase64(bytes: Uint8Array): string {
+  const binary = String.fromCharCode(...bytes);
+  return btoa(binary);
+}
 
 export class SolanaExecutionSubmissionAdapter implements ExecutionSubmissionPort {
   constructor(private readonly rpcUrl: string) {}
@@ -26,12 +33,11 @@ export class SolanaExecutionSubmissionAdapter implements ExecutionSubmissionPort
     const rpc = this.getRpc();
 
     const transaction = Transaction.from(signedPayload);
-    const serialized = transaction.serialize();
-    const base64 = serialized.toString('base64');
-
-    const signature = await rpc.sendTransaction(base64 as any).send();
-
     const stepKind = this.determineStepKindFromTransaction(transaction);
+
+    const base64 = uint8ArrayToBase64(signedPayload) as Base64EncodedWireTransaction;
+
+    const signature = await rpc.sendTransaction(base64, { encoding: 'base64', skipPreflight: true }).send();
 
     const reference: TransactionReference = {
       signature: signature.toString(),

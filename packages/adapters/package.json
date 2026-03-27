@@ -18,6 +18,7 @@
     "@nestjs/platform-fastify": "^10.0.0",
     "@orca-so/whirlpools": "^7.0.2",
     "@solana-mobile/mobile-wallet-adapter-protocol": "^2.2.6",
+    "@solana-mobile/mobile-wallet-adapter-protocol-kit": "^0.2.3",
     "@solana-mobile/mobile-wallet-adapter-protocol-web3js": "^2.2.6",
     "@solana/kit": "^6.5.0",
     "@solana/wallet-adapter-base": "^0.9.27",

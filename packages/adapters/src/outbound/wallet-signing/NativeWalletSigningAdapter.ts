@@ -1,14 +1,20 @@
 /**
  * NativeWalletSigningAdapter
  *
- * Uses @solana-mobile/mobile-wallet-adapter-protocol (MWA) for React Native.
+ * Uses @solana-mobile/mobile-wallet-adapter-protocol with @solana/kit for React Native.
  * Signing remains EXPLICIT and USER-MEDIATED — backend NEVER stores signing authority.
  *
- * Docs: @solana-mobile/mobile-wallet-adapter-protocol-web3js v2
+ * Docs: @solana-mobile/mobile-wallet-adapter-protocol-kit
  *       https://docs.solanamobile.com/get-started/react-native/mobile-wallet-adapter
  */
-import { transact, Web3MobileWallet } from '@solana-mobile/mobile-wallet-adapter-protocol-web3js';
-import { Transaction } from '@solana/web3.js';
+import { transact } from '@solana-mobile/mobile-wallet-adapter-protocol-kit';
+import type { KitMobileWallet } from '@solana-mobile/mobile-wallet-adapter-protocol-kit';
+import {
+  getTransactionDecoder,
+  getBase64EncodedWireTransaction,
+  Transaction,
+  address,
+} from '@solana/kit';
 import type { WalletSigningPort } from '@clmm/application';
 import type { WalletId } from '@clmm/domain';
 
@@ -31,10 +37,10 @@ export class NativeWalletSigningAdapter implements WalletSigningPort {
   > {
     try {
       const signedTransactions = await transact(
-        async (wallet: Web3MobileWallet) => {
+        async (wallet: KitMobileWallet) => {
           const authResult = await wallet.authorize({
-            cluster: this.cluster as any,
             identity: APP_IDENTITY,
+            cluster: this.cluster as any,
           });
 
           const account = authResult.accounts[0];
@@ -44,7 +50,9 @@ export class NativeWalletSigningAdapter implements WalletSigningPort {
             );
           }
 
-          const transaction = Transaction.from(serializedPayload);
+          const transactionDecoder = getTransactionDecoder();
+          const transaction = transactionDecoder.decode(serializedPayload);
+
           const signed = await wallet.signTransactions({
             transactions: [transaction],
           });
@@ -57,9 +65,10 @@ export class NativeWalletSigningAdapter implements WalletSigningPort {
       }
 
       const signedTransaction = signedTransactions[0]!;
+      const serialized = getBase64EncodedWireTransaction(signedTransaction);
       return {
         kind: 'signed',
-        signedPayload: signedTransaction.serialize(),
+        signedPayload: new Uint8Array(Buffer.from(serialized, 'base64')),
       };
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : String(error);

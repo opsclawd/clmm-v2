@@ -4,19 +4,16 @@
  * Prepares an execution plan into a serialized transaction payload
  * ready for signing by the user's wallet.
  *
- * Uses @solana/kit for RPC and Orca/Jupiter for instructions.
+ * Uses @solana/kit for RPC and transaction building, and Orca/Jupiter for instructions.
  * The plan steps translate to:
  * - remove-liquidity: Orca close-position instruction
  * - collect-fees: Orca collect-fees instruction
  * - swap-assets: Jupiter swap instruction
- *
- * Note: Transaction building uses @solana/web3.js Transaction for wallet compatibility.
- * The signed payload format must match what wallets expect (MWA expects web3.js Transaction format).
  */
-import { createSolanaRpc, address } from '@solana/kit';
+import { createSolanaRpc, address, pipe } from '@solana/kit';
 import type { Address } from '@solana/kit';
-import { Transaction, PublicKey } from '@solana/web3.js';
 import { fetchPosition, fetchWhirlpool } from '@orca-so/whirlpools-client';
+import { Transaction, PublicKey } from '@solana/web3.js';
 import type { ExecutionPreparationPort } from '@clmm/application';
 import type { ExecutionPlan, WalletId, PositionId, ClockTimestamp, LiquidityPosition } from '@clmm/domain';
 import { makeClockTimestamp } from '@clmm/domain';
