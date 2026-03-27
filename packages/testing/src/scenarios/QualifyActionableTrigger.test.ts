@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach } from 'vitest';
-import { qualifyActionableTrigger } from './QualifyActionableTrigger.js';
+import { qualifyActionableTrigger } from '@clmm/application';
 import {
   FakeClockPort,
   FakeIdGeneratorPort,
@@ -7,7 +7,7 @@ import {
   FIXTURE_POSITION_ID,
 } from '@clmm/testing';
 import { LOWER_BOUND_BREACH, UPPER_BOUND_BREACH, makeClockTimestamp } from '@clmm/domain';
-import type { BreachObservationResult } from './ScanPositionsForBreaches.js';
+import type { BreachObservationResult } from '@clmm/application';
 
 function makeObs(
   direction = LOWER_BOUND_BREACH,

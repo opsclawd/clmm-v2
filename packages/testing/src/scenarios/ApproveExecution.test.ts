@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach } from 'vitest';
-import { approveExecution } from './ApproveExecution.js';
+import { approveExecution, createExecutionPreview } from '@clmm/application';
 import {
   FakeClockPort,
   FakeIdGeneratorPort,
@@ -12,7 +12,6 @@ import {
   FIXTURE_POSITION_ID,
   FIXTURE_WALLET_ID,
 } from '@clmm/testing';
-import { createExecutionPreview } from '../previews/CreateExecutionPreview.js';
 import { LOWER_BOUND_BREACH } from '@clmm/domain';
 
 describe('ApproveExecution', () => {
@@ -97,7 +96,6 @@ describe('ApproveExecution', () => {
       ids,
     });
     expect(historyRepo.events.length).toBeGreaterThan(0);
-    // Verify directional context preserved in history
     for (const event of historyRepo.events) {
       expect(event.breachDirection).toBeDefined();
     }

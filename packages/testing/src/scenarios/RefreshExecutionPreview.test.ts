@@ -1,6 +1,5 @@
 import { describe, it, expect, beforeEach } from 'vitest';
-import { refreshExecutionPreview } from './RefreshExecutionPreview.js';
-import { createExecutionPreview } from './CreateExecutionPreview.js';
+import { refreshExecutionPreview, createExecutionPreview } from '@clmm/application';
 import {
   FakeClockPort,
   FakeIdGeneratorPort,
@@ -34,7 +33,7 @@ describe('RefreshExecutionPreview', () => {
   });
 
   it('refreshed preview is fresh and replaces the old one', async () => {
-    clock.advance(45_000); // advance to stale territory
+    clock.advance(45_000);
     const result = await refreshExecutionPreview({
       previewId,
       positionId: FIXTURE_POSITION_ID,

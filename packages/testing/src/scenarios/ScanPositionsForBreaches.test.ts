@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach } from 'vitest';
-import { scanPositionsForBreaches } from './ScanPositionsForBreaches.js';
+import { scanPositionsForBreaches } from '@clmm/application';
 import {
   FakeSupportedPositionReadPort,
   FakeClockPort,

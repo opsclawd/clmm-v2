@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach } from 'vitest';
-import { reconcileExecutionAttempt } from './ReconcileExecutionAttempt.js';
+import { reconcileExecutionAttempt } from '@clmm/application';
 import {
   FakeClockPort,
   FakeIdGeneratorPort,
