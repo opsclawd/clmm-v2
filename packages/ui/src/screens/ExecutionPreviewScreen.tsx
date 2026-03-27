@@ -1,7 +1,5 @@
-import { View, Text, ScrollView, TouchableOpacity } from 'react-native';
+import { View, Text, ScrollView } from 'react-native';
 import { colors } from '../design-system/index.js';
-import { DirectionalPolicyCard } from '../components/DirectionalPolicyCard.js';
-import { PreviewStepSequence } from '../components/PreviewStepSequence.js';
 
 export function ExecutionPreviewScreen() {
   return (

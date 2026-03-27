@@ -1,4 +1,4 @@
-import { View, Text, FlatList, TouchableOpacity } from 'react-native';
+import { View, Text } from 'react-native';
 import { useRouter } from 'expo-router';
 import { colors } from '../design-system/index.js';
 
