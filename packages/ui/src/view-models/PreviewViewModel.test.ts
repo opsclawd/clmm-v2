@@ -1,12 +1,12 @@
 import { describe, it, expect } from 'vitest';
 import { buildPreviewViewModel } from './PreviewViewModel.js';
-import { LOWER_BOUND_BREACH, UPPER_BOUND_BREACH, makeClockTimestamp } from '@clmm/domain';
+import { LOWER_BOUND_BREACH, UPPER_BOUND_BREACH, makeClockTimestamp, makePositionId } from '@clmm/domain';
 import type { ExecutionPreviewDto } from '@clmm/application/public';
 
 function makePreviewDto(direction = LOWER_BOUND_BREACH): ExecutionPreviewDto {
   return {
     previewId: 'preview-1',
-    positionId: 'pos-1' as any,
+    positionId: makePositionId('pos-1'),
     breachDirection: direction,
     postExitPosture: direction.kind === 'lower-bound-breach'
       ? { kind: 'exit-to-usdc' }

@@ -15,7 +15,7 @@ export async function qualifyActionableTrigger(params: {
   clock: ClockPort;
   ids: IdGeneratorPort;
 }): Promise<QualifyResult> {
-  const { observation, consecutiveCount, triggerRepo, clock, ids } = params;
+  const { observation, consecutiveCount, triggerRepo, clock } = params;
 
   const existingId = await triggerRepo.getActiveEpisodeTrigger(
     observation.episodeId as BreachEpisodeId,

@@ -152,9 +152,6 @@ importers:
       '@clmm/config':
         specifier: workspace:*
         version: link:../config
-      '@clmm/testing':
-        specifier: workspace:*
-        version: link:../testing
       typescript:
         specifier: ^5.4.0
         version: 5.9.3
@@ -189,6 +186,9 @@ importers:
         specifier: workspace:*
         version: link:../domain
     devDependencies:
+      '@clmm/application':
+        specifier: workspace:*
+        version: link:../application
       '@clmm/config':
         specifier: workspace:*
         version: link:../config

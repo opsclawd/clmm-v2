@@ -7,7 +7,6 @@
  * Uses @solana/kit for RPC calls as required by AGENTS.md.
  */
 import { createSolanaRpc, address } from '@solana/kit';
-import type { Address } from '@solana/kit';
 import { fetchWhirlpool, fetchPosition } from '@orca-so/whirlpools-client';
 import type { RangeObservationPort } from '@clmm/application';
 import type { PositionId, ClockTimestamp } from '@clmm/domain';

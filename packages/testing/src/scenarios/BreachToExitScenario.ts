@@ -1,9 +1,6 @@
 import type { BreachDirection, PostExitAssetPosture, SwapInstruction } from '@clmm/domain';
 import {
-  makePositionId,
   makeWalletId,
-  makeClockTimestamp,
-  LOWER_BOUND_BREACH,
 } from '@clmm/domain';
 import { scanPositionsForBreaches } from '@clmm/application';
 import { qualifyActionableTrigger } from '@clmm/application';
@@ -34,7 +31,6 @@ export async function runBreachToExitScenario(params: {
   direction: BreachDirection;
 }): Promise<ScenarioResult> {
   const walletId = makeWalletId('scenario-wallet');
-  const positionId = makePositionId('scenario-pos');
   const clock = new FakeClockPort();
   const ids = new FakeIdGeneratorPort('scenario');
 

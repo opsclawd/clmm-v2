@@ -2,12 +2,12 @@
 
 module.exports = {
   root: true,
-  extends: ['@clmm/config/eslint'],
+  extends: [
+    './packages/config/eslint/index.js',
+    './packages/config/eslint/boundary-rules.js',
+  ],
   parserOptions: {
-    project: './tsconfig.json',
+    project: true,
     tsconfigRootDir: __dirname,
-  },
-  rules: {
-    // Per-package overrides applied in each package's own .eslintrc.js
   },
 };

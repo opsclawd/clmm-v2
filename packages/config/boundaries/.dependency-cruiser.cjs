@@ -1,6 +1,13 @@
 'use strict';
 
 /** @type {import('dependency-cruiser').IConfiguration} */
+const SOLANA_IMPORT_PATTERN = '^@solana(/|$)';
+const ORCA_IMPORT_PATTERN = '^@orca-so(/|$)';
+const REACT_IMPORT_PATTERN = '^react$';
+const REACT_NATIVE_IMPORT_PATTERN = '^react-native$';
+const EXPO_IMPORT_PATTERN = '^expo($|/)';
+const NEST_IMPORT_PATTERN = '^@nestjs(/|$)';
+
 module.exports = {
   forbidden: [
     {
@@ -10,12 +17,12 @@ module.exports = {
       from: { path: 'packages/domain/src' },
       to: {
         path: [
-          'node_modules/@solana',
-          'node_modules/@orca-so',
-          'node_modules/react',
-          'node_modules/react-native',
-          'node_modules/expo',
-          'node_modules/@nestjs',
+          SOLANA_IMPORT_PATTERN,
+          ORCA_IMPORT_PATTERN,
+          REACT_IMPORT_PATTERN,
+          REACT_NATIVE_IMPORT_PATTERN,
+          EXPO_IMPORT_PATTERN,
+          NEST_IMPORT_PATTERN,
         ],
       },
     },
@@ -27,11 +34,11 @@ module.exports = {
       to: {
         path: [
           'packages/adapters',
-          'node_modules/@solana',
-          'node_modules/@orca-so',
-          'node_modules/react',
-          'node_modules/react-native',
-          'node_modules/expo',
+          SOLANA_IMPORT_PATTERN,
+          ORCA_IMPORT_PATTERN,
+          REACT_IMPORT_PATTERN,
+          REACT_NATIVE_IMPORT_PATTERN,
+          EXPO_IMPORT_PATTERN,
         ],
       },
     },
@@ -43,8 +50,8 @@ module.exports = {
       to: {
         path: [
           'packages/adapters',
-          'node_modules/@solana',
-          'node_modules/@orca-so',
+          SOLANA_IMPORT_PATTERN,
+          ORCA_IMPORT_PATTERN,
         ],
       },
     },

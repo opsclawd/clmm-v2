@@ -2,10 +2,20 @@
 
 ## Architecture Invariants
 
+- [ ] `pnpm install --frozen-lockfile` exits 0
 - [ ] `pnpm typecheck` exits 0
+- [ ] `pnpm lint` executes package lint tasks and exits 0
 - [ ] `pnpm boundaries` exits 0
 - [ ] `pnpm --filter @clmm/config test` exits 0 (banned-concept scan)
 - [ ] `pnpm test` exits 0
+- [ ] Temporary `@solana/*` import under `packages/domain/src` makes `pnpm boundaries` fail
+- [ ] Temporary `ExecutionReceipt` in scanned source makes `pnpm --filter @clmm/config test` fail
+
+## Historical Epic Audits
+
+- [ ] Treat Epic 1 scaffold-only checks as historical once the MVP is implemented
+- [ ] Do not fail completed-product audits for expected evolution such as populated barrels, live app composition, or non-stub adapter mains
+- [ ] Continue failing audits for broken enduring guardrails: install reproducibility, lint, boundaries, banned-concept scan, and negative smoke tests
 
 ## Directional Exit Policy
 

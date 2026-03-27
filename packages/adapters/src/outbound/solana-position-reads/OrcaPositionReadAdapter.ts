@@ -21,7 +21,6 @@ import {
   makeClockTimestamp,
   evaluateRangeState,
 } from '@clmm/domain';
-import type { MonitoringReadiness } from '@clmm/domain';
 
 export class OrcaPositionReadAdapter implements SupportedPositionReadPort {
   constructor(private readonly rpcUrl: string) {}

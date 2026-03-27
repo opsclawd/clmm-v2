@@ -67,7 +67,7 @@ export class OperationalStorageAdapter
     };
   }
 
-  async listActionableTriggers(walletId: WalletId): Promise<ExitTrigger[]> {
+  async listActionableTriggers(_walletId: WalletId): Promise<ExitTrigger[]> {
     const rows = await this.db.select().from(exitTriggers);
     return rows.map((row) => ({
       triggerId: row.triggerId as ExitTriggerId,

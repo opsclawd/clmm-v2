@@ -10,11 +10,8 @@ import {
 import {
   LOWER_BOUND_BREACH,
   makeClockTimestamp,
-  makeWalletId,
 } from '@clmm/domain';
 import type { ExitTrigger, ExitTriggerId, BreachEpisodeId } from '@clmm/domain';
-
-const WALLET_ID = makeWalletId('contract-wallet');
 
 export function runTriggerRepositoryContract(
   factory: () => TriggerRepository,

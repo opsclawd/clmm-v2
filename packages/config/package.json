@@ -9,7 +9,8 @@
     "./boundaries": "./boundaries/.dependency-cruiser.cjs"
   },
   "scripts": {
-    "test": "vitest run ci/"
+    "test": "vitest run ci/",
+    "lint": "eslint ci vitest.config.ts --ext .ts"
   },
   "devDependencies": {
     "vitest": "^1.6.0"

@@ -16,7 +16,7 @@ export async function createExecutionPreview(params: {
   clock: ClockPort;
   ids: IdGeneratorPort;
 }): Promise<CreatePreviewResult> {
-  const { positionId, breachDirection, swapQuotePort, executionRepo, clock, ids: _ids } = params;
+  const { positionId, breachDirection, swapQuotePort, executionRepo, clock } = params;
 
   const plan = buildExecutionPlan(breachDirection);
 

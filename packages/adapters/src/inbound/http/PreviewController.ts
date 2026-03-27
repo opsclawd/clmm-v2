@@ -12,13 +12,13 @@ export class PreviewController {
   ) {}
 
   @Get(':previewId')
-  async getPreview(@Param('previewId') previewId: string) {
+  getPreview(@Param('previewId') _previewId: string) {
     // TODO: invoke GetExecutionPreview use case
     return { preview: null };
   }
 
   @Post(':triggerId/refresh')
-  async refreshPreview(@Param('triggerId') triggerId: string) {
+  refreshPreview(@Param('triggerId') _triggerId: string) {
     // TODO: invoke RefreshExecutionPreview use case
     return { preview: null };
   }

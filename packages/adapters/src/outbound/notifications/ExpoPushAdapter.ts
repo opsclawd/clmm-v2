@@ -15,7 +15,7 @@ export class ExpoPushAdapter implements NotificationPort {
     triggerId: ExitTriggerId;
   }): Promise<{ deliveredAt: ClockTimestamp | null }> {
     try {
-      const expoPushToken = await Notifications.getExpoPushTokenAsync({
+      const _expoPushToken = await Notifications.getExpoPushTokenAsync({
         projectId: 'clmm-superpowers',
       });
 

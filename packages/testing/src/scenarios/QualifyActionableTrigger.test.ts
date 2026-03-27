@@ -11,7 +11,6 @@ import type { BreachObservationResult } from '@clmm/application';
 
 function makeObs(
   direction = LOWER_BOUND_BREACH,
-  count = 3,
 ): BreachObservationResult {
   return {
     positionId: FIXTURE_POSITION_ID,

@@ -1,6 +1,5 @@
 import type {
   PositionId,
-  WalletId,
   PoolId,
   BreachDirection,
   PostExitAssetPosture,
@@ -8,7 +7,7 @@ import type {
   ClockTimestamp,
 } from '@clmm/domain';
 import type { ExecutionLifecycleState, PreviewFreshness, TransactionReference } from '@clmm/domain';
-import type { ExitTriggerId, BreachEpisodeId } from '@clmm/domain';
+import type { ExitTriggerId } from '@clmm/domain';
 import type { PlatformCapabilityState } from '../ports/index.js';
 
 // Position DTOs

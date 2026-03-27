@@ -12,28 +12,28 @@ export class ExecutionController {
   ) {}
 
   @Get(':attemptId')
-  async getExecution(@Param('attemptId') attemptId: string) {
+  getExecution(@Param('attemptId') _attemptId: string) {
     // TODO: invoke GetExecutionAttemptDetail use case
     return { execution: null };
   }
 
   @Get('history/:positionId')
-  async getExecutionHistory(@Param('positionId') positionId: string) {
+  getExecutionHistory(@Param('positionId') _positionId: string) {
     // TODO: invoke GetExecutionHistory use case
     return { history: [] };
   }
 
   @Post(':attemptId/submit')
-  async submitExecution(
-    @Param('attemptId') attemptId: string,
-    @Body() body: { signedPayload: string },
+  submitExecution(
+    @Param('attemptId') _attemptId: string,
+    @Body() _body: { signedPayload: string },
   ) {
     // TODO: invoke ReconcileExecutionAttempt use case
     return { success: true };
   }
 
   @Post(':attemptId/abandon')
-  async abandonExecution(@Param('attemptId') attemptId: string) {
+  abandonExecution(@Param('attemptId') _attemptId: string) {
     // TODO: invoke RecordExecutionAbandonment use case
     return { abandoned: true };
   }

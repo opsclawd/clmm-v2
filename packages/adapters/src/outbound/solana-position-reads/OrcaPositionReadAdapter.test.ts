@@ -3,8 +3,8 @@
  */
 import { describe, it, expect, vi } from 'vitest';
 import { OrcaPositionReadAdapter } from './OrcaPositionReadAdapter';
-import { makeWalletId, makePositionId } from '@clmm/domain';
-import type { WalletId, PositionId } from '@clmm/domain';
+import { makePositionId } from '@clmm/domain';
+import type { WalletId } from '@clmm/domain';
 
 // Mock the Orca SDK functions
 vi.mock('@orca-so/whirlpools', () => ({

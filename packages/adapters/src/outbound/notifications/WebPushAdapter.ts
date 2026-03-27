@@ -2,7 +2,7 @@ import type { NotificationPort } from '@clmm/application';
 import type { WalletId, PositionId, BreachDirection, ClockTimestamp, ExitTriggerId } from '@clmm/domain';
 
 export class WebPushAdapter implements NotificationPort {
-  async sendActionableAlert(params: {
+  async sendActionableAlert(_params: {
     walletId: WalletId;
     positionId: PositionId;
     breachDirection: BreachDirection;

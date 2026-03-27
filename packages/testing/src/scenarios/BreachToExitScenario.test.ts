@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach } from 'vitest';
+import { describe, it, expect } from 'vitest';
 import { runBreachToExitScenario } from './BreachToExitScenario.js';
 import { LOWER_BOUND_BREACH, UPPER_BOUND_BREACH } from '@clmm/domain';
 

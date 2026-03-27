@@ -7,7 +7,7 @@ export class PositionController {
   ) {}
 
   @Get(':walletId')
-  async listPositions(@Param('walletId') walletId: string) {
+  listPositions(@Param('walletId') _walletId: string) {
     // TODO: invoke ListSupportedPositions use case
     return { positions: [] };
   }

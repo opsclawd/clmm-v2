@@ -13,11 +13,10 @@ const TRIGGER_ID = 'trigger-1' as ExitTriggerId;
 
 describe('DispatchActionableNotification', () => {
   let notificationPort: FakeNotificationPort;
-  let ids: FakeIdGeneratorPort;
 
   beforeEach(() => {
     notificationPort = new FakeNotificationPort();
-    ids = new FakeIdGeneratorPort();
+    void new FakeIdGeneratorPort();
   });
 
   it('dispatches notification with breach direction for lower-bound trigger', async () => {

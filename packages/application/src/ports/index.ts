@@ -1,15 +1,12 @@
 import type {
   PositionId,
   WalletId,
-  PoolId,
   BreachDirection,
   ClockTimestamp,
   TokenAmount,
 } from '@clmm/domain';
 import type {
   LiquidityPosition,
-  RangeState,
-  MonitoringReadiness,
 } from '@clmm/domain';
 import type {
   ExitTrigger,

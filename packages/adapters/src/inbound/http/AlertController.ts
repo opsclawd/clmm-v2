@@ -12,13 +12,13 @@ export class AlertController {
   ) {}
 
   @Get(':walletId')
-  async listAlerts(@Param('walletId') walletId: string) {
+  listAlerts(@Param('walletId') _walletId: string) {
     // TODO: invoke ListActionableAlerts use case
     return { alerts: [] };
   }
 
   @Post(':triggerId/acknowledge')
-  async acknowledgeAlert(@Param('triggerId') triggerId: string) {
+  acknowledgeAlert(@Param('triggerId') _triggerId: string) {
     // TODO: invoke AcknowledgeAlert use case
     return { acknowledged: true };
   }

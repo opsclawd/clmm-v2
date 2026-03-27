@@ -12,8 +12,6 @@ import type { KitMobileWallet } from '@solana-mobile/mobile-wallet-adapter-proto
 import {
   getTransactionDecoder,
   getBase64EncodedWireTransaction,
-  Transaction,
-  address,
 } from '@solana/kit';
 import type { WalletSigningPort } from '@clmm/application';
 import type { WalletId } from '@clmm/domain';

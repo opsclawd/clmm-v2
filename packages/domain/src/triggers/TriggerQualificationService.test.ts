@@ -2,7 +2,6 @@ import { describe, it, expect } from 'vitest';
 import {
   qualifyTrigger,
   type BreachObservation,
-  type TriggerQualificationResult,
 } from './TriggerQualificationService.js';
 import {
   makePositionId,
@@ -76,8 +75,7 @@ describe('TriggerQualificationService', () => {
     });
 
     it('does not suppress when no existing trigger for episode', () => {
-      const { existingTriggerIdForEpisode: _unused, ...observationWithoutTriggerId } = baseObservation;
-      const result = qualifyTrigger(observationWithoutTriggerId);
+      const result = qualifyTrigger(baseObservation);
       expect(result.kind).toBe('qualified');
     });
   });

@@ -3,8 +3,6 @@ import { JupiterQuoteAdapter } from './JupiterQuoteAdapter.js';
 import { makeTokenAmount } from '@clmm/domain';
 import type { SwapInstruction } from '@clmm/domain';
 
-const JUPITER_API_BASE = 'https://quote-api.jup.ag/v6';
-
 const JUPITER_QUOTE_RESPONSE = {
   inputMint: 'So11111111111111111111111111111111111111112',
   inAmount: '1000000',

@@ -7,6 +7,7 @@
     "test": "vitest run",
     "typecheck": "tsc --noEmit",
     "build": "tsc -p tsconfig.json",
+    "lint": "eslint src --ext .ts",
     "dev:api": "ts-node -r tsconfig-paths/register src/inbound/http/main.ts",
     "dev:worker": "ts-node -r tsconfig-paths/register src/inbound/jobs/main.ts"
   },

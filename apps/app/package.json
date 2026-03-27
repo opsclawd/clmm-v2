@@ -7,7 +7,8 @@
     "dev": "expo start",
     "dev:web": "expo start --web",
     "build": "expo export",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "lint": "eslint app src --ext .ts,.tsx"
   },
   "dependencies": {
     "@clmm/application": "workspace:*",

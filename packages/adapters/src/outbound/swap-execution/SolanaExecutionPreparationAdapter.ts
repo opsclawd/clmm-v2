@@ -20,7 +20,6 @@ import {
   pipe,
   getTransactionDecoder,
   getBase64Encoder,
-  getBase64Decoder,
   getCompiledTransactionMessageDecoder,
   decompileTransactionMessageFetchingLookupTables,
   getBase64EncodedWireTransaction,
@@ -30,7 +29,6 @@ import {
   setTransactionMessageLifetimeUsingBlockhash,
   prependTransactionMessageInstructions,
 } from '@solana/kit';
-import type { Address } from '@solana/kit';
 import { fetchPosition, fetchWhirlpool } from '@orca-so/whirlpools-client';
 import { closePositionInstructions } from '@orca-so/whirlpools';
 import type { Instruction } from '@solana/kit';
@@ -41,7 +39,6 @@ import { makeClockTimestamp } from '@clmm/domain';
 const JUPITER_API_BASE = 'https://api.jup.ag/swap/v1';
 
 const SOL_MINT = 'So11111111111111111111111111111111111111112';
-const USDC_MINT = 'EPjFWdd5AufqSSqeM2ZbiBci8f9aa211KkZg4fDqM9N';
 
 export class SolanaExecutionPreparationAdapter implements ExecutionPreparationPort {
   constructor(private readonly rpcUrl: string) {}
@@ -142,7 +139,7 @@ export class SolanaExecutionPreparationAdapter implements ExecutionPreparationPo
   private async buildOrcaInstructions(
     rpc: ReturnType<typeof createSolanaRpc>,
     positionData: LiquidityPosition,
-    walletId: WalletId
+    _walletId: WalletId
   ): Promise<Instruction[]> {
     try {
       const positionMintAddress = address(positionData.positionId);
