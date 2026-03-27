@@ -6,6 +6,11 @@
  */
 import type { NotificationPermissionPort } from '@clmm/application';
 
+declare const Notification: {
+  permission: 'granted' | 'denied' | 'default' | 'prompt';
+  requestPermission: () => Promise<'granted' | 'denied' | 'default' | 'prompt'>;
+};
+
 export class WebNotificationPermissionAdapter implements NotificationPermissionPort {
   async getPermissionState(): Promise<'granted' | 'denied' | 'undetermined'> {
     if (typeof Notification === 'undefined') {
