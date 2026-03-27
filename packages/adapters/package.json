@@ -19,12 +19,7 @@
     "@orca-so/whirlpools": "^7.0.2",
     "@solana-mobile/mobile-wallet-adapter-protocol": "^2.2.6",
     "@solana-mobile/mobile-wallet-adapter-protocol-kit": "^0.2.3",
-    "@solana-mobile/mobile-wallet-adapter-protocol-web3js": "^2.2.6",
     "@solana/kit": "^6.5.0",
-    "@solana/wallet-adapter-base": "^0.9.27",
-    "@solana/wallet-adapter-react": "^0.15.39",
-    "@solana/wallet-adapter-wallets": "^0.19.37",
-    "@solana/web3.js": "^1.98.4",
     "expo-notifications": "^55.0.13",
     "reflect-metadata": "^0.2.0"
   },
