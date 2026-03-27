@@ -58,7 +58,11 @@ export interface SwapQuotePort {
 }
 
 export interface ExecutionPreparationPort {
-  prepareExecution(plan: ExecutionPlan, walletId: WalletId): Promise<{
+  prepareExecution(params: {
+    plan: ExecutionPlan;
+    walletId: WalletId;
+    positionId: PositionId;
+  }): Promise<{
     serializedPayload: Uint8Array;
     preparedAt: ClockTimestamp;
   }>;

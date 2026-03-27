@@ -56,7 +56,11 @@ export async function approveExecution(params: {
     lifecycleState: { kind: 'awaiting-signature' },
   });
 
-  const { serializedPayload } = await prepPort.prepareExecution(preview.plan, walletId);
+  const { serializedPayload } = await prepPort.prepareExecution({
+    plan: preview.plan,
+    walletId,
+    positionId,
+  });
 
   const sigResult = await signingPort.requestSignature(serializedPayload, walletId);
 
