@@ -31,7 +31,7 @@ export class ExpoPushAdapter implements NotificationPort {
           positionId: params.positionId,
           deepLink: `clmmv2://preview/${params.triggerId}/${params.positionId}`,
         },
-        sound: true,
+        sound: 'default',
       };
 
       await Notifications.scheduleNotificationAsync({
@@ -40,7 +40,8 @@ export class ExpoPushAdapter implements NotificationPort {
       });
 
       return { deliveredAt: makeClockTimestamp(Date.now()) };
-    } catch {
+    } catch (error) {
+      console.warn('ExpoPushAdapter: failed to send notification', error);
       return { deliveredAt: null };
     }
   }
