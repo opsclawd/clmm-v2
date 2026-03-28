@@ -167,7 +167,15 @@ export class OperationalStorageAdapter
       transactionRefsJson: attempt.transactionReferences as unknown as Record<string, unknown>[],
       createdAt: now,
       updatedAt: now,
-    }).onConflictDoNothing();
+    }).onConflictDoUpdate({
+      target: executionAttempts.attemptId,
+      set: {
+        lifecycleStateKind: attempt.lifecycleState.kind,
+        completedStepsJson: attempt.completedSteps as unknown as string[],
+        transactionRefsJson: attempt.transactionReferences as unknown as Record<string, unknown>[],
+        updatedAt: now,
+      },
+    });
   }
 
   async getAttempt(attemptId: string): Promise<(ExecutionAttempt & { attemptId: string; positionId: PositionId }) | null> {
