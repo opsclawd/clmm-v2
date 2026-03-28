@@ -1,7 +1,6 @@
 import { Controller, Get, Param, Post, Inject, NotFoundException } from '@nestjs/common';
 import type { TriggerRepository, ActionableAlertDto } from '@clmm/application';
-import { listActionableAlerts } from '../../../../application/src/use-cases/alerts/ListActionableAlerts.js';
-import { acknowledgeAlert } from '../../../../application/src/use-cases/alerts/AcknowledgeAlert.js';
+import { listActionableAlerts, acknowledgeAlert } from '@clmm/application';
 import type { ExitTrigger, ExitTriggerId } from '@clmm/domain';
 import { makeWalletId } from '@clmm/domain';
 import { TRIGGER_REPOSITORY } from './tokens.js';

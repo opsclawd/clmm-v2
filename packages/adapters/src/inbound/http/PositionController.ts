@@ -1,6 +1,6 @@
 import { Controller, Get, Param, Inject } from '@nestjs/common';
 import type { SupportedPositionReadPort, PositionSummaryDto } from '@clmm/application';
-import { listSupportedPositions } from '../../../../application/src/use-cases/positions/ListSupportedPositions.js';
+import { listSupportedPositions } from '@clmm/application';
 import type { LiquidityPosition } from '@clmm/domain';
 import { makeWalletId } from '@clmm/domain';
 import { SUPPORTED_POSITION_READ_PORT } from './tokens.js';

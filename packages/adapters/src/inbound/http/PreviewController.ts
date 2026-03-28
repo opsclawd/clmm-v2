@@ -7,8 +7,7 @@ import type {
   IdGeneratorPort,
   ExecutionPreviewDto,
 } from '@clmm/application';
-import { getExecutionPreview } from '../../../../application/src/use-cases/previews/GetExecutionPreview.js';
-import { refreshExecutionPreview } from '../../../../application/src/use-cases/previews/RefreshExecutionPreview.js';
+import { getExecutionPreview, refreshExecutionPreview } from '@clmm/application';
 import type { ExitTriggerId, ExecutionPreview, PositionId, BreachDirection } from '@clmm/domain';
 import {
   EXECUTION_REPOSITORY,
