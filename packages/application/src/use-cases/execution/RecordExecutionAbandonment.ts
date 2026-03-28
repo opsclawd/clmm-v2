@@ -33,13 +33,22 @@ export async function recordExecutionAbandonment(params: {
     return { kind: 'already-terminal', state: attempt.lifecycleState.kind };
   }
 
+  const timeline = await historyRepo.getTimeline(attempt.positionId);
+  const latestDirection = timeline.events[timeline.events.length - 1]?.breachDirection;
+
+  if (latestDirection && latestDirection.kind !== breachDirection.kind) {
+    throw new Error(`recordExecutionAbandonment: breachDirection mismatch for attempt ${attemptId}`);
+  }
+
+  const authoritativeDirection = latestDirection ?? breachDirection;
+
   await executionRepo.updateAttemptState(attemptId, { kind: 'abandoned' });
 
   await historyRepo.appendEvent({
     eventId: ids.generateId(),
     positionId: attempt.positionId,
     eventType: 'abandoned',
-    breachDirection,
+    breachDirection: authoritativeDirection,
     occurredAt: clock.now(),
     lifecycleState: { kind: 'abandoned' },
   });
