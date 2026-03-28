@@ -11,6 +11,7 @@ export class FakeTriggerRepository implements TriggerRepository {
   readonly triggers = new Map<string, ExitTrigger>();
   readonly episodes = new Map<string, BreachEpisode>();
   readonly episodeTriggerMap = new Map<string, string>();
+  lastListedWalletId: WalletId | null = null;
 
   async saveTrigger(trigger: ExitTrigger): Promise<void> {
     this.triggers.set(trigger.triggerId, trigger);
@@ -20,7 +21,8 @@ export class FakeTriggerRepository implements TriggerRepository {
     return this.triggers.get(triggerId) ?? null;
   }
 
-  async listActionableTriggers(_walletId: WalletId): Promise<ExitTrigger[]> {
+  async listActionableTriggers(walletId: WalletId): Promise<ExitTrigger[]> {
+    this.lastListedWalletId = walletId;
     return Array.from(this.triggers.values());
   }
 

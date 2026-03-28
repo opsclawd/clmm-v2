@@ -4,14 +4,12 @@ import type {
   ClockPort,
   IdGeneratorPort,
 } from '../../ports/index.js';
-import type { PositionId, BreachDirection } from '@clmm/domain';
+import type { PositionId, BreachDirection, ExecutionLifecycleState } from '@clmm/domain';
 
 export type RecordAbandonmentResult =
   | { kind: 'abandoned' }
   | { kind: 'not-found' }
-  | { kind: 'already-terminal'; state: string };
-
-const TERMINAL_STATES = new Set(['confirmed', 'partial', 'abandoned']);
+  | { kind: 'already-terminal'; state: ExecutionLifecycleState['kind'] };
 
 export async function recordExecutionAbandonment(params: {
   attemptId: string;
@@ -27,7 +25,11 @@ export async function recordExecutionAbandonment(params: {
   const attempt = await executionRepo.getAttempt(attemptId);
   if (!attempt) return { kind: 'not-found' };
 
-  if (TERMINAL_STATES.has(attempt.lifecycleState.kind)) {
+  if (attempt.positionId !== positionId) {
+    throw new Error(`recordExecutionAbandonment: positionId mismatch for attempt ${attemptId}`);
+  }
+
+  if (attempt.lifecycleState.kind !== 'awaiting-signature') {
     return { kind: 'already-terminal', state: attempt.lifecycleState.kind };
   }
 
@@ -35,7 +37,7 @@ export async function recordExecutionAbandonment(params: {
 
   await historyRepo.appendEvent({
     eventId: ids.generateId(),
-    positionId,
+    positionId: attempt.positionId,
     eventType: 'abandoned',
     breachDirection,
     occurredAt: clock.now(),

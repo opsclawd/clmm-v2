@@ -46,4 +46,9 @@ describe('ListActionableAlerts', () => {
     expect(result.triggers[0]?.triggerId).toBeDefined();
     expect(result.triggers[0]?.positionId).toBe(FIXTURE_POSITION_ID);
   });
+
+  it('passes walletId through to the repository lookup', async () => {
+    await listActionableAlerts({ walletId: FIXTURE_WALLET_ID, triggerRepo });
+    expect(triggerRepo.lastListedWalletId).toBe(FIXTURE_WALLET_ID);
+  });
 });

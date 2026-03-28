@@ -7,7 +7,7 @@ import {
   FakeExecutionHistoryRepository,
   FIXTURE_POSITION_ID,
 } from '@clmm/testing';
-import { LOWER_BOUND_BREACH } from '@clmm/domain';
+import { LOWER_BOUND_BREACH, makePositionId } from '@clmm/domain';
 
 describe('RecordExecutionAbandonment', () => {
   let executionRepo: FakeExecutionRepository;
@@ -21,7 +21,7 @@ describe('RecordExecutionAbandonment', () => {
     await executionRepo.saveAttempt({
       attemptId: 'attempt-abandon-1',
       positionId: FIXTURE_POSITION_ID,
-      lifecycleState: { kind: 'submitted' },
+      lifecycleState: { kind: 'awaiting-signature' },
       completedSteps: [],
       transactionReferences: [],
     });
@@ -56,6 +56,19 @@ describe('RecordExecutionAbandonment', () => {
     expect(historyRepo.events[0]?.eventType).toBe('abandoned');
   });
 
+  it('uses the stored attempt positionId for the history event after validating the caller input', async () => {
+    await recordExecutionAbandonment({
+      attemptId: 'attempt-abandon-1',
+      positionId: FIXTURE_POSITION_ID,
+      breachDirection: LOWER_BOUND_BREACH,
+      executionRepo,
+      historyRepo,
+      clock,
+      ids,
+    });
+    expect(historyRepo.events[0]?.positionId).toBe(FIXTURE_POSITION_ID);
+  });
+
   it('returns not-found for unknown attemptId', async () => {
     const result = await recordExecutionAbandonment({
       attemptId: 'no-such',
@@ -69,8 +82,15 @@ describe('RecordExecutionAbandonment', () => {
     expect(result.kind).toBe('not-found');
   });
 
-  it('refuses to abandon an already-terminal attempt', async () => {
-    await executionRepo.updateAttemptState('attempt-abandon-1', { kind: 'confirmed' });
+  it.each([
+    'submitted',
+    'failed',
+    'expired',
+    'confirmed',
+    'partial',
+    'abandoned',
+  ] as const)('refuses to abandon an attempt in %s state', async (state) => {
+    await executionRepo.updateAttemptState('attempt-abandon-1', { kind: state });
     const result = await recordExecutionAbandonment({
       attemptId: 'attempt-abandon-1',
       positionId: FIXTURE_POSITION_ID,
@@ -81,5 +101,24 @@ describe('RecordExecutionAbandonment', () => {
       ids,
     });
     expect(result.kind).toBe('already-terminal');
+    if (result.kind === 'already-terminal') {
+      expect(result.state).toBe(state);
+    }
+    expect(historyRepo.events).toHaveLength(0);
+  });
+
+  it('fails fast when the caller positionId mismatches the stored attempt', async () => {
+    await expect(
+      recordExecutionAbandonment({
+        attemptId: 'attempt-abandon-1',
+        positionId: makePositionId('other-position'),
+        breachDirection: LOWER_BOUND_BREACH,
+        executionRepo,
+        historyRepo,
+        clock,
+        ids,
+      }),
+    ).rejects.toThrow('positionId mismatch');
+    expect(historyRepo.events).toHaveLength(0);
   });
 });
