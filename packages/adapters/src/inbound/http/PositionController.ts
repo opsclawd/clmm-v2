@@ -1,14 +1,33 @@
-import { Controller, Get, Param } from '@nestjs/common';
+import { Controller, Get, Param, Inject } from '@nestjs/common';
+import type { SupportedPositionReadPort, PositionSummaryDto } from '@clmm/application';
+import { listSupportedPositions } from '../../../../application/src/use-cases/positions/ListSupportedPositions.js';
+import type { LiquidityPosition } from '@clmm/domain';
+import { makeWalletId } from '@clmm/domain';
+import { SUPPORTED_POSITION_READ_PORT } from './tokens.js';
+
+function toPositionSummaryDto(p: LiquidityPosition): PositionSummaryDto {
+  return {
+    positionId: p.positionId,
+    poolId: p.poolId,
+    rangeState: p.rangeState.kind,
+    hasActionableTrigger: false,
+    monitoringStatus: p.monitoringReadiness.kind,
+  };
+}
 
 @Controller('positions')
 export class PositionController {
   constructor(
-    // TODO: inject use case facades in Epic 5 composition
+    @Inject(SUPPORTED_POSITION_READ_PORT)
+    private readonly positionReadPort: SupportedPositionReadPort,
   ) {}
 
   @Get(':walletId')
-  listPositions(@Param('walletId') _walletId: string) {
-    // TODO: invoke ListSupportedPositions use case
-    return { positions: [] };
+  async listPositions(@Param('walletId') walletId: string) {
+    const { positions } = await listSupportedPositions({
+      walletId: makeWalletId(walletId),
+      positionReadPort: this.positionReadPort,
+    });
+    return { positions: positions.map(toPositionSummaryDto) };
   }
 }

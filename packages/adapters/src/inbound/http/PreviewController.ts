@@ -1,25 +1,94 @@
-/**
- * PreviewController
- *
- * Handles execution preview HTTP endpoints for the NestJS BFF.
- */
-import { Controller, Get, Param, Post } from '@nestjs/common';
+import { Controller, Get, Param, Post, Inject, NotFoundException } from '@nestjs/common';
+import type {
+  ExecutionRepository,
+  TriggerRepository,
+  SwapQuotePort,
+  ClockPort,
+  IdGeneratorPort,
+  ExecutionPreviewDto,
+} from '@clmm/application';
+import { getExecutionPreview } from '../../../../application/src/use-cases/previews/GetExecutionPreview.js';
+import { refreshExecutionPreview } from '../../../../application/src/use-cases/previews/RefreshExecutionPreview.js';
+import type { ExitTriggerId, ExecutionPreview, PositionId, BreachDirection } from '@clmm/domain';
+import {
+  EXECUTION_REPOSITORY,
+  TRIGGER_REPOSITORY,
+  SWAP_QUOTE_PORT,
+  CLOCK_PORT,
+  ID_GENERATOR_PORT,
+} from './tokens.js';
+
+function toPreviewDto(
+  previewId: string,
+  positionId: PositionId,
+  breachDirection: BreachDirection,
+  preview: ExecutionPreview,
+): ExecutionPreviewDto {
+  const plan = preview.plan;
+  return {
+    previewId,
+    positionId,
+    breachDirection,
+    postExitPosture: plan.postExitPosture,
+    steps: plan.steps.map((step) => {
+      if (step.kind === 'swap-assets') {
+        return {
+          kind: 'swap-assets' as const,
+          fromAsset: step.instruction.fromAsset,
+          toAsset: step.instruction.toAsset,
+          policyReason: step.instruction.policyReason,
+        };
+      }
+      return { kind: step.kind as 'remove-liquidity' | 'collect-fees' };
+    }),
+    freshness: preview.freshness,
+    estimatedAt: preview.estimatedAt as ExecutionPreviewDto['estimatedAt'],
+  };
+}
 
 @Controller('previews')
 export class PreviewController {
   constructor(
-    // TODO: inject use case facades in Epic 5 composition
+    @Inject(EXECUTION_REPOSITORY)
+    private readonly executionRepo: ExecutionRepository,
+    @Inject(TRIGGER_REPOSITORY)
+    private readonly triggerRepo: TriggerRepository,
+    @Inject(SWAP_QUOTE_PORT)
+    private readonly swapQuotePort: SwapQuotePort,
+    @Inject(CLOCK_PORT)
+    private readonly clock: ClockPort,
+    @Inject(ID_GENERATOR_PORT)
+    private readonly ids: IdGeneratorPort,
   ) {}
 
   @Get(':previewId')
-  getPreview(@Param('previewId') _previewId: string) {
-    // TODO: invoke GetExecutionPreview use case
-    return { preview: null };
+  async getPreview(@Param('previewId') previewId: string) {
+    const result = await getExecutionPreview({ previewId, executionRepo: this.executionRepo });
+    if (result.kind === 'not-found') {
+      throw new NotFoundException(`Preview not found: ${previewId}`);
+    }
+    return {
+      preview: toPreviewDto(previewId, result.positionId, result.breachDirection, result.preview),
+    };
   }
 
   @Post(':triggerId/refresh')
-  refreshPreview(@Param('triggerId') _triggerId: string) {
-    // TODO: invoke RefreshExecutionPreview use case
-    return { preview: null };
+  async refreshPreview(@Param('triggerId') triggerId: string) {
+    const trigger = await this.triggerRepo.getTrigger(triggerId as ExitTriggerId);
+    if (!trigger) {
+      throw new NotFoundException(`Trigger not found: ${triggerId}`);
+    }
+    const result = await refreshExecutionPreview({
+      previewId: '',
+      positionId: trigger.positionId,
+      breachDirection: trigger.breachDirection,
+      swapQuotePort: this.swapQuotePort,
+      executionRepo: this.executionRepo,
+      clock: this.clock,
+      ids: this.ids,
+    });
+    return {
+      preview: toPreviewDto(result.previewId, trigger.positionId, trigger.breachDirection, result.preview),
+    };
   }
 }
