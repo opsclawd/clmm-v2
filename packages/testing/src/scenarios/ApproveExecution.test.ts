@@ -61,6 +61,8 @@ describe('ApproveExecution', () => {
       ids,
     });
     expect(result.kind).toBe('submitted');
+    const storedAttempt = await executionRepo.getAttempt(result.attemptId);
+    expect(storedAttempt?.breachDirection).toEqual(LOWER_BOUND_BREACH);
   });
 
   it('records decline when user declines to sign', async () => {

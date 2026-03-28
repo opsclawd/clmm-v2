@@ -17,9 +17,9 @@ import type {
   IdGeneratorPort,
   ExecutionAttemptDto,
   HistoryEventDto,
+  StoredExecutionAttempt,
 } from '@clmm/application';
 import {
-  getExecutionAttemptDetail,
   getExecutionHistory,
   recordExecutionAbandonment,
 } from '@clmm/application';
@@ -100,10 +100,22 @@ export class ExecutionController {
     private readonly ids: IdGeneratorPort,
   ) {}
 
-  private async resolveAuthoritativeDirection(params: {
+  private resolveAttemptDirection(
+    attempt: StoredExecutionAttempt,
+    requestDirectionKind?: 'lower-bound-breach' | 'upper-bound-breach',
+  ): BreachDirection {
+    const requestDirection = parseDirectionKind(requestDirectionKind);
+    if (requestDirection && requestDirection.kind !== attempt.breachDirection.kind) {
+      throw new ConflictException(
+        `breachDirection conflicts with authoritative attempt direction for attempt ${attempt.attemptId}`,
+      );
+    }
+    return attempt.breachDirection;
+  }
+
+  private async resolveHistoryDirection(params: {
     positionId: PositionId;
     fallbackDirection?: 'lower-bound-breach' | 'upper-bound-breach';
-    requireHistoryDirection?: boolean;
   }): Promise<BreachDirection> {
     const timeline = await this.historyRepo.getTimeline(params.positionId);
     const timelineDirection = timeline.events.at(-1)?.breachDirection ?? null;
@@ -117,12 +129,6 @@ export class ExecutionController {
 
     if (timelineDirection) {
       return timelineDirection;
-    }
-
-    if (params.requireHistoryDirection) {
-      throw new ConflictException(
-        `Authoritative breachDirection unavailable for position ${params.positionId}`,
-      );
     }
 
     if (!fallbackDirection) {
@@ -154,15 +160,18 @@ export class ExecutionController {
 
   @Get(':attemptId')
   async getExecution(@Param('attemptId') attemptId: string) {
-    const result = await getExecutionAttemptDetail({ attemptId, executionRepo: this.executionRepo });
-    if (result.kind === 'not-found') {
+    const attempt = await this.executionRepo.getAttempt(attemptId);
+    if (!attempt) {
       throw new NotFoundException(`Attempt not found: ${attemptId}`);
     }
-    const breachDirection = await this.resolveAuthoritativeDirection({
-      positionId: result.positionId,
-      requireHistoryDirection: true,
-    });
-    return { execution: toAttemptDto(result.attemptId, result.positionId, breachDirection, result.attempt) };
+    return {
+      execution: toAttemptDto(
+        attempt.attemptId,
+        attempt.positionId,
+        attempt.breachDirection,
+        attempt,
+      ),
+    };
   }
 
   @Get('history/:positionId')
@@ -196,10 +205,7 @@ export class ExecutionController {
       );
     }
 
-    const breachDirection = await this.resolveAuthoritativeDirection({
-      positionId: attempt.positionId,
-      ...(body.breachDirection ? { fallbackDirection: body.breachDirection } : {}),
-    });
+    const breachDirection = this.resolveAttemptDirection(attempt, body.breachDirection);
     const signedPayload = decodeSignedPayload(body.signedPayload);
     const { references } = await this.submissionPort.submitExecution(signedPayload);
 
@@ -263,7 +269,7 @@ export class ExecutionController {
     const attempt = await this.executionRepo.getAttempt(attemptId);
     if (!attempt) throw new NotFoundException(`Attempt not found: ${attemptId}`);
 
-    const breachDirection = await this.resolveAuthoritativeDirection({
+    const breachDirection = await this.resolveHistoryDirection({
       positionId: attempt.positionId,
       ...(body?.breachDirection ? { fallbackDirection: body.breachDirection } : {}),
     });

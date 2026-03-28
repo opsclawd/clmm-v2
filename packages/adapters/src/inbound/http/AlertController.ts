@@ -1,9 +1,9 @@
 import { Controller, Get, Param, Post, Inject, NotFoundException } from '@nestjs/common';
-import type { TriggerRepository, ActionableAlertDto, SupportedPositionReadPort } from '@clmm/application';
+import type { TriggerRepository, ActionableAlertDto } from '@clmm/application';
 import { listActionableAlerts, acknowledgeAlert } from '@clmm/application';
 import type { ExitTrigger, ExitTriggerId } from '@clmm/domain';
 import { makeWalletId } from '@clmm/domain';
-import { TRIGGER_REPOSITORY, SUPPORTED_POSITION_READ_PORT } from './tokens.js';
+import { TRIGGER_REPOSITORY } from './tokens.js';
 
 function toActionableAlertDto(t: ExitTrigger): ActionableAlertDto {
   return {
@@ -19,24 +19,15 @@ export class AlertController {
   constructor(
     @Inject(TRIGGER_REPOSITORY)
     private readonly triggerRepo: TriggerRepository,
-    @Inject(SUPPORTED_POSITION_READ_PORT)
-    private readonly positionReadPort: SupportedPositionReadPort,
   ) {}
 
   @Get(':walletId')
   async listAlerts(@Param('walletId') walletId: string) {
-    const wallet = makeWalletId(walletId);
     const { triggers } = await listActionableAlerts({
-      walletId: wallet,
+      walletId: makeWalletId(walletId),
       triggerRepo: this.triggerRepo,
     });
-    const positions = await this.positionReadPort.listSupportedPositions(wallet);
-    const ownedPositionIds = new Set(positions.map((position) => position.positionId));
-    return {
-      alerts: triggers
-        .filter((trigger) => ownedPositionIds.has(trigger.positionId))
-        .map(toActionableAlertDto),
-    };
+    return { alerts: triggers.map(toActionableAlertDto) };
   }
 
   @Post(':triggerId/acknowledge')

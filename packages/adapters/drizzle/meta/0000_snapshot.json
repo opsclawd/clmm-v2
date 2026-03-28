@@ -20,6 +20,12 @@
           "primaryKey": false,
           "notNull": true
         },
+        "direction_kind": {
+          "name": "direction_kind",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
         "lifecycle_state_kind": {
           "name": "lifecycle_state_kind",
           "type": "text",
@@ -58,7 +64,12 @@
       "compositePrimaryKeys": {},
       "uniqueConstraints": {},
       "policies": {},
-      "checkConstraints": {},
+      "checkConstraints": {
+        "execution_attempts_direction_kind_check": {
+          "name": "execution_attempts_direction_kind_check",
+          "value": "\"execution_attempts\".\"direction_kind\" in ('lower-bound-breach', 'upper-bound-breach')"
+        }
+      },
       "isRLSEnabled": false
     },
     "public.execution_sessions": {
@@ -101,7 +112,12 @@
       "compositePrimaryKeys": {},
       "uniqueConstraints": {},
       "policies": {},
-      "checkConstraints": {},
+      "checkConstraints": {
+        "history_events_direction_kind_check": {
+          "name": "history_events_direction_kind_check",
+          "value": "\"history_events\".\"direction_kind\" in ('lower-bound-breach', 'upper-bound-breach')"
+        }
+      },
       "isRLSEnabled": false
     },
     "public.history_events": {
@@ -156,7 +172,12 @@
       "compositePrimaryKeys": {},
       "uniqueConstraints": {},
       "policies": {},
-      "checkConstraints": {},
+      "checkConstraints": {
+        "breach_episodes_direction_kind_check": {
+          "name": "breach_episodes_direction_kind_check",
+          "value": "\"breach_episodes\".\"direction_kind\" in ('lower-bound-breach', 'upper-bound-breach')"
+        }
+      },
       "isRLSEnabled": false
     },
     "public.breach_episodes": {
@@ -205,7 +226,12 @@
       "compositePrimaryKeys": {},
       "uniqueConstraints": {},
       "policies": {},
-      "checkConstraints": {},
+      "checkConstraints": {
+        "exit_triggers_direction_kind_check": {
+          "name": "exit_triggers_direction_kind_check",
+          "value": "\"exit_triggers\".\"direction_kind\" in ('lower-bound-breach', 'upper-bound-breach')"
+        }
+      },
       "isRLSEnabled": false
     },
     "public.exit_triggers": {

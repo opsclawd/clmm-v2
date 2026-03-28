@@ -1,20 +1,28 @@
 import { describe, it, expect } from 'vitest';
 import { AlertController } from './AlertController.js';
-import { FakeSupportedPositionReadPort, FakeTriggerRepository, FIXTURE_POSITION_IN_RANGE } from '@clmm/testing';
+import { FakeTriggerRepository, FIXTURE_POSITION_IN_RANGE } from '@clmm/testing';
 import { makeClockTimestamp, makePositionId } from '@clmm/domain';
-import type { SupportedPositionReadPort, TriggerRepository } from '@clmm/application';
-import type { BreachEpisodeId, ExitTriggerId } from '@clmm/domain';
+import type { TriggerRepository } from '@clmm/application';
+import type { BreachEpisodeId, ExitTrigger, ExitTriggerId, WalletId } from '@clmm/domain';
 
 const otherPositionId = makePositionId('other-wallet-position');
+const requestedWalletId = FIXTURE_POSITION_IN_RANGE.walletId as WalletId;
+
+class WalletScopedTriggerRepository extends FakeTriggerRepository {
+  listedWalletId: WalletId | null = null;
+
+  override async listActionableTriggers(walletId: WalletId): Promise<ExitTrigger[]> {
+    this.listedWalletId = walletId;
+    return Array.from(this.triggers.values()).filter(
+      (trigger) => walletId === requestedWalletId && trigger.positionId === FIXTURE_POSITION_IN_RANGE.positionId,
+    );
+  }
+}
 
 describe('AlertController', () => {
-  it('filters actionable alerts to positions owned by the requested wallet', async () => {
-    const triggerRepo = new FakeTriggerRepository();
-    const positionReadPort = new FakeSupportedPositionReadPort([FIXTURE_POSITION_IN_RANGE]);
-    const controller = new AlertController(
-      triggerRepo as unknown as TriggerRepository,
-      positionReadPort as unknown as SupportedPositionReadPort,
-    );
+  it('returns repository-scoped actionable alerts without controller-side wallet filtering', async () => {
+    const triggerRepo = new WalletScopedTriggerRepository();
+    const controller = new AlertController(triggerRepo as unknown as TriggerRepository);
 
     await triggerRepo.saveTrigger({
       triggerId: 'trigger-owned' as ExitTriggerId,
@@ -39,5 +47,6 @@ describe('AlertController', () => {
 
     expect(result.alerts).toHaveLength(1);
     expect(result.alerts[0]?.triggerId).toBe('trigger-owned');
+    expect(triggerRepo.listedWalletId).toBe(requestedWalletId);
   });
 });

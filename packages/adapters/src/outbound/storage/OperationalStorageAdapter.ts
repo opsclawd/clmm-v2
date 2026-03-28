@@ -1,4 +1,4 @@
-import { eq } from 'drizzle-orm';
+import { eq, inArray } from 'drizzle-orm';
 import type { Db } from './db.js';
 import { breachEpisodes, exitTriggers, executionAttempts, executionSessions, executionPreviews } from './schema/index.js';
 import type {
@@ -6,6 +6,8 @@ import type {
   ExecutionRepository,
   ExecutionSessionRepository,
   IdGeneratorPort,
+  SupportedPositionReadPort,
+  StoredExecutionAttempt,
 } from '@clmm/application';
 import type {
   ExitTrigger,
@@ -34,6 +36,7 @@ export class OperationalStorageAdapter
   constructor(
     private readonly db: Db,
     private readonly ids: IdGeneratorPort,
+    private readonly positionReadPort: SupportedPositionReadPort,
   ) {}
 
   // --- TriggerRepository ---
@@ -68,8 +71,19 @@ export class OperationalStorageAdapter
     };
   }
 
-  async listActionableTriggers(_walletId: WalletId): Promise<ExitTrigger[]> {
-    const rows = await this.db.select().from(exitTriggers);
+  async listActionableTriggers(walletId: WalletId): Promise<ExitTrigger[]> {
+    const positions = await this.positionReadPort.listSupportedPositions(walletId);
+    const positionIds = positions.map((position) => position.positionId);
+    if (positionIds.length === 0) {
+      return [];
+    }
+
+    const rows = await this.db
+      .select()
+      .from(exitTriggers)
+      .where(inArray(exitTriggers.positionId, positionIds));
+
+    const ownedPositionIds = new Set(positionIds);
     return rows.map((row) => ({
       triggerId: row.triggerId as ExitTriggerId,
       positionId: row.positionId as PositionId,
@@ -77,8 +91,8 @@ export class OperationalStorageAdapter
       breachDirection: directionFromKind(row.directionKind),
       triggeredAt: makeClockTimestamp(row.triggeredAt),
       confirmationEvaluatedAt: makeClockTimestamp(row.confirmationEvaluatedAt),
-      confirmationPassed: true,
-    }));
+      confirmationPassed: true as const,
+    })).filter((trigger) => ownedPositionIds.has(trigger.positionId));
   }
 
   async getActiveEpisodeTrigger(episodeId: BreachEpisodeId): Promise<ExitTriggerId | null> {
@@ -155,13 +169,12 @@ export class OperationalStorageAdapter
     };
   }
 
-  async saveAttempt(
-    attempt: ExecutionAttempt & { attemptId: string; positionId: PositionId },
-  ): Promise<void> {
+  async saveAttempt(attempt: StoredExecutionAttempt): Promise<void> {
     const now = Date.now();
     await this.db.insert(executionAttempts).values({
       attemptId: attempt.attemptId,
       positionId: attempt.positionId,
+      directionKind: attempt.breachDirection.kind,
       lifecycleStateKind: attempt.lifecycleState.kind,
       completedStepsJson: attempt.completedSteps as unknown as string[],
       transactionRefsJson: attempt.transactionReferences as unknown as Record<string, unknown>[],
@@ -170,6 +183,7 @@ export class OperationalStorageAdapter
     }).onConflictDoUpdate({
       target: executionAttempts.attemptId,
       set: {
+        directionKind: attempt.breachDirection.kind,
         lifecycleStateKind: attempt.lifecycleState.kind,
         completedStepsJson: attempt.completedSteps as unknown as string[],
         transactionRefsJson: attempt.transactionReferences as unknown as Record<string, unknown>[],
@@ -178,7 +192,7 @@ export class OperationalStorageAdapter
     });
   }
 
-  async getAttempt(attemptId: string): Promise<(ExecutionAttempt & { attemptId: string; positionId: PositionId }) | null> {
+  async getAttempt(attemptId: string): Promise<StoredExecutionAttempt | null> {
     const rows = await this.db
       .select()
       .from(executionAttempts)
@@ -188,6 +202,7 @@ export class OperationalStorageAdapter
     return {
       attemptId: row.attemptId,
       positionId: row.positionId as PositionId,
+      breachDirection: directionFromKind(row.directionKind),
       lifecycleState: { kind: row.lifecycleStateKind } as ExecutionLifecycleState,
       completedSteps: (row.completedStepsJson as unknown as ExecutionAttempt['completedSteps']) ?? [],
       transactionReferences: (row.transactionRefsJson as unknown as ExecutionAttempt['transactionReferences']) ?? [],

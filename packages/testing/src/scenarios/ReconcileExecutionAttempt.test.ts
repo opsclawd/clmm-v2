@@ -27,6 +27,7 @@ describe('ReconcileExecutionAttempt', () => {
     await executionRepo.saveAttempt({
       attemptId: 'attempt-1',
       positionId: FIXTURE_POSITION_ID,
+      breachDirection: LOWER_BOUND_BREACH,
       lifecycleState: { kind: 'submitted' },
       completedSteps: [],
       transactionReferences: [{ signature: 'sig-1', stepKind: 'remove-liquidity' }],

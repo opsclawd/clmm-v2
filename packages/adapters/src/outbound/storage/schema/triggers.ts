@@ -1,4 +1,5 @@
-import { pgTable, text, boolean, bigint } from 'drizzle-orm/pg-core';
+import { sql } from 'drizzle-orm';
+import { pgTable, text, boolean, bigint, check } from 'drizzle-orm/pg-core';
 
 export const breachEpisodes = pgTable('breach_episodes', {
   episodeId: text('episode_id').primaryKey(),
@@ -7,7 +8,12 @@ export const breachEpisodes = pgTable('breach_episodes', {
   startedAt: bigint('started_at', { mode: 'number' }).notNull(),
   lastObservedAt: bigint('last_observed_at', { mode: 'number' }).notNull(),
   activeTriggerId: text('active_trigger_id'),
-});
+}, (table) => [
+  check(
+    'breach_episodes_direction_kind_check',
+    sql`${table.directionKind} in ('lower-bound-breach', 'upper-bound-breach')`,
+  ),
+]);
 
 export const exitTriggers = pgTable('exit_triggers', {
   triggerId: text('trigger_id').primaryKey(),
@@ -17,4 +23,9 @@ export const exitTriggers = pgTable('exit_triggers', {
   triggeredAt: bigint('triggered_at', { mode: 'number' }).notNull(),
   confirmationEvaluatedAt: bigint('confirmation_evaluated_at', { mode: 'number' }).notNull(),
   confirmationPassed: boolean('confirmation_passed').notNull().default(true),
-});
+}, (table) => [
+  check(
+    'exit_triggers_direction_kind_check',
+    sql`${table.directionKind} in ('lower-bound-breach', 'upper-bound-breach')`,
+  ),
+]);

@@ -10,6 +10,7 @@ describe('GetExecutionAttemptDetail', () => {
     await executionRepo.saveAttempt({
       attemptId: 'attempt-1',
       positionId: FIXTURE_POSITION_ID,
+      breachDirection: { kind: 'lower-bound-breach' },
       lifecycleState: { kind: 'submitted' },
       completedSteps: [],
       transactionReferences: [],

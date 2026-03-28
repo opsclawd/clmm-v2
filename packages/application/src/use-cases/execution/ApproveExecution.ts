@@ -56,6 +56,7 @@ export async function approveExecution(params: {
   await executionRepo.saveAttempt({
     attemptId,
     positionId: previewPositionId,
+    breachDirection: previewBreachDirection,
     lifecycleState: { kind: 'awaiting-signature' },
     completedSteps: [],
     transactionReferences: [],

@@ -26,6 +26,7 @@ describe('RecordExecutionAbandonment', () => {
     await executionRepo.saveAttempt({
       attemptId: 'attempt-abandon-1',
       positionId: FIXTURE_POSITION_ID,
+      breachDirection: LOWER_BOUND_BREACH,
       lifecycleState: { kind: 'awaiting-signature' },
       completedSteps: [],
       transactionReferences: [],

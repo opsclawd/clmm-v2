@@ -138,11 +138,17 @@ export interface TriggerRepository {
   deleteTrigger(triggerId: ExitTriggerId): Promise<void>;
 }
 
+export type StoredExecutionAttempt = ExecutionAttempt & {
+  attemptId: string;
+  positionId: PositionId;
+  breachDirection: BreachDirection;
+};
+
 export interface ExecutionRepository {
   savePreview(positionId: PositionId, preview: ExecutionPreview, breachDirection: BreachDirection): Promise<{ previewId: string }>;
   getPreview(previewId: string): Promise<{ preview: ExecutionPreview; positionId: PositionId; breachDirection: BreachDirection } | null>;
-  saveAttempt(attempt: ExecutionAttempt & { attemptId: string; positionId: PositionId }): Promise<void>;
-  getAttempt(attemptId: string): Promise<(ExecutionAttempt & { attemptId: string; positionId: PositionId }) | null>;
+  saveAttempt(attempt: StoredExecutionAttempt): Promise<void>;
+  getAttempt(attemptId: string): Promise<StoredExecutionAttempt | null>;
   updateAttemptState(attemptId: string, state: ExecutionLifecycleState): Promise<void>;
 }
 

@@ -6,8 +6,8 @@ import type {
   ExecutionLifecycleState,
   PositionId,
 } from '@clmm/domain';
+import type { StoredExecutionAttempt } from '@clmm/application';
 
-type StoredAttempt = ExecutionAttempt & { attemptId: string; positionId: PositionId };
 type StoredPreview = {
   preview: ExecutionPreview;
   positionId: PositionId;
@@ -16,7 +16,7 @@ type StoredPreview = {
 
 export class FakeExecutionRepository implements ExecutionRepository {
   readonly previews = new Map<string, StoredPreview>();
-  readonly attempts = new Map<string, StoredAttempt>();
+  readonly attempts = new Map<string, StoredExecutionAttempt>();
   private _previewCounter = 0;
 
   async savePreview(positionId: PositionId, preview: ExecutionPreview, breachDirection: BreachDirection): Promise<{ previewId: string }> {
@@ -29,11 +29,11 @@ export class FakeExecutionRepository implements ExecutionRepository {
     return this.previews.get(previewId) ?? null;
   }
 
-  async saveAttempt(attempt: StoredAttempt): Promise<void> {
+  async saveAttempt(attempt: StoredExecutionAttempt): Promise<void> {
     this.attempts.set(attempt.attemptId, attempt);
   }
 
-  async getAttempt(attemptId: string): Promise<StoredAttempt | null> {
+  async getAttempt(attemptId: string): Promise<StoredExecutionAttempt | null> {
     return this.attempts.get(attemptId) ?? null;
   }
 
