@@ -8,6 +8,13 @@
       "when": 1774708583114,
       "tag": "0000_acoustic_the_fallen",
       "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "7",
+      "when": 1774719136000,
+      "tag": "0001_attempt_direction_hardening",
+      "breakpoints": true
     }
   ]
 }

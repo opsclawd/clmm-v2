@@ -1,6 +1,6 @@
 {
-  "id": "a7d76b74-eb69-49f0-81d5-c2279aee77e3",
-  "prevId": "00000000-0000-0000-0000-000000000000",
+  "id": "8af64db1-388f-4d84-a722-e7b91d6b5c33",
+  "prevId": "a7d76b74-eb69-49f0-81d5-c2279aee77e3",
   "version": "7",
   "dialect": "postgresql",
   "tables": {
@@ -16,6 +16,12 @@
         },
         "position_id": {
           "name": "position_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "direction_kind": {
+          "name": "direction_kind",
           "type": "text",
           "primaryKey": false,
           "notNull": true
@@ -58,7 +64,12 @@
       "compositePrimaryKeys": {},
       "uniqueConstraints": {},
       "policies": {},
-      "checkConstraints": {},
+      "checkConstraints": {
+        "execution_attempts_direction_kind_check": {
+          "name": "execution_attempts_direction_kind_check",
+          "value": "\"execution_attempts\".\"direction_kind\" in ('lower-bound-breach', 'upper-bound-breach')"
+        }
+      },
       "isRLSEnabled": false
     },
     "public.execution_sessions": {
@@ -156,7 +167,12 @@
       "compositePrimaryKeys": {},
       "uniqueConstraints": {},
       "policies": {},
-      "checkConstraints": {},
+      "checkConstraints": {
+        "history_events_direction_kind_check": {
+          "name": "history_events_direction_kind_check",
+          "value": "\"history_events\".\"direction_kind\" in ('lower-bound-breach', 'upper-bound-breach')"
+        }
+      },
       "isRLSEnabled": false
     },
     "public.breach_episodes": {
@@ -205,7 +221,12 @@
       "compositePrimaryKeys": {},
       "uniqueConstraints": {},
       "policies": {},
-      "checkConstraints": {},
+      "checkConstraints": {
+        "breach_episodes_direction_kind_check": {
+          "name": "breach_episodes_direction_kind_check",
+          "value": "\"breach_episodes\".\"direction_kind\" in ('lower-bound-breach', 'upper-bound-breach')"
+        }
+      },
       "isRLSEnabled": false
     },
     "public.exit_triggers": {
@@ -261,7 +282,12 @@
       "compositePrimaryKeys": {},
       "uniqueConstraints": {},
       "policies": {},
-      "checkConstraints": {},
+      "checkConstraints": {
+        "exit_triggers_direction_kind_check": {
+          "name": "exit_triggers_direction_kind_check",
+          "value": "\"exit_triggers\".\"direction_kind\" in ('lower-bound-breach', 'upper-bound-breach')"
+        }
+      },
       "isRLSEnabled": false
     },
     "public.execution_previews": {

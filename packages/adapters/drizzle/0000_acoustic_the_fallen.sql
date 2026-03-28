@@ -1,13 +1,11 @@
 CREATE TABLE "execution_attempts" (
 	"attempt_id" text PRIMARY KEY NOT NULL,
 	"position_id" text NOT NULL,
-	"direction_kind" text NOT NULL,
 	"lifecycle_state_kind" text NOT NULL,
 	"completed_steps_json" jsonb DEFAULT '[]'::jsonb NOT NULL,
 	"transaction_refs_json" jsonb DEFAULT '[]'::jsonb NOT NULL,
 	"created_at" bigint NOT NULL,
-	"updated_at" bigint NOT NULL,
-	CONSTRAINT "execution_attempts_direction_kind_check" CHECK ("execution_attempts"."direction_kind" in ('lower-bound-breach', 'upper-bound-breach'))
+	"updated_at" bigint NOT NULL
 );
 --> statement-breakpoint
 CREATE TABLE "execution_sessions" (
@@ -25,8 +23,7 @@ CREATE TABLE "history_events" (
 	"direction_kind" text NOT NULL,
 	"occurred_at" bigint NOT NULL,
 	"lifecycle_state_kind" text,
-	"transaction_ref_json" jsonb,
-	CONSTRAINT "history_events_direction_kind_check" CHECK ("history_events"."direction_kind" in ('lower-bound-breach', 'upper-bound-breach'))
+	"transaction_ref_json" jsonb
 );
 --> statement-breakpoint
 CREATE TABLE "breach_episodes" (
@@ -35,8 +32,7 @@ CREATE TABLE "breach_episodes" (
 	"direction_kind" text NOT NULL,
 	"started_at" bigint NOT NULL,
 	"last_observed_at" bigint NOT NULL,
-	"active_trigger_id" text,
-	CONSTRAINT "breach_episodes_direction_kind_check" CHECK ("breach_episodes"."direction_kind" in ('lower-bound-breach', 'upper-bound-breach'))
+	"active_trigger_id" text
 );
 --> statement-breakpoint
 CREATE TABLE "exit_triggers" (
@@ -46,8 +42,7 @@ CREATE TABLE "exit_triggers" (
 	"direction_kind" text NOT NULL,
 	"triggered_at" bigint NOT NULL,
 	"confirmation_evaluated_at" bigint NOT NULL,
-	"confirmation_passed" boolean DEFAULT true NOT NULL,
-	CONSTRAINT "exit_triggers_direction_kind_check" CHECK ("exit_triggers"."direction_kind" in ('lower-bound-breach', 'upper-bound-breach'))
+	"confirmation_passed" boolean DEFAULT true NOT NULL
 );
 --> statement-breakpoint
 CREATE TABLE "execution_previews" (

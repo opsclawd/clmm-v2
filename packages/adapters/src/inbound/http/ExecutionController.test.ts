@@ -159,7 +159,7 @@ describe('ExecutionController', () => {
     ).rejects.toBeInstanceOf(ConflictException);
   });
 
-  it('rejects missing direction in abandon when no authoritative history exists', async () => {
+  it('uses the attempt-persisted direction during abandon when history is absent', async () => {
     await saveAttempt({
       attemptId: 'attempt-missing-abandon-direction',
       positionId: FIXTURE_POSITION_ID,
@@ -169,12 +169,13 @@ describe('ExecutionController', () => {
       transactionReferences: [],
     });
 
-    await expect(
-      controller.abandonExecution('attempt-missing-abandon-direction', {}),
-    ).rejects.toBeInstanceOf(BadRequestException);
+    const result = await controller.abandonExecution('attempt-missing-abandon-direction', {});
+
+    expect(result.abandoned).toBe(true);
+    expect(historyRepo.events.at(-1)?.breachDirection).toEqual(LOWER_BOUND_BREACH);
   });
 
-  it('uses authoritative history direction during abandon without defaulting lower-bound', async () => {
+  it('uses the attempt-persisted direction during abandon even when history disagrees', async () => {
     await saveAttempt({
       attemptId: 'attempt-abandon-history',
       positionId: FIXTURE_POSITION_ID,
@@ -195,7 +196,24 @@ describe('ExecutionController', () => {
     const result = await controller.abandonExecution('attempt-abandon-history', {});
 
     expect(result.abandoned).toBe(true);
-    expect(historyRepo.events.at(-1)?.breachDirection).toEqual(UPPER_BOUND_BREACH);
+    expect(historyRepo.events.at(-1)?.breachDirection).toEqual(LOWER_BOUND_BREACH);
+  });
+
+  it('rejects abandon when caller direction conflicts with the attempt-persisted direction', async () => {
+    await saveAttempt({
+      attemptId: 'attempt-abandon-mismatch',
+      positionId: FIXTURE_POSITION_ID,
+      breachDirection: UPPER_BOUND_BREACH,
+      lifecycleState: { kind: 'awaiting-signature' },
+      completedSteps: [],
+      transactionReferences: [],
+    });
+
+    await expect(
+      controller.abandonExecution('attempt-abandon-mismatch', {
+        breachDirection: 'lower-bound-breach',
+      }),
+    ).rejects.toBeInstanceOf(ConflictException);
   });
 
   it('rejects malformed base64 submit payloads explicitly', async () => {

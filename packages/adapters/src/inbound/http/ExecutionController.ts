@@ -113,33 +113,6 @@ export class ExecutionController {
     return attempt.breachDirection;
   }
 
-  private async resolveHistoryDirection(params: {
-    positionId: PositionId;
-    fallbackDirection?: 'lower-bound-breach' | 'upper-bound-breach';
-  }): Promise<BreachDirection> {
-    const timeline = await this.historyRepo.getTimeline(params.positionId);
-    const timelineDirection = timeline.events.at(-1)?.breachDirection ?? null;
-    const fallbackDirection = parseDirectionKind(params.fallbackDirection);
-
-    if (timelineDirection && fallbackDirection && timelineDirection.kind !== fallbackDirection.kind) {
-      throw new ConflictException(
-        `breachDirection conflicts with authoritative history for position ${params.positionId}`,
-      );
-    }
-
-    if (timelineDirection) {
-      return timelineDirection;
-    }
-
-    if (!fallbackDirection) {
-      throw new BadRequestException(
-        'breachDirection is required when authoritative history direction is unavailable',
-      );
-    }
-
-    return fallbackDirection;
-  }
-
   private async appendLifecycleEvent(params: {
     positionId: PositionId;
     breachDirection: BreachDirection;
@@ -269,10 +242,7 @@ export class ExecutionController {
     const attempt = await this.executionRepo.getAttempt(attemptId);
     if (!attempt) throw new NotFoundException(`Attempt not found: ${attemptId}`);
 
-    const breachDirection = await this.resolveHistoryDirection({
-      positionId: attempt.positionId,
-      ...(body?.breachDirection ? { fallbackDirection: body.breachDirection } : {}),
-    });
+    const breachDirection = this.resolveAttemptDirection(attempt, body?.breachDirection);
 
     const result = await recordExecutionAbandonment({
       attemptId,
