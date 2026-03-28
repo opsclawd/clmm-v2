@@ -135,11 +135,12 @@ export interface TriggerRepository {
   listActionableTriggers(walletId: WalletId): Promise<ExitTrigger[]>;
   getActiveEpisodeTrigger(episodeId: BreachEpisodeId): Promise<ExitTriggerId | null>;
   saveEpisode(episode: BreachEpisode): Promise<void>;
+  deleteTrigger(triggerId: ExitTriggerId): Promise<void>;
 }
 
 export interface ExecutionRepository {
-  savePreview(positionId: PositionId, preview: ExecutionPreview): Promise<{ previewId: string }>;
-  getPreview(previewId: string): Promise<ExecutionPreview | null>;
+  savePreview(positionId: PositionId, preview: ExecutionPreview, breachDirection: BreachDirection): Promise<{ previewId: string }>;
+  getPreview(previewId: string): Promise<{ preview: ExecutionPreview; positionId: PositionId; breachDirection: BreachDirection } | null>;
   saveAttempt(attempt: ExecutionAttempt & { attemptId: string; positionId: PositionId }): Promise<void>;
   getAttempt(attemptId: string): Promise<(ExecutionAttempt & { attemptId: string; positionId: PositionId }) | null>;
   updateAttemptState(attemptId: string, state: ExecutionLifecycleState): Promise<void>;

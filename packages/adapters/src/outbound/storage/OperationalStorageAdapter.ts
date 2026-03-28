@@ -18,6 +18,7 @@ import type {
   ExecutionAttempt,
   ExecutionLifecycleState,
   ClockTimestamp,
+  BreachDirection,
 } from '@clmm/domain';
 import { LOWER_BOUND_BREACH, UPPER_BOUND_BREACH, makeClockTimestamp } from '@clmm/domain';
 
@@ -106,13 +107,18 @@ export class OperationalStorageAdapter
     });
   }
 
+  async deleteTrigger(triggerId: ExitTriggerId): Promise<void> {
+    await this.db.delete(exitTriggers).where(eq(exitTriggers.triggerId, triggerId));
+  }
+
   // --- ExecutionRepository ---
 
-  async savePreview(positionId: PositionId, preview: ExecutionPreview): Promise<{ previewId: string }> {
+  async savePreview(positionId: PositionId, preview: ExecutionPreview, breachDirection: BreachDirection): Promise<{ previewId: string }> {
     const previewId = this.ids.generateId();
     await this.db.insert(executionPreviews).values({
       previewId,
       positionId,
+      directionKind: breachDirection.kind,
       planJson: preview.plan as unknown as Record<string, unknown>,
       freshnessKind: preview.freshness.kind,
       freshnessExpiresAt: preview.freshness.kind === 'fresh' ? preview.freshness.expiresAt : null,
@@ -122,14 +128,18 @@ export class OperationalStorageAdapter
     return { previewId };
   }
 
-  async getPreview(previewId: string): Promise<ExecutionPreview | null> {
+  async getPreview(previewId: string): Promise<{
+    preview: ExecutionPreview;
+    positionId: PositionId;
+    breachDirection: BreachDirection;
+  } | null> {
     const rows = await this.db
       .select()
       .from(executionPreviews)
       .where(eq(executionPreviews.previewId, previewId));
     const [row] = rows;
     if (!row) return null;
-    return {
+    const preview: ExecutionPreview = {
       plan: row.planJson as ExecutionPreview['plan'],
       freshness: row.freshnessKind === 'fresh'
         ? { kind: 'fresh', expiresAt: row.freshnessExpiresAt ?? 0 }
@@ -137,6 +147,11 @@ export class OperationalStorageAdapter
           ? { kind: 'stale' }
           : { kind: 'expired' },
       estimatedAt: makeClockTimestamp(row.estimatedAt),
+    };
+    return {
+      preview,
+      positionId: row.positionId as PositionId,
+      breachDirection: directionFromKind(row.directionKind),
     };
   }
 

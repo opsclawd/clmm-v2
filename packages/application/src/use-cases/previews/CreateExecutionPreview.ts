@@ -33,7 +33,7 @@ export async function createExecutionPreview(params: {
     estimatedAt,
   };
 
-  const { previewId } = await executionRepo.savePreview(positionId, preview);
+  const { previewId } = await executionRepo.savePreview(positionId, preview, breachDirection);
 
   return { previewId, plan: enrichedPlan, preview };
 }

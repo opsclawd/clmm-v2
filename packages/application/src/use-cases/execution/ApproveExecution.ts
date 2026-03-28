@@ -33,15 +33,29 @@ export async function approveExecution(params: {
   } = params;
 
   const attemptId = ids.generateId();
-  const preview = await executionRepo.getPreview(previewId);
+  const previewRecord = await executionRepo.getPreview(previewId);
 
-  if (!preview) {
+  if (!previewRecord) {
     throw new Error(`Preview not found: ${previewId}`);
+  }
+
+  const {
+    positionId: previewPositionId,
+    breachDirection: previewBreachDirection,
+    preview,
+  } = previewRecord;
+
+  if (positionId !== previewPositionId) {
+    throw new Error(`approveExecution: positionId mismatch for preview ${previewId}`);
+  }
+
+  if (breachDirection.kind !== previewBreachDirection.kind) {
+    throw new Error(`approveExecution: breachDirection mismatch for preview ${previewId}`);
   }
 
   await executionRepo.saveAttempt({
     attemptId,
-    positionId,
+    positionId: previewPositionId,
     lifecycleState: { kind: 'awaiting-signature' },
     completedSteps: [],
     transactionReferences: [],
@@ -49,9 +63,9 @@ export async function approveExecution(params: {
 
   await historyRepo.appendEvent({
     eventId: ids.generateId(),
-    positionId,
+    positionId: previewPositionId,
     eventType: 'signature-requested',
-    breachDirection,
+    breachDirection: previewBreachDirection,
     occurredAt: clock.now(),
     lifecycleState: { kind: 'awaiting-signature' },
   });
@@ -59,7 +73,7 @@ export async function approveExecution(params: {
   const { serializedPayload } = await prepPort.prepareExecution({
     plan: preview.plan,
     walletId,
-    positionId,
+    positionId: previewPositionId,
   });
 
   const sigResult = await signingPort.requestSignature(serializedPayload, walletId);
@@ -68,9 +82,9 @@ export async function approveExecution(params: {
     await executionRepo.updateAttemptState(attemptId, { kind: 'abandoned' });
     await historyRepo.appendEvent({
       eventId: ids.generateId(),
-      positionId,
+      positionId: previewPositionId,
       eventType: 'signature-declined',
-      breachDirection,
+      breachDirection: previewBreachDirection,
       occurredAt: clock.now(),
       lifecycleState: { kind: 'abandoned' },
     });
@@ -80,9 +94,9 @@ export async function approveExecution(params: {
   if (sigResult.kind === 'interrupted') {
     await historyRepo.appendEvent({
       eventId: ids.generateId(),
-      positionId,
+      positionId: previewPositionId,
       eventType: 'signature-interrupted',
-      breachDirection,
+      breachDirection: previewBreachDirection,
       occurredAt: clock.now(),
       lifecycleState: { kind: 'awaiting-signature' },
     });
@@ -96,9 +110,9 @@ export async function approveExecution(params: {
   if (firstReference) {
     await historyRepo.appendEvent({
       eventId: ids.generateId(),
-      positionId,
+      positionId: previewPositionId,
       eventType: 'submitted',
-      breachDirection,
+      breachDirection: previewBreachDirection,
       occurredAt: clock.now(),
       lifecycleState: { kind: 'submitted' },
       transactionReference: firstReference,

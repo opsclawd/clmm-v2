@@ -1,5 +1,6 @@
 import type { ExecutionRepository } from '@clmm/application';
 import type {
+  BreachDirection,
   ExecutionPreview,
   ExecutionAttempt,
   ExecutionLifecycleState,
@@ -7,19 +8,24 @@ import type {
 } from '@clmm/domain';
 
 type StoredAttempt = ExecutionAttempt & { attemptId: string; positionId: PositionId };
+type StoredPreview = {
+  preview: ExecutionPreview;
+  positionId: PositionId;
+  breachDirection: BreachDirection;
+};
 
 export class FakeExecutionRepository implements ExecutionRepository {
-  readonly previews = new Map<string, ExecutionPreview>();
+  readonly previews = new Map<string, StoredPreview>();
   readonly attempts = new Map<string, StoredAttempt>();
   private _previewCounter = 0;
 
-  async savePreview(positionId: PositionId, preview: ExecutionPreview): Promise<{ previewId: string }> {
+  async savePreview(positionId: PositionId, preview: ExecutionPreview, breachDirection: BreachDirection): Promise<{ previewId: string }> {
     const previewId = `preview-${++this._previewCounter}`;
-    this.previews.set(previewId, preview);
+    this.previews.set(previewId, { preview, positionId, breachDirection });
     return { previewId };
   }
 
-  async getPreview(previewId: string): Promise<ExecutionPreview | null> {
+  async getPreview(previewId: string): Promise<StoredPreview | null> {
     return this.previews.get(previewId) ?? null;
   }
 

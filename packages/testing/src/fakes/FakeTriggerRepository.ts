@@ -35,4 +35,8 @@ export class FakeTriggerRepository implements TriggerRepository {
       this.episodeTriggerMap.set(episode.episodeId, episode.activeTriggerId);
     }
   }
+
+  async deleteTrigger(triggerId: ExitTriggerId): Promise<void> {
+    this.triggers.delete(triggerId);
+  }
 }
