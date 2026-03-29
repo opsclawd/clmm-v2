@@ -2,7 +2,6 @@ import type { ExecutionRepository } from '@clmm/application';
 import type {
   BreachDirection,
   ExecutionPreview,
-  ExecutionAttempt,
   ExecutionLifecycleState,
   PositionId,
 } from '@clmm/domain';
