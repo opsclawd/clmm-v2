@@ -7,6 +7,7 @@ export { SigningStatusScreen } from './screens/SigningStatusScreen.js';
 export { ExecutionResultScreen } from './screens/ExecutionResultScreen.js';
 export { HistoryListScreen } from './screens/HistoryListScreen.js';
 export { HistoryDetailScreen } from './screens/HistoryDetailScreen.js';
+export { WalletSettingsScreen } from './screens/WalletSettingsScreen.js';
 
 // Components — reusable
 export { DesktopShell } from './components/DesktopShell.js';
