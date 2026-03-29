@@ -15,5 +15,6 @@ export * from './use-cases/notifications/DispatchActionableNotification.js';
 export * from './use-cases/positions/ListSupportedPositions.js';
 export * from './use-cases/positions/GetPositionDetail.js';
 export * from './use-cases/positions/GetMonitoringReadiness.js';
+export * from './use-cases/wallet/ConnectWalletSession.js';
 export * from './use-cases/alerts/ListActionableAlerts.js';
 export * from './use-cases/alerts/AcknowledgeAlert.js';
