@@ -10,6 +10,7 @@ import { LOWER_BOUND_BREACH, UPPER_BOUND_BREACH } from '@clmm/domain';
 import type { ExitTriggerId } from '@clmm/domain';
 
 const TRIGGER_ID = 'trigger-1' as ExitTriggerId;
+const TRIGGER_ID_2 = 'trigger-2' as ExitTriggerId;
 
 describe('DispatchActionableNotification', () => {
   let notificationPort: FakeNotificationPort;
@@ -40,5 +41,68 @@ describe('DispatchActionableNotification', () => {
       notificationPort,
     });
     expect(notificationPort.dispatched[0]?.breachDirection.kind).toBe('upper-bound-breach');
+  });
+
+  it('returns { dispatched: true } when notification is sent', async () => {
+    const result = await dispatchActionableNotification({
+      walletId: FIXTURE_WALLET_ID,
+      positionId: FIXTURE_POSITION_ID,
+      triggerId: TRIGGER_ID,
+      breachDirection: LOWER_BOUND_BREACH,
+      notificationPort,
+    });
+    expect(result).toEqual({ dispatched: true });
+  });
+
+  it('suppresses duplicate notification for same triggerId', async () => {
+    const notificationDedup = new Map<string, boolean>();
+
+    const result1 = await dispatchActionableNotification({
+      walletId: FIXTURE_WALLET_ID,
+      positionId: FIXTURE_POSITION_ID,
+      triggerId: TRIGGER_ID,
+      breachDirection: LOWER_BOUND_BREACH,
+      notificationPort,
+      notificationDedup,
+    });
+
+    const result2 = await dispatchActionableNotification({
+      walletId: FIXTURE_WALLET_ID,
+      positionId: FIXTURE_POSITION_ID,
+      triggerId: TRIGGER_ID,
+      breachDirection: LOWER_BOUND_BREACH,
+      notificationPort,
+      notificationDedup,
+    });
+
+    expect(result1).toEqual({ dispatched: true });
+    expect(result2).toEqual({ dispatched: false });
+    expect(notificationPort.dispatched).toHaveLength(1);
+  });
+
+  it('does NOT suppress notification for a different triggerId', async () => {
+    const notificationDedup = new Map<string, boolean>();
+
+    const result1 = await dispatchActionableNotification({
+      walletId: FIXTURE_WALLET_ID,
+      positionId: FIXTURE_POSITION_ID,
+      triggerId: TRIGGER_ID,
+      breachDirection: LOWER_BOUND_BREACH,
+      notificationPort,
+      notificationDedup,
+    });
+
+    const result2 = await dispatchActionableNotification({
+      walletId: FIXTURE_WALLET_ID,
+      positionId: FIXTURE_POSITION_ID,
+      triggerId: TRIGGER_ID_2,
+      breachDirection: UPPER_BOUND_BREACH,
+      notificationPort,
+      notificationDedup,
+    });
+
+    expect(result1).toEqual({ dispatched: true });
+    expect(result2).toEqual({ dispatched: true });
+    expect(notificationPort.dispatched).toHaveLength(2);
   });
 });

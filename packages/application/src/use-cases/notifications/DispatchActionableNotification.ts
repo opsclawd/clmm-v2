@@ -7,12 +7,23 @@ export async function dispatchActionableNotification(params: {
   triggerId: ExitTriggerId;
   breachDirection: BreachDirection;
   notificationPort: NotificationPort;
-}): Promise<void> {
-  const { walletId, positionId, triggerId, breachDirection, notificationPort } = params;
+  notificationDedup?: Map<string, boolean>;
+}): Promise<{ dispatched: boolean }> {
+  const { walletId, positionId, triggerId, breachDirection, notificationPort, notificationDedup } =
+    params;
+
+  if (notificationDedup?.has(triggerId)) {
+    return { dispatched: false };
+  }
+
   await notificationPort.sendActionableAlert({
     walletId,
     positionId,
     breachDirection,
     triggerId,
   });
+
+  notificationDedup?.set(triggerId, true);
+
+  return { dispatched: true };
 }
