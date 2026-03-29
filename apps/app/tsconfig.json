@@ -9,6 +9,7 @@
   "include": ["app/**/*", "src/**/*"],
   "references": [
     { "path": "../../packages/ui" },
-    { "path": "../../packages/application" }
+    { "path": "../../packages/application" },
+    { "path": "../../packages/config" }
   ]
 }
