@@ -9,6 +9,7 @@ export { HistoryListScreen } from './screens/HistoryListScreen.js';
 export { HistoryDetailScreen } from './screens/HistoryDetailScreen.js';
 
 // Components — reusable
+export { DesktopShell } from './components/DesktopShell.js';
 export { DirectionalPolicyCard } from './components/DirectionalPolicyCard.js';
 export { PreviewStepSequence } from './components/PreviewStepSequence.js';
 export { RangeStatusBadge, getRangeStatusBadgeProps } from './components/RangeStatusBadge.js';
