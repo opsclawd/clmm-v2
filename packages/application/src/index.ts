@@ -19,3 +19,4 @@ export * from './use-cases/wallet/ConnectWalletSession.js';
 export * from './use-cases/wallet/SyncPlatformCapabilities.js';
 export * from './use-cases/alerts/ListActionableAlerts.js';
 export * from './use-cases/alerts/AcknowledgeAlert.js';
+export * from './use-cases/execution/ResolveExecutionEntryContext.js';
