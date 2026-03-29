@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { buildPreviewStepLabels } from './PreviewStepSequenceUtils.js';
-import { LOWER_BOUND_BREACH, UPPER_BOUND_BREACH } from '@clmm/domain';
+import { LOWER_BOUND_BREACH, UPPER_BOUND_BREACH } from '@clmm/application/public';
 
 describe('PreviewStepSequence', () => {
   it('downside preview step order: remove liq → fees → SOL→USDC → USDC posture', () => {

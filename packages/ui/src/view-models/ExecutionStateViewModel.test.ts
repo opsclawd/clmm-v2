@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { buildExecutionStateViewModel } from './ExecutionStateViewModel.js';
-import type { ExecutionLifecycleState } from '@clmm/domain';
+import type { ExecutionLifecycleState } from '@clmm/application/public';
 
 function makeState(kind: ExecutionLifecycleState['kind']): ExecutionLifecycleState {
   return { kind } as ExecutionLifecycleState;

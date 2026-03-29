@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { buildPreviewViewModel } from './PreviewViewModel.js';
-import { LOWER_BOUND_BREACH, UPPER_BOUND_BREACH, makeClockTimestamp, makePositionId } from '@clmm/domain';
+import { LOWER_BOUND_BREACH, UPPER_BOUND_BREACH, makeClockTimestamp, makePositionId } from '@clmm/application/public';
 import type { ExecutionPreviewDto } from '@clmm/application/public';
 
 function makePreviewDto(direction = LOWER_BOUND_BREACH): ExecutionPreviewDto {

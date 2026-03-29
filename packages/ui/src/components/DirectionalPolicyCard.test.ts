@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { renderDirectionalPolicyText } from './DirectionalPolicyCardUtils.js';
-import { LOWER_BOUND_BREACH, UPPER_BOUND_BREACH } from '@clmm/domain';
+import { LOWER_BOUND_BREACH, UPPER_BOUND_BREACH } from '@clmm/application/public';
 
 describe('DirectionalPolicyCard', () => {
   it('lower-bound breach shows SOL → USDC', () => {
