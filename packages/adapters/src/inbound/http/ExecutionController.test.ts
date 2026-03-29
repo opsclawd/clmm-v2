@@ -57,9 +57,7 @@ describe('ExecutionController', () => {
   let controller: ExecutionController;
 
   async function saveAttempt(attempt: StoredExecutionAttempt) {
-    await executionRepo.saveAttempt(
-      attempt as Parameters<FakeExecutionRepository['saveAttempt']>[0],
-    );
+    await executionRepo.saveAttempt(attempt);
   }
 
   beforeEach(() => {
@@ -133,7 +131,7 @@ describe('ExecutionController', () => {
     expect(Array.from(submissionPort.submittedPayloads[0] ?? [])).toEqual([1, 2, 3, 4]);
     expect(submissionPort.reconcileCalls).toEqual([[{ signature: 'sig-submit-1', stepKind: 'swap-assets' }]]);
 
-    const storedAttempt = await executionRepo.getAttempt('attempt-submit') as StoredExecutionAttempt | null;
+    const storedAttempt = await executionRepo.getAttempt('attempt-submit');
     expect(storedAttempt?.transactionReferences).toEqual([{ signature: 'sig-submit-1', stepKind: 'swap-assets' }]);
     expect(storedAttempt?.breachDirection).toEqual(UPPER_BOUND_BREACH);
 

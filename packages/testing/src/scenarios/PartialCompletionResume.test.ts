@@ -1,7 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import {
   makeWalletId,
-  LOWER_BOUND_BREACH,
 } from '@clmm/domain';
 import {
   scanPositionsForBreaches,
