@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
-import { syncPlatformCapabilities } from '@clmm/application';
-import { FakePlatformCapabilityPort } from '../fakes/FakePlatformCapabilityPort.js';
+import { syncPlatformCapabilities } from './SyncPlatformCapabilities.js';
+import { FakePlatformCapabilityPort } from '@clmm/testing';
 
 describe('SyncPlatformCapabilities', () => {
   it('returns current platform capabilities', async () => {

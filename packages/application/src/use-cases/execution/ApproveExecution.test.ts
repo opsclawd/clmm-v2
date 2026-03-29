@@ -1,5 +1,6 @@
 import { describe, it, expect, beforeEach } from 'vitest';
-import { requestWalletSignature, createExecutionPreview } from '@clmm/application';
+import { approveExecution } from './ApproveExecution.js';
+import { createExecutionPreview } from '../previews/CreateExecutionPreview.js';
 import {
   FakeClockPort,
   FakeIdGeneratorPort,
@@ -7,30 +8,34 @@ import {
   FakeExecutionRepository,
   FakeExecutionPreparationPort,
   FakeWalletSigningPort,
+  FakeExecutionSubmissionPort,
   FakeExecutionHistoryRepository,
   FIXTURE_POSITION_ID,
   FIXTURE_WALLET_ID,
 } from '@clmm/testing';
 import { LOWER_BOUND_BREACH } from '@clmm/domain';
 
-describe('RequestWalletSignature', () => {
+describe('ApproveExecution', () => {
   let clock: FakeClockPort;
   let ids: FakeIdGeneratorPort;
+  let swapQuote: FakeSwapQuotePort;
   let executionRepo: FakeExecutionRepository;
   let prepPort: FakeExecutionPreparationPort;
   let signingPort: FakeWalletSigningPort;
+  let submissionPort: FakeExecutionSubmissionPort;
   let historyRepo: FakeExecutionHistoryRepository;
   let previewId: string;
 
   beforeEach(async () => {
     clock = new FakeClockPort();
     ids = new FakeIdGeneratorPort();
+    swapQuote = new FakeSwapQuotePort();
     executionRepo = new FakeExecutionRepository();
     prepPort = new FakeExecutionPreparationPort();
     signingPort = new FakeWalletSigningPort();
+    submissionPort = new FakeExecutionSubmissionPort();
     historyRepo = new FakeExecutionHistoryRepository();
 
-    const swapQuote = new FakeSwapQuotePort();
     const created = await createExecutionPreview({
       positionId: FIXTURE_POSITION_ID,
       breachDirection: LOWER_BOUND_BREACH,
@@ -42,8 +47,8 @@ describe('RequestWalletSignature', () => {
     previewId = created.previewId;
   });
 
-  it('returns signed payload when user approves', async () => {
-    const result = await requestWalletSignature({
+  it('moves lifecycle to submitted when user signs', async () => {
+    const result = await approveExecution({
       previewId,
       walletId: FIXTURE_WALLET_ID,
       positionId: FIXTURE_POSITION_ID,
@@ -51,21 +56,19 @@ describe('RequestWalletSignature', () => {
       executionRepo,
       prepPort,
       signingPort,
+      submissionPort,
       historyRepo,
       clock,
       ids,
     });
-
-    expect(result.kind).toBe('signed');
-    if (result.kind === 'signed') {
-      expect(result.attemptId).toBeTruthy();
-      expect(result.signedPayload).toBeInstanceOf(Uint8Array);
-    }
+    expect(result.kind).toBe('submitted');
+    const storedAttempt = await executionRepo.getAttempt(result.attemptId);
+    expect(storedAttempt?.breachDirection).toEqual(LOWER_BOUND_BREACH);
   });
 
-  it('returns declined when user declines', async () => {
+  it('records decline when user declines to sign', async () => {
     signingPort.willDecline();
-    const result = await requestWalletSignature({
+    const result = await approveExecution({
       previewId,
       walletId: FIXTURE_WALLET_ID,
       positionId: FIXTURE_POSITION_ID,
@@ -73,17 +76,16 @@ describe('RequestWalletSignature', () => {
       executionRepo,
       prepPort,
       signingPort,
+      submissionPort,
       historyRepo,
       clock,
       ids,
     });
-
     expect(result.kind).toBe('declined');
   });
 
-  it('returns interrupted when signing interrupted (e.g. MWA handoff)', async () => {
-    signingPort.willInterrupt();
-    const result = await requestWalletSignature({
+  it('appends history events during execution', async () => {
+    await approveExecution({
       previewId,
       walletId: FIXTURE_WALLET_ID,
       positionId: FIXTURE_POSITION_ID,
@@ -91,14 +93,14 @@ describe('RequestWalletSignature', () => {
       executionRepo,
       prepPort,
       signingPort,
+      submissionPort,
       historyRepo,
       clock,
       ids,
     });
-
-    expect(result.kind).toBe('interrupted');
-    if (result.kind === 'interrupted') {
-      expect(result.attemptId).toBeTruthy();
+    expect(historyRepo.events.length).toBeGreaterThan(0);
+    for (const event of historyRepo.events) {
+      expect(event.breachDirection).toBeDefined();
     }
   });
 });

@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach } from 'vitest';
-import { createExecutionPreview } from '@clmm/application';
+import { createExecutionPreview } from './CreateExecutionPreview.js';
 import {
   FakeClockPort,
   FakeIdGeneratorPort,

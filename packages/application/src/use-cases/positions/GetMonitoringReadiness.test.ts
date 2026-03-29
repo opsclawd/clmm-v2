@@ -1,7 +1,6 @@
 import { describe, it, expect } from 'vitest';
-import { getMonitoringReadiness } from '@clmm/application';
-import { FakeNotificationPermissionPort } from '../fakes/FakeNotificationPermissionPort.js';
-import { FakePlatformCapabilityPort } from '../fakes/FakePlatformCapabilityPort.js';
+import { getMonitoringReadiness } from './GetMonitoringReadiness.js';
+import { FakeNotificationPermissionPort, FakePlatformCapabilityPort } from '@clmm/testing';
 
 describe('GetMonitoringReadiness', () => {
   it('returns full readiness when all capabilities available', async () => {

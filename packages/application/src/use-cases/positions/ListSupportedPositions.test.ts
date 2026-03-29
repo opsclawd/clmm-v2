@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { listSupportedPositions } from '@clmm/application';
+import { listSupportedPositions } from './ListSupportedPositions.js';
 import {
   FakeSupportedPositionReadPort,
   FIXTURE_WALLET_ID,

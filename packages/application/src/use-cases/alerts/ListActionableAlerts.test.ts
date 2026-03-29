@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach } from 'vitest';
-import { listActionableAlerts } from '@clmm/application';
+import { listActionableAlerts } from './ListActionableAlerts.js';
 import {
   FakeTriggerRepository,
   FIXTURE_WALLET_ID,

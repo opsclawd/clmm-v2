@@ -1,11 +1,11 @@
 import { describe, it, expect } from 'vitest';
-import { resumeExecutionAttempt } from '@clmm/application';
+import { resumeExecutionAttempt } from './ResumeExecutionAttempt.js';
 import {
   FakeExecutionRepository,
   FIXTURE_POSITION_ID,
 } from '@clmm/testing';
 import { LOWER_BOUND_BREACH } from '@clmm/domain';
-import type { StoredExecutionAttempt } from '@clmm/application';
+import type { StoredExecutionAttempt } from '../../ports/index.js';
 
 describe('ResumeExecutionAttempt', () => {
   it('returns resumable attempt when in awaiting-signature state', async () => {

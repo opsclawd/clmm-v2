@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach } from 'vitest';
-import { acknowledgeAlert } from '@clmm/application';
+import { acknowledgeAlert } from './AcknowledgeAlert.js';
 import { FakeTriggerRepository, FIXTURE_POSITION_ID } from '@clmm/testing';
 import { LOWER_BOUND_BREACH, makeClockTimestamp } from '@clmm/domain';
 import type { ExitTrigger, ExitTriggerId, BreachEpisodeId, WalletId } from '@clmm/domain';

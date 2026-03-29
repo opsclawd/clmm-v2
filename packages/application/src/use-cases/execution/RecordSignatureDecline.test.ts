@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { recordSignatureDecline } from '@clmm/application';
+import { recordSignatureDecline } from './RecordSignatureDecline.js';
 import {
   FakeClockPort,
   FakeIdGeneratorPort,
@@ -8,7 +8,7 @@ import {
   FIXTURE_POSITION_ID,
 } from '@clmm/testing';
 import { LOWER_BOUND_BREACH } from '@clmm/domain';
-import type { StoredExecutionAttempt } from '@clmm/application';
+import type { StoredExecutionAttempt } from '../../ports/index.js';
 
 describe('RecordSignatureDecline', () => {
   it('transitions awaiting-signature to abandoned', async () => {

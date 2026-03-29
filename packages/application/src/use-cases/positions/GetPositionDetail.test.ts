@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { getPositionDetail } from '@clmm/application';
+import { getPositionDetail } from './GetPositionDetail.js';
 import {
   FakeSupportedPositionReadPort,
   FIXTURE_POSITION_ID,

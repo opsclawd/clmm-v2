@@ -1,7 +1,6 @@
 import { describe, it, expect } from 'vitest';
-import { resolveExecutionEntryContext } from '@clmm/application';
-import { FIXTURE_POSITION_ID } from '@clmm/testing';
-import { FakeDeepLinkEntryPort } from '../fakes/FakeDeepLinkEntryPort.js';
+import { resolveExecutionEntryContext } from './ResolveExecutionEntryContext.js';
+import { FIXTURE_POSITION_ID, FakeDeepLinkEntryPort } from '@clmm/testing';
 import type { ExitTriggerId } from '@clmm/domain';
 
 describe('ResolveExecutionEntryContext', () => {

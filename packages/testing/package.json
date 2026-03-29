@@ -9,10 +9,10 @@
     "lint": "eslint src --ext .ts"
   },
   "dependencies": {
+    "@clmm/application": "workspace:*",
     "@clmm/domain": "workspace:*"
   },
   "devDependencies": {
-    "@clmm/application": "workspace:*",
     "@clmm/config": "workspace:*",
     "vitest": "^1.6.0",
     "typescript": "^5.4.0"

@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach } from 'vitest';
-import { getExecutionHistory } from '@clmm/application';
+import { getExecutionHistory } from './GetExecutionHistory.js';
 import { FakeClockPort, FakeExecutionHistoryRepository, FIXTURE_POSITION_ID } from '@clmm/testing';
 import { LOWER_BOUND_BREACH, makePositionId } from '@clmm/domain';
 

@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach } from 'vitest';
-import { getExecutionAttemptDetail } from '@clmm/application';
+import { getExecutionAttemptDetail } from './GetExecutionAttemptDetail.js';
 import { FakeExecutionRepository, FIXTURE_POSITION_ID } from '@clmm/testing';
 
 describe('GetExecutionAttemptDetail', () => {

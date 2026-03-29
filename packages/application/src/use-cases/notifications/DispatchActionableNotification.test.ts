@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach } from 'vitest';
-import { dispatchActionableNotification } from '@clmm/application';
+import { dispatchActionableNotification } from './DispatchActionableNotification.js';
 import {
   FakeNotificationPort,
   FakeIdGeneratorPort,

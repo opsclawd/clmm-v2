@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach } from 'vitest';
-import { recordExecutionAbandonment } from '@clmm/application';
+import { recordExecutionAbandonment } from './RecordExecutionAbandonment.js';
 import {
   FakeClockPort,
   FakeIdGeneratorPort,

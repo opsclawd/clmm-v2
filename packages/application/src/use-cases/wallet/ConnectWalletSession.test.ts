@@ -1,13 +1,13 @@
 import { describe, it, expect } from 'vitest';
-import { connectWalletSession } from '@clmm/application';
+import { connectWalletSession } from './ConnectWalletSession.js';
 import {
   FakeWalletSigningPort,
   FakeIdGeneratorPort,
   FakeClockPort,
   FIXTURE_WALLET_ID,
   FIXTURE_POSITION_ID,
+  FakeExecutionSessionRepository,
 } from '@clmm/testing';
-import { FakeExecutionSessionRepository } from '../fakes/FakeExecutionSessionRepository.js';
 
 describe('ConnectWalletSession', () => {
   it('creates a new wallet session and returns sessionId', async () => {
