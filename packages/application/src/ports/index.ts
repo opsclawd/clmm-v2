@@ -176,9 +176,26 @@ export interface ExecutionHistoryRepository {
 
 // --- Cross-cutting ports ---
 
+export type DetectionTimingRecord = {
+  readonly positionId: string;
+  readonly detectedAt: number;
+  readonly observedAt: number;
+  readonly durationMs: number;
+};
+
+export type DeliveryTimingRecord = {
+  readonly triggerId: string;
+  readonly dispatchedAt: number;
+  readonly deliveredAt: number | null;
+  readonly durationMs: number;
+  readonly channel: 'push' | 'web-push' | 'in-app';
+};
+
 export interface ObservabilityPort {
   log(level: 'info' | 'warn' | 'error', message: string, context?: Record<string, unknown>): void;
   recordTiming(event: string, durationMs: number, tags?: Record<string, string>): void;
+  recordDetectionTiming(record: DetectionTimingRecord): void;
+  recordDeliveryTiming(record: DeliveryTimingRecord): void;
 }
 
 export interface ClockPort {

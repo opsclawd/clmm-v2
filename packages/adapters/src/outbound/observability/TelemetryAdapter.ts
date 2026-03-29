@@ -1,4 +1,4 @@
-import type { ObservabilityPort } from '@clmm/application';
+import type { ObservabilityPort, DetectionTimingRecord, DeliveryTimingRecord } from '@clmm/application';
 
 export class TelemetryAdapter implements ObservabilityPort {
   log(
@@ -27,5 +27,24 @@ export class TelemetryAdapter implements ObservabilityPort {
     tags?: Record<string, string>,
   ): void {
     this.log('info', `timing:${event}`, { durationMs, ...tags });
+  }
+
+  recordDetectionTiming(record: DetectionTimingRecord): void {
+    this.log('info', 'timing:detection', {
+      positionId: record.positionId,
+      detectedAt: record.detectedAt,
+      observedAt: record.observedAt,
+      durationMs: record.durationMs,
+    });
+  }
+
+  recordDeliveryTiming(record: DeliveryTimingRecord): void {
+    this.log('info', 'timing:delivery', {
+      triggerId: record.triggerId,
+      dispatchedAt: record.dispatchedAt,
+      deliveredAt: record.deliveredAt,
+      durationMs: record.durationMs,
+      channel: record.channel,
+    });
   }
 }
