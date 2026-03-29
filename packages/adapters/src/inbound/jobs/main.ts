@@ -4,7 +4,8 @@ import { WorkerModule } from './WorkerModule.js';
 
 async function bootstrap(): Promise<void> {
   const app = await NestFactory.create(WorkerModule);
-  const port = process.env['PORT'] ?? 3002;
+  // boundary: process.env values are untyped at runtime; validated via env schema at deploy
+  const port = (process.env as Record<string, string | undefined>)['PORT'] ?? 3002;
   await app.listen(port);
   console.log(`Worker listening on port ${port}`);
 }

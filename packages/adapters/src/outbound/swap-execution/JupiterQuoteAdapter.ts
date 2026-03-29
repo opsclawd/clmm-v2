@@ -44,14 +44,19 @@ export class JupiterQuoteAdapter implements SwapQuotePort {
       slippageBps,
     });
 
-    const url = `${JUPITER_API_BASE}/quote?${params}`;
+    const url = `${JUPITER_API_BASE}/quote?${params.toString()}`;
     const res = await fetch(url);
 
     if (!res.ok) {
       throw new Error(`JupiterQuoteAdapter: Jupiter API error ${res.status}`);
     }
 
-    const data = await res.json();
+    // boundary: Jupiter v6 REST /quote response is untyped JSON
+    const data = (await res.json()) as {
+      outAmount: string;
+      priceImpactPct?: string;
+      routePlan?: Array<{ swapInfo?: { label?: string } }>;
+    };
 
     const decimals = instruction.toAsset === 'SOL' ? 9 : instruction.toAsset === 'USDC' ? 6 : 9;
     const estimatedOutputAmount = makeTokenAmount(

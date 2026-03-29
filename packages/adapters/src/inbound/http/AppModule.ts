@@ -23,8 +23,10 @@ import {
   ID_GENERATOR_PORT,
 } from './tokens.js';
 
-const db = createDb(process.env['DATABASE_URL'] ?? 'postgresql://localhost/clmm');
-const rpcUrl = process.env['SOLANA_RPC_URL'] ?? 'https://api.mainnet-beta.solana.com';
+// boundary: process.env values are untyped at runtime; validated via env schema at deploy
+const dbUrl = (process.env as Record<string, string | undefined>)['DATABASE_URL'] ?? 'postgresql://localhost/clmm';
+const db = createDb(dbUrl);
+const rpcUrl = (process.env as Record<string, string | undefined>)['SOLANA_RPC_URL'] ?? 'https://api.mainnet-beta.solana.com';
 
 const systemClock: ClockPort = {
   now: () => Date.now() as ClockTimestamp,

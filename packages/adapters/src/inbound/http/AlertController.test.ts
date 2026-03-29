@@ -6,7 +6,7 @@ import type { TriggerRepository } from '@clmm/application';
 import type { BreachEpisodeId, ExitTrigger, ExitTriggerId, WalletId } from '@clmm/domain';
 
 const otherPositionId = makePositionId('other-wallet-position');
-const requestedWalletId = FIXTURE_POSITION_IN_RANGE.walletId as WalletId;
+const requestedWalletId = FIXTURE_POSITION_IN_RANGE.walletId;
 
 class WalletScopedTriggerRepository extends FakeTriggerRepository {
   listedWalletId: WalletId | null = null;

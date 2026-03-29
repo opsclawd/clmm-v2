@@ -204,8 +204,9 @@ export class OperationalStorageAdapter
       positionId: row.positionId as PositionId,
       breachDirection: directionFromKind(row.directionKind),
       lifecycleState: { kind: row.lifecycleStateKind } as ExecutionLifecycleState,
-      completedSteps: (row.completedStepsJson as unknown as ExecutionAttempt['completedSteps']) ?? [],
-      transactionReferences: (row.transactionRefsJson as unknown as ExecutionAttempt['transactionReferences']) ?? [],
+      // boundary: Drizzle jsonb columns return unknown; runtime shape matches domain types
+      completedSteps: (row.completedStepsJson as ExecutionAttempt['completedSteps']) ?? [],
+      transactionReferences: (row.transactionRefsJson as ExecutionAttempt['transactionReferences']) ?? [],
     };
   }
 

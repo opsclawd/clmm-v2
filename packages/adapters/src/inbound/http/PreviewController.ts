@@ -38,7 +38,7 @@ function toPreviewDto(
           policyReason: step.instruction.policyReason,
         };
       }
-      return { kind: step.kind as 'remove-liquidity' | 'collect-fees' };
+      return { kind: step.kind };
     }),
     freshness: preview.freshness,
     estimatedAt: preview.estimatedAt as ExecutionPreviewDto['estimatedAt'],

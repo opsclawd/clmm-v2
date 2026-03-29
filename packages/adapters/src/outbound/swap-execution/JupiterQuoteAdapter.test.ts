@@ -133,7 +133,8 @@ describe('JupiterQuoteAdapter', () => {
   it('throws error for unsupported asset pair', async () => {
     const instruction: SwapInstruction = {
       fromAsset: 'SOL',
-      toAsset: 'UNSUPPORTED' as any,
+      // boundary: intentionally invalid value to test error path
+      toAsset: 'UNSUPPORTED' as unknown as SwapInstruction['toAsset'],
       policyReason: 'Test',
     };
 

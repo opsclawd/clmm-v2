@@ -40,14 +40,16 @@ describe('OrcaPositionReadAdapter', () => {
             positionMint: MOCK_POSITION_MINT,
           },
         },
-      ] as any);
+        // boundary: Orca SDK Position type has many fields; test uses minimal shape
+      ] as unknown as Awaited<ReturnType<typeof fetchPositionsForOwner>>);
 
       vi.mocked(fetchWhirlpool).mockResolvedValue({
         data: {
           tickCurrentIndex: -18130,
           sqrtPrice: 79228162514264337593543950336n,
         },
-      } as any);
+        // boundary: Orca SDK Whirlpool type has many fields; test uses minimal shape
+      } as unknown as Awaited<ReturnType<typeof fetchWhirlpool>>);
 
       const adapter = new OrcaPositionReadAdapter(mockRpcUrl);
       const positions = await adapter.listSupportedPositions(MOCK_WALLET);
@@ -72,14 +74,16 @@ describe('OrcaPositionReadAdapter', () => {
             positionMint: MOCK_POSITION_MINT,
           },
         },
-      ] as any);
+        // boundary: Orca SDK Position type has many fields; test uses minimal shape
+      ] as unknown as Awaited<ReturnType<typeof fetchPositionsForOwner>>);
 
       vi.mocked(fetchWhirlpool).mockResolvedValue({
         data: {
           tickCurrentIndex: -18130,
           sqrtPrice: 79228162514264337593543950336n,
         },
-      } as any);
+        // boundary: Orca SDK Whirlpool type has many fields; test uses minimal shape
+      } as unknown as Awaited<ReturnType<typeof fetchWhirlpool>>);
 
       const adapter = new OrcaPositionReadAdapter(mockRpcUrl);
       const positions = await adapter.listSupportedPositions(MOCK_WALLET);
@@ -102,14 +106,16 @@ describe('OrcaPositionReadAdapter', () => {
             positionMint: MOCK_POSITION_MINT,
           },
         },
-      ] as any);
+        // boundary: Orca SDK Position type has many fields; test uses minimal shape
+      ] as unknown as Awaited<ReturnType<typeof fetchPositionsForOwner>>);
 
       vi.mocked(fetchWhirlpool).mockResolvedValue({
         data: {
           tickCurrentIndex: -20000,
           sqrtPrice: 79228162514264337593543950336n,
         },
-      } as any);
+        // boundary: Orca SDK Whirlpool type has many fields; test uses minimal shape
+      } as unknown as Awaited<ReturnType<typeof fetchWhirlpool>>);
 
       const adapter = new OrcaPositionReadAdapter(mockRpcUrl);
       const positions = await adapter.listSupportedPositions(MOCK_WALLET);
@@ -132,14 +138,16 @@ describe('OrcaPositionReadAdapter', () => {
             positionMint: MOCK_POSITION_MINT,
           },
         },
-      ] as any);
+        // boundary: Orca SDK Position type has many fields; test uses minimal shape
+      ] as unknown as Awaited<ReturnType<typeof fetchPositionsForOwner>>);
 
       vi.mocked(fetchWhirlpool).mockResolvedValue({
         data: {
           tickCurrentIndex: 0,
           sqrtPrice: 79228162514264337593543950336n,
         },
-      } as any);
+        // boundary: Orca SDK Whirlpool type has many fields; test uses minimal shape
+      } as unknown as Awaited<ReturnType<typeof fetchWhirlpool>>);
 
       const adapter = new OrcaPositionReadAdapter(mockRpcUrl);
       const positions = await adapter.listSupportedPositions(MOCK_WALLET);
@@ -167,14 +175,16 @@ describe('OrcaPositionReadAdapter', () => {
             positionMint: MOCK_POSITION_MINT,
           },
         },
-      ] as any);
+        // boundary: Orca SDK Position type has many fields; test uses minimal shape
+      ] as unknown as Awaited<ReturnType<typeof fetchPositionsForOwner>>);
 
       vi.mocked(fetchWhirlpool).mockResolvedValue({
         data: {
           tickCurrentIndex: -7500,
           sqrtPrice: 79228162514264337593543950336n,
         },
-      } as any);
+        // boundary: Orca SDK Whirlpool type has many fields; test uses minimal shape
+      } as unknown as Awaited<ReturnType<typeof fetchWhirlpool>>);
 
       const adapter = new OrcaPositionReadAdapter(mockRpcUrl);
       const positions = await adapter.listSupportedPositions(MOCK_WALLET);

@@ -13,13 +13,16 @@ import type { NotificationPermissionPort } from '@clmm/application';
 export class NativeNotificationPermissionAdapter implements NotificationPermissionPort {
   async getPermissionState(): Promise<'granted' | 'denied' | 'undetermined'> {
     const { status } = await Notifications.getPermissionsAsync();
-    if (status === 'granted') return 'granted';
-    if (status === 'denied') return 'denied';
+    // boundary: expo-notifications PermissionStatus is an enum; we compare as string
+    const statusStr = status as string;
+    if (statusStr === 'granted') return 'granted';
+    if (statusStr === 'denied') return 'denied';
     return 'undetermined';
   }
 
   async requestPermission(): Promise<'granted' | 'denied'> {
     const { status } = await Notifications.requestPermissionsAsync();
-    return status === 'granted' ? 'granted' : 'denied';
+    // boundary: expo-notifications PermissionStatus is an enum; we compare as string
+    return (status as string) === 'granted' ? 'granted' : 'denied';
   }
 }

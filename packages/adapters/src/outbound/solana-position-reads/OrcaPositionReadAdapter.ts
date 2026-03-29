@@ -13,7 +13,7 @@ import { fetchPositionsForOwner } from '@orca-so/whirlpools';
 import { fetchWhirlpool, fetchPosition } from '@orca-so/whirlpools-client';
 
 import type { SupportedPositionReadPort } from '@clmm/application';
-import type { LiquidityPosition, WalletId, PositionId, PoolId } from '@clmm/domain';
+import type { LiquidityPosition, WalletId, PositionId } from '@clmm/domain';
 import {
   makePositionId,
   makePoolId,
@@ -56,7 +56,7 @@ export class OrcaPositionReadAdapter implements SupportedPositionReadPort {
         continue;
       }
 
-      const poolId = makePoolId(whirlpoolAddress.toString()) as PoolId;
+      const poolId = makePoolId(whirlpoolAddress.toString());
       const positionId = makePositionId(position.positionMint.toString());
 
       const bounds = {
@@ -102,7 +102,7 @@ export class OrcaPositionReadAdapter implements SupportedPositionReadPort {
       return null;
     }
 
-    const poolId = makePoolId(whirlpoolAddress.toString()) as PoolId;
+    const poolId = makePoolId(whirlpoolAddress.toString());
 
     const bounds = {
       lowerBound: position.tickLowerIndex,

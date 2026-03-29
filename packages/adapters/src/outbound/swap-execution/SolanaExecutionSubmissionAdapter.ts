@@ -7,7 +7,7 @@
  * Uses @solana/kit for RPC submission only.
  */
 import { createSolanaRpc } from '@solana/kit';
-import type { Base64EncodedWireTransaction } from '@solana/kit';
+import type { Base64EncodedWireTransaction, Signature } from '@solana/kit';
 import type { ExecutionSubmissionPort } from '@clmm/application';
 import type { TransactionReference, ExecutionLifecycleState, ClockTimestamp } from '@clmm/domain';
 import { makeClockTimestamp } from '@clmm/domain';
@@ -55,11 +55,12 @@ export class SolanaExecutionSubmissionAdapter implements ExecutionSubmissionPort
 
     for (const ref of references) {
       try {
-        const status = await rpc.getSignatureStatuses([ref.signature as any], { searchTransactionHistory: true }).send();
+        // boundary: @solana/kit getSignatureStatuses expects Signature branded type; ref.signature is a string
+        const status = await rpc.getSignatureStatuses([ref.signature as unknown as Signature], { searchTransactionHistory: true }).send();
         const sigStatus = status.value[0];
 
         if (sigStatus?.confirmationStatus === 'confirmed' || sigStatus?.confirmationStatus === 'finalized') {
-          confirmedSteps.push(ref.stepKind as 'remove-liquidity' | 'collect-fees' | 'swap-assets');
+          confirmedSteps.push(ref.stepKind);
         }
       } catch {
         // Transaction not found or error - skip

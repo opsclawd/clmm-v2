@@ -33,7 +33,7 @@ import { fetchPosition, fetchWhirlpool } from '@orca-so/whirlpools-client';
 import { closePositionInstructions } from '@orca-so/whirlpools';
 import type { Instruction } from '@solana/kit';
 import type { ExecutionPreparationPort } from '@clmm/application';
-import type { ExecutionPlan, WalletId, PositionId, ClockTimestamp, LiquidityPosition } from '@clmm/domain';
+import type { ExecutionPlan, WalletId, PositionId, PoolId, ClockTimestamp, LiquidityPosition } from '@clmm/domain';
 import { makeClockTimestamp } from '@clmm/domain';
 
 const JUPITER_API_BASE = 'https://api.jup.ag/swap/v1';
@@ -112,7 +112,8 @@ export class SolanaExecutionPreparationAdapter implements ExecutionPreparationPo
       return {
         positionId,
         walletId: position.positionMint.toString() as WalletId,
-        poolId: whirlpoolAddress.toString() as any,
+        // boundary: Orca SDK returns Address type; domain uses branded PoolId
+        poolId: whirlpoolAddress.toString() as unknown as PoolId,
         bounds,
         lastObservedAt: makeClockTimestamp(Date.now()),
         rangeState,
@@ -199,20 +200,23 @@ export class SolanaExecutionPreparationAdapter implements ExecutionPreparationPo
     }
   }
 
-  private async getJupiterQuote(inputMint: string, outputMint: string, amount: string): Promise<any | null> {
+  // boundary: Jupiter v6 REST /quote response is untyped — no official SDK types available
+  private async getJupiterQuote(inputMint: string, outputMint: string, amount: string): Promise<unknown> {
     try {
       const url = `${JUPITER_API_BASE}/quote?inputMint=${inputMint}&outputMint=${outputMint}&amount=${amount}&slippageBps=50`;
       const response = await fetch(url);
       if (!response.ok) {
         return null;
       }
-      return await response.json();
+      // boundary: Jupiter v6 REST /quote response is untyped JSON
+      return (await response.json()) as unknown;
     } catch {
       return null;
     }
   }
 
-  private async getJupiterSwapTransaction(quoteResponse: any, userPublicKey: string): Promise<string | null> {
+  // boundary: Jupiter v6 REST /swap expects the raw /quote response object — no official SDK types
+  private async getJupiterSwapTransaction(quoteResponse: unknown, userPublicKey: string): Promise<string | null> {
     try {
       const response = await fetch(`${JUPITER_API_BASE}/swap`, {
         method: 'POST',
@@ -229,8 +233,12 @@ export class SolanaExecutionPreparationAdapter implements ExecutionPreparationPo
         return null;
       }
 
-      const data = await response.json();
-      return data.swapTransaction || null;
+      // boundary: Jupiter v6 REST /swap response is untyped JSON
+      const data: unknown = await response.json();
+      const swapTx = data != null && typeof data === 'object' && 'swapTransaction' in data
+        ? (data as { swapTransaction?: string }).swapTransaction
+        : undefined;
+      return swapTx ?? null;
     } catch (error) {
       console.error('Failed to get Jupiter swap transaction:', error);
       return null;
