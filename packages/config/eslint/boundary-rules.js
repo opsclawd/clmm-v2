@@ -38,8 +38,8 @@ module.exports = {
       rules: {
         'no-restricted-imports': restrictedPatterns([
           {
-            group: ['@clmm/adapters', '@solana/*', '@orca-so/*'],
-            message: 'packages/ui must not import adapters or Solana SDK packages.',
+            group: ['@clmm/adapters', '@clmm/domain', '@solana/*', '@orca-so/*'],
+            message: 'packages/ui must not import @clmm/domain, adapters, or Solana SDK packages. Use @clmm/application/public re-exports.',
           },
         ]),
       },

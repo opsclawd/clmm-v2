@@ -56,6 +56,18 @@ module.exports = {
       },
     },
     {
+      name: 'ui-no-domain',
+      severity: 'error',
+      comment: 'packages/ui must not import @clmm/domain directly — use @clmm/application/public re-exports',
+      from: { path: 'packages/ui/src' },
+      to: {
+        path: [
+          'packages/domain',
+          '^@clmm/domain',
+        ],
+      },
+    },
+    {
       name: 'app-no-direct-adapters',
       severity: 'error',
       comment: 'apps/app may only import adapters through the one approved composition bootstrap',
