@@ -100,6 +100,11 @@ export interface NotificationPort {
   }): Promise<{ deliveredAt: ClockTimestamp | null }>;
 }
 
+export interface NotificationDedupPort {
+  hasDispatched(triggerId: string): Promise<boolean>;
+  markDispatched(triggerId: string): Promise<void>;
+}
+
 export type PlatformCapabilityState = {
   nativePushAvailable: boolean;
   browserNotificationAvailable: boolean;

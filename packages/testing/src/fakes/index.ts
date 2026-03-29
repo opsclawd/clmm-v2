@@ -7,6 +7,7 @@ export { FakeSupportedPositionReadPort } from './FakeSupportedPositionReadPort.j
 export { FakeSwapQuotePort } from './FakeSwapQuotePort.js';
 export { FakeWalletSigningPort } from './FakeWalletSigningPort.js';
 export { FakeNotificationPort } from './FakeNotificationPort.js';
+export { FakeNotificationDedupPort } from './FakeNotificationDedupPort.js';
 export { FakeExecutionPreparationPort } from './FakeExecutionPreparationPort.js';
 export { FakeExecutionSubmissionPort } from './FakeExecutionSubmissionPort.js';
 export { FakeRangeObservationPort } from './FakeRangeObservationPort.js';
