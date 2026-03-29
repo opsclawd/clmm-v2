@@ -1,5 +1,5 @@
 import { View, Text } from 'react-native';
-import type { BreachDirection } from '@clmm/domain';
+import type { BreachDirection } from '@clmm/application/public';
 import { renderDirectionalPolicyText } from './DirectionalPolicyCardUtils.js';
 import { colors } from '../design-system/index.js';
 

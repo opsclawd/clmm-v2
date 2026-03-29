@@ -1,4 +1,4 @@
-import type { ExecutionLifecycleState } from '@clmm/domain';
+import type { ExecutionLifecycleState } from '@clmm/application/public';
 
 export type ExecutionStateViewModel = {
   title: string;

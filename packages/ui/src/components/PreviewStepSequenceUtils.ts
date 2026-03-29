@@ -1,4 +1,4 @@
-import type { BreachDirection } from '@clmm/domain';
+import type { BreachDirection } from '@clmm/application/public';
 import { renderDirectionalPolicyText } from './DirectionalPolicyCardUtils.js';
 
 export type StepLabel = {

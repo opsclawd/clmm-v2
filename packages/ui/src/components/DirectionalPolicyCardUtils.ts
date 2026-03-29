@@ -1,5 +1,5 @@
-import type { BreachDirection } from '@clmm/domain';
-import { applyDirectionalExitPolicy } from '@clmm/domain';
+import type { BreachDirection } from '@clmm/application/public';
+import { applyDirectionalExitPolicy } from '@clmm/application/public';
 
 export type DirectionalPolicyText = {
   swapLabel: string;

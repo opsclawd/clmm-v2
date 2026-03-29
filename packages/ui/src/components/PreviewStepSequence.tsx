@@ -1,4 +1,4 @@
-import type { BreachDirection } from '@clmm/domain';
+import type { BreachDirection } from '@clmm/application/public';
 import { buildPreviewStepLabels } from './PreviewStepSequenceUtils.js';
 import { View, Text } from 'react-native';
 import { colors } from '../design-system/index.js';
