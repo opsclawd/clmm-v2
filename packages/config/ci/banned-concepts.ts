@@ -4,6 +4,7 @@ import { extname, join } from 'path';
 const SUFFIX_BANNED_CONCEPTS = [
   'Receipt',
   'Attestation',
+  'Proof',
   'OnChainHistory',
   'ClaimVerification',
   'CanonicalExecutionCertificate',
@@ -11,8 +12,6 @@ const SUFFIX_BANNED_CONCEPTS = [
 
 export const BANNED_PATTERNS = [
   ...SUFFIX_BANNED_CONCEPTS.map((concept) => new RegExp(`\\b\\w*${concept}\\b`)),
-  /\bProofVerification\b/,
-  /\bExecutionProof\b/,
 ];
 
 const SOURCE_EXTENSIONS = new Set(['.ts', '.tsx', '.js', '.jsx']);
