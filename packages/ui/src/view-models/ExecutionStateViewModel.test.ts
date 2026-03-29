@@ -10,10 +10,8 @@ describe('ExecutionStateViewModel', () => {
   it.each([
     ['confirmed', 'Transaction confirmed', true, false],
     ['submitted', 'Submitted — awaiting confirmation', false, false],
-    ['failed', 'Transaction failed', false, true],
-    ['partial', 'Partial completion — some steps confirmed', false, false],
-    ['abandoned', 'You declined to sign', false, false],
-    ['expired', 'Preview expired', false, true],
+    ['partial', 'Partial completion — some steps confirmed', true, false],
+    ['abandoned', 'You declined to sign', true, false],
   ] as Array<[string, string, boolean, boolean]>)(
     '%s state: title=%s, isTerminal=%s, showRetry=%s',
     (kind, expectedTitle, isTerminal, showRetry) => {
@@ -24,9 +22,36 @@ describe('ExecutionStateViewModel', () => {
     },
   );
 
-  it('partial state NEVER shows retry — explicitly disabled', () => {
-    const vm = buildExecutionStateViewModel(makeState('partial'), false);
+  it('failed state with retryEligible=true shows retry', () => {
+    const vm = buildExecutionStateViewModel(makeState('failed'), true);
+    expect(vm.isTerminal).toBe(false);
+    expect(vm.showRetry).toBe(true);
+    expect(vm.nextAction).toBe('Refresh preview and retry');
+  });
+
+  it('failed state with retryEligible=false does NOT show retry', () => {
+    const vm = buildExecutionStateViewModel(makeState('failed'), false);
+    expect(vm.isTerminal).toBe(false);
     expect(vm.showRetry).toBe(false);
+  });
+
+  it('expired state with retryEligible=true shows retry', () => {
+    const vm = buildExecutionStateViewModel(makeState('expired'), true);
+    expect(vm.isTerminal).toBe(false);
+    expect(vm.showRetry).toBe(true);
+    expect(vm.nextAction).toBe('Refresh preview');
+  });
+
+  it('expired state with retryEligible=false does NOT show retry', () => {
+    const vm = buildExecutionStateViewModel(makeState('expired'), false);
+    expect(vm.isTerminal).toBe(false);
+    expect(vm.showRetry).toBe(false);
+  });
+
+  it('partial state NEVER shows retry — explicitly disabled', () => {
+    const vm = buildExecutionStateViewModel(makeState('partial'), true);
+    expect(vm.showRetry).toBe(false);
+    expect(vm.isTerminal).toBe(true);
     expect(vm.partialCompletionWarning).toBeTruthy();
   });
 

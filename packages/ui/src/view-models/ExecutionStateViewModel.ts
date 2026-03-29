@@ -32,7 +32,7 @@ export function buildExecutionStateViewModel(
         title: 'Transaction failed',
         subtitle: 'No on-chain step was confirmed.',
         isTerminal: false,
-        showRetry: true,
+        showRetry: retryEligible,
         ...(retryEligible ? { nextAction: 'Refresh preview and retry' } : {}),
       };
     case 'expired':
@@ -40,16 +40,16 @@ export function buildExecutionStateViewModel(
         title: 'Preview expired',
         subtitle: 'Quote expired before signing.',
         isTerminal: false,
-        showRetry: true,
-        nextAction: 'Refresh preview',
+        showRetry: retryEligible,
+        ...(retryEligible ? { nextAction: 'Refresh preview' } : {}),
       };
     case 'abandoned':
-      return { title: 'You declined to sign', subtitle: 'Exit was not executed.', isTerminal: false, showRetry: false };
+      return { title: 'You declined to sign', subtitle: 'Exit was not executed.', isTerminal: true, showRetry: false };
     case 'partial':
       return {
         title: 'Partial completion — some steps confirmed',
         subtitle: 'One or more steps completed on-chain but the sequence did not finish.',
-        isTerminal: false,
+        isTerminal: true,
         showRetry: false,
         partialCompletionWarning:
           'Full replay is not available. Please review completed steps before taking action.',
