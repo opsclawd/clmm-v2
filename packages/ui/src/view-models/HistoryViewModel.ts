@@ -11,6 +11,7 @@ export type HistoryItemViewModel = {
 export type HistoryViewModel = {
   items: HistoryItemViewModel[];
   isEmpty: boolean;
+  offChainNote: string;
 };
 
 function formatEventType(eventType: string): string {
@@ -21,7 +22,10 @@ function formatEventType(eventType: string): string {
 }
 
 export function buildHistoryViewModel(events: HistoryEventDto[]): HistoryViewModel {
-  const items: HistoryItemViewModel[] = events.map((e) => {
+  // UX-DR9: reverse-chronological order (most recent first)
+  const sorted = [...events].sort((a, b) => b.occurredAt - a.occurredAt);
+
+  const items: HistoryItemViewModel[] = sorted.map((e) => {
     const base = {
       eventId: e.eventId,
       eventTypeLabel: formatEventType(e.eventType),
@@ -39,5 +43,9 @@ export function buildHistoryViewModel(events: HistoryEventDto[]): HistoryViewMod
     return base;
   });
 
-  return { items, isEmpty: items.length === 0 };
+  return {
+    items,
+    isEmpty: items.length === 0,
+    offChainNote: 'off-chain operational history — not an on-chain receipt or attestation',
+  };
 }
