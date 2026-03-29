@@ -7,7 +7,7 @@ type SigningResult =
   | { kind: 'interrupted' };
 
 export class FakeWalletSigningPort implements WalletSigningPort {
-  private _nextResult: SigningResult = {
+  _nextResult: SigningResult = {
     kind: 'signed',
     signedPayload: new Uint8Array([1, 2, 3]),
   };
@@ -18,6 +18,10 @@ export class FakeWalletSigningPort implements WalletSigningPort {
 
   willInterrupt(): void {
     this._nextResult = { kind: 'interrupted' };
+  }
+
+  willSign(payload?: Uint8Array): void {
+    this._nextResult = { kind: 'signed', signedPayload: payload ?? new Uint8Array([1, 2, 3]) };
   }
 
   async requestSignature(
