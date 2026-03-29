@@ -19,7 +19,7 @@ export function getRangeStatusBadgeProps(rangeStateKind: RangeStateKind): BadgeP
       return { label: 'Above Range', colorKey: 'breach' };
     default: {
       const _exhaustive: never = rangeStateKind;
-      throw new Error(`Unhandled range state: ${_exhaustive}`);
+      throw new Error(`Unhandled range state: ${String(_exhaustive)}`);
     }
   }
 }

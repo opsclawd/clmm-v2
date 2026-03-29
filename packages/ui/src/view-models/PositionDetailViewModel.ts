@@ -14,7 +14,7 @@ export type PositionDetailViewModel = {
 };
 
 export function buildPositionDetailViewModel(dto: PositionDetailDto): PositionDetailViewModel {
-  const badge = getRangeStatusBadgeProps(dto.rangeState as 'in-range' | 'below-range' | 'above-range');
+  const badge = getRangeStatusBadgeProps(dto.rangeState);
 
   const base = {
     positionId: dto.positionId,

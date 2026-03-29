@@ -37,7 +37,7 @@ export function buildPositionListViewModel(positions: PositionSummaryDto[]): Pos
     positionId: p.positionId,
     poolLabel: `Pool ${p.poolId}`,
     rangeStatusLabel: rangeStateLabel(p.rangeState),
-    rangeStatusKind: p.rangeState as 'in-range' | 'below-range' | 'above-range',
+    rangeStatusKind: p.rangeState,
     hasAlert: p.hasActionableTrigger,
     monitoringLabel: monitoringLabel(p.monitoringStatus),
   }));
