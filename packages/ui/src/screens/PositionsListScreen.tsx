@@ -4,13 +4,16 @@ import { colors } from '../design-system/index.js';
 import { typography } from '../design-system/index.js';
 import { buildPositionListViewModel } from '../view-models/PositionListViewModel.js';
 import { RangeStatusBadge } from '../components/RangeStatusBadge.js';
+import { DegradedCapabilityBanner } from '../components/DegradedCapabilityBanner.js';
+import type { PlatformCapabilities } from '../components/DegradedCapabilityBannerUtils.js';
 
 type Props = {
   positions?: PositionSummaryDto[];
   onSelectPosition?: (positionId: string) => void;
+  platformCapabilities?: PlatformCapabilities | null;
 };
 
-export function PositionsListScreen({ positions, onSelectPosition }: Props) {
+export function PositionsListScreen({ positions, onSelectPosition, platformCapabilities }: Props) {
   const viewModel = buildPositionListViewModel(positions ?? []);
 
   return (
@@ -22,6 +25,8 @@ export function PositionsListScreen({ positions, onSelectPosition }: Props) {
       }}>
         Positions
       </Text>
+
+      <DegradedCapabilityBanner capabilities={platformCapabilities} />
 
       {viewModel.isEmpty ? (
         <Text style={{ color: colors.textSecondary, marginTop: 8 }}>

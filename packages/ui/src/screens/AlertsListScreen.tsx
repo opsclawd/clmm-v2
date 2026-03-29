@@ -3,13 +3,16 @@ import type { ActionableAlertDto } from '@clmm/application/public';
 import { colors } from '../design-system/index.js';
 import { typography } from '../design-system/index.js';
 import { DirectionalPolicyCard } from '../components/DirectionalPolicyCard.js';
+import { DegradedCapabilityBanner } from '../components/DegradedCapabilityBanner.js';
+import type { PlatformCapabilities } from '../components/DegradedCapabilityBannerUtils.js';
 
 type Props = {
   alerts?: ActionableAlertDto[];
   onSelectAlert?: (triggerId: string, positionId: string) => void;
+  platformCapabilities?: PlatformCapabilities | null;
 };
 
-export function AlertsListScreen({ alerts, onSelectAlert }: Props) {
+export function AlertsListScreen({ alerts, onSelectAlert, platformCapabilities }: Props) {
   const alertItems = alerts ?? [];
   const isEmpty = alertItems.length === 0;
 
@@ -22,6 +25,8 @@ export function AlertsListScreen({ alerts, onSelectAlert }: Props) {
       }}>
         Alerts
       </Text>
+
+      <DegradedCapabilityBanner capabilities={platformCapabilities} />
 
       {isEmpty ? (
         <Text style={{ color: colors.textSecondary, marginTop: 8 }}>

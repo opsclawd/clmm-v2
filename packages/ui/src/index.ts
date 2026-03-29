@@ -17,6 +17,7 @@ export { RangeStatusBadge, getRangeStatusBadgeProps } from './components/RangeSt
 export { ExecutionStateCard } from './components/ExecutionStateCard.js';
 export { HistoryEventRow } from './components/HistoryEventRow.js';
 export { OffChainHistoryLabel } from './components/OffChainHistoryLabel.js';
+export { DegradedCapabilityBanner, buildDegradedBannerMessage } from './components/DegradedCapabilityBanner.js';
 
 // View models — for testing and screen composition
 export { buildPreviewViewModel } from './view-models/PreviewViewModel.js';
