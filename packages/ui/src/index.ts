@@ -16,6 +16,7 @@ export { PreviewStepSequence } from './components/PreviewStepSequence.js';
 export { RangeStatusBadge, getRangeStatusBadgeProps } from './components/RangeStatusBadge.js';
 export { ExecutionStateCard } from './components/ExecutionStateCard.js';
 export { HistoryEventRow } from './components/HistoryEventRow.js';
+export { OffChainHistoryLabel } from './components/OffChainHistoryLabel.js';
 
 // View models — for testing and screen composition
 export { buildPreviewViewModel } from './view-models/PreviewViewModel.js';

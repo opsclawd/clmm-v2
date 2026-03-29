@@ -3,6 +3,7 @@ import type { HistoryEventDto } from '@clmm/application/public';
 import { colors } from '../design-system/index.js';
 import { typography } from '../design-system/index.js';
 import { HistoryEventRow } from '../components/HistoryEventRow.js';
+import { OffChainHistoryLabel } from '../components/OffChainHistoryLabel.js';
 
 type Props = {
   positionId?: string;
@@ -38,6 +39,8 @@ export function HistoryDetailScreen({ positionId, events }: Props) {
           Position: {positionId}
         </Text>
       ) : null}
+
+      <OffChainHistoryLabel note="off-chain operational history — not an on-chain receipt or attestation" />
 
       {!isEmpty && eventItems[0] ? (
         <View style={{

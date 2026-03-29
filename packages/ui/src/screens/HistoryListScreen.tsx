@@ -3,6 +3,7 @@ import type { HistoryEventDto } from '@clmm/application/public';
 import { colors } from '../design-system/index.js';
 import { typography } from '../design-system/index.js';
 import { buildHistoryViewModel } from '../view-models/HistoryViewModel.js';
+import { OffChainHistoryLabel } from '../components/OffChainHistoryLabel.js';
 
 type Props = {
   events?: HistoryEventDto[];
@@ -21,6 +22,8 @@ export function HistoryListScreen({ events, onSelectEvent }: Props) {
       }}>
         History
       </Text>
+
+      <OffChainHistoryLabel note={viewModel.offChainNote} />
 
       {viewModel.isEmpty ? (
         <Text style={{ color: colors.textSecondary, marginTop: 8 }}>
