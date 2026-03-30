@@ -5,7 +5,7 @@ export type BrowserWalletPublicKey = {
 export type BrowserWalletProvider = {
   isPhantom?: boolean;
   publicKey?: BrowserWalletPublicKey | null;
-  connect(): Promise<{ publicKey?: BrowserWalletPublicKey | null }>;
+  connect(): Promise<{ publicKey?: BrowserWalletPublicKey | null } | null | undefined>;
   disconnect?(): Promise<void>;
 };
 
@@ -35,7 +35,7 @@ export async function connectBrowserWallet(browserWindow: BrowserWalletWindow | 
   }
 
   const result = await provider.connect();
-  return normalizeBrowserWalletAddress(result.publicKey ?? provider.publicKey ?? null);
+  return normalizeBrowserWalletAddress(result?.publicKey ?? provider.publicKey ?? null);
 }
 
 export async function disconnectBrowserWallet(browserWindow: BrowserWalletWindow | undefined): Promise<void> {
