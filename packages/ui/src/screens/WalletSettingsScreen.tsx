@@ -1,6 +1,5 @@
 import { View, Text, TouchableOpacity, ScrollView } from 'react-native';
-import { colors } from '../design-system/index.js';
-import { typography } from '../design-system/index.js';
+import { colors, typography } from '../design-system/index.js';
 import { buildWalletSettingsViewModel } from '../view-models/WalletConnectionViewModel.js';
 import { DegradedCapabilityBanner } from '../components/DegradedCapabilityBanner.js';
 import type { PlatformCapabilities } from '../components/DegradedCapabilityBannerUtils.js';
@@ -77,12 +76,14 @@ export function WalletSettingsScreen({
           <View style={{ marginTop: 16, gap: 8 }}>
             <TouchableOpacity
               onPress={onReconnect}
+              disabled={onReconnect == null}
               style={{
                 padding: 14,
                 backgroundColor: colors.surface,
                 borderRadius: 8,
                 borderWidth: 1,
                 borderColor: colors.border,
+                ...(onReconnect == null ? { opacity: 0.5 } : {}),
               }}
             >
               <Text style={{
@@ -97,12 +98,14 @@ export function WalletSettingsScreen({
 
             <TouchableOpacity
               onPress={onSwitchWallet}
+              disabled={onSwitchWallet == null}
               style={{
                 padding: 14,
                 backgroundColor: colors.surface,
                 borderRadius: 8,
                 borderWidth: 1,
                 borderColor: colors.border,
+                ...(onSwitchWallet == null ? { opacity: 0.5 } : {}),
               }}
             >
               <Text style={{
@@ -117,12 +120,14 @@ export function WalletSettingsScreen({
 
             <TouchableOpacity
               onPress={onDisconnect}
+              disabled={onDisconnect == null}
               style={{
                 padding: 14,
                 backgroundColor: 'transparent',
                 borderRadius: 8,
                 borderWidth: 1,
                 borderColor: colors.danger,
+                ...(onDisconnect == null ? { opacity: 0.5 } : {}),
               }}
             >
               <Text style={{

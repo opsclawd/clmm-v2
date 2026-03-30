@@ -1,9 +1,8 @@
 import { View, Text, TouchableOpacity, ActivityIndicator, ScrollView } from 'react-native';
-import { colors } from '../design-system/index.js';
-import { typography } from '../design-system/index.js';
+import { colors, typography } from '../design-system/index.js';
 import { buildWalletConnectViewModel } from '../view-models/WalletConnectionViewModel.js';
 import type { PlatformCapabilities } from '../components/DegradedCapabilityBannerUtils.js';
-import type { ConnectionOutcome, WalletOptionKind } from '../components/WalletConnectionUtils.js';
+import type { ConnectionOutcome, ConnectionOutcomeDisplay, WalletOptionKind } from '../components/WalletConnectionUtils.js';
 
 type Props = {
   platformCapabilities?: PlatformCapabilities | null;
@@ -13,7 +12,7 @@ type Props = {
   onGoBack?: () => void;
 };
 
-const severityColors: Record<string, string> = {
+const severityColors: Record<ConnectionOutcomeDisplay['severity'], string> = {
   success: colors.primary,
   error: colors.danger,
   warning: colors.warning,

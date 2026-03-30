@@ -1,6 +1,5 @@
 import { View, Text, TouchableOpacity } from 'react-native';
-import { colors } from '../design-system/index.js';
-import { typography } from '../design-system/index.js';
+import { colors, typography } from '../design-system/index.js';
 
 type Props = {
   onConnectWallet?: () => void;

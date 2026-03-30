@@ -51,16 +51,20 @@ export function buildWalletSettingsViewModel(params: {
   connectionKind: WalletOptionKind | null;
   capabilities: PlatformCapabilities;
 }): WalletSettingsViewModel {
-  const connected = params.walletAddress !== null && params.connectionKind !== null;
+  if (params.walletAddress !== null && params.connectionKind !== null) {
+    return {
+      connected: true,
+      walletSummary: buildConnectedWalletSummary({
+        walletAddress: params.walletAddress,
+        connectionKind: params.connectionKind,
+      }),
+      platformNotice: buildPlatformNotice(params.capabilities),
+    };
+  }
 
   return {
-    connected,
-    walletSummary: connected
-      ? buildConnectedWalletSummary({
-          walletAddress: params.walletAddress!,
-          connectionKind: params.connectionKind!,
-        })
-      : null,
+    connected: false,
+    walletSummary: null,
     platformNotice: buildPlatformNotice(params.capabilities),
   };
 }
