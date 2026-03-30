@@ -1,6 +1,5 @@
 import { useEffect } from 'react';
 import { useRouter } from 'expo-router';
-import { Platform } from 'react-native';
 import { WalletConnectScreen } from '@clmm/ui';
 import { useStore } from 'zustand';
 import type { PlatformCapabilityState } from '@clmm/application/public';
@@ -12,8 +11,8 @@ import { walletSessionStore } from '../src/state/walletSessionStore.js';
 const FALLBACK_PLATFORM_CAPABILITIES: PlatformCapabilityState = {
   nativePushAvailable: false,
   browserNotificationAvailable: false,
-  nativeWalletAvailable: Platform.OS !== 'web',
-  browserWalletAvailable: Platform.OS === 'web',
+  nativeWalletAvailable: false,
+  browserWalletAvailable: false,
   isMobileWeb: false,
 };
 

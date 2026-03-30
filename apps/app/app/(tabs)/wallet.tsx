@@ -1,6 +1,7 @@
 import { useRouter } from 'expo-router';
 import { WalletSettingsScreen } from '@clmm/ui';
 import { useStore } from 'zustand';
+import { disconnectBrowserWallet } from '../../src/platform/browserWallet.js';
 import { walletSessionStore } from '../../src/state/walletSessionStore.js';
 
 export default function WalletRoute() {
@@ -21,6 +22,18 @@ export default function WalletRoute() {
     router.push('/connect');
   }
 
+  async function handleDisconnect() {
+    if (connectionKind === 'browser' && typeof window !== 'undefined') {
+      try {
+        await disconnectBrowserWallet(window);
+      } catch {
+        // Browser wallet disconnect is best-effort; always clear local session.
+      }
+    }
+
+    disconnect();
+  }
+
   return (
     <WalletSettingsScreen
       walletAddress={walletAddress}
@@ -28,7 +41,9 @@ export default function WalletRoute() {
       platformCapabilities={platformCapabilities}
       onReconnect={handleReconnect}
       onSwitchWallet={handleSwitchWallet}
-      onDisconnect={disconnect}
+      onDisconnect={() => {
+        void handleDisconnect();
+      }}
     />
   );
 }
