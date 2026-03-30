@@ -69,7 +69,7 @@ export default function ConnectRoute() {
 
     try {
       const walletAddress =
-        kind === 'browser' || Platform.OS === 'web'
+        kind === 'browser'
           ? await connectBrowserWallet(typeof window !== 'undefined' ? window : undefined)
           : await walletPlatform.connectNativeWallet();
 
@@ -85,7 +85,9 @@ export default function ConnectRoute() {
       platformCapabilities={platformCapabilities}
       connectionOutcome={connectionOutcome}
       isConnecting={isConnecting}
-      onSelectWallet={handleSelectWallet}
+      onSelectWallet={(kind) => {
+        void handleSelectWallet(kind);
+      }}
       onGoBack={() => {
         clearOutcome();
         router.back();
