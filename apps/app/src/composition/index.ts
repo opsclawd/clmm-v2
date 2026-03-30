@@ -12,7 +12,6 @@ import {
 } from '@clmm/adapters';
 import { detectPlatformKind, selectCapabilityAdapter } from '../platform/capabilities.js';
 import { parseIncomingUrl, registerDeepLinkListener } from '../platform/deepLinks.js';
-import { connectNativeWallet } from '../platform/nativeWallet.js';
 
 const platformKind = detectPlatformKind();
 const nativeCapability = new NativePlatformCapabilityAdapter();
@@ -32,5 +31,8 @@ export const deepLink = {
 export { notificationPermissionAdapter };
 
 export const walletPlatform = {
-  connectNativeWallet,
+  connectNativeWallet: async (cluster?: string) => {
+    const nativeWallet = await import('../platform/nativeWallet.js');
+    return nativeWallet.connectNativeWallet(cluster);
+  },
 };
