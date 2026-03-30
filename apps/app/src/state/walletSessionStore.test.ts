@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it } from 'vitest';
+import { describe, expect, it } from 'vitest';
 import type { PlatformCapabilityState } from '@clmm/application/public';
 import {
   createWalletSessionStore,
@@ -14,10 +14,6 @@ const caps: PlatformCapabilityState = {
 };
 
 describe('walletSessionStore', () => {
-  beforeEach(() => {
-    // Each test creates a fresh store instance.
-  });
-
   it('loads platform capabilities into state', () => {
     const store = createWalletSessionStore();
 
@@ -40,13 +36,34 @@ describe('walletSessionStore', () => {
     expect(store.getState().isConnecting).toBe(false);
   });
 
+  it('beginConnection clears stale session fields and stale outcome', () => {
+    const store = createWalletSessionStore();
+
+    store.setState({
+      walletAddress: 'DemoWallet1111111111111111111111111111111111',
+      connectionKind: 'browser' satisfies WalletConnectionKind,
+      connectionOutcome: { kind: 'failed', reason: 'stale' },
+    });
+
+    store.getState().beginConnection();
+
+    expect(store.getState().isConnecting).toBe(true);
+    expect(store.getState().walletAddress).toBeNull();
+    expect(store.getState().connectionKind).toBeNull();
+    expect(store.getState().connectionOutcome).toBeNull();
+  });
+
   it.each([
     [{ kind: 'cancelled' }],
     [{ kind: 'interrupted' }],
     [{ kind: 'failed', reason: 'boom' }],
-  ] as const)('stores non-success outcomes: %j', (outcome) => {
+  ] as const)('stores non-success outcomes and clears session: %j', (outcome) => {
     const store = createWalletSessionStore();
 
+    store.getState().markConnected({
+      walletAddress: 'DemoWallet1111111111111111111111111111111111',
+      connectionKind: 'browser' satisfies WalletConnectionKind,
+    });
     store.getState().beginConnection();
     store.getState().markOutcome(outcome);
 

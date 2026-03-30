@@ -3,6 +3,7 @@ import type { PlatformCapabilityState } from '@clmm/application/public';
 import type { ConnectionOutcome } from '@clmm/ui';
 
 export type WalletConnectionKind = 'native' | 'browser';
+type NonSuccessConnectionOutcome = Exclude<ConnectionOutcome, { kind: 'connected' }>;
 
 export type WalletSessionState = {
   walletAddress: string | null;
@@ -16,7 +17,7 @@ export type WalletSessionState = {
     walletAddress: string;
     connectionKind: WalletConnectionKind;
   }) => void;
-  markOutcome: (outcome: ConnectionOutcome) => void;
+  markOutcome: (outcome: NonSuccessConnectionOutcome) => void;
   disconnect: () => void;
   clearOutcome: () => void;
 };
@@ -29,7 +30,13 @@ export function createWalletSessionStore() {
     platformCapabilities: null,
     isConnecting: false,
     setPlatformCapabilities: (platformCapabilities) => set({ platformCapabilities }),
-    beginConnection: () => set({ isConnecting: true, connectionOutcome: null }),
+    beginConnection: () =>
+      set({
+        isConnecting: true,
+        connectionOutcome: null,
+        walletAddress: null,
+        connectionKind: null,
+      }),
     markConnected: ({ walletAddress, connectionKind }) =>
       set({
         walletAddress,
