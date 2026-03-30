@@ -12,6 +12,7 @@ import {
 } from '@clmm/adapters';
 import { detectPlatformKind, selectCapabilityAdapter } from '../platform/capabilities.js';
 import { parseIncomingUrl, registerDeepLinkListener } from '../platform/deepLinks.js';
+import { connectNativeWallet } from '../platform/nativeWallet.js';
 
 const platformKind = detectPlatformKind();
 const nativeCapability = new NativePlatformCapabilityAdapter();
@@ -29,3 +30,7 @@ export const deepLink = {
   registerListener: registerDeepLinkListener,
 };
 export { notificationPermissionAdapter };
+
+export const walletPlatform = {
+  connectNativeWallet,
+};
