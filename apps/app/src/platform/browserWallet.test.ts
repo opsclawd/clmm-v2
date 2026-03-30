@@ -12,7 +12,10 @@ describe('browserWallet helpers', () => {
   });
 
   it('returns the injected wallet provider when available', () => {
-    const provider = { isPhantom: true, connect: async () => ({ publicKey: { toBase58: () => 'abc' } }) };
+    const provider = {
+      isPhantom: true,
+      connect: () => Promise.resolve({ publicKey: { toBase58: () => 'abc' } }),
+    };
 
     expect(getInjectedBrowserProvider({ solana: provider })).toBe(provider);
   });
@@ -27,7 +30,7 @@ describe('browserWallet helpers', () => {
 
   it('connectBrowserWallet returns address when connect response has publicKey', async () => {
     const provider = {
-      connect: async () => ({
+      connect: () => Promise.resolve({
         publicKey: {
           toBase58: () => 'ConnectResult111111111111111111111111111111111',
         },
@@ -50,7 +53,7 @@ describe('browserWallet helpers', () => {
       publicKey: {
         toBase58: () => 'ProviderState111111111111111111111111111111111',
       },
-      connect: async () => undefined,
+      connect: () => Promise.resolve(undefined),
     };
 
     await expect(connectBrowserWallet({ solana: provider })).resolves.toBe(
@@ -60,7 +63,7 @@ describe('browserWallet helpers', () => {
 
   it('connectBrowserWallet throws controlled error when no public key exists after connect', async () => {
     const provider = {
-      connect: async () => undefined,
+      connect: () => Promise.resolve(undefined),
     };
 
     await expect(connectBrowserWallet({ solana: provider })).rejects.toThrow(
@@ -75,9 +78,10 @@ describe('browserWallet helpers', () => {
   it('disconnectBrowserWallet calls provider.disconnect when provider exists', async () => {
     let disconnectCalls = 0;
     const provider = {
-      connect: async () => ({ publicKey: null }),
-      disconnect: async () => {
+      connect: () => Promise.resolve({ publicKey: null }),
+      disconnect: () => {
         disconnectCalls += 1;
+        return Promise.resolve();
       },
     };
 
