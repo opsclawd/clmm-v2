@@ -37,4 +37,14 @@ describe('app shell wallet dependency guard', () => {
 
     expect(compositionSource).not.toContain("from '@clmm/adapters'");
   });
+
+  it('wires the positions route to the supported positions BFF client', () => {
+    const routeSource = readText('../app/(tabs)/positions.tsx');
+
+    expect(routeSource).toContain('useQuery');
+    expect(routeSource).toContain('fetchSupportedPositions');
+    expect(routeSource).toContain("queryKey: ['supported-positions', walletAddress]");
+    expect(routeSource).toContain('enabled: walletAddress != null && walletAddress.length > 0');
+    expect(routeSource).toContain('positions={positionsQuery.data}');
+  });
 });

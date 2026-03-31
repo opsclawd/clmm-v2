@@ -16,6 +16,8 @@
   },
   "devDependencies": {
     "@clmm/config": "workspace:*",
+    "@testing-library/react": "^16.3.0",
+    "react-native-web": "~0.19.13",
     "vitest": "^1.6.0",
     "typescript": "^5.4.0"
   }

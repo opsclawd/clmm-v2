@@ -10,7 +10,9 @@ import type { PlatformCapabilities } from '../components/DegradedCapabilityBanne
 
 type Props = {
   walletAddress?: string | null;
-  positions?: PositionSummaryDto[];
+  positions?: PositionSummaryDto[] | undefined;
+  positionsLoading?: boolean;
+  positionsError?: string | null;
   onSelectPosition?: (positionId: string) => void;
   onConnectWallet?: () => void;
   platformCapabilities?: PlatformCapabilities | null;
@@ -19,11 +21,14 @@ type Props = {
 export function PositionsListScreen({
   walletAddress,
   positions,
+  positionsLoading,
+  positionsError,
   onSelectPosition,
   onConnectWallet,
   platformCapabilities,
 }: Props) {
   const isConnected = walletAddress != null && walletAddress.length > 0;
+  const hasPositions = (positions?.length ?? 0) > 0;
 
   return (
     <View style={{ flex: 1, backgroundColor: colors.background, padding: 16 }}>
@@ -39,6 +44,45 @@ export function PositionsListScreen({
 
       {!isConnected ? (
         <ConnectWalletEntry {...(onConnectWallet != null ? { onConnectWallet } : {})} />
+      ) : positionsLoading ? (
+        <View style={{ alignItems: 'center', paddingVertical: 48, paddingHorizontal: 24 }}>
+          <Text style={{
+            color: colors.text,
+            fontSize: typography.fontSize.lg,
+            fontWeight: typography.fontWeight.semibold,
+            textAlign: 'center',
+          }}>
+            Loading supported Orca positions
+          </Text>
+          <Text style={{
+            color: colors.textSecondary,
+            fontSize: typography.fontSize.base,
+            textAlign: 'center',
+            marginTop: 8,
+          }}>
+            Checking this wallet for supported concentrated liquidity positions.
+          </Text>
+        </View>
+      ) : positionsError && !hasPositions ? (
+        <View style={{ alignItems: 'center', paddingVertical: 48, paddingHorizontal: 24 }}>
+          <Text style={{
+            color: colors.text,
+            fontSize: typography.fontSize.lg,
+            fontWeight: typography.fontWeight.semibold,
+            textAlign: 'center',
+          }}>
+            Could not load supported positions
+          </Text>
+          <Text style={{
+            color: colors.textSecondary,
+            fontSize: typography.fontSize.base,
+            textAlign: 'center',
+            marginTop: 8,
+            lineHeight: typography.fontSize.base * typography.lineHeight.normal,
+          }}>
+            {positionsError}
+          </Text>
+        </View>
       ) : (
         <ConnectedPositionsList
           positions={positions ?? []}

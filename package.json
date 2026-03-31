@@ -6,6 +6,8 @@
   "scripts": {
     "build": "turbo build",
     "dev": "turbo dev",
+    "dev:api": "pnpm --filter @clmm/adapters dev:api",
+    "dev:worker": "pnpm --filter @clmm/adapters dev:worker",
     "test": "turbo test",
     "typecheck": "turbo typecheck",
     "lint": "turbo lint",

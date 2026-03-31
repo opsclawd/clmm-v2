@@ -191,6 +191,45 @@ describe('OrcaPositionReadAdapter', () => {
 
       expect(positions.length).toBe(1);
     });
+
+    it('returns bundled positions owned by the wallet', async () => {
+      const { fetchPositionsForOwner } = await import('@orca-so/whirlpools');
+      const { fetchWhirlpool } = await import('@orca-so/whirlpools-client');
+
+      vi.mocked(fetchPositionsForOwner).mockResolvedValue([
+        {
+          address: 'BundleAddress1234567890123456789012345',
+          isPositionBundle: true,
+          positions: [
+            {
+              address: 'BundledPositionAddress12345678901234567890',
+              data: {
+                whirlpool: MOCK_WHIRLPOOL,
+                tickLowerIndex: -18304,
+                tickUpperIndex: -17956,
+                positionMint: MOCK_POSITION_MINT,
+              },
+            },
+          ],
+        },
+        // boundary: Orca SDK bundled position shape is broader; test uses minimal shape
+      ] as unknown as Awaited<ReturnType<typeof fetchPositionsForOwner>>);
+
+      vi.mocked(fetchWhirlpool).mockResolvedValue({
+        data: {
+          tickCurrentIndex: -18130,
+          sqrtPrice: 79228162514264337593543950336n,
+        },
+        // boundary: Orca SDK Whirlpool type has many fields; test uses minimal shape
+      } as unknown as Awaited<ReturnType<typeof fetchWhirlpool>>);
+
+      const adapter = new OrcaPositionReadAdapter(mockRpcUrl);
+      const positions = await adapter.listSupportedPositions(MOCK_WALLET);
+
+      expect(positions).toHaveLength(1);
+      expect(positions[0]!.positionId).toBe(MOCK_POSITION_MINT);
+      expect(positions[0]!.rangeState.kind).toBe('in-range');
+    });
   });
 
   describe('getPosition', () => {

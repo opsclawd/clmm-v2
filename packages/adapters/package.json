@@ -8,8 +8,8 @@
     "typecheck": "tsc --noEmit",
     "build": "tsc -p tsconfig.json",
     "lint": "eslint src --ext .ts",
-    "dev:api": "ts-node -r tsconfig-paths/register src/inbound/http/main.ts",
-    "dev:worker": "ts-node -r tsconfig-paths/register src/inbound/jobs/main.ts"
+    "dev:api": "tsx src/inbound/http/main.ts",
+    "dev:worker": "tsx src/inbound/jobs/main.ts"
   },
   "dependencies": {
     "@clmm/application": "workspace:*",
@@ -32,6 +32,7 @@
     "@types/node": "^25.5.0",
     "@types/pg": "^8.20.0",
     "drizzle-kit": "^0.31.10",
+    "tsx": "^4.21.0",
     "typescript": "^5.4.0",
     "vitest": "^1.6.0"
   }

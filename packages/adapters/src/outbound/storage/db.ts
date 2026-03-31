@@ -1,5 +1,5 @@
 import { drizzle } from 'drizzle-orm/postgres-js';
-import * as postgres from 'postgres';
+import postgres = require('postgres');
 import * as triggersSchema from './schema/triggers.js';
 import * as previewsSchema from './schema/previews.js';
 import * as executionsSchema from './schema/executions.js';
