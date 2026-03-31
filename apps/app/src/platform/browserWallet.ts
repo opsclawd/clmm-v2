@@ -9,13 +9,9 @@ export type BrowserWalletProvider = {
   disconnect?(): Promise<void>;
 };
 
-export type BrowserWalletWindow =
-  | {
-      solana?: BrowserWalletProvider;
-    }
-  | (Window & {
-      solana?: BrowserWalletProvider;
-    });
+export type BrowserWalletWindow = {
+  solana?: BrowserWalletProvider;
+};
 
 export function getInjectedBrowserProvider(
   browserWindow: BrowserWalletWindow | undefined,
