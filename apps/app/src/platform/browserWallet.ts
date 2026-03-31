@@ -10,13 +10,21 @@ export type BrowserWalletProvider = {
 };
 
 export type BrowserWalletWindow = {
-  solana?: BrowserWalletProvider;
+  solana?: unknown;
 };
+
+function isBrowserWalletProvider(value: unknown): value is BrowserWalletProvider {
+  if (typeof value !== 'object' || value == null) {
+    return false;
+  }
+
+  return typeof Reflect.get(value, 'connect') === 'function';
+}
 
 export function getInjectedBrowserProvider(
   browserWindow: BrowserWalletWindow | undefined,
 ): BrowserWalletProvider | null {
-  return browserWindow?.solana ?? null;
+  return isBrowserWalletProvider(browserWindow?.solana) ? browserWindow.solana : null;
 }
 
 export function normalizeBrowserWalletAddress(publicKey: BrowserWalletPublicKey | null | undefined): string {

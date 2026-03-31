@@ -67,9 +67,11 @@ export default function ConnectRoute() {
     beginConnection();
 
     try {
+      const browserWalletWindow =
+        typeof window === 'undefined' ? undefined : { solana: Reflect.get(window, 'solana') as unknown };
       const walletAddress =
         kind === 'browser'
-          ? await connectBrowserWallet(typeof window !== 'undefined' ? window : undefined)
+          ? await connectBrowserWallet(browserWalletWindow)
           : await walletPlatform.connectNativeWallet();
 
       markConnected({ walletAddress, connectionKind: kind });

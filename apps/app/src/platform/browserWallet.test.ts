@@ -20,6 +20,12 @@ describe('browserWallet helpers', () => {
     expect(getInjectedBrowserProvider({ solana: provider })).toBe(provider);
   });
 
+  it('returns null when injected solana does not expose a connect function', () => {
+    expect(
+      getInjectedBrowserProvider({ solana: { isPhantom: true } } as unknown as { solana?: unknown }),
+    ).toBeNull();
+  });
+
   it('normalizes a provider public key into base58 address text', () => {
     expect(
       normalizeBrowserWalletAddress({
@@ -46,6 +52,12 @@ describe('browserWallet helpers', () => {
     await expect(connectBrowserWallet(undefined)).rejects.toThrow(
       'No supported browser wallet detected on this device',
     );
+  });
+
+  it('connectBrowserWallet throws controlled error when injected solana shape is unsupported', async () => {
+    await expect(
+      connectBrowserWallet({ solana: { isPhantom: true } } as unknown as { solana?: unknown }),
+    ).rejects.toThrow('No supported browser wallet detected on this device');
   });
 
   it('connectBrowserWallet uses provider.publicKey when connect returns undefined', async () => {

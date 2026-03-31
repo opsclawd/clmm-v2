@@ -4,12 +4,10 @@
  * This is the ONLY file in apps/app that may import from @clmm/adapters.
  * All other app code must import from @clmm/application/public or @clmm/ui only.
  */
-import {
-  NativePlatformCapabilityAdapter,
-  WebPlatformCapabilityAdapter,
-  ExpoDeepLinkAdapter,
-  NativeNotificationPermissionAdapter,
-} from '@clmm/adapters';
+import { NativePlatformCapabilityAdapter } from '@clmm/adapters/src/outbound/capabilities/NativePlatformCapabilityAdapter';
+import { WebPlatformCapabilityAdapter } from '@clmm/adapters/src/outbound/capabilities/WebPlatformCapabilityAdapter';
+import { ExpoDeepLinkAdapter } from '@clmm/adapters/src/outbound/capabilities/ExpoDeepLinkAdapter';
+import { NativeNotificationPermissionAdapter } from '@clmm/adapters/src/outbound/capabilities/NativeNotificationPermissionAdapter';
 import { detectPlatformKind, selectCapabilityAdapter } from '../platform/capabilities.js';
 import { parseIncomingUrl, registerDeepLinkListener } from '../platform/deepLinks.js';
 

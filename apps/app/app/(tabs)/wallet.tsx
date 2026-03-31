@@ -25,7 +25,7 @@ export default function WalletRoute() {
   async function handleDisconnect() {
     if (connectionKind === 'browser' && typeof window !== 'undefined') {
       try {
-        await disconnectBrowserWallet(window);
+        await disconnectBrowserWallet({ solana: Reflect.get(window, 'solana') });
       } catch {
         // Browser wallet disconnect is best-effort; always clear local session.
       }
