@@ -12,7 +12,7 @@ export class FakeSupportedPositionReadPort implements SupportedPositionReadPort 
     return [...this._positions];
   }
 
-  async getPosition(positionId: PositionId): Promise<LiquidityPosition | null> {
-    return this._positions.find((p) => p.positionId === positionId) ?? null;
+  async getPosition(walletId: WalletId, positionId: PositionId): Promise<LiquidityPosition | null> {
+    return this._positions.find((p) => p.walletId === walletId && p.positionId === positionId) ?? null;
   }
 }

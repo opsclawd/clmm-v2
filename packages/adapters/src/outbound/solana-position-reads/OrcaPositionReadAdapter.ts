@@ -10,7 +10,7 @@
 import { createSolanaRpc, address } from '@solana/kit';
 import type { Address } from '@solana/kit';
 import { fetchPositionsForOwner } from '@orca-so/whirlpools';
-import { fetchWhirlpool, fetchPosition } from '@orca-so/whirlpools-client';
+import { fetchWhirlpool } from '@orca-so/whirlpools-client';
 
 import type { SupportedPositionReadPort } from '@clmm/application';
 import type { LiquidityPosition, WalletId, PositionId } from '@clmm/domain';
@@ -144,45 +144,8 @@ export class OrcaPositionReadAdapter implements SupportedPositionReadPort {
     return liquidityPositions;
   }
 
-  async getPosition(positionId: PositionId): Promise<LiquidityPosition | null> {
-    const rpc = this.getRpc();
-    const positionAddress = address(positionId);
-
-    let positionAccount;
-    try {
-      positionAccount = await fetchPosition(rpc, positionAddress);
-    } catch {
-      return null;
-    }
-
-    const position = positionAccount.data;
-    const whirlpoolAddress = position.whirlpool;
-
-    let whirlpoolData;
-    try {
-      whirlpoolData = await fetchWhirlpool(rpc, whirlpoolAddress);
-    } catch {
-      return null;
-    }
-
-    const poolId = makePoolId(whirlpoolAddress.toString());
-
-    const bounds = {
-      lowerBound: position.tickLowerIndex,
-      upperBound: position.tickUpperIndex,
-    };
-
-    const currentTick = whirlpoolData.data.tickCurrentIndex;
-    const rangeState = evaluateRangeState(bounds, currentTick);
-
-    return {
-      positionId,
-      walletId: makeWalletId(position.positionMint.toString()),
-      poolId,
-      bounds,
-      lastObservedAt: makeClockTimestamp(Date.now()),
-      rangeState,
-      monitoringReadiness: { kind: 'active' },
-    };
+  async getPosition(walletId: WalletId, positionId: PositionId): Promise<LiquidityPosition | null> {
+    const positions = await this.listSupportedPositions(walletId);
+    return positions.find((position) => position.positionId === positionId) ?? null;
   }
 }

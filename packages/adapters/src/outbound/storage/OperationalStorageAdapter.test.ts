@@ -3,7 +3,7 @@ import { OperationalStorageAdapter } from './OperationalStorageAdapter.js';
 import { FIXTURE_POSITION_IN_RANGE, FIXTURE_WALLET_ID, FakeIdGeneratorPort } from '@clmm/testing';
 import { makeClockTimestamp, makePositionId } from '@clmm/domain';
 import type { SupportedPositionReadPort } from '@clmm/application';
-import type { LiquidityPosition, WalletId } from '@clmm/domain';
+import type { LiquidityPosition, PositionId, WalletId } from '@clmm/domain';
 import type { Db } from './db.js';
 
 const leakedPositionId = makePositionId('leaked-position');
@@ -18,7 +18,7 @@ class WalletScopedPositionReadPort implements SupportedPositionReadPort {
     return [...this.positions];
   }
 
-  async getPosition() {
+  async getPosition(_walletId: WalletId, _positionId: PositionId): Promise<LiquidityPosition | null> {
     return null;
   }
 }

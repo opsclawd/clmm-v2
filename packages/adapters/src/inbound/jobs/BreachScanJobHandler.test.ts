@@ -84,7 +84,7 @@ describe('BreachScanJobHandler', () => {
       async listSupportedPositions() {
         throw new Error('RPC timeout');
       },
-      async getPosition() {
+      async getPosition(_walletId: string, _positionId: string) {
         return null;
       },
     } as unknown as FakeSupportedPositionReadPort;

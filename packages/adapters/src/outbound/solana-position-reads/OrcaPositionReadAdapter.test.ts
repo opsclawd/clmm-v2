@@ -13,7 +13,6 @@ vi.mock('@orca-so/whirlpools', () => ({
 
 vi.mock('@orca-so/whirlpools-client', () => ({
   fetchWhirlpool: vi.fn(),
-  fetchPosition: vi.fn(),
 }));
 
 // Valid base58 Solana addresses (32 bytes = 44 base58 chars)
@@ -233,13 +232,68 @@ describe('OrcaPositionReadAdapter', () => {
   });
 
   describe('getPosition', () => {
-    it('returns null when position not found', async () => {
-      const client = await import('@orca-so/whirlpools-client');
+    it('returns the requested position when the wallet owns it', async () => {
+      const { fetchPositionsForOwner } = await import('@orca-so/whirlpools');
+      const { fetchWhirlpool } = await import('@orca-so/whirlpools-client');
 
-      vi.mocked(client.fetchPosition).mockRejectedValue(new Error('not found'));
+      vi.mocked(fetchPositionsForOwner).mockResolvedValue([
+        {
+          address: 'PositionAddress123456789012345678901234',
+          isPositionBundle: false,
+          data: {
+            whirlpool: MOCK_WHIRLPOOL,
+            tickLowerIndex: -18304,
+            tickUpperIndex: -17956,
+            positionMint: MOCK_POSITION_MINT,
+          },
+        },
+      ] as unknown as Awaited<ReturnType<typeof fetchPositionsForOwner>>);
+
+      vi.mocked(fetchWhirlpool).mockResolvedValue({
+        data: {
+          tickCurrentIndex: -18130,
+          sqrtPrice: 79228162514264337593543950336n,
+        },
+      } as unknown as Awaited<ReturnType<typeof fetchWhirlpool>>);
 
       const adapter = new OrcaPositionReadAdapter(mockRpcUrl);
-      const result = await adapter.getPosition(makePositionId('7qbRF6YsyGuLUVs6Y1q64bdVrfe4ZcUUz1JRdoVNUJnm'));
+      const result = await adapter.getPosition(MOCK_WALLET, makePositionId(MOCK_POSITION_MINT));
+
+      expect(result).not.toBeNull();
+      expect(result?.positionId).toBe(MOCK_POSITION_MINT);
+      expect(result?.walletId).toBe(MOCK_WALLET);
+      expect(result?.rangeState.kind).toBe('in-range');
+    });
+
+    it('returns null when the wallet does not own the requested position', async () => {
+      const { fetchPositionsForOwner } = await import('@orca-so/whirlpools');
+      const { fetchWhirlpool } = await import('@orca-so/whirlpools-client');
+
+      vi.mocked(fetchPositionsForOwner).mockResolvedValue([
+        {
+          address: 'PositionAddress123456789012345678901234',
+          isPositionBundle: false,
+          data: {
+            whirlpool: MOCK_WHIRLPOOL,
+            tickLowerIndex: -18304,
+            tickUpperIndex: -17956,
+            positionMint: MOCK_POSITION_MINT,
+          },
+        },
+      ] as unknown as Awaited<ReturnType<typeof fetchPositionsForOwner>>);
+
+      vi.mocked(fetchWhirlpool).mockResolvedValue({
+        data: {
+          tickCurrentIndex: -18130,
+          sqrtPrice: 79228162514264337593543950336n,
+        },
+      } as unknown as Awaited<ReturnType<typeof fetchWhirlpool>>);
+
+      const adapter = new OrcaPositionReadAdapter(mockRpcUrl);
+      const result = await adapter.getPosition(
+        MOCK_WALLET,
+        makePositionId('9w7A9sXjC8eGdxzpcM8f7mPy8tLQGvY1z9WnK3m2LcQa'),
+      );
 
       expect(result).toBeNull();
     });

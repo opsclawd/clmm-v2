@@ -53,6 +53,7 @@ export class PositionController {
   ) {
     const wallet = makeWalletId(walletId);
     const result = await getPositionDetail({
+      walletId: wallet,
       positionId: makePositionId(positionId),
       positionReadPort: this.positionReadPort,
     });

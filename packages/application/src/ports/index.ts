@@ -32,7 +32,7 @@ import type {
 
 export interface SupportedPositionReadPort {
   listSupportedPositions(walletId: WalletId): Promise<LiquidityPosition[]>;
-  getPosition(positionId: PositionId): Promise<LiquidityPosition | null>;
+  getPosition(walletId: WalletId, positionId: PositionId): Promise<LiquidityPosition | null>;
 }
 
 export interface RangeObservationPort {

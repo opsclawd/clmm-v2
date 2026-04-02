@@ -89,6 +89,22 @@ describe('PositionController', () => {
     ).rejects.toBeInstanceOf(NotFoundException);
   });
 
+  it('returns the owned position for the same wallet-position pair used by listPositions', async () => {
+    const positionReadPort = new FakeSupportedPositionReadPort([FIXTURE_POSITION_IN_RANGE]);
+    const triggerRepo = new FakeTriggerRepository();
+    const controller = new PositionController(positionReadPort, triggerRepo);
+
+    const listResult = await controller.listPositions(FIXTURE_POSITION_IN_RANGE.walletId);
+    const positionId = listResult.positions[0]!.positionId;
+
+    const detailResult = await controller.getPosition(
+      FIXTURE_POSITION_IN_RANGE.walletId,
+      positionId,
+    );
+
+    expect(detailResult.position.positionId).toBe(positionId);
+  });
+
   it('degrades gracefully when trigger fetch fails with transient RPC error', async () => {
     const positionReadPort = new FakeSupportedPositionReadPort([FIXTURE_POSITION_IN_RANGE]);
     const triggerRepo = new FakeTriggerRepository();
