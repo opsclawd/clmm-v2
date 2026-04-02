@@ -7,6 +7,12 @@ import {
   FakeClockPort,
 } from '@clmm/testing';
 
+type ObservabilityLog = {
+  level: 'info' | 'warn' | 'error';
+  message: string;
+  context?: Record<string, unknown> | undefined;
+};
+
 describe('NotificationDispatchJobHandler', () => {
   let notificationPort: FakeNotificationPort;
   let dedupPort: FakeNotificationDedupPort;
@@ -40,7 +46,9 @@ describe('NotificationDispatchJobHandler', () => {
     expect(await dedupPort.hasDispatched('trigger-1')).toBe(true);
     expect(notificationPort.dispatched).toHaveLength(1);
     expect(notificationPort.dispatched[0]?.triggerId).toBe('trigger-1');
-    expect(observability.logs.some((l) => l.level === 'info' && l.message.includes('trigger-1'))).toBe(true);
+    expect(
+      observability.logs.some((l: ObservabilityLog) => l.level === 'info' && l.message.includes('trigger-1')),
+    ).toBe(true);
     expect(observability.deliveryTimings).toHaveLength(1);
   });
 
@@ -59,7 +67,7 @@ describe('NotificationDispatchJobHandler', () => {
     expect(observability.deliveryTimings).toHaveLength(0);
     // Info log should still be recorded (dispatched=false)
     expect(
-      observability.logs.some((l) => l.level === 'info' && l.message.includes('dispatched=false')),
+      observability.logs.some((l: ObservabilityLog) => l.level === 'info' && l.message.includes('dispatched=false')),
     ).toBe(true);
   });
 
@@ -88,7 +96,8 @@ describe('NotificationDispatchJobHandler', () => {
 
     expect(
       observability.logs.some(
-        (l) => l.level === 'error' && l.message.includes('trigger-3') && l.context?.['error'] === 'Push service unavailable',
+        (l: ObservabilityLog) =>
+          l.level === 'error' && l.message.includes('trigger-3') && l.context?.['error'] === 'Push service unavailable',
       ),
     ).toBe(true);
   });

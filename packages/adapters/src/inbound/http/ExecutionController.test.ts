@@ -13,6 +13,7 @@ import {
   UPPER_BOUND_BREACH,
   makeClockTimestamp,
 } from '@clmm/domain';
+import type { HistoryEvent } from '@clmm/domain';
 import type {
   ExecutionHistoryRepository,
   ExecutionRepository,
@@ -135,7 +136,7 @@ describe('ExecutionController', () => {
     expect(storedAttempt?.transactionReferences).toEqual([{ signature: 'sig-submit-1', stepKind: 'swap-assets' }]);
     expect(storedAttempt?.breachDirection).toEqual(UPPER_BOUND_BREACH);
 
-    const submittedEvent = historyRepo.events.find((event) => event.eventType === 'submitted');
+    const submittedEvent = historyRepo.events.find((event: HistoryEvent) => event.eventType === 'submitted');
     expect(submittedEvent?.breachDirection).toEqual(UPPER_BOUND_BREACH);
   });
 

@@ -10,6 +10,12 @@ import {
 } from '@clmm/testing';
 import { makeClockTimestamp } from '@clmm/domain';
 
+type ObservabilityLog = {
+  level: 'info' | 'warn' | 'error';
+  message: string;
+  context?: Record<string, unknown> | undefined;
+};
+
 type EnqueuedJob = { name: string; data: unknown };
 
 function makePayload(overrides?: Partial<{
@@ -68,7 +74,7 @@ describe('TriggerQualificationJobHandler', () => {
     expect(enqueuedJobs[0]!.name).toBe('dispatch-notification');
 
     // Observability should log creation
-    const infoLogs = observability.logs.filter((l) => l.level === 'info');
+    const infoLogs = observability.logs.filter((l: ObservabilityLog) => l.level === 'info');
     expect(infoLogs.length).toBeGreaterThan(0);
   });
 
@@ -89,7 +95,7 @@ describe('TriggerQualificationJobHandler', () => {
 
     // Should log suppression
     const suppressionLogs = observability.logs.filter(
-      (l) => l.level === 'info' && l.message.includes('suppressed'),
+      (l: ObservabilityLog) => l.level === 'info' && l.message.includes('suppressed'),
     );
     expect(suppressionLogs.length).toBeGreaterThan(0);
   });
@@ -114,7 +120,7 @@ describe('TriggerQualificationJobHandler', () => {
     await expect(brokenHandler.handle(makePayload())).rejects.toThrow('db down');
 
     // Error should be logged
-    const errorLogs = observability.logs.filter((l) => l.level === 'error');
+    const errorLogs = observability.logs.filter((l: ObservabilityLog) => l.level === 'error');
     expect(errorLogs.length).toBeGreaterThan(0);
   });
 });

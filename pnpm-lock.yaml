@@ -35,6 +35,9 @@ importers:
 
   apps/app:
     dependencies:
+      '@babel/runtime':
+        specifier: ^7.29.0
+        version: 7.29.2
       '@clmm/application':
         specifier: workspace:*
         version: link:../../packages/application

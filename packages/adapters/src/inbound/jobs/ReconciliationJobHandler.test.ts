@@ -11,6 +11,12 @@ import {
 } from '@clmm/testing';
 import { LOWER_BOUND_BREACH } from '@clmm/domain';
 
+type ObservabilityLog = {
+  level: 'info' | 'warn' | 'error';
+  message: string;
+  context?: Record<string, unknown> | undefined;
+};
+
 describe('ReconciliationJobHandler', () => {
   let executionRepo: FakeExecutionRepository;
   let submissionPort: FakeExecutionSubmissionPort;
@@ -62,7 +68,7 @@ describe('ReconciliationJobHandler', () => {
 
     // Verify observability logged the result
     const infoLog = observability.logs.find(
-      (l) => l.level === 'info' && l.message.includes('Reconciliation result'),
+      (l: ObservabilityLog) => l.level === 'info' && l.message.includes('Reconciliation result'),
     );
     expect(infoLog).toBeDefined();
     expect(infoLog?.context?.['result']).toBe('confirmed');
@@ -88,13 +94,13 @@ describe('ReconciliationJobHandler', () => {
 
     // Should have logged a warning about not being in submitted state
     const warnLog = observability.logs.find(
-      (l) => l.level === 'warn' && l.message.includes('not in submitted state'),
+      (l: ObservabilityLog) => l.level === 'warn' && l.message.includes('not in submitted state'),
     );
     expect(warnLog).toBeDefined();
 
     // Should NOT have logged a reconciliation result (use case was never called)
     const infoLog = observability.logs.find(
-      (l) => l.level === 'info' && l.message.includes('Reconciliation result'),
+      (l: ObservabilityLog) => l.level === 'info' && l.message.includes('Reconciliation result'),
     );
     expect(infoLog).toBeUndefined();
   });
@@ -103,7 +109,7 @@ describe('ReconciliationJobHandler', () => {
     await handler.handle({ attemptId: 'nonexistent' });
 
     const warnLog = observability.logs.find(
-      (l) => l.level === 'warn' && l.message.includes('attempt not found'),
+      (l: ObservabilityLog) => l.level === 'warn' && l.message.includes('attempt not found'),
     );
     expect(warnLog).toBeDefined();
   });
