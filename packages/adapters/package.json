@@ -23,6 +23,7 @@
     "@solana/kit": "^6.5.0",
     "drizzle-orm": "^0.36.0",
     "expo-notifications": "^55.0.13",
+    "pg-boss": "^12.15.0",
     "postgres": "^3.4.0",
     "reflect-metadata": "^0.2.0"
   },
