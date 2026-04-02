@@ -179,6 +179,13 @@ export interface ExecutionHistoryRepository {
   getOutcomeSummary(positionId: PositionId): Promise<ExecutionOutcomeSummary | null>;
 }
 
+export interface MonitoredWalletRepository {
+  enroll(walletId: WalletId, enrolledAt: ClockTimestamp): Promise<void>;
+  unenroll(walletId: WalletId): Promise<void>;
+  listActiveWallets(): Promise<Array<{ walletId: WalletId; lastScannedAt: ClockTimestamp | null }>>;
+  markScanned(walletId: WalletId, scannedAt: ClockTimestamp): Promise<void>;
+}
+
 // --- Cross-cutting ports ---
 
 export type DetectionTimingRecord = {
