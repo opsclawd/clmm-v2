@@ -2,7 +2,10 @@
   "name": "clmm-v2",
   "private": true,
   "packageManager": "pnpm@9.0.0",
-  "engines": { "node": ">=20.0.0", "pnpm": ">=9.0.0" },
+  "engines": {
+    "node": ">=20.0.0",
+    "pnpm": ">=9.0.0"
+  },
   "scripts": {
     "build": "turbo build",
     "dev": "turbo dev",
@@ -21,6 +24,7 @@
     "@typescript-eslint/eslint-plugin": "^7.0.0",
     "@typescript-eslint/parser": "^7.0.0",
     "dependency-cruiser": "^16.0.0",
+    "dotenv": "^17.4.0",
     "eslint": "^8.57.0",
     "eslint-plugin-import": "^2.29.0",
     "turbo": "^2.0.0",

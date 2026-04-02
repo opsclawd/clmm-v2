@@ -1,5 +1,6 @@
 {
   "files": [],
+  "include": ["drizzle.config.ts"],
   "references": [
     { "path": "packages/config" },
     { "path": "packages/domain" },

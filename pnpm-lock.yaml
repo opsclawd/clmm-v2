@@ -17,6 +17,9 @@ importers:
       dependency-cruiser:
         specifier: ^16.0.0
         version: 16.10.4
+      dotenv:
+        specifier: ^17.4.0
+        version: 17.4.0
       eslint:
         specifier: ^8.57.0
         version: 8.57.1
@@ -4038,6 +4041,10 @@ packages:
 
   dotenv@16.4.7:
     resolution: {integrity: sha512-47qPchRCykZC03FhkYAhrvwU4xDBFIj1QPqaarj6mdM/hgUzfPHcpkHJOn3mJAufFeeAxAzeGsr5X0M4k6fLZQ==}
+    engines: {node: '>=12'}
+
+  dotenv@17.4.0:
+    resolution: {integrity: sha512-kCKF62fwtzwYm0IGBNjRUjtJgMfGapII+FslMHIjMR5KTnwEmBmWLDRSnc3XSNP8bNy34tekgQyDT0hr7pERRQ==}
     engines: {node: '>=12'}
 
   drizzle-kit@0.31.10:
@@ -11944,6 +11951,8 @@ snapshots:
       dotenv: 16.4.7
 
   dotenv@16.4.7: {}
+
+  dotenv@17.4.0: {}
 
   drizzle-kit@0.31.10:
     dependencies:

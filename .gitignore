@@ -6,3 +6,5 @@ dist/
 .next/
 coverage/
 .worktrees
+.env
+.env.local

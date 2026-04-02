@@ -1,3 +1,4 @@
+import 'dotenv/config';
 import 'reflect-metadata';
 import { NestFactory } from '@nestjs/core';
 import { WorkerModule } from './WorkerModule.js';
@@ -8,10 +9,11 @@ async function bootstrap(): Promise<void> {
   // Graceful shutdown
   const signals = ['SIGTERM', 'SIGINT'] as const;
   for (const signal of signals) {
-    process.on(signal, async () => {
+    process.on(signal, () => {
       console.log(`Worker received ${signal}, shutting down...`);
-      await app.close();
-      process.exit(0);
+      void app.close().finally(() => {
+        process.exit(0);
+      });
     });
   }
 
