@@ -4,8 +4,10 @@ import { PositionController } from './PositionController.js';
 import { AlertController } from './AlertController.js';
 import { PreviewController } from './PreviewController.js';
 import { ExecutionController } from './ExecutionController.js';
+import { WalletController } from './WalletController.js';
 import { OperationalStorageAdapter } from '../../outbound/storage/OperationalStorageAdapter.js';
 import { OffChainHistoryStorageAdapter } from '../../outbound/storage/OffChainHistoryStorageAdapter.js';
+import { MonitoredWalletStorageAdapter } from '../../outbound/storage/MonitoredWalletStorageAdapter.js';
 import { OrcaPositionReadAdapter } from '../../outbound/solana-position-reads/OrcaPositionReadAdapter.js';
 import { JupiterQuoteAdapter } from '../../outbound/swap-execution/JupiterQuoteAdapter.js';
 import { SolanaExecutionSubmissionAdapter } from '../../outbound/swap-execution/SolanaExecutionSubmissionAdapter.js';
@@ -21,6 +23,7 @@ import {
   SWAP_QUOTE_PORT,
   CLOCK_PORT,
   ID_GENERATOR_PORT,
+  MONITORED_WALLET_REPOSITORY,
 } from './tokens.js';
 
 // boundary: process.env values are untyped at runtime; validated via env schema at deploy
@@ -42,9 +45,10 @@ const operationalStorage = new OperationalStorageAdapter(db, systemIds, orcaPosi
 const historyStorage = new OffChainHistoryStorageAdapter(db);
 const jupiterQuote = new JupiterQuoteAdapter();
 const solanaSubmission = new SolanaExecutionSubmissionAdapter(rpcUrl);
+const monitoredWalletStorage = new MonitoredWalletStorageAdapter(db);
 
 @Module({
-  controllers: [PositionController, AlertController, PreviewController, ExecutionController],
+  controllers: [PositionController, AlertController, PreviewController, ExecutionController, WalletController],
   providers: [
     { provide: TRIGGER_REPOSITORY, useValue: operationalStorage },
     { provide: EXECUTION_REPOSITORY, useValue: operationalStorage },
@@ -54,6 +58,7 @@ const solanaSubmission = new SolanaExecutionSubmissionAdapter(rpcUrl);
     { provide: SWAP_QUOTE_PORT, useValue: jupiterQuote },
     { provide: CLOCK_PORT, useValue: systemClock },
     { provide: ID_GENERATOR_PORT, useValue: systemIds },
+    { provide: MONITORED_WALLET_REPOSITORY, useValue: monitoredWalletStorage },
   ],
 })
 export class AppModule {}

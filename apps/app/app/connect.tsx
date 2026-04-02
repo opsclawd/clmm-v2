@@ -7,6 +7,7 @@ import { platformCapabilityAdapter, walletPlatform } from '../src/composition/in
 import { connectBrowserWallet } from '../src/platform/browserWallet.js';
 import { mapWalletErrorToOutcome } from '../src/platform/walletConnection.js';
 import { walletSessionStore } from '../src/state/walletSessionStore.js';
+import { enrollWalletForMonitoring } from '../src/api/wallets.js';
 
 const FALLBACK_PLATFORM_CAPABILITIES: PlatformCapabilityState = {
   nativePushAvailable: false,
@@ -75,6 +76,10 @@ export default function ConnectRoute() {
           : await walletPlatform.connectNativeWallet();
 
       markConnected({ walletAddress, connectionKind: kind });
+      // Best-effort enrollment -- non-blocking
+      enrollWalletForMonitoring(walletAddress).catch((err) => {
+        console.warn('Wallet enrollment failed (will retry on next connect):', err);
+      });
       router.replace('/(tabs)/positions');
     } catch (error) {
       handleConnectionError(error);

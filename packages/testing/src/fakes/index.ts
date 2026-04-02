@@ -16,3 +16,4 @@ export { FakeExecutionSessionRepository } from './FakeExecutionSessionRepository
 export { FakePlatformCapabilityPort } from './FakePlatformCapabilityPort.js';
 export { FakeNotificationPermissionPort } from './FakeNotificationPermissionPort.js';
 export { FakeObservabilityPort } from './FakeObservabilityPort.js';
+export { FakeMonitoredWalletRepository } from './FakeMonitoredWalletRepository.js';

@@ -3,11 +3,19 @@ import { NestFactory } from '@nestjs/core';
 import { WorkerModule } from './WorkerModule.js';
 
 async function bootstrap(): Promise<void> {
-  const app = await NestFactory.create(WorkerModule);
-  // boundary: process.env values are untyped at runtime; validated via env schema at deploy
-  const port = (process.env as Record<string, string | undefined>)['PORT'] ?? 3002;
-  await app.listen(port);
-  console.log(`Worker listening on port ${port}`);
+  const app = await NestFactory.createApplicationContext(WorkerModule);
+
+  // Graceful shutdown
+  const signals = ['SIGTERM', 'SIGINT'] as const;
+  for (const signal of signals) {
+    process.on(signal, async () => {
+      console.log(`Worker received ${signal}, shutting down...`);
+      await app.close();
+      process.exit(0);
+    });
+  }
+
+  console.log('Worker started');
 }
 
 void bootstrap();

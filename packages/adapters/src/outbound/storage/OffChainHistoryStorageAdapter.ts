@@ -67,7 +67,45 @@ export class OffChainHistoryStorageAdapter implements ExecutionHistoryRepository
     return { positionId, events };
   }
 
-  async getOutcomeSummary(_positionId: PositionId): Promise<ExecutionOutcomeSummary | null> {
-    return null;
+  async getOutcomeSummary(positionId: PositionId): Promise<ExecutionOutcomeSummary | null> {
+    const rows = await this.db
+      .select()
+      .from(historyEvents)
+      .where(eq(historyEvents.positionId, positionId))
+      .orderBy(historyEvents.occurredAt);
+
+    if (rows.length === 0) return null;
+
+    // Find the last terminal event (confirmed, failed, partial-completion, abandoned)
+    const terminalEventTypes = ['confirmed', 'failed', 'partial-completion', 'abandoned'];
+    const terminalRow = [...rows].reverse().find(
+      (r) => terminalEventTypes.includes(r.eventType),
+    );
+
+    if (!terminalRow) return null;
+
+    const breachDirection =
+      terminalRow.directionKind === 'lower-bound-breach'
+        ? LOWER_BOUND_BREACH
+        : terminalRow.directionKind === 'upper-bound-breach'
+          ? UPPER_BOUND_BREACH
+          : (() => {
+              throw new Error(`getOutcomeSummary: unknown directionKind ${terminalRow.directionKind}`);
+            })();
+
+    const lifecycleStateKind = terminalRow.lifecycleStateKind;
+    if (!lifecycleStateKind) return null;
+
+    const txRefs = rows
+      .filter((r) => r.transactionRefJson != null)
+      .map((r) => r.transactionRefJson as { signature: string; stepKind: string });
+
+    return {
+      positionId,
+      breachDirection,
+      finalState: { kind: lifecycleStateKind } as ExecutionOutcomeSummary['finalState'],
+      transactionReferences: txRefs as ExecutionOutcomeSummary['transactionReferences'],
+      completedAt: makeClockTimestamp(terminalRow.occurredAt),
+    };
   }
 }
