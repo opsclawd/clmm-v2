@@ -4,6 +4,7 @@ import { listActionableAlerts, acknowledgeAlert } from '@clmm/application';
 import type { ExitTrigger, ExitTriggerId } from '@clmm/domain';
 import { makeWalletId } from '@clmm/domain';
 import { TRIGGER_REPOSITORY } from './tokens.js';
+import { isTransientPositionReadFailure } from './transient-errors.js';
 
 function toActionableAlertDto(t: ExitTrigger): ActionableAlertDto {
   return {
@@ -23,11 +24,22 @@ export class AlertController {
 
   @Get(':walletId')
   async listAlerts(@Param('walletId') walletId: string) {
-    const { triggers } = await listActionableAlerts({
-      walletId: makeWalletId(walletId),
-      triggerRepo: this.triggerRepo,
-    });
-    return { alerts: triggers.map(toActionableAlertDto) };
+    try {
+      const { triggers } = await listActionableAlerts({
+        walletId: makeWalletId(walletId),
+        triggerRepo: this.triggerRepo,
+      });
+      return { alerts: triggers.map(toActionableAlertDto) };
+    } catch (error: unknown) {
+      if (!isTransientPositionReadFailure(error)) {
+        throw error;
+      }
+
+      return {
+        alerts: [],
+        error: 'Unable to fetch alerts. Position data temporarily unavailable.',
+      };
+    }
   }
 
   @Post(':triggerId/acknowledge')

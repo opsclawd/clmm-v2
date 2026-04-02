@@ -2,7 +2,6 @@ import { describe, it, expect } from 'vitest';
 import { AlertController } from './AlertController.js';
 import { FakeTriggerRepository, FIXTURE_POSITION_IN_RANGE } from '@clmm/testing';
 import { makeClockTimestamp, makePositionId } from '@clmm/domain';
-import type { TriggerRepository } from '@clmm/application';
 import type { BreachEpisodeId, ExitTrigger, ExitTriggerId, WalletId } from '@clmm/domain';
 
 const otherPositionId = makePositionId('other-wallet-position');
@@ -22,7 +21,7 @@ class WalletScopedTriggerRepository extends FakeTriggerRepository {
 describe('AlertController', () => {
   it('returns repository-scoped actionable alerts without controller-side wallet filtering', async () => {
     const triggerRepo = new WalletScopedTriggerRepository();
-    const controller = new AlertController(triggerRepo as unknown as TriggerRepository);
+    const controller = new AlertController(triggerRepo);
 
     await triggerRepo.saveTrigger({
       triggerId: 'trigger-owned' as ExitTriggerId,
@@ -48,5 +47,32 @@ describe('AlertController', () => {
     expect(result.alerts).toHaveLength(1);
     expect(result.alerts[0]?.triggerId).toBe('trigger-owned');
     expect(triggerRepo.listedWalletId).toBe(requestedWalletId);
+  });
+
+  it('returns empty alerts array when position read fails due to RPC error', async () => {
+    const triggerRepo = new WalletScopedTriggerRepository();
+    triggerRepo.listActionableTriggers = async () => {
+      throw new Error('Solana RPC timeout');
+    };
+    const controller = new AlertController(triggerRepo);
+
+    const result = await controller.listAlerts(FIXTURE_POSITION_IN_RANGE.walletId);
+
+    expect(result).toEqual({
+      alerts: [],
+      error: 'Unable to fetch alerts. Position data temporarily unavailable.',
+    });
+  });
+
+  it('rethrows non-transient repository errors', async () => {
+    const triggerRepo = new WalletScopedTriggerRepository();
+    triggerRepo.listActionableTriggers = async () => {
+      throw new Error('Invariant violated while hydrating triggers');
+    };
+    const controller = new AlertController(triggerRepo);
+
+    await expect(controller.listAlerts(FIXTURE_POSITION_IN_RANGE.walletId)).rejects.toThrow(
+      'Invariant violated while hydrating triggers',
+    );
   });
 });

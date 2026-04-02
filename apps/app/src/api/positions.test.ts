@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import type { PositionSummaryDto } from '@clmm/application/public';
-import { fetchSupportedPositions } from './positions.js';
+import type { PositionDetailDto, PositionSummaryDto } from '@clmm/application/public';
+import { fetchPositionDetail, fetchSupportedPositions } from './positions.js';
 
 type ExpoPublicEnv = NodeJS.ProcessEnv & {
   EXPO_PUBLIC_BFF_BASE_URL?: string;
@@ -141,6 +141,113 @@ describe('fetchSupportedPositions', () => {
     expect((error as Error & { cause?: unknown }).cause).toBeInstanceOf(Error);
     expect(((error as Error & { cause?: Error }).cause as Error).message).toContain(
       'Malformed positions response',
+    );
+  });
+});
+
+describe('fetchPositionDetail', () => {
+  afterEach(() => {
+    globalThis.fetch = ORIGINAL_FETCH;
+    restoreBffBaseUrl();
+    delete (globalThis as { location?: Location }).location;
+    vi.unstubAllGlobals();
+    vi.restoreAllMocks();
+  });
+
+  it('requests position detail from the configured BFF base URL', async () => {
+    env.EXPO_PUBLIC_BFF_BASE_URL = 'https://bff.example.test';
+
+    const detail = {
+      positionId: 'Position1111111111111111111111111111111111',
+      poolId: 'Pool111111111111111111111111111111111111111',
+      rangeState: 'below-range',
+      hasActionableTrigger: true,
+      monitoringStatus: 'active',
+      lowerBound: 100,
+      upperBound: 200,
+      currentPrice: 80,
+      triggerId: 'Trigger1111111111111111111111111111111111',
+      breachDirection: { kind: 'lower-bound-breach' },
+    } as PositionDetailDto;
+
+    const fetchMock = vi.fn().mockResolvedValue({
+      ok: true,
+      json: () => Promise.resolve(detail),
+    });
+    globalThis.fetch = fetchMock as typeof fetch;
+
+    await expect(
+      fetchPositionDetail(
+        'DemoWallet1111111111111111111111111111111111',
+        'Position1111111111111111111111111111111111',
+      ),
+    ).resolves.toEqual(detail);
+
+    expect(fetchMock).toHaveBeenCalledWith(
+      'https://bff.example.test/positions/DemoWallet1111111111111111111111111111111111/Position1111111111111111111111111111111111',
+      { method: 'GET' },
+    );
+  });
+
+  it('rejects position detail payloads with NaN bounds or price', async () => {
+    env.EXPO_PUBLIC_BFF_BASE_URL = 'https://bff.example.test';
+
+    globalThis.fetch = vi.fn().mockResolvedValue({
+      ok: true,
+      json: () =>
+        Promise.resolve({
+          positionId: 'Position1111111111111111111111111111111111',
+          poolId: 'Pool111111111111111111111111111111111111111',
+          rangeState: 'below-range',
+          hasActionableTrigger: false,
+          monitoringStatus: 'active',
+          lowerBound: Number.NaN,
+          upperBound: 200,
+          currentPrice: 80,
+        }),
+    }) as typeof fetch;
+
+    const error = await fetchPositionDetail(
+      'DemoWallet1111111111111111111111111111111111',
+      'Position1111111111111111111111111111111111',
+    ).catch((reason: unknown) => reason);
+
+    expect(error).toBeInstanceOf(Error);
+    expect((error as Error).message).toBe('Could not load position detail for this wallet');
+    expect((error as Error & { cause?: unknown }).cause).toBeInstanceOf(Error);
+    expect(((error as Error & { cause?: Error }).cause as Error).message).toContain(
+      'Malformed position detail response',
+    );
+  });
+
+  it('rejects position detail payloads with infinite bounds or price', async () => {
+    env.EXPO_PUBLIC_BFF_BASE_URL = 'https://bff.example.test';
+
+    globalThis.fetch = vi.fn().mockResolvedValue({
+      ok: true,
+      json: () =>
+        Promise.resolve({
+          positionId: 'Position1111111111111111111111111111111111',
+          poolId: 'Pool111111111111111111111111111111111111111',
+          rangeState: 'below-range',
+          hasActionableTrigger: false,
+          monitoringStatus: 'active',
+          lowerBound: 100,
+          upperBound: Number.POSITIVE_INFINITY,
+          currentPrice: 80,
+        }),
+    }) as typeof fetch;
+
+    const error = await fetchPositionDetail(
+      'DemoWallet1111111111111111111111111111111111',
+      'Position1111111111111111111111111111111111',
+    ).catch((reason: unknown) => reason);
+
+    expect(error).toBeInstanceOf(Error);
+    expect((error as Error).message).toBe('Could not load position detail for this wallet');
+    expect((error as Error & { cause?: unknown }).cause).toBeInstanceOf(Error);
+    expect(((error as Error & { cause?: Error }).cause as Error).message).toContain(
+      'Malformed position detail response',
     );
   });
 });
