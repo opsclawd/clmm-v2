@@ -47,4 +47,11 @@ describe('app shell wallet dependency guard', () => {
     expect(routeSource).toContain('enabled: walletAddress != null && walletAddress.length > 0');
     expect(routeSource).toContain('positions={positionsQuery.data}');
   });
+
+  it('wires position tap navigation to the position detail route', () => {
+    const routeSource = readText('../app/(tabs)/positions.tsx');
+
+    expect(routeSource).toContain('onSelectPosition');
+    expect(routeSource).toContain("router.push(`/position/");
+  });
 });
