@@ -11,12 +11,12 @@ import { makeWalletId, makePositionId } from '@clmm/domain';
 import { SUPPORTED_POSITION_READ_PORT, TRIGGER_REPOSITORY } from './tokens.js';
 import { isTransientPositionReadFailure } from './transient-errors.js';
 
-function toPositionSummaryDto(p: LiquidityPosition): PositionSummaryDto {
+function toPositionSummaryDto(p: LiquidityPosition, hasActionableTrigger = false): PositionSummaryDto {
   return {
     positionId: p.positionId,
     poolId: p.poolId,
     rangeState: p.rangeState.kind,
-    hasActionableTrigger: false,
+    hasActionableTrigger,
     monitoringStatus: p.monitoringReadiness.kind,
   };
 }
@@ -87,12 +87,14 @@ export class PositionController {
 
   @Get(':walletId')
   async listPositions(@Param('walletId') walletId: string) {
+    const wallet = makeWalletId(walletId);
+
+    let positions: LiquidityPosition[];
     try {
-      const { positions } = await listSupportedPositions({
-        walletId: makeWalletId(walletId),
+      ({ positions } = await listSupportedPositions({
+        walletId: wallet,
         positionReadPort: this.positionReadPort,
-      });
-      return { positions: positions.map(toPositionSummaryDto) };
+      }));
     } catch (error: unknown) {
       if (!isTransientPositionReadFailure(error)) {
         throw error;
@@ -102,5 +104,23 @@ export class PositionController {
         error: 'Unable to fetch positions. Position data temporarily unavailable.',
       };
     }
+
+    let triggerPositionIds: ReadonlySet<string> = new Set();
+    let triggerError: string | undefined;
+
+    try {
+      const actionableTriggers = await this.triggerRepo.listActionableTriggers(wallet);
+      triggerPositionIds = new Set(actionableTriggers.map((t) => t.positionId));
+    } catch (error: unknown) {
+      if (!isTransientPositionReadFailure(error)) {
+        throw error;
+      }
+      triggerError = 'Unable to fetch trigger data. Trigger status may be incomplete.';
+    }
+
+    return {
+      positions: positions.map((p) => toPositionSummaryDto(p, triggerPositionIds.has(p.positionId))),
+      ...(triggerError ? { error: triggerError } : {}),
+    };
   }
 }

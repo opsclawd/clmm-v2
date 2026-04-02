@@ -152,4 +152,55 @@ describe('PositionController', () => {
       controller.listPositions(FIXTURE_POSITION_IN_RANGE.walletId),
     ).rejects.toThrow('Invariant: unknown pool type');
   });
+
+  it('enriches position summaries with hasActionableTrigger from trigger repository', async () => {
+    const positionReadPort = new FakeSupportedPositionReadPort([FIXTURE_POSITION_IN_RANGE]);
+    const triggerRepo = new FakeTriggerRepository();
+    await triggerRepo.saveTrigger({
+      triggerId: 'trigger-list-1' as ExitTriggerId,
+      positionId: FIXTURE_POSITION_IN_RANGE.positionId,
+      episodeId: 'episode-list-1' as BreachEpisodeId,
+      breachDirection: { kind: 'lower-bound-breach' },
+      triggeredAt: makeClockTimestamp(2_000_000),
+      confirmationEvaluatedAt: makeClockTimestamp(2_000_001),
+      confirmationPassed: true,
+    });
+    const controller = new PositionController(positionReadPort, triggerRepo);
+
+    const result = await controller.listPositions(FIXTURE_POSITION_IN_RANGE.walletId);
+
+    expect(result.positions).toHaveLength(1);
+    expect(result.positions[0]!.hasActionableTrigger).toBe(true);
+    expect(result.positions[0]!.positionId).toBe(FIXTURE_POSITION_IN_RANGE.positionId);
+    expect(result).not.toHaveProperty('error');
+  });
+
+  it('returns positions with hasActionableTrigger false and error when trigger fetch fails transiently in listPositions', async () => {
+    const positionReadPort = new FakeSupportedPositionReadPort([FIXTURE_POSITION_IN_RANGE]);
+    const triggerRepo = new FakeTriggerRepository();
+    triggerRepo.listActionableTriggers = async () => {
+      throw new Error('SolanaError: HTTP error (429): Too Many Requests');
+    };
+    const controller = new PositionController(positionReadPort, triggerRepo);
+
+    const result = await controller.listPositions(FIXTURE_POSITION_IN_RANGE.walletId);
+
+    expect(result.positions).toHaveLength(1);
+    expect(result.positions[0]!.hasActionableTrigger).toBe(false);
+    expect(result.positions[0]!.positionId).toBe(FIXTURE_POSITION_IN_RANGE.positionId);
+    expect(result.error).toBe('Unable to fetch trigger data. Trigger status may be incomplete.');
+  });
+
+  it('rethrows non-transient trigger errors from listPositions', async () => {
+    const positionReadPort = new FakeSupportedPositionReadPort([FIXTURE_POSITION_IN_RANGE]);
+    const triggerRepo = new FakeTriggerRepository();
+    triggerRepo.listActionableTriggers = async () => {
+      throw new Error('Database connection pool exhausted');
+    };
+    const controller = new PositionController(positionReadPort, triggerRepo);
+
+    await expect(
+      controller.listPositions(FIXTURE_POSITION_IN_RANGE.walletId),
+    ).rejects.toThrow('Database connection pool exhausted');
+  });
 });
