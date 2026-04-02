@@ -131,6 +131,50 @@ export class ExecutionController {
     });
   }
 
+  @Post('approve')
+  async approveExecution(
+    @Body() body: {
+      previewId: string;
+      triggerId: string;
+      breachDirection?: 'lower-bound-breach' | 'upper-bound-breach';
+    },
+  ) {
+    const previewResult = await this.executionRepo.getPreview(body.previewId);
+    if (!previewResult) {
+      throw new NotFoundException(`Preview not found: ${body.previewId}`);
+    }
+
+    const { positionId, breachDirection } = previewResult;
+    const attemptId = this.ids.generateId();
+
+    const attempt: StoredExecutionAttempt = {
+      attemptId,
+      positionId,
+      breachDirection,
+      lifecycleState: { kind: 'awaiting-signature' },
+      completedSteps: [],
+      transactionReferences: [],
+    };
+
+    await this.executionRepo.saveAttempt(attempt);
+
+    await this.historyRepo.appendEvent({
+      eventId: this.ids.generateId(),
+      positionId,
+      eventType: 'signature-requested',
+      breachDirection,
+      occurredAt: this.clock.now(),
+      lifecycleState: { kind: 'awaiting-signature' },
+    });
+
+    return {
+      attemptId,
+      positionId,
+      breachDirection,
+      lifecycleState: { kind: 'awaiting-signature' },
+    };
+  }
+
   @Get(':attemptId')
   async getExecution(@Param('attemptId') attemptId: string) {
     const attempt = await this.executionRepo.getAttempt(attemptId);
