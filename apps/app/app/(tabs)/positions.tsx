@@ -24,6 +24,7 @@ export default function PositionsRoute() {
       positionsError={positionsQuery.isError && !hasLoadedPositions ? 'Could not load supported positions for this wallet.' : null}
       platformCapabilities={platformCapabilities}
       onConnectWallet={() => router.push('/connect')}
+      onSelectPosition={(positionId) => router.push(`/position/${positionId}`)}
     />
   );
 }
