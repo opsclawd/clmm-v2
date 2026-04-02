@@ -15,6 +15,13 @@
       "when": 1774719136000,
       "tag": "0001_attempt_direction_hardening",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1775138011536,
+      "tag": "0002_chief_doctor_strange",
+      "breakpoints": true
     }
   ]
 }
