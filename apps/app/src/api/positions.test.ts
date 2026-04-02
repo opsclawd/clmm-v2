@@ -172,7 +172,7 @@ describe('fetchPositionDetail', () => {
 
     const fetchMock = vi.fn().mockResolvedValue({
       ok: true,
-      json: () => Promise.resolve(detail),
+      json: () => Promise.resolve({ position: detail }),
     });
     globalThis.fetch = fetchMock as typeof fetch;
 
@@ -196,14 +196,16 @@ describe('fetchPositionDetail', () => {
       ok: true,
       json: () =>
         Promise.resolve({
-          positionId: 'Position1111111111111111111111111111111111',
-          poolId: 'Pool111111111111111111111111111111111111111',
-          rangeState: 'below-range',
-          hasActionableTrigger: false,
-          monitoringStatus: 'active',
-          lowerBound: Number.NaN,
-          upperBound: 200,
-          currentPrice: 80,
+          position: {
+            positionId: 'Position1111111111111111111111111111111111',
+            poolId: 'Pool111111111111111111111111111111111111111',
+            rangeState: 'below-range',
+            hasActionableTrigger: false,
+            monitoringStatus: 'active',
+            lowerBound: Number.NaN,
+            upperBound: 200,
+            currentPrice: 80,
+          },
         }),
     }) as typeof fetch;
 
@@ -227,14 +229,16 @@ describe('fetchPositionDetail', () => {
       ok: true,
       json: () =>
         Promise.resolve({
-          positionId: 'Position1111111111111111111111111111111111',
-          poolId: 'Pool111111111111111111111111111111111111111',
-          rangeState: 'below-range',
-          hasActionableTrigger: false,
-          monitoringStatus: 'active',
-          lowerBound: 100,
-          upperBound: Number.POSITIVE_INFINITY,
-          currentPrice: 80,
+          position: {
+            positionId: 'Position1111111111111111111111111111111111',
+            poolId: 'Pool111111111111111111111111111111111111111',
+            rangeState: 'below-range',
+            hasActionableTrigger: false,
+            monitoringStatus: 'active',
+            lowerBound: 100,
+            upperBound: Number.POSITIVE_INFINITY,
+            currentPrice: 80,
+          },
         }),
     }) as typeof fetch;
 
@@ -249,5 +253,60 @@ describe('fetchPositionDetail', () => {
     expect(((error as Error & { cause?: Error }).cause as Error).message).toContain(
       'Malformed position detail response',
     );
+  });
+
+  it('rejects position detail payloads that omit the position envelope field', async () => {
+    env.EXPO_PUBLIC_BFF_BASE_URL = 'https://bff.example.test';
+
+    globalThis.fetch = vi.fn().mockResolvedValue({
+      ok: true,
+      json: () =>
+        Promise.resolve({
+          error: 'Position data temporarily unavailable.',
+        }),
+    }) as typeof fetch;
+
+    const error = await fetchPositionDetail(
+      'DemoWallet1111111111111111111111111111111111',
+      'Position1111111111111111111111111111111111',
+    ).catch((reason: unknown) => reason);
+
+    expect(error).toBeInstanceOf(Error);
+    expect((error as Error).message).toBe('Could not load position detail for this wallet');
+    expect((error as Error & { cause?: unknown }).cause).toBeInstanceOf(Error);
+    expect(((error as Error & { cause?: Error }).cause as Error).message).toContain(
+      'Malformed position detail response',
+    );
+  });
+
+  it('returns position detail when the payload includes both position data and a warning', async () => {
+    env.EXPO_PUBLIC_BFF_BASE_URL = 'https://bff.example.test';
+
+    const detail = {
+      positionId: 'Position1111111111111111111111111111111111',
+      poolId: 'Pool111111111111111111111111111111111111111',
+      rangeState: 'below-range',
+      hasActionableTrigger: false,
+      monitoringStatus: 'active',
+      lowerBound: 100,
+      upperBound: 200,
+      currentPrice: 80,
+    } as PositionDetailDto;
+
+    globalThis.fetch = vi.fn().mockResolvedValue({
+      ok: true,
+      json: () =>
+        Promise.resolve({
+          position: detail,
+          error: 'Trigger status may be incomplete.',
+        }),
+    }) as typeof fetch;
+
+    await expect(
+      fetchPositionDetail(
+        'DemoWallet1111111111111111111111111111111111',
+        'Position1111111111111111111111111111111111',
+      ),
+    ).resolves.toEqual(detail);
   });
 });

@@ -5,6 +5,11 @@ type PositionsResponse = {
   positions: PositionSummaryDto[];
 };
 
+type PositionDetailResponse = {
+  position: unknown;
+  error?: string;
+};
+
 type BreachDirection = NonNullable<PositionDetailDto['breachDirection']>;
 
 const VALID_RANGE_STATES = ['in-range', 'below-range', 'above-range'] as const;
@@ -91,13 +96,15 @@ export async function fetchPositionDetail(
   positionId: string,
 ): Promise<PositionDetailDto> {
   try {
-    const payload = await fetchJson(`/positions/${walletId}/${positionId}`);
+    const payload = (await fetchJson(
+      `/positions/${walletId}/${positionId}`,
+    )) as Partial<PositionDetailResponse>;
 
-    if (!isPositionDetailDto(payload)) {
+    if (!isPositionDetailDto(payload.position)) {
       throw new Error('Malformed position detail response');
     }
 
-    return payload;
+    return payload.position;
   } catch (cause: unknown) {
     throw new Error('Could not load position detail for this wallet', { cause });
   }
