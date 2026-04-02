@@ -1,5 +1,5 @@
 import { View, Text, ScrollView, TouchableOpacity } from 'react-native';
-import type { PositionDetailDto, ActionableAlertDto } from '@clmm/application/public';
+import type { PositionDetailDto } from '@clmm/application/public';
 import { colors } from '../design-system/index.js';
 import { typography } from '../design-system/index.js';
 import { presentPositionDetail } from '../presenters/PositionDetailPresenter.js';
@@ -8,11 +8,10 @@ import { DirectionalPolicyCard } from '../components/DirectionalPolicyCard.js';
 
 type Props = {
   position?: PositionDetailDto;
-  alert?: ActionableAlertDto;
   onViewPreview?: (triggerId: string) => void;
 };
 
-export function PositionDetailScreen({ position, alert, onViewPreview }: Props) {
+export function PositionDetailScreen({ position, onViewPreview }: Props) {
   if (!position) {
     return (
       <View style={{ flex: 1, backgroundColor: colors.background, padding: 16 }}>
@@ -26,10 +25,11 @@ export function PositionDetailScreen({ position, alert, onViewPreview }: Props) 
     );
   }
 
-  const presentation = presentPositionDetail(
-    alert ? { position, alert } : { position },
-  );
+  const presentation = presentPositionDetail({ position });
   const vm = presentation.position;
+  const breachDirection = position.breachDirection;
+  const triggerId = position.triggerId;
+  const canViewPreview = position.hasActionableTrigger && breachDirection != null && triggerId != null;
 
   return (
     <ScrollView style={{ flex: 1, backgroundColor: colors.background }}>
@@ -93,30 +93,28 @@ export function PositionDetailScreen({ position, alert, onViewPreview }: Props) 
           </View>
         ) : null}
 
-        {alert && position.breachDirection ? (
+        {canViewPreview ? (
           <View style={{ marginTop: 16 }}>
-            <DirectionalPolicyCard direction={position.breachDirection} />
+            <DirectionalPolicyCard direction={breachDirection!} />
 
-            {presentation.alert ? (
-              <TouchableOpacity
-                onPress={() => onViewPreview?.(presentation.alert!.triggerId)}
-                style={{
-                  marginTop: 16,
-                  padding: 16,
-                  backgroundColor: colors.primary,
-                  borderRadius: 8,
-                  alignItems: 'center',
-                }}
-              >
-                <Text style={{
-                  color: colors.background,
-                  fontSize: typography.fontSize.base,
-                  fontWeight: typography.fontWeight.bold,
-                }}>
-                  View Exit Preview
-                </Text>
-              </TouchableOpacity>
-            ) : null}
+            <TouchableOpacity
+              onPress={() => onViewPreview?.(triggerId!)}
+              style={{
+                marginTop: 16,
+                padding: 16,
+                backgroundColor: colors.primary,
+                borderRadius: 8,
+                alignItems: 'center',
+              }}
+            >
+              <Text style={{
+                color: colors.background,
+                fontSize: typography.fontSize.base,
+                fontWeight: typography.fontWeight.bold,
+              }}>
+                View Exit Preview
+              </Text>
+            </TouchableOpacity>
           </View>
         ) : null}
 

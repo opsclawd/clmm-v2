@@ -4,7 +4,6 @@ import { PositionDetailScreen } from '@clmm/ui';
 import { Text, View } from 'react-native';
 import { useStore } from 'zustand';
 import { fetchPositionDetail } from '../../src/api/positions.js';
-import { fetchAlerts } from '../../src/api/alerts.js';
 import { walletSessionStore } from '../../src/state/walletSessionStore.js';
 
 export default function PositionDetailRoute() {
@@ -14,16 +13,6 @@ export default function PositionDetailRoute() {
   const positionId = typeof id === 'string' ? id : undefined;
   const hasValidPositionId = positionId != null && positionId.length > 0;
   const hasWalletAddress = walletAddress != null && walletAddress.length > 0;
-
-  // Fetch alerts to find the matching alert for this position
-  const alertsQuery = useQuery({
-    queryKey: ['alerts', walletAddress],
-    queryFn: () => fetchAlerts(walletAddress!),
-    enabled: hasWalletAddress,
-  });
-
-  // Find alert matching this position
-  const alert = alertsQuery.data?.find((a) => a.positionId === positionId);
 
   const positionQuery = useQuery({
     queryKey: ['position-detail', walletAddress, positionId],
@@ -50,7 +39,6 @@ export default function PositionDetailRoute() {
   return (
     <PositionDetailScreen
       {...(positionQuery.data ? { position: positionQuery.data } : {})}
-      {...(alert ? { alert } : {})}
       onViewPreview={(triggerId) => router.push(`/preview/${triggerId}`)}
     />
   );
