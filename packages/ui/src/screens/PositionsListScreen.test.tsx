@@ -1,6 +1,6 @@
 import React from 'react';
-import { afterEach, describe, expect, it } from 'vitest';
-import { cleanup, render, screen } from '@testing-library/react';
+import { afterEach, describe, expect, it, vi } from 'vitest';
+import { cleanup, fireEvent, render, screen } from '@testing-library/react';
 import type { PositionSummaryDto } from '@clmm/application/public';
 import { PositionsListScreen } from './PositionsListScreen.js';
 
@@ -71,5 +71,20 @@ describe('PositionsListScreen', () => {
         'No supported Orca CLMM positions found for this wallet. Positions will appear here when you have active concentrated liquidity positions on Orca.',
       ),
     ).toBeTruthy();
+  });
+
+  it('calls onSelectPosition with the position id when a position row is tapped', () => {
+    const onSelectPosition = vi.fn();
+
+    render(
+      <PositionsListScreen
+        walletAddress="wallet-1"
+        positions={[makePosition({ positionId: brand<PositionSummaryDto['positionId']>('pos-tap-test'), poolId: brand<PositionSummaryDto['poolId']>('pool-tap-test') })]}
+        onSelectPosition={onSelectPosition}
+      />,
+    );
+
+    fireEvent.click(screen.getByText('Pool pool-tap-test'));
+    expect(onSelectPosition).toHaveBeenCalledWith('pos-tap-test');
   });
 });
