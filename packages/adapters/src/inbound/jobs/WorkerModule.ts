@@ -39,6 +39,17 @@ export class WorkerModule implements OnModuleInit, OnModuleDestroy {
   async onModuleInit(): Promise<void> {
     await boss.start();
 
+    const queueNames = [
+      BreachScanJobHandler.JOB_NAME,
+      TriggerQualificationJobHandler.JOB_NAME,
+      ReconciliationJobHandler.JOB_NAME,
+      NotificationDispatchJobHandler.JOB_NAME,
+    ] as const;
+
+    for (const queueName of queueNames) {
+      await boss.createQueue(queueName);
+    }
+
     // Register job handlers
     // pg-boss v12 delivers jobs as arrays; each handler processes the batch sequentially
     await boss.work(

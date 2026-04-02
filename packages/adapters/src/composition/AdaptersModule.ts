@@ -8,7 +8,7 @@ import { MonitoredWalletStorageAdapter } from '../outbound/storage/MonitoredWall
 import { NotificationDedupStorageAdapter } from '../outbound/storage/NotificationDedupStorageAdapter.js';
 import { JupiterQuoteAdapter } from '../outbound/swap-execution/JupiterQuoteAdapter.js';
 import { SolanaExecutionSubmissionAdapter } from '../outbound/swap-execution/SolanaExecutionSubmissionAdapter.js';
-import { ExpoPushAdapter } from '../outbound/notifications/ExpoPushAdapter.js';
+import { InAppAlertAdapter } from '../outbound/notifications/InAppAlertAdapter.js';
 import { TelemetryAdapter } from '../outbound/observability/TelemetryAdapter.js';
 import { createDb } from '../outbound/storage/db.js';
 import type { ClockPort, IdGeneratorPort } from '@clmm/application';
@@ -52,7 +52,7 @@ const monitoredWalletStorage = new MonitoredWalletStorageAdapter(db);
 const notificationDedupStorage = new NotificationDedupStorageAdapter(db);
 const jupiterQuote = new JupiterQuoteAdapter();
 const solanaSubmission = new SolanaExecutionSubmissionAdapter(rpcUrl);
-const expoPush = new ExpoPushAdapter();
+const inAppAlert = new InAppAlertAdapter();
 const telemetry = new TelemetryAdapter();
 
 const sharedProviders = [
@@ -63,7 +63,7 @@ const sharedProviders = [
   { provide: EXECUTION_REPOSITORY, useValue: operationalStorage },
   { provide: EXECUTION_HISTORY_REPOSITORY, useValue: historyStorage },
   { provide: EXECUTION_SUBMISSION_PORT, useValue: solanaSubmission },
-  { provide: NOTIFICATION_PORT, useValue: expoPush },
+  { provide: NOTIFICATION_PORT, useValue: inAppAlert },
   { provide: NOTIFICATION_DEDUP_PORT, useValue: notificationDedupStorage },
   { provide: OBSERVABILITY_PORT, useValue: telemetry },
   { provide: CLOCK_PORT, useValue: systemClock },
