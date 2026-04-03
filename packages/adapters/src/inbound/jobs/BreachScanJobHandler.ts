@@ -43,7 +43,17 @@ export class BreachScanJobHandler {
   ) {}
 
   async handle(): Promise<void> {
-    const wallets = await this.monitoredWalletRepo.listActiveWallets();
+    let wallets: Awaited<ReturnType<MonitoredWalletRepository['listActiveWallets']>>;
+
+    try {
+      wallets = await this.monitoredWalletRepo.listActiveWallets();
+    } catch (error: unknown) {
+      this.observability.log('error', 'Breach scan failed before wallet iteration', {
+        stage: 'list-active-wallets',
+        error: error instanceof Error ? error.message : String(error),
+      });
+      throw error;
+    }
 
     for (const wallet of wallets) {
       try {

@@ -11,6 +11,7 @@ import {
   FIXTURE_POSITION_IN_RANGE,
 } from '@clmm/testing';
 import { makeClockTimestamp } from '@clmm/domain';
+import type { MonitoredWalletRepository } from '@clmm/application';
 
 describe('BreachScanJobHandler', () => {
   let walletRepo: FakeMonitoredWalletRepository;
@@ -92,8 +93,37 @@ describe('BreachScanJobHandler', () => {
 
     await handler.handle();
 
-    expect(observability.logs).toHaveLength(1);
-    expect(observability.logs[0]!.level).toBe('error');
-    expect(observability.logs[0]!.message).toContain(FIXTURE_WALLET_ID);
+    const errorLogs = observability.logs.filter((entry) => entry.level === 'error');
+
+    expect(errorLogs).toHaveLength(1);
+    expect(errorLogs[0]!.message).toContain(FIXTURE_WALLET_ID);
+  });
+
+  it('logs and rethrows when loading monitored wallets fails before scanning begins', async () => {
+    const brokenWalletRepo: MonitoredWalletRepository = {
+      enroll: walletRepo.enroll.bind(walletRepo),
+      unenroll: walletRepo.unenroll.bind(walletRepo),
+      listActiveWallets: async () => {
+        throw new Error('database unavailable');
+      },
+      markScanned: walletRepo.markScanned.bind(walletRepo),
+    };
+
+    const handler = new BreachScanJobHandler(
+      brokenWalletRepo,
+      new FakeSupportedPositionReadPort([FIXTURE_POSITION_BELOW_RANGE]),
+      clock,
+      ids,
+      observability,
+      enqueue,
+    );
+
+    await expect(handler.handle()).rejects.toThrow('database unavailable');
+
+    const errorLogs = observability.logs.filter((entry) => entry.level === 'error');
+    expect(errorLogs).toHaveLength(1);
+    expect(errorLogs[0]!.message).toBe('Breach scan failed before wallet iteration');
+    expect(errorLogs[0]!.context?.['stage']).toBe('list-active-wallets');
+    expect(errorLogs[0]!.context?.['error']).toBe('database unavailable');
   });
 });
