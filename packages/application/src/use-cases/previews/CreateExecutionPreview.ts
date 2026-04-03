@@ -19,10 +19,17 @@ export async function createExecutionPreview(params: {
   const { positionId, breachDirection, swapQuotePort, executionRepo, clock } = params;
 
   const plan = buildExecutionPlan(breachDirection);
+  let enrichedPlan = plan;
 
-  const quote = await swapQuotePort.getQuote(plan.swapInstruction);
-  const enrichedSwap = { ...plan.swapInstruction, amountBasis: quote.estimatedOutputAmount };
-  const enrichedPlan = { ...plan, swapInstruction: enrichedSwap };
+  try {
+    const quote = await swapQuotePort.getQuote(plan.swapInstruction);
+    enrichedPlan = {
+      ...plan,
+      swapInstruction: { ...plan.swapInstruction, amountBasis: quote.estimatedOutputAmount },
+    };
+  } catch {
+    // Quote is best-effort for preview rendering; keep the directional preview available.
+  }
 
   const estimatedAt = clock.now();
   const freshness = evaluatePreviewFreshness(estimatedAt, estimatedAt);

@@ -74,4 +74,23 @@ describe('CreateExecutionPreview', () => {
     });
     expect(result.preview.freshness.kind).toBe('fresh');
   });
+
+  it('still creates a preview when quote lookup fails', async () => {
+    swapQuote.failNext();
+
+    const result = await createExecutionPreview({
+      positionId: FIXTURE_POSITION_ID,
+      breachDirection: LOWER_BOUND_BREACH,
+      swapQuotePort: swapQuote,
+      executionRepo,
+      clock,
+      ids,
+    });
+
+    expect(result.previewId).toBeTruthy();
+    expect(result.preview.plan.swapInstruction.fromAsset).toBe('SOL');
+    expect(result.preview.plan.swapInstruction.toAsset).toBe('USDC');
+    expect(result.preview.plan.swapInstruction.amountBasis).toBeUndefined();
+    expect(executionRepo.previews.size).toBe(1);
+  });
 });
