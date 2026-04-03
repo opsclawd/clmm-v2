@@ -7,6 +7,7 @@ import { OffChainHistoryStorageAdapter } from '../outbound/storage/OffChainHisto
 import { MonitoredWalletStorageAdapter } from '../outbound/storage/MonitoredWalletStorageAdapter.js';
 import { NotificationDedupStorageAdapter } from '../outbound/storage/NotificationDedupStorageAdapter.js';
 import { JupiterQuoteAdapter } from '../outbound/swap-execution/JupiterQuoteAdapter.js';
+import { SolanaExecutionPreparationAdapter } from '../outbound/swap-execution/SolanaExecutionPreparationAdapter.js';
 import { SolanaExecutionSubmissionAdapter } from '../outbound/swap-execution/SolanaExecutionSubmissionAdapter.js';
 import { InAppAlertAdapter } from '../outbound/notifications/InAppAlertAdapter.js';
 import { TelemetryAdapter } from '../outbound/observability/TelemetryAdapter.js';
@@ -21,6 +22,7 @@ import {
   TRIGGER_REPOSITORY,
   EXECUTION_REPOSITORY,
   EXECUTION_HISTORY_REPOSITORY,
+  EXECUTION_PREPARATION_PORT,
   EXECUTION_SUBMISSION_PORT,
   NOTIFICATION_PORT,
   NOTIFICATION_DEDUP_PORT,
@@ -51,6 +53,7 @@ const historyStorage = new OffChainHistoryStorageAdapter(db);
 const monitoredWalletStorage = new MonitoredWalletStorageAdapter(db);
 const notificationDedupStorage = new NotificationDedupStorageAdapter(db);
 const jupiterQuote = new JupiterQuoteAdapter();
+const solanaPreparation = new SolanaExecutionPreparationAdapter(rpcUrl);
 const solanaSubmission = new SolanaExecutionSubmissionAdapter(rpcUrl);
 const inAppAlert = new InAppAlertAdapter();
 const telemetry = new TelemetryAdapter();
@@ -62,6 +65,7 @@ const sharedProviders = [
   { provide: TRIGGER_REPOSITORY, useValue: operationalStorage },
   { provide: EXECUTION_REPOSITORY, useValue: operationalStorage },
   { provide: EXECUTION_HISTORY_REPOSITORY, useValue: historyStorage },
+  { provide: EXECUTION_PREPARATION_PORT, useValue: solanaPreparation },
   { provide: EXECUTION_SUBMISSION_PORT, useValue: solanaSubmission },
   { provide: NOTIFICATION_PORT, useValue: inAppAlert },
   { provide: NOTIFICATION_DEDUP_PORT, useValue: notificationDedupStorage },

@@ -1,14 +1,22 @@
 import { describe, it, expect, beforeEach } from 'vitest';
-import { BadRequestException, ConflictException } from '@nestjs/common';
+import {
+  BadRequestException,
+  ConflictException,
+  GoneException,
+  NotFoundException,
+} from '@nestjs/common';
 import { ExecutionController } from './ExecutionController.js';
 import {
   FakeClockPort,
   FakeExecutionHistoryRepository,
   FakeExecutionRepository,
   FakeIdGeneratorPort,
+  FIXTURE_FRESH_PREVIEW,
   FIXTURE_POSITION_ID,
+  FIXTURE_WALLET_ID,
 } from '@clmm/testing';
 import {
+  buildExecutionPlan,
   LOWER_BOUND_BREACH,
   UPPER_BOUND_BREACH,
   makeClockTimestamp,
@@ -16,11 +24,38 @@ import {
 import type { HistoryEvent } from '@clmm/domain';
 import type {
   ExecutionHistoryRepository,
+  ExecutionPreparationPort,
   ExecutionRepository,
   ExecutionSubmissionPort,
   StoredExecutionAttempt,
 } from '@clmm/application';
-import type { ClockTimestamp, ExecutionLifecycleState, ExecutionStep, TransactionReference } from '@clmm/domain';
+import type {
+  ClockTimestamp,
+  ExecutionLifecycleState,
+  ExecutionPlan,
+  ExecutionStep,
+  PositionId,
+  TransactionReference,
+  WalletId,
+} from '@clmm/domain';
+
+class RecordingPreparationPort implements ExecutionPreparationPort {
+  calls: Array<{ plan: ExecutionPlan; walletId: WalletId; positionId: PositionId }> = [];
+  serializedPayload = new Uint8Array([5, 4, 3]);
+  preparedAt = makeClockTimestamp(1_001_000);
+
+  async prepareExecution(params: {
+    plan: ExecutionPlan;
+    walletId: WalletId;
+    positionId: PositionId;
+  }): Promise<{ serializedPayload: Uint8Array; preparedAt: ClockTimestamp }> {
+    this.calls.push(params);
+    return {
+      serializedPayload: Uint8Array.from(this.serializedPayload),
+      preparedAt: this.preparedAt,
+    };
+  }
+}
 
 class RecordingSubmissionPort implements ExecutionSubmissionPort {
   submittedPayloads: Uint8Array[] = [];
@@ -52,26 +87,57 @@ class RecordingSubmissionPort implements ExecutionSubmissionPort {
 }
 
 describe('ExecutionController', () => {
+  let clock: FakeClockPort;
   let executionRepo: FakeExecutionRepository;
   let historyRepo: FakeExecutionHistoryRepository;
+  let preparationPort: RecordingPreparationPort;
   let submissionPort: RecordingSubmissionPort;
+  let ids: FakeIdGeneratorPort;
   let controller: ExecutionController;
 
   async function saveAttempt(attempt: StoredExecutionAttempt) {
     await executionRepo.saveAttempt(attempt);
   }
 
+  async function savePreview(direction = LOWER_BOUND_BREACH) {
+    return executionRepo.savePreview(
+      FIXTURE_POSITION_ID,
+      {
+        ...FIXTURE_FRESH_PREVIEW,
+        plan: buildExecutionPlan(direction),
+      },
+      direction,
+    );
+  }
+
   beforeEach(() => {
+    clock = new FakeClockPort();
     executionRepo = new FakeExecutionRepository();
     historyRepo = new FakeExecutionHistoryRepository();
+    preparationPort = new RecordingPreparationPort();
     submissionPort = new RecordingSubmissionPort();
+    ids = new FakeIdGeneratorPort('exec-http');
     controller = new ExecutionController(
       executionRepo as unknown as ExecutionRepository,
       historyRepo as unknown as ExecutionHistoryRepository,
+      preparationPort,
       submissionPort,
-      new FakeClockPort(),
-      new FakeIdGeneratorPort('exec-http'),
+      clock,
+      ids,
     );
+  });
+
+  it('stores previewId on the attempt created by approve', async () => {
+    const { previewId } = await savePreview(LOWER_BOUND_BREACH);
+
+    const result = await controller.approveExecution({
+      previewId,
+      triggerId: 'trigger-1',
+      breachDirection: LOWER_BOUND_BREACH.kind,
+    });
+
+    const storedAttempt = await executionRepo.getAttempt(result.attemptId);
+    expect(storedAttempt?.previewId).toBe(previewId);
   });
 
   it('uses the attempt-persisted direction for GET /executions/:attemptId even when history disagrees', async () => {
@@ -123,9 +189,20 @@ describe('ExecutionController', () => {
       completedSteps: [],
       transactionReferences: [],
     });
+    await executionRepo.savePreparedPayload({
+      payloadId: 'payload-submit',
+      attemptId: 'attempt-submit',
+      unsignedPayload: new Uint8Array([1, 2, 3, 4]),
+      payloadVersion: 'submit-version',
+      expiresAt: makeClockTimestamp(1_100_000),
+      createdAt: makeClockTimestamp(1_000_000),
+    });
 
     const signedPayload = Buffer.from([1, 2, 3, 4]).toString('base64');
-    const result = await controller.submitExecution('attempt-submit', { signedPayload });
+    const result = await controller.submitExecution('attempt-submit', {
+      signedPayload,
+      payloadVersion: 'submit-version',
+    });
 
     expect(result.result).toBe('confirmed');
     expect(submissionPort.submittedPayloads).toHaveLength(1);
@@ -140,6 +217,106 @@ describe('ExecutionController', () => {
     expect(submittedEvent?.breachDirection).toEqual(UPPER_BOUND_BREACH);
   });
 
+  it('returns prepared payload details and saves the payload for POST /executions/:attemptId/prepare', async () => {
+    const { previewId } = await savePreview(LOWER_BOUND_BREACH);
+    await saveAttempt({
+      attemptId: 'attempt-prepare',
+      positionId: FIXTURE_POSITION_ID,
+      breachDirection: LOWER_BOUND_BREACH,
+      previewId,
+      lifecycleState: { kind: 'awaiting-signature' },
+      completedSteps: [],
+      transactionReferences: [],
+    });
+
+    const result = await controller.prepareExecution('attempt-prepare', {
+      walletId: FIXTURE_WALLET_ID,
+    });
+
+    expect(result).toEqual({
+      unsignedPayloadBase64: Buffer.from([5, 4, 3]).toString('base64'),
+      payloadVersion: 'exec-http-1',
+      expiresAt: 1_091_000,
+      requiresSignature: true,
+    });
+    expect(preparationPort.calls).toEqual([
+      {
+        plan: buildExecutionPlan(LOWER_BOUND_BREACH),
+        walletId: FIXTURE_WALLET_ID,
+        positionId: FIXTURE_POSITION_ID,
+      },
+    ]);
+
+    const storedPayload = await executionRepo.getPreparedPayload('attempt-prepare');
+    expect(storedPayload).toEqual({
+      payloadVersion: 'exec-http-1',
+      unsignedPayload: new Uint8Array([5, 4, 3]),
+      expiresAt: makeClockTimestamp(1_091_000),
+    });
+  });
+
+  it('returns 404 when prepare is called for a missing attempt', async () => {
+    await expect(
+      controller.prepareExecution('attempt-missing', {
+        walletId: FIXTURE_WALLET_ID,
+      }),
+    ).rejects.toBeInstanceOf(NotFoundException);
+  });
+
+  it('returns 409 when prepare is called for an attempt outside awaiting-signature', async () => {
+    const { previewId } = await savePreview(LOWER_BOUND_BREACH);
+    await saveAttempt({
+      attemptId: 'attempt-submitted',
+      positionId: FIXTURE_POSITION_ID,
+      breachDirection: LOWER_BOUND_BREACH,
+      previewId,
+      lifecycleState: { kind: 'submitted' },
+      completedSteps: [],
+      transactionReferences: [],
+    });
+
+    await expect(
+      controller.prepareExecution('attempt-submitted', {
+        walletId: FIXTURE_WALLET_ID,
+      }),
+    ).rejects.toBeInstanceOf(ConflictException);
+  });
+
+  it('returns 409 when prepare is called for an attempt without previewId', async () => {
+    await saveAttempt({
+      attemptId: 'attempt-no-preview',
+      positionId: FIXTURE_POSITION_ID,
+      breachDirection: LOWER_BOUND_BREACH,
+      lifecycleState: { kind: 'awaiting-signature' },
+      completedSteps: [],
+      transactionReferences: [],
+    });
+
+    await expect(
+      controller.prepareExecution('attempt-no-preview', {
+        walletId: FIXTURE_WALLET_ID,
+      }),
+    ).rejects.toBeInstanceOf(ConflictException);
+  });
+
+  it('returns 404 when prepare cannot load the linked preview', async () => {
+    await saveAttempt({
+      attemptId: 'attempt-missing-preview',
+      positionId: FIXTURE_POSITION_ID,
+      breachDirection: LOWER_BOUND_BREACH,
+      previewId: 'preview-missing',
+      lifecycleState: { kind: 'awaiting-signature' },
+      completedSteps: [],
+      transactionReferences: [],
+    });
+
+    await expect(
+      controller.prepareExecution('attempt-missing-preview', {
+        walletId: FIXTURE_WALLET_ID,
+      }),
+    ).rejects.toBeInstanceOf(NotFoundException);
+  });
+
   it('rejects submit when caller direction conflicts with the attempt-persisted direction', async () => {
     await saveAttempt({
       attemptId: 'attempt-mismatch',
@@ -149,10 +326,19 @@ describe('ExecutionController', () => {
       completedSteps: [],
       transactionReferences: [],
     });
+    await executionRepo.savePreparedPayload({
+      payloadId: 'payload-mismatch',
+      attemptId: 'attempt-mismatch',
+      unsignedPayload: new Uint8Array([9]),
+      payloadVersion: 'version-mismatch-check',
+      expiresAt: makeClockTimestamp(1_100_000),
+      createdAt: makeClockTimestamp(1_000_000),
+    });
 
     await expect(
       controller.submitExecution('attempt-mismatch', {
         signedPayload: Buffer.from([9]).toString('base64'),
+        payloadVersion: 'version-mismatch-check',
         breachDirection: 'lower-bound-breach',
       }),
     ).rejects.toBeInstanceOf(ConflictException);
@@ -172,6 +358,127 @@ describe('ExecutionController', () => {
 
     expect(result.abandoned).toBe(true);
     expect(historyRepo.events.at(-1)?.breachDirection).toEqual(LOWER_BOUND_BREACH);
+  });
+
+  it('rejects submit when payloadVersion does not match the stored prepared payload', async () => {
+    await saveAttempt({
+      attemptId: 'attempt-version-mismatch',
+      positionId: FIXTURE_POSITION_ID,
+      breachDirection: LOWER_BOUND_BREACH,
+      lifecycleState: { kind: 'awaiting-signature' },
+      completedSteps: [],
+      transactionReferences: [],
+    });
+    await executionRepo.savePreparedPayload({
+      payloadId: 'payload-1',
+      attemptId: 'attempt-version-mismatch',
+      unsignedPayload: new Uint8Array([1]),
+      payloadVersion: 'expected-version',
+      expiresAt: makeClockTimestamp(1_100_000),
+      createdAt: makeClockTimestamp(1_000_000),
+    });
+
+    await expect(
+      controller.submitExecution('attempt-version-mismatch', {
+        signedPayload: Buffer.from([7, 8]).toString('base64'),
+        payloadVersion: 'different-version',
+      }),
+    ).rejects.toBeInstanceOf(ConflictException);
+    expect(submissionPort.submittedPayloads).toHaveLength(0);
+  });
+
+  it('rejects submit when no prepared payload exists for the attempt', async () => {
+    await saveAttempt({
+      attemptId: 'attempt-missing-prepared-payload',
+      positionId: FIXTURE_POSITION_ID,
+      breachDirection: LOWER_BOUND_BREACH,
+      lifecycleState: { kind: 'awaiting-signature' },
+      completedSteps: [],
+      transactionReferences: [],
+    });
+
+    await expect(
+      controller.submitExecution('attempt-missing-prepared-payload', {
+        signedPayload: Buffer.from([7, 8]).toString('base64'),
+        payloadVersion: 'missing-prepared-version',
+      }),
+    ).rejects.toBeInstanceOf(ConflictException);
+    expect(submissionPort.submittedPayloads).toHaveLength(0);
+  });
+
+  it('submits without payloadVersion for the legacy awaiting-signature path', async () => {
+    await saveAttempt({
+      attemptId: 'attempt-legacy-submit',
+      positionId: FIXTURE_POSITION_ID,
+      breachDirection: LOWER_BOUND_BREACH,
+      lifecycleState: { kind: 'awaiting-signature' },
+      completedSteps: [],
+      transactionReferences: [],
+    });
+
+    const result = await controller.submitExecution('attempt-legacy-submit', {
+      signedPayload: Buffer.from([3, 2, 1]).toString('base64'),
+    });
+
+    expect(result.result).toBe('confirmed');
+    expect(submissionPort.submittedPayloads).toHaveLength(1);
+    expect(Array.from(submissionPort.submittedPayloads[0] ?? [])).toEqual([3, 2, 1]);
+  });
+
+  it('rejects submit with 410 when the prepared payload is expired', async () => {
+    await saveAttempt({
+      attemptId: 'attempt-expired-payload',
+      positionId: FIXTURE_POSITION_ID,
+      breachDirection: LOWER_BOUND_BREACH,
+      lifecycleState: { kind: 'awaiting-signature' },
+      completedSteps: [],
+      transactionReferences: [],
+    });
+    await executionRepo.savePreparedPayload({
+      payloadId: 'payload-2',
+      attemptId: 'attempt-expired-payload',
+      unsignedPayload: new Uint8Array([1]),
+      payloadVersion: 'expired-version',
+      expiresAt: makeClockTimestamp(1_000_000),
+      createdAt: makeClockTimestamp(900_000),
+    });
+    clock.set(1_000_000);
+
+    await expect(
+      controller.submitExecution('attempt-expired-payload', {
+        signedPayload: Buffer.from([9]).toString('base64'),
+        payloadVersion: 'expired-version',
+      }),
+    ).rejects.toBeInstanceOf(GoneException);
+    expect(submissionPort.submittedPayloads).toHaveLength(0);
+  });
+
+  it('submits successfully when payloadVersion matches the stored prepared payload', async () => {
+    await saveAttempt({
+      attemptId: 'attempt-matching-version',
+      positionId: FIXTURE_POSITION_ID,
+      breachDirection: LOWER_BOUND_BREACH,
+      lifecycleState: { kind: 'awaiting-signature' },
+      completedSteps: [],
+      transactionReferences: [],
+    });
+    await executionRepo.savePreparedPayload({
+      payloadId: 'payload-3',
+      attemptId: 'attempt-matching-version',
+      unsignedPayload: new Uint8Array([1]),
+      payloadVersion: 'matching-version',
+      expiresAt: makeClockTimestamp(1_100_000),
+      createdAt: makeClockTimestamp(1_000_000),
+    });
+
+    const result = await controller.submitExecution('attempt-matching-version', {
+      signedPayload: Buffer.from([6, 5]).toString('base64'),
+      payloadVersion: 'matching-version',
+    });
+
+    expect(result.result).toBe('confirmed');
+    expect(submissionPort.submittedPayloads).toHaveLength(1);
+    expect(Array.from(submissionPort.submittedPayloads[0] ?? [])).toEqual([6, 5]);
   });
 
   it('uses the attempt-persisted direction during abandon even when history disagrees', async () => {
@@ -224,12 +531,42 @@ describe('ExecutionController', () => {
       completedSteps: [],
       transactionReferences: [],
     });
+    await executionRepo.savePreparedPayload({
+      payloadId: 'payload-bad-base64',
+      attemptId: 'attempt-bad-payload',
+      unsignedPayload: new Uint8Array([1]),
+      payloadVersion: 'bad-base64-version',
+      expiresAt: makeClockTimestamp(1_100_000),
+      createdAt: makeClockTimestamp(1_000_000),
+    });
 
     await expect(
       controller.submitExecution('attempt-bad-payload', {
         signedPayload: '!!!not-base64!!!',
+        payloadVersion: 'bad-base64-version',
         breachDirection: LOWER_BOUND_BREACH.kind,
       }),
     ).rejects.toBeInstanceOf(BadRequestException);
+  });
+
+  it('rejects submit when request body is missing or signedPayload is not a string', async () => {
+    await saveAttempt({
+      attemptId: 'attempt-invalid-body',
+      positionId: FIXTURE_POSITION_ID,
+      breachDirection: LOWER_BOUND_BREACH,
+      lifecycleState: { kind: 'awaiting-signature' },
+      completedSteps: [],
+      transactionReferences: [],
+    });
+
+    await expect(
+      controller.submitExecution('attempt-invalid-body', undefined as never),
+    ).rejects.toBeInstanceOf(BadRequestException);
+    await expect(
+      controller.submitExecution('attempt-invalid-body', {
+        signedPayload: 42 as unknown as string,
+      }),
+    ).rejects.toBeInstanceOf(BadRequestException);
+    expect(submissionPort.submittedPayloads).toHaveLength(0);
   });
 });

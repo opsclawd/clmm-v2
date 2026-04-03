@@ -5,6 +5,13 @@ type ExecutionResponse = {
   execution: ExecutionAttemptDto;
 };
 
+export type PrepareResponse = {
+  unsignedPayloadBase64: string;
+  payloadVersion: string;
+  expiresAt: number;
+  requiresSignature: true;
+};
+
 export async function fetchExecution(attemptId: string): Promise<ExecutionAttemptDto> {
   try {
     const payload = (await fetchJson(`/executions/${attemptId}`)) as Partial<ExecutionResponse>;
@@ -17,14 +24,33 @@ export async function fetchExecution(attemptId: string): Promise<ExecutionAttemp
   }
 }
 
+export async function prepareExecution(attemptId: string, walletId: string): Promise<PrepareResponse> {
+  const response = await fetch(`${getBffBaseUrl()}/executions/${attemptId}/prepare`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ walletId }),
+  });
+
+  if (!response.ok) {
+    const text = await response.text().catch(() => '');
+    throw new Error(`Prepare failed: HTTP ${response.status}${text ? `: ${text}` : ''}`);
+  }
+
+  return response.json() as Promise<PrepareResponse>;
+}
+
 export async function submitExecution(
   attemptId: string,
   signedPayload: string,
+  payloadVersion: string,
 ): Promise<{ result: 'confirmed' | 'failed' | 'partial' | 'pending' }> {
   const response = await fetch(`${getBffBaseUrl()}/executions/${attemptId}/submit`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ signedPayload }),
+    body: JSON.stringify({
+      signedPayload,
+      payloadVersion,
+    }),
   });
   if (!response.ok) {
     const text = await response.text().catch(() => '');

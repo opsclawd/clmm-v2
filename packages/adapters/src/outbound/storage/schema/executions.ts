@@ -3,6 +3,7 @@ import { pgTable, text, bigint, jsonb, check } from 'drizzle-orm/pg-core';
 
 export const executionAttempts = pgTable('execution_attempts', {
   attemptId: text('attempt_id').primaryKey(),
+  previewId: text('preview_id'),
   positionId: text('position_id').notNull(),
   directionKind: text('direction_kind').notNull(),
   lifecycleStateKind: text('lifecycle_state_kind').notNull(),

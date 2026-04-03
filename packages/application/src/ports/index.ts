@@ -147,6 +147,7 @@ export type StoredExecutionAttempt = ExecutionAttempt & {
   attemptId: string;
   positionId: PositionId;
   breachDirection: BreachDirection;
+  previewId?: string;
 };
 
 export interface ExecutionRepository {
@@ -154,6 +155,19 @@ export interface ExecutionRepository {
   getPreview(previewId: string): Promise<{ preview: ExecutionPreview; positionId: PositionId; breachDirection: BreachDirection } | null>;
   saveAttempt(attempt: StoredExecutionAttempt): Promise<void>;
   getAttempt(attemptId: string): Promise<StoredExecutionAttempt | null>;
+  savePreparedPayload(params: {
+    payloadId: string;
+    attemptId: string;
+    unsignedPayload: Uint8Array;
+    payloadVersion: string;
+    expiresAt: ClockTimestamp;
+    createdAt: ClockTimestamp;
+  }): Promise<void>;
+  getPreparedPayload(attemptId: string): Promise<{
+    payloadVersion: string;
+    unsignedPayload: Uint8Array;
+    expiresAt: ClockTimestamp;
+  } | null>;
   updateAttemptState(attemptId: string, state: ExecutionLifecycleState): Promise<void>;
 }
 
