@@ -1,4 +1,8 @@
 {
+  "compilerOptions": {
+    "outDir": "dist",
+    "types": ["node"]
+  },
   "files": [],
   "include": ["drizzle.config.ts"],
   "references": [
@@ -6,8 +10,8 @@
     { "path": "packages/domain" },
     { "path": "packages/application" },
     { "path": "packages/adapters" },
-    { "path": "packages/ui" },
     { "path": "packages/testing" },
+    { "path": "packages/ui" },
     { "path": "apps/app" }
   ]
 }

@@ -14,7 +14,7 @@
     "test": "turbo test",
     "typecheck": "turbo typecheck",
     "lint": "turbo lint",
-    "boundaries": "depcruise --config packages/config/boundaries/.dependency-cruiser.cjs packages apps",
+    "boundaries": "depcruise --config packages/config/boundaries/dependency-cruiser.cjs packages apps",
     "test:domain": "pnpm --filter @clmm/domain test",
     "test:application": "pnpm --filter @clmm/application test",
     "test:adapters": "pnpm --filter @clmm/adapters test",

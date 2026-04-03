@@ -1,6 +1,7 @@
 {
   "extends": "@clmm/config/tsconfig/react-native",
   "compilerOptions": {
+    "outDir": "dist",
     "paths": {
       "@clmm/application/public": ["../../packages/application/src/public/index.ts"],
       "@clmm/ui": ["../../packages/ui/src/index.ts"]

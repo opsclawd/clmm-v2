@@ -6,7 +6,7 @@
     "./tsconfig/*": "./tsconfig/*.json",
     "./eslint": "./eslint/index.js",
     "./eslint/boundary-rules": "./eslint/boundary-rules.js",
-    "./boundaries": "./boundaries/.dependency-cruiser.cjs"
+    "./boundaries": "./boundaries/dependency-cruiser.cjs"
   },
   "scripts": {
     "test": "vitest run ci/",
