@@ -1,8 +1,8 @@
 import { useRouter } from 'expo-router';
 import { WalletSettingsScreen } from '@clmm/ui';
 import { useStore } from 'zustand';
-import { disconnectBrowserWallet } from '../../src/platform/browserWallet.js';
-import { walletSessionStore } from '../../src/state/walletSessionStore.js';
+import { disconnectBrowserWallet } from '../../src/platform/browserWallet';
+import { walletSessionStore } from '../../src/state/walletSessionStore';
 
 export default function WalletRoute() {
   const router = useRouter();

@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import {
   mapWalletErrorToOutcome,
   normalizeSuccessfulConnection,
-} from './walletConnection.js';
+} from './walletConnection';
 
 describe('walletConnection helpers', () => {
   it('maps user rejected errors to cancelled', () => {

@@ -1,5 +1,5 @@
 import type { ExecutionAttemptDto } from '@clmm/application/public';
-import { fetchJson, getBffBaseUrl } from './http.js';
+import { fetchJson, getBffBaseUrl } from './http';
 
 type ExecutionResponse = {
   execution: ExecutionAttemptDto;

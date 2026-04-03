@@ -5,9 +5,9 @@ import { SigningStatusScreen, colors, typography } from '@clmm/ui';
 import { Text, TouchableOpacity, View } from 'react-native';
 import { useStore } from 'zustand';
 import { Buffer } from 'buffer';
-import { fetchExecution, prepareExecution, submitExecution } from '../../src/api/executions.js';
-import { signTransactionWithBrowserWallet } from '../../src/platform/browserWallet.js';
-import { walletSessionStore } from '../../src/state/walletSessionStore.js';
+import { fetchExecution, prepareExecution, submitExecution } from '../../src/api/executions';
+import { signTransactionWithBrowserWallet } from '../../src/platform/browserWallet';
+import { walletSessionStore } from '../../src/state/walletSessionStore';
 
 type SigningState = 'idle' | 'preparing' | 'signing' | 'submitting' | 'error';
 

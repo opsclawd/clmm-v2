@@ -3,8 +3,8 @@ import { useQuery } from '@tanstack/react-query';
 import { PositionDetailScreen } from '@clmm/ui';
 import { Text, View } from 'react-native';
 import { useStore } from 'zustand';
-import { fetchPositionDetail } from '../../src/api/positions.js';
-import { walletSessionStore } from '../../src/state/walletSessionStore.js';
+import { fetchPositionDetail } from '../../src/api/positions';
+import { walletSessionStore } from '../../src/state/walletSessionStore';
 
 export default function PositionDetailRoute() {
   const { id } = useLocalSearchParams<{ id: string }>();

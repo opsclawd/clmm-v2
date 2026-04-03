@@ -2,8 +2,8 @@ import { useRouter } from 'expo-router';
 import { useQuery } from '@tanstack/react-query';
 import { PositionsListScreen } from '@clmm/ui';
 import { useStore } from 'zustand';
-import { fetchSupportedPositions } from '../../src/api/positions.js';
-import { walletSessionStore } from '../../src/state/walletSessionStore.js';
+import { fetchSupportedPositions } from '../../src/api/positions';
+import { walletSessionStore } from '../../src/state/walletSessionStore';
 
 export default function PositionsRoute() {
   const router = useRouter();

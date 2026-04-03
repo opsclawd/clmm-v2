@@ -5,7 +5,7 @@ import {
   getInjectedBrowserProvider,
   normalizeBrowserWalletAddress,
   signTransactionWithBrowserWallet,
-} from './browserWallet.js';
+} from './browserWallet';
 
 describe('browserWallet helpers', () => {
   it('returns null when no browser wallet provider exists', () => {

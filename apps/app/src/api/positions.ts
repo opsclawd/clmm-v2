@@ -1,5 +1,5 @@
 import type { PositionDetailDto, PositionSummaryDto } from '@clmm/application/public';
-import { fetchJson } from './http.js';
+import { fetchJson } from './http';
 
 type PositionsResponse = {
   positions: PositionSummaryDto[];

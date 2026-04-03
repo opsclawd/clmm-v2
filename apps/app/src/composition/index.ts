@@ -8,8 +8,8 @@ import { NativePlatformCapabilityAdapter } from '@clmm/adapters/src/outbound/cap
 import { WebPlatformCapabilityAdapter } from '@clmm/adapters/src/outbound/capabilities/WebPlatformCapabilityAdapter';
 import { ExpoDeepLinkAdapter } from '@clmm/adapters/src/outbound/capabilities/ExpoDeepLinkAdapter';
 import { NativeNotificationPermissionAdapter } from '@clmm/adapters/src/outbound/capabilities/NativeNotificationPermissionAdapter';
-import { detectPlatformKind, selectCapabilityAdapter } from '../platform/capabilities.js';
-import { parseIncomingUrl, registerDeepLinkListener } from '../platform/deepLinks.js';
+import { detectPlatformKind, selectCapabilityAdapter } from '../platform/capabilities';
+import { parseIncomingUrl, registerDeepLinkListener } from '../platform/deepLinks';
 
 const platformKind = detectPlatformKind();
 const nativeCapability = new NativePlatformCapabilityAdapter();
