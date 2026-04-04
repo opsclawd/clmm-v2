@@ -1,5 +1,6 @@
 import type { ExecutionRepository } from '@clmm/application';
 import type {
+  BreachEpisodeId,
   BreachDirection,
   ClockTimestamp,
   ExecutionPreview,
@@ -78,6 +79,16 @@ export class FakeExecutionRepository implements ExecutionRepository {
       unsignedPayload: Uint8Array.from(payload.unsignedPayload),
       expiresAt: payload.expiresAt,
     };
+  }
+
+  async listAwaitingSignatureAttemptsByEpisode(episodeId: BreachEpisodeId): Promise<StoredExecutionAttempt[]> {
+    return Array.from(this.attempts.values())
+      .filter((attempt) => attempt.episodeId === episodeId && attempt.lifecycleState.kind === 'awaiting-signature')
+      .map((attempt) => ({
+        ...attempt,
+        completedSteps: [...attempt.completedSteps],
+        transactionReferences: [...attempt.transactionReferences],
+      }));
   }
 
   async updateAttemptState(attemptId: string, state: ExecutionLifecycleState): Promise<void> {

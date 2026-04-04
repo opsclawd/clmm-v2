@@ -1,6 +1,7 @@
 export { FakeClockPort } from './FakeClockPort.js';
 export { FakeIdGeneratorPort } from './FakeIdGeneratorPort.js';
 export { FakeTriggerRepository } from './FakeTriggerRepository.js';
+export { FakeBreachEpisodeRepository } from './FakeBreachEpisodeRepository.js';
 export { FakeExecutionRepository } from './FakeExecutionRepository.js';
 export { FakeExecutionHistoryRepository } from './FakeExecutionHistoryRepository.js';
 export { FakeSupportedPositionReadPort } from './FakeSupportedPositionReadPort.js';
