@@ -13,6 +13,6 @@ export function buildPreviewStepLabels(direction: BreachDirection): StepLabel[] 
     { step: 1, label: 'Remove Liquidity', sublabel: 'Withdraw LP tokens from pool' },
     { step: 2, label: 'Collect Fees', sublabel: 'Claim accrued trading fees' },
     { step: 3, label: `Swap: ${policy.swapLabel}`, sublabel: policy.policyReason },
-    { step: 4, label: `Result: ${policy.postureLabel}`, sublabel: 'Estimated — see amounts below' },
+    { step: 4, label: `Result: ${policy.postureLabel}` },
   ];
 }
