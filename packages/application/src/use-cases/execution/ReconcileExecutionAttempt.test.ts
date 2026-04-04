@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach } from 'vitest';
+import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { reconcileExecutionAttempt } from './ReconcileExecutionAttempt.js';
 import {
   FakeClockPort,
@@ -78,5 +78,62 @@ describe('ReconcileExecutionAttempt', () => {
     });
     const confirmedEvent = historyRepo.events.find((e) => e.eventType === 'confirmed');
     expect(confirmedEvent?.breachDirection.kind).toBe('lower-bound-breach');
+  });
+
+  it('returns stored confirmed state without calling the submission port again', async () => {
+    const reconcileSpy = vi.spyOn(submissionPort, 'reconcileExecution');
+
+    await executionRepo.saveAttempt({
+      attemptId: 'attempt-confirmed',
+      positionId: FIXTURE_POSITION_ID,
+      breachDirection: LOWER_BOUND_BREACH,
+      lifecycleState: { kind: 'confirmed' },
+      completedSteps: ['remove-liquidity', 'collect-fees', 'swap-assets'],
+      transactionReferences: [{ signature: 'sig-confirmed', stepKind: 'swap-assets' }],
+    });
+
+    const result = await reconcileExecutionAttempt({
+      attemptId: 'attempt-confirmed',
+      positionId: FIXTURE_POSITION_ID,
+      breachDirection: LOWER_BOUND_BREACH,
+      executionRepo,
+      submissionPort,
+      historyRepo,
+      clock,
+      ids,
+    });
+
+    expect(result).toEqual({ kind: 'confirmed' });
+    expect(reconcileSpy).not.toHaveBeenCalled();
+  });
+
+  it('returns stored partial state with completed steps without calling the submission port again', async () => {
+    const reconcileSpy = vi.spyOn(submissionPort, 'reconcileExecution');
+
+    await executionRepo.saveAttempt({
+      attemptId: 'attempt-partial',
+      positionId: FIXTURE_POSITION_ID,
+      breachDirection: LOWER_BOUND_BREACH,
+      lifecycleState: { kind: 'partial' },
+      completedSteps: ['remove-liquidity'],
+      transactionReferences: [{ signature: 'sig-partial', stepKind: 'remove-liquidity' }],
+    });
+
+    const result = await reconcileExecutionAttempt({
+      attemptId: 'attempt-partial',
+      positionId: FIXTURE_POSITION_ID,
+      breachDirection: LOWER_BOUND_BREACH,
+      executionRepo,
+      submissionPort,
+      historyRepo,
+      clock,
+      ids,
+    });
+
+    expect(result).toEqual({
+      kind: 'partial',
+      confirmedSteps: ['remove-liquidity'],
+    });
+    expect(reconcileSpy).not.toHaveBeenCalled();
   });
 });

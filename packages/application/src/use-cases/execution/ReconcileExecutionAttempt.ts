@@ -28,6 +28,14 @@ export async function reconcileExecutionAttempt(params: {
   const attempt = await executionRepo.getAttempt(attemptId);
   if (!attempt) throw new Error(`Attempt not found: ${attemptId}`);
 
+  if (attempt.lifecycleState.kind === 'confirmed') {
+    return { kind: 'confirmed' };
+  }
+
+  if (attempt.lifecycleState.kind === 'partial') {
+    return { kind: 'partial', confirmedSteps: [...attempt.completedSteps] };
+  }
+
   const { confirmedSteps, finalState } = await submissionPort.reconcileExecution(
     [...attempt.transactionReferences],
   );

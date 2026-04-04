@@ -9,6 +9,7 @@ import type { TransactionReference } from '@clmm/domain';
 
 export type SubmitExecutionAttemptResult =
   | { kind: 'submitted'; references: TransactionReference[] }
+  | { kind: 'expired'; currentState: 'expired' }
   | { kind: 'not-found' }
   | { kind: 'invalid-state'; currentState: string };
 
@@ -28,6 +29,22 @@ export async function submitExecutionAttempt(params: {
 
   if (attempt.lifecycleState.kind !== 'awaiting-signature') {
     return { kind: 'invalid-state', currentState: attempt.lifecycleState.kind };
+  }
+
+  const preparedPayload = await executionRepo.getPreparedPayload(attemptId);
+  const now = clock.now();
+  if (preparedPayload && now > preparedPayload.expiresAt) {
+    await executionRepo.updateAttemptState(attemptId, { kind: 'expired' });
+    await historyRepo.appendEvent({
+      eventId: ids.generateId(),
+      positionId: attempt.positionId,
+      eventType: 'preview-expired',
+      breachDirection: attempt.breachDirection,
+      occurredAt: now,
+      lifecycleState: { kind: 'expired' },
+    });
+
+    return { kind: 'expired', currentState: 'expired' };
   }
 
   const { references } = await submissionPort.submitExecution(signedPayload);
