@@ -1,7 +1,7 @@
 import { eq, inArray } from 'drizzle-orm';
 import type { Db } from './db.js';
-import { executionSessions, historyEvents } from './schema/index.js';
-import type { ExecutionHistoryRepository } from '@clmm/application';
+import { historyEvents } from './schema/index.js';
+import type { ExecutionHistoryRepository, SupportedPositionReadPort } from '@clmm/application';
 import type {
   HistoryEvent,
   HistoryTimeline,
@@ -44,7 +44,10 @@ function mapHistoryEventRow(row: HistoryEventRow): HistoryEvent {
 }
 
 export class OffChainHistoryStorageAdapter implements ExecutionHistoryRepository {
-  constructor(private readonly db: Db) {}
+  constructor(
+    private readonly db: Db,
+    private readonly positionReadPort: SupportedPositionReadPort,
+  ) {}
 
   async appendEvent(event: HistoryEvent): Promise<void> {
     await this.db.insert(historyEvents).values({
@@ -61,12 +64,8 @@ export class OffChainHistoryStorageAdapter implements ExecutionHistoryRepository
   }
 
   async getWalletHistory(walletId: WalletId): Promise<readonly HistoryEvent[]> {
-    const sessionRows = await this.db
-      .select({ positionId: executionSessions.positionId })
-      .from(executionSessions)
-      .where(eq(executionSessions.walletId, walletId));
-
-    const positionIds = [...new Set(sessionRows.map((row) => row.positionId as PositionId))];
+    const positions = await this.positionReadPort.listSupportedPositions(walletId);
+    const positionIds = [...new Set(positions.map((position) => position.positionId))];
     if (positionIds.length === 0) {
       return [];
     }
