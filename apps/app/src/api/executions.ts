@@ -28,13 +28,6 @@ type SignatureMutationResponse = {
   state: string;
 };
 
-type PrepareResponse = {
-  unsignedPayloadBase64: string;
-  payloadVersion: string;
-  expiresAt: number;
-  requiresSignature: true;
-};
-
 type SubmitExecutionResponse =
   | { result: 'pending' }
   | { result: 'confirmed' }
@@ -315,32 +308,6 @@ export async function fetchWalletExecutionHistory(walletId: string): Promise<His
     return payload.history;
   } catch (cause: unknown) {
     throw new Error('Could not load wallet execution history', { cause });
-  }
-}
-
-export async function prepareExecution(attemptId: string, walletId: string): Promise<PrepareResponse> {
-  try {
-    const payload = (await fetchJson(`/executions/${attemptId}/prepare`, {
-      method: 'POST',
-      body: JSON.stringify({ walletId }),
-    })) as Partial<PrepareResponse>;
-
-    if (
-      typeof payload.unsignedPayloadBase64 !== 'string' ||
-      typeof payload.payloadVersion !== 'string' ||
-      typeof payload.expiresAt !== 'number' ||
-      payload.requiresSignature !== true
-    ) {
-      throw new Error('Malformed prepare response');
-    }
-
-    return payload as PrepareResponse;
-  } catch (cause: unknown) {
-    if (cause instanceof Error) {
-      throw cause;
-    }
-
-    throw new Error('Could not prepare execution', { cause });
   }
 }
 

@@ -25,7 +25,6 @@ import type {
 } from '@clmm/application';
 import {
   getAwaitingSignaturePayload,
-  getExecutionHistory,
   getWalletExecutionHistory,
   recordExecutionAbandonment,
   recordSignatureDecline,
@@ -46,7 +45,6 @@ import type {
 } from '@clmm/domain';
 import {
   applyDirectionalExitPolicy,
-  buildExecutionPlan,
   evaluateRetryEligibility,
 } from '@clmm/domain';
 import {
@@ -193,54 +191,6 @@ export class ExecutionController {
     }
   }
 
-  @Post(':attemptId/prepare')
-  async prepareExecution(
-    @Param('attemptId') attemptId: string,
-    @Body() body: { walletId: string },
-  ) {
-    const attempt = await this.executionRepo.getAttempt(attemptId);
-    if (!attempt) {
-      throw new NotFoundException(`Attempt not found: ${attemptId}`);
-    }
-    if (attempt.lifecycleState.kind !== 'awaiting-signature') {
-      throw new ConflictException(
-        `Attempt ${attemptId} cannot be prepared from state ${attempt.lifecycleState.kind}`,
-      );
-    }
-    if (!attempt.previewId) {
-      throw new ConflictException(`Attempt ${attemptId} is missing previewId`);
-    }
-
-    if (!(await this.executionRepo.getPreview(attempt.previewId))) {
-      throw new NotFoundException(`Preview not found: ${attempt.previewId}`);
-    }
-
-    const plan = buildExecutionPlan(attempt.breachDirection);
-    const { serializedPayload, preparedAt } = await this.preparationPort.prepareExecution({
-      plan,
-      walletId: body.walletId as WalletId,
-      positionId: attempt.positionId,
-    });
-    const payloadVersion = this.ids.generateId();
-    const expiresAt = (preparedAt + 90_000) as ClockTimestamp;
-
-    await this.executionRepo.savePreparedPayload({
-      payloadId: this.ids.generateId(),
-      attemptId,
-      unsignedPayload: serializedPayload,
-      payloadVersion,
-      expiresAt,
-      createdAt: preparedAt,
-    });
-
-    return {
-      unsignedPayloadBase64: Buffer.from(serializedPayload).toString('base64'),
-      payloadVersion,
-      expiresAt,
-      requiresSignature: true as const,
-    };
-  }
-
   @Get(':attemptId/signing-payload')
   async getSigningPayload(
     @Param('attemptId') attemptId: string,
@@ -349,16 +299,6 @@ export class ExecutionController {
       historyRepo: this.historyRepo,
     });
     return { history: history.map((event) => toHistoryEventDto(event)) };
-  }
-
-  @Get('history/:positionId')
-  async getExecutionHistory(@Param('positionId') positionId: string) {
-    const { timeline } = await getExecutionHistory({
-      positionId: positionId as PositionId,
-      historyRepo: this.historyRepo,
-    });
-    const events: HistoryEventDto[] = timeline.events.map((e: HistoryEvent) => toHistoryEventDto(e));
-    return { history: events };
   }
 
   @Post(':attemptId/submit')
