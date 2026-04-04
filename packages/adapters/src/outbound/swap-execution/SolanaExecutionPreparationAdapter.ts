@@ -71,8 +71,9 @@ export class SolanaExecutionPreparationAdapter implements ExecutionPreparationPo
       throw new Error(`Position not found: ${positionId}`);
     }
 
-    const { instructions: orcaInstructions, tokenAmounts } = await this.buildOrcaInstructions(rpc, positionData, walletId);
-    const swapInstructions = await this.buildSwapInstructions(plan, walletId, tokenAmounts);
+    const orcaPreparation = await this.buildOrcaInstructions(rpc, positionData, walletId);
+    const { instructions: orcaInstructions } = orcaPreparation;
+    const swapInstructions = await this.buildSwapInstructions(plan, walletId, orcaPreparation);
 
     const allInstructions: Instruction[] = [...orcaInstructions];
     if (swapInstructions.length > 0) {
@@ -152,30 +153,36 @@ export class SolanaExecutionPreparationAdapter implements ExecutionPreparationPo
     rpc: ReturnType<typeof createSolanaRpc>,
     positionData: LiquidityPosition,
     walletId: WalletId
-  ): Promise<{ instructions: Instruction[]; tokenAmounts: { tokenA: bigint; tokenB: bigint } }> {
-    try {
-      const positionMintAddress = address(positionData.positionId);
-      const authority = createNoopSigner(address(walletId));
+  ): Promise<{
+    instructions: Instruction[];
+    tokenAmounts: { tokenA: bigint; tokenB: bigint };
+    tokenMintA: string;
+    tokenMintB: string;
+  }> {
+    const positionMintAddress = address(positionData.positionId);
+    const authority = createNoopSigner(address(walletId));
+    const orcaResult = await closePositionInstructions(rpc, positionMintAddress, 100, authority);
+    const whirlpoolAccount = await fetchWhirlpool(rpc, address(positionData.poolId));
 
-      const orcaResult = await closePositionInstructions(rpc, positionMintAddress, 100, authority);
-
-      return {
-        instructions: orcaResult.instructions,
-        tokenAmounts: {
-          tokenA: orcaResult.quote.tokenEstA + orcaResult.feesQuote.feeOwedA,
-          tokenB: orcaResult.quote.tokenEstB + orcaResult.feesQuote.feeOwedB,
-        },
-      };
-    } catch (error) {
-      console.error('Failed to build Orca instructions:', error);
-      return { instructions: [], tokenAmounts: { tokenA: 0n, tokenB: 0n } };
-    }
+    return {
+      instructions: orcaResult.instructions,
+      tokenAmounts: {
+        tokenA: orcaResult.quote.tokenEstA + orcaResult.feesQuote.feeOwedA,
+        tokenB: orcaResult.quote.tokenEstB + orcaResult.feesQuote.feeOwedB,
+      },
+      tokenMintA: whirlpoolAccount.data.tokenMintA.toString(),
+      tokenMintB: whirlpoolAccount.data.tokenMintB.toString(),
+    };
   }
 
   private async buildSwapInstructions(
     plan: ExecutionPlan,
     walletId: WalletId,
-    tokenAmounts: { tokenA: bigint; tokenB: bigint }
+    tokenContext: {
+      tokenAmounts: { tokenA: bigint; tokenB: bigint };
+      tokenMintA: string;
+      tokenMintB: string;
+    },
   ): Promise<Instruction[]> {
     const swapStep = plan.steps.find((s) => s.kind === 'swap-assets');
     if (!swapStep || swapStep.kind !== 'swap-assets') {
@@ -191,9 +198,15 @@ export class SolanaExecutionPreparationAdapter implements ExecutionPreparationPo
         throw new Error(`Unsupported swap pair ${fromAsset}->${toAsset} for Jupiter quote`);
       }
 
-      // Use the actual token amount from the Orca close quote.
-      // token A = SOL (lower-bound breach swaps SOL→USDC), token B = USDC (upper-bound swaps USDC→SOL).
-      const swapAmount = fromAsset === 'SOL' ? tokenAmounts.tokenA : tokenAmounts.tokenB;
+      const sourceMint = TOKEN_MINTS[fromAsset];
+      let swapAmount = 0n;
+      if (tokenContext.tokenMintA === sourceMint) {
+        swapAmount = tokenContext.tokenAmounts.tokenA;
+      } else if (tokenContext.tokenMintB === sourceMint) {
+        swapAmount = tokenContext.tokenAmounts.tokenB;
+      } else {
+        throw new Error(`Swap source mint ${sourceMint} not found in whirlpool token mints`);
+      }
       if (swapAmount === 0n) {
         return [];
       }
