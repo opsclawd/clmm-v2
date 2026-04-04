@@ -218,6 +218,7 @@ export function SigningStatusScreen({
       lifecycleState.kind === 'expired' ||
       lifecycleState.kind === 'abandoned' ||
       lifecycleState.kind === 'partial');
+  const canGoHomeFromResultState = onGoHome != null && canViewResult;
   const retryDisabled = !canRetry;
   const progressLabel = showProgress ? getProgressLabel(signingState) : undefined;
   const declineDisabled = declineLoading === true;
@@ -352,6 +353,29 @@ export function SigningStatusScreen({
               fontWeight: typography.fontWeight.semibold,
             }}>
               View Execution Result
+            </Text>
+          </TouchableOpacity>
+        ) : null}
+
+        {canGoHomeFromResultState ? (
+          <TouchableOpacity
+            onPress={onGoHome}
+            style={{
+              marginTop: 12,
+              padding: 16,
+              backgroundColor: colors.surface,
+              borderRadius: 8,
+              borderWidth: 1,
+              borderColor: colors.border,
+              alignItems: 'center',
+            }}
+          >
+            <Text style={{
+              color: colors.text,
+              fontSize: typography.fontSize.base,
+              fontWeight: typography.fontWeight.semibold,
+            }}>
+              Return Home
             </Text>
           </TouchableOpacity>
         ) : null}

@@ -268,6 +268,9 @@ export default function SigningRoute() {
                   : null
       }
       statusNotice={statusNotice}
+      onGoHome={() => {
+        router.replace('/(tabs)/positions');
+      }}
       {...(isPendingApprovalMode
         ? {
             ...(triggerId != null
@@ -277,9 +280,6 @@ export default function SigningRoute() {
                   },
                 }
               : {}),
-            onGoHome: () => {
-              router.replace('/(tabs)/positions');
-            },
           }
         : {})}
       {...(declineAvailable
