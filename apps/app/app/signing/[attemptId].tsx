@@ -57,6 +57,7 @@ export default function SigningRoute() {
   const attempt = executionQuery.data;
 
   const currentState = attempt?.lifecycleState?.kind;
+
   useEffect(() => {
     if (!resolvedAttemptId) {
       return;
@@ -161,17 +162,17 @@ export default function SigningRoute() {
     );
   }
 
-  return (
-    <SigningStatusScreen
-      {...(attempt?.lifecycleState ? { lifecycleState: attempt.lifecycleState } : {})}
-      {...(attempt?.breachDirection ? { breachDirection: attempt.breachDirection } : {})}
-      {...(attempt?.retryEligible != null ? { retryEligible: attempt.retryEligible } : {})}
-      signingState={signingState}
-      {...(signingError != null ? { signingError } : {})}
-      onSignAndExecute={() => {
-        void handleSignAndExecute();
-      }}
-      walletConnected={walletAddress != null && walletAddress.length > 0}
-    />
-  );
+  const signingStatusScreenProps = {
+    signingState,
+    walletConnected: walletAddress != null && walletAddress.length > 0,
+    onSignAndExecute: () => {
+      void handleSignAndExecute();
+    },
+    ...(attempt?.lifecycleState && { lifecycleState: attempt.lifecycleState }),
+    ...(attempt?.breachDirection && { breachDirection: attempt.breachDirection }),
+    ...(attempt?.retryEligible != null && { retryEligible: attempt.retryEligible }),
+    ...(signingError != null && { signingError }),
+  };
+
+  return <SigningStatusScreen {...signingStatusScreenProps} />;
 }
