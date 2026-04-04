@@ -58,6 +58,13 @@ export type ExecutionAttemptDto = {
   retryReason?: string;
 };
 
+export type PreparedPayloadDto = {
+  unsignedPayloadBase64: string;
+  payloadVersion: string;
+  expiresAt: number;
+  requiresSignature: true;
+};
+
 // Alert DTOs
 export type ActionableAlertDto = {
   triggerId: ExitTriggerId;

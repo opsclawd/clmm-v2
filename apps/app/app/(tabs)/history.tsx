@@ -1,8 +1,8 @@
 import { useQuery } from '@tanstack/react-query';
 import { HistoryListScreen } from '@clmm/ui';
 import { useStore } from 'zustand';
-import { fetchExecutionHistory } from '../../src/api/history.js';
-import { walletSessionStore } from '../../src/state/walletSessionStore.js';
+import { fetchExecutionHistory } from '../../src/api/history';
+import { walletSessionStore } from '../../src/state/walletSessionStore';
 
 export default function HistoryRoute() {
   const walletAddress = useStore(walletSessionStore, (state) => state.walletAddress);

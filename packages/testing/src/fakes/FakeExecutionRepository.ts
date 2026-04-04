@@ -1,6 +1,7 @@
 import type { ExecutionRepository } from '@clmm/application';
 import type {
   BreachDirection,
+  ClockTimestamp,
   ExecutionPreview,
   ExecutionLifecycleState,
   PositionId,
@@ -13,9 +14,25 @@ type StoredPreview = {
   breachDirection: BreachDirection;
 };
 
+type SavePreparedPayloadParams = {
+  payloadId: string;
+  attemptId: string;
+  unsignedPayload: Uint8Array;
+  payloadVersion: string;
+  expiresAt: ClockTimestamp;
+  createdAt: ClockTimestamp;
+};
+type StoredPreparedPayload = SavePreparedPayloadParams;
+type PreparedPayloadRecord = {
+  payloadVersion: string;
+  unsignedPayload: Uint8Array;
+  expiresAt: ClockTimestamp;
+} | null;
+
 export class FakeExecutionRepository implements ExecutionRepository {
   readonly previews = new Map<string, StoredPreview>();
   readonly attempts = new Map<string, StoredExecutionAttempt>();
+  readonly preparedPayloads = new Map<string, StoredPreparedPayload>();
   private _previewCounter = 0;
 
   async savePreview(positionId: PositionId, preview: ExecutionPreview, breachDirection: BreachDirection): Promise<{ previewId: string }> {
@@ -29,11 +46,38 @@ export class FakeExecutionRepository implements ExecutionRepository {
   }
 
   async saveAttempt(attempt: StoredExecutionAttempt): Promise<void> {
-    this.attempts.set(attempt.attemptId, attempt);
+    this.attempts.set(attempt.attemptId, {
+      ...attempt,
+      completedSteps: [...attempt.completedSteps],
+      transactionReferences: [...attempt.transactionReferences],
+    });
   }
 
   async getAttempt(attemptId: string): Promise<StoredExecutionAttempt | null> {
-    return this.attempts.get(attemptId) ?? null;
+    const attempt = this.attempts.get(attemptId);
+    if (!attempt) return null;
+    return {
+      ...attempt,
+      completedSteps: [...attempt.completedSteps],
+      transactionReferences: [...attempt.transactionReferences],
+    };
+  }
+
+  async savePreparedPayload(params: SavePreparedPayloadParams): Promise<void> {
+    this.preparedPayloads.set(params.attemptId, {
+      ...params,
+      unsignedPayload: Uint8Array.from(params.unsignedPayload),
+    });
+  }
+
+  async getPreparedPayload(attemptId: string): Promise<PreparedPayloadRecord> {
+    const payload = this.preparedPayloads.get(attemptId);
+    if (!payload) return null;
+    return {
+      payloadVersion: payload.payloadVersion,
+      unsignedPayload: Uint8Array.from(payload.unsignedPayload),
+      expiresAt: payload.expiresAt,
+    };
   }
 
   async updateAttemptState(attemptId: string, state: ExecutionLifecycleState): Promise<void> {

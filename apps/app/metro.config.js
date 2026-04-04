@@ -3,40 +3,34 @@ const { getDefaultConfig } = require('expo/metro-config');
 const path = require('path');
 
 const projectRoot = __dirname;
-const monorepoRoot = path.resolve(projectRoot, '../..');
+const workspaceRoot = path.resolve(projectRoot, '../..');
+const repoRoot = path.resolve(projectRoot, '../../../..');
 
 const config = getDefaultConfig(projectRoot);
 
 // Watch all packages in the monorepo
-config.watchFolders = [monorepoRoot];
+config.watchFolders = [workspaceRoot, repoRoot];
 
 // Resolve packages from both the app and the monorepo root
 config.resolver.nodeModulesPaths = [
   path.resolve(projectRoot, 'node_modules'),
-  path.resolve(monorepoRoot, 'node_modules'),
+  path.resolve(workspaceRoot, 'node_modules'),
+  path.resolve(repoRoot, 'node_modules'),
 ];
 
-// Ensure Metro resolves .ts/.tsx when imports use .js extension
-// (TypeScript moduleResolution: "bundler" emits .js extensions that Metro must map back)
 config.resolver.sourceExts = ['ts', 'tsx', 'js', 'jsx', 'json', 'cjs', 'mjs'];
 
-// Ensure .ts and .tsx are resolved before .js and .jsx
 config.resolver.resolveRequest = (context, moduleName, platform) => {
-  // If the import ends with .js, try .ts/.tsx first
-  if (moduleName.endsWith('.js')) {
-    const tsName = moduleName.replace(/\.js$/, '.ts');
-    const tsxName = moduleName.replace(/\.js$/, '.tsx');
+  if ((moduleName.startsWith('.') || moduleName.startsWith('/')) && moduleName.endsWith('.js')) {
+    const extensionlessName = moduleName.replace(/\.js$/, '');
 
-    for (const candidate of [tsxName, tsName]) {
-      try {
-        return context.resolveRequest(context, candidate, platform);
-      } catch {
-        // Try next candidate
-      }
+    try {
+      return context.resolveRequest(context, extensionlessName, platform);
+    } catch {
+      // Fall back to the emitted .js path below.
     }
   }
 
-  // Fall back to default resolution
   return context.resolveRequest(context, moduleName, platform);
 };
 

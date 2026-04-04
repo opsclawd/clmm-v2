@@ -1,8 +1,8 @@
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { ExecutionPreviewScreen } from '@clmm/ui';
-import { refreshPreview } from '../../src/api/previews.js';
-import { getBffBaseUrl } from '../../src/api/http.js';
+import { refreshPreview } from '../../src/api/previews';
+import { getBffBaseUrl } from '../../src/api/http';
 
 export default function PreviewRoute() {
   const { triggerId } = useLocalSearchParams<{ triggerId: string }>();

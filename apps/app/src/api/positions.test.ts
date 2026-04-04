@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import type { PositionDetailDto, PositionSummaryDto } from '@clmm/application/public';
-import { fetchPositionDetail, fetchSupportedPositions } from './positions.js';
+import { fetchPositionDetail, fetchSupportedPositions } from './positions';
 
 type ExpoPublicEnv = NodeJS.ProcessEnv & {
   EXPO_PUBLIC_BFF_BASE_URL?: string;

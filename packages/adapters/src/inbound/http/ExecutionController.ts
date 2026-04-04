@@ -8,10 +8,12 @@ import {
   NotFoundException,
   BadRequestException,
   ConflictException,
+  GoneException,
 } from '@nestjs/common';
 import type {
   ExecutionRepository,
   ExecutionHistoryRepository,
+  ExecutionPreparationPort,
   ExecutionSubmissionPort,
   ClockPort,
   IdGeneratorPort,
@@ -29,12 +31,19 @@ import type {
   ExecutionAttempt,
   HistoryEvent,
   ExecutionLifecycleState,
+  ClockTimestamp,
   TransactionReference,
+  WalletId,
 } from '@clmm/domain';
-import { applyDirectionalExitPolicy, evaluateRetryEligibility } from '@clmm/domain';
+import {
+  applyDirectionalExitPolicy,
+  buildExecutionPlan,
+  evaluateRetryEligibility,
+} from '@clmm/domain';
 import {
   EXECUTION_REPOSITORY,
   EXECUTION_HISTORY_REPOSITORY,
+  EXECUTION_PREPARATION_PORT,
   EXECUTION_SUBMISSION_PORT,
   CLOCK_PORT,
   ID_GENERATOR_PORT,
@@ -92,6 +101,8 @@ export class ExecutionController {
     private readonly executionRepo: ExecutionRepository,
     @Inject(EXECUTION_HISTORY_REPOSITORY)
     private readonly historyRepo: ExecutionHistoryRepository,
+    @Inject(EXECUTION_PREPARATION_PORT)
+    private readonly preparationPort: ExecutionPreparationPort,
     @Inject(EXECUTION_SUBMISSION_PORT)
     private readonly submissionPort: ExecutionSubmissionPort,
     @Inject(CLOCK_PORT)
@@ -151,6 +162,7 @@ export class ExecutionController {
       attemptId,
       positionId,
       breachDirection,
+      previewId: body.previewId,
       lifecycleState: { kind: 'awaiting-signature' },
       completedSteps: [],
       transactionReferences: [],
@@ -172,6 +184,54 @@ export class ExecutionController {
       positionId,
       breachDirection,
       lifecycleState: { kind: 'awaiting-signature' },
+    };
+  }
+
+  @Post(':attemptId/prepare')
+  async prepareExecution(
+    @Param('attemptId') attemptId: string,
+    @Body() body: { walletId: string },
+  ) {
+    const attempt = await this.executionRepo.getAttempt(attemptId);
+    if (!attempt) {
+      throw new NotFoundException(`Attempt not found: ${attemptId}`);
+    }
+    if (attempt.lifecycleState.kind !== 'awaiting-signature') {
+      throw new ConflictException(
+        `Attempt ${attemptId} cannot be prepared from state ${attempt.lifecycleState.kind}`,
+      );
+    }
+    if (!attempt.previewId) {
+      throw new ConflictException(`Attempt ${attemptId} is missing previewId`);
+    }
+
+    if (!(await this.executionRepo.getPreview(attempt.previewId))) {
+      throw new NotFoundException(`Preview not found: ${attempt.previewId}`);
+    }
+
+    const plan = buildExecutionPlan(attempt.breachDirection);
+    const { serializedPayload, preparedAt } = await this.preparationPort.prepareExecution({
+      plan,
+      walletId: body.walletId as WalletId,
+      positionId: attempt.positionId,
+    });
+    const payloadVersion = this.ids.generateId();
+    const expiresAt = (preparedAt + 90_000) as ClockTimestamp;
+
+    await this.executionRepo.savePreparedPayload({
+      payloadId: this.ids.generateId(),
+      attemptId,
+      unsignedPayload: serializedPayload,
+      payloadVersion,
+      expiresAt,
+      createdAt: preparedAt,
+    });
+
+    return {
+      unsignedPayloadBase64: Buffer.from(serializedPayload).toString('base64'),
+      payloadVersion,
+      expiresAt,
+      requiresSignature: true as const,
     };
   }
 
@@ -212,7 +272,12 @@ export class ExecutionController {
   @Post(':attemptId/submit')
   async submitExecution(
     @Param('attemptId') attemptId: string,
-    @Body() body: { signedPayload: string; breachDirection?: 'lower-bound-breach' | 'upper-bound-breach' },
+    @Body()
+    body: {
+      signedPayload: string;
+      payloadVersion?: string;
+      breachDirection?: 'lower-bound-breach' | 'upper-bound-breach';
+    },
   ) {
     const attempt = await this.executionRepo.getAttempt(attemptId);
     if (!attempt) throw new NotFoundException(`Attempt not found: ${attemptId}`);
@@ -221,9 +286,25 @@ export class ExecutionController {
         `Attempt ${attemptId} cannot be submitted from state ${attempt.lifecycleState.kind}`,
       );
     }
+    if (!body || typeof body.signedPayload !== 'string') {
+      throw new BadRequestException('submit body must include signedPayload as a string');
+    }
 
     const breachDirection = this.resolveAttemptDirection(attempt, body.breachDirection);
     const signedPayload = decodeSignedPayload(body.signedPayload);
+    if (body.payloadVersion) {
+      const preparedPayload = await this.executionRepo.getPreparedPayload(attemptId);
+      if (!preparedPayload) {
+        throw new ConflictException(`Attempt ${attemptId} has no prepared payload`);
+      }
+      if (preparedPayload.payloadVersion !== body.payloadVersion) {
+        throw new ConflictException(`Attempt ${attemptId} payloadVersion does not match`);
+      }
+      if (preparedPayload.expiresAt <= this.clock.now()) {
+        throw new GoneException(`Prepared payload expired for attempt ${attemptId}`);
+      }
+    }
+
     const { references } = await this.submissionPort.submitExecution(signedPayload);
 
     await this.executionRepo.saveAttempt({

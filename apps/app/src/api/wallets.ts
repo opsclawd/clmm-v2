@@ -1,4 +1,4 @@
-import { getBffBaseUrl } from './http.js';
+import { getBffBaseUrl } from './http';
 
 export async function enrollWalletForMonitoring(walletId: string): Promise<{ enrolled: boolean; enrolledAt: number }> {
   const response = await fetch(`${getBffBaseUrl()}/wallets/${walletId}/monitor`, {

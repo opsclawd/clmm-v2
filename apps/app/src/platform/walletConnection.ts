@@ -1,5 +1,5 @@
 import type { ConnectionOutcome } from '@clmm/ui';
-import type { WalletConnectionKind } from '../state/walletSessionStore.js';
+import type { WalletConnectionKind } from '../state/walletSessionStore';
 
 const CANCELLATION_MATCHERS = ['user rejected', 'declined', 'cancelled', 'canceled'] as const;
 const INTERRUPTION_MATCHERS = ['interrupted', 'timeout', 'closed'] as const;

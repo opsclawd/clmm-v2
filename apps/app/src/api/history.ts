@@ -1,5 +1,5 @@
 import type { HistoryEventDto } from '@clmm/application/public';
-import { fetchJson } from './http.js';
+import { fetchJson } from './http';
 
 type HistoryResponse = {
   history: HistoryEventDto[];

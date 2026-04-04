@@ -3,11 +3,11 @@ import { useRouter } from 'expo-router';
 import { WalletConnectScreen } from '@clmm/ui';
 import { useStore } from 'zustand';
 import type { PlatformCapabilityState } from '@clmm/application/public';
-import { platformCapabilityAdapter, walletPlatform } from '../src/composition/index.js';
-import { connectBrowserWallet } from '../src/platform/browserWallet.js';
-import { mapWalletErrorToOutcome } from '../src/platform/walletConnection.js';
-import { walletSessionStore } from '../src/state/walletSessionStore.js';
-import { enrollWalletForMonitoring } from '../src/api/wallets.js';
+import { platformCapabilityAdapter, walletPlatform } from '../src/composition/index';
+import { connectBrowserWallet } from '../src/platform/browserWallet';
+import { mapWalletErrorToOutcome } from '../src/platform/walletConnection';
+import { walletSessionStore } from '../src/state/walletSessionStore';
+import { enrollWalletForMonitoring } from '../src/api/wallets';
 
 const FALLBACK_PLATFORM_CAPABILITIES: PlatformCapabilityState = {
   nativePushAvailable: false,

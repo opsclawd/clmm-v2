@@ -1,6 +1,6 @@
 import { eq, inArray } from 'drizzle-orm';
 import type { Db } from './db.js';
-import { breachEpisodes, exitTriggers, executionAttempts, executionSessions, executionPreviews } from './schema/index.js';
+import { breachEpisodes, exitTriggers, executionAttempts, executionSessions, executionPreviews, preparedPayloads } from './schema/index.js';
 import type {
   TriggerRepository,
   ExecutionRepository,
@@ -171,8 +171,21 @@ export class OperationalStorageAdapter
 
   async saveAttempt(attempt: StoredExecutionAttempt): Promise<void> {
     const now = Date.now();
+    const updateSet = {
+      directionKind: attempt.breachDirection.kind,
+      lifecycleStateKind: attempt.lifecycleState.kind,
+      completedStepsJson: attempt.completedSteps as unknown as string[],
+      transactionRefsJson: attempt.transactionReferences as unknown as Record<string, unknown>[],
+      updatedAt: now,
+    };
+
+    if (attempt.previewId !== undefined) {
+      Object.assign(updateSet, { previewId: attempt.previewId });
+    }
+
     await this.db.insert(executionAttempts).values({
       attemptId: attempt.attemptId,
+      previewId: attempt.previewId ?? null,
       positionId: attempt.positionId,
       directionKind: attempt.breachDirection.kind,
       lifecycleStateKind: attempt.lifecycleState.kind,
@@ -182,13 +195,7 @@ export class OperationalStorageAdapter
       updatedAt: now,
     }).onConflictDoUpdate({
       target: executionAttempts.attemptId,
-      set: {
-        directionKind: attempt.breachDirection.kind,
-        lifecycleStateKind: attempt.lifecycleState.kind,
-        completedStepsJson: attempt.completedSteps as unknown as string[],
-        transactionRefsJson: attempt.transactionReferences as unknown as Record<string, unknown>[],
-        updatedAt: now,
-      },
+      set: updateSet,
     });
   }
 
@@ -204,9 +211,55 @@ export class OperationalStorageAdapter
       positionId: row.positionId as PositionId,
       breachDirection: directionFromKind(row.directionKind),
       lifecycleState: { kind: row.lifecycleStateKind } as ExecutionLifecycleState,
+      ...(row.previewId ? { previewId: row.previewId } : {}),
       // boundary: Drizzle jsonb columns return unknown; runtime shape matches domain types
       completedSteps: (row.completedStepsJson as ExecutionAttempt['completedSteps']) ?? [],
       transactionReferences: (row.transactionRefsJson as ExecutionAttempt['transactionReferences']) ?? [],
+    };
+  }
+
+  async savePreparedPayload(params: {
+    payloadId: string;
+    attemptId: string;
+    unsignedPayload: Uint8Array;
+    payloadVersion: string;
+    expiresAt: ClockTimestamp;
+    createdAt: ClockTimestamp;
+  }): Promise<void> {
+    const unsignedPayload = Buffer.from(params.unsignedPayload);
+    await this.db.insert(preparedPayloads).values({
+      payloadId: params.payloadId,
+      attemptId: params.attemptId,
+      unsignedPayload,
+      payloadVersion: params.payloadVersion,
+      expiresAt: params.expiresAt,
+      createdAt: params.createdAt,
+    }).onConflictDoUpdate({
+      target: preparedPayloads.attemptId,
+      set: {
+        payloadId: params.payloadId,
+        unsignedPayload,
+        payloadVersion: params.payloadVersion,
+        expiresAt: params.expiresAt,
+      },
+    });
+  }
+
+  async getPreparedPayload(attemptId: string): Promise<{
+    payloadVersion: string;
+    unsignedPayload: Uint8Array;
+    expiresAt: ClockTimestamp;
+  } | null> {
+    const rows = await this.db
+      .select()
+      .from(preparedPayloads)
+      .where(eq(preparedPayloads.attemptId, attemptId));
+    const [row] = rows;
+    if (!row) return null;
+    return {
+      payloadVersion: row.payloadVersion,
+      unsignedPayload: Uint8Array.from(row.unsignedPayload),
+      expiresAt: makeClockTimestamp(row.expiresAt),
     };
   }
 

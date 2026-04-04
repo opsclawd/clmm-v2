@@ -1,2 +1,2 @@
-export * from './browserWallet.js';
-export * from './walletConnection.js';
+export * from './browserWallet';
+export * from './walletConnection';

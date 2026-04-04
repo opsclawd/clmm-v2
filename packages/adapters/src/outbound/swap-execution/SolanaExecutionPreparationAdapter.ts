@@ -17,6 +17,7 @@
 import {
   createSolanaRpc,
   address,
+  createNoopSigner,
   pipe,
   getTransactionDecoder,
   getBase64Encoder,
@@ -29,7 +30,7 @@ import {
   setTransactionMessageLifetimeUsingBlockhash,
   prependTransactionMessageInstructions,
 } from '@solana/kit';
-import { fetchPosition, fetchWhirlpool } from '@orca-so/whirlpools-client';
+import { fetchPosition, fetchWhirlpool, getPositionAddress } from '@orca-so/whirlpools-client';
 import { closePositionInstructions } from '@orca-so/whirlpools';
 import type { Instruction } from '@solana/kit';
 import type { ExecutionPreparationPort } from '@clmm/application';
@@ -66,8 +67,8 @@ export class SolanaExecutionPreparationAdapter implements ExecutionPreparationPo
       throw new Error(`Position not found: ${positionId}`);
     }
 
-    const orcaInstructions = await this.buildOrcaInstructions(rpc, positionData, walletId);
-    const swapInstruction = await this.buildSwapInstruction(plan, walletId);
+    const { instructions: orcaInstructions, tokenAmounts } = await this.buildOrcaInstructions(rpc, positionData, walletId);
+    const swapInstruction = await this.buildSwapInstruction(plan, walletId, tokenAmounts);
 
     const allInstructions: Instruction[] = [...orcaInstructions];
     if (swapInstruction) {
@@ -93,7 +94,8 @@ export class SolanaExecutionPreparationAdapter implements ExecutionPreparationPo
 
   private async fetchPositionData(rpc: ReturnType<typeof createSolanaRpc>, positionId: PositionId): Promise<LiquidityPosition | null> {
     try {
-      const positionAddress = address(positionId);
+      const positionMint = address(positionId);
+      const [positionAddress] = await getPositionAddress(positionMint);
       const positionAccount = await fetchPosition(rpc, positionAddress);
       const position = positionAccount.data;
       const whirlpoolAddress = position.whirlpool;
@@ -140,23 +142,31 @@ export class SolanaExecutionPreparationAdapter implements ExecutionPreparationPo
   private async buildOrcaInstructions(
     rpc: ReturnType<typeof createSolanaRpc>,
     positionData: LiquidityPosition,
-    _walletId: WalletId
-  ): Promise<Instruction[]> {
+    walletId: WalletId
+  ): Promise<{ instructions: Instruction[]; tokenAmounts: { tokenA: bigint; tokenB: bigint } }> {
     try {
       const positionMintAddress = address(positionData.positionId);
+      const authority = createNoopSigner(address(walletId));
 
-      const orcaResult = await closePositionInstructions(rpc, positionMintAddress, 100);
+      const orcaResult = await closePositionInstructions(rpc, positionMintAddress, 100, authority);
 
-      return orcaResult.instructions;
+      return {
+        instructions: orcaResult.instructions,
+        tokenAmounts: {
+          tokenA: orcaResult.quote.tokenEstA + orcaResult.feesQuote.feeOwedA,
+          tokenB: orcaResult.quote.tokenEstB + orcaResult.feesQuote.feeOwedB,
+        },
+      };
     } catch (error) {
       console.error('Failed to build Orca instructions:', error);
-      return [];
+      return { instructions: [], tokenAmounts: { tokenA: 0n, tokenB: 0n } };
     }
   }
 
   private async buildSwapInstruction(
     plan: ExecutionPlan,
-    walletId: WalletId
+    walletId: WalletId,
+    tokenAmounts: { tokenA: bigint; tokenB: bigint }
   ): Promise<Instruction | null> {
     const swapStep = plan.steps.find((s) => s.kind === 'swap-assets');
     if (!swapStep || swapStep.kind !== 'swap-assets') {
@@ -164,10 +174,19 @@ export class SolanaExecutionPreparationAdapter implements ExecutionPreparationPo
     }
 
     try {
-      const inputMint = swapStep.instruction.fromAsset === 'SOL' ? SOL_MINT : swapStep.instruction.fromAsset;
-      const outputMint = swapStep.instruction.toAsset === 'SOL' ? SOL_MINT : swapStep.instruction.toAsset;
+      const fromAsset = swapStep.instruction.fromAsset;
+      const toAsset = swapStep.instruction.toAsset;
+      const inputMint = fromAsset === 'SOL' ? SOL_MINT : fromAsset;
+      const outputMint = toAsset === 'SOL' ? SOL_MINT : toAsset;
 
-      const quoteResponse = await this.getJupiterQuote(inputMint, outputMint, '1000000');
+      // Use the actual token amount from the Orca close quote.
+      // token A = SOL (lower-bound breach swaps SOL→USDC), token B = USDC (upper-bound swaps USDC→SOL).
+      const swapAmount = fromAsset === 'SOL' ? tokenAmounts.tokenA : tokenAmounts.tokenB;
+      if (swapAmount === 0n) {
+        return null;
+      }
+
+      const quoteResponse = await this.getJupiterQuote(inputMint, outputMint, swapAmount.toString());
       if (!quoteResponse) {
         return null;
       }

@@ -10,6 +10,7 @@ import { OffChainHistoryStorageAdapter } from '../../outbound/storage/OffChainHi
 import { MonitoredWalletStorageAdapter } from '../../outbound/storage/MonitoredWalletStorageAdapter.js';
 import { OrcaPositionReadAdapter } from '../../outbound/solana-position-reads/OrcaPositionReadAdapter.js';
 import { JupiterQuoteAdapter } from '../../outbound/swap-execution/JupiterQuoteAdapter.js';
+import { SolanaExecutionPreparationAdapter } from '../../outbound/swap-execution/SolanaExecutionPreparationAdapter.js';
 import { SolanaExecutionSubmissionAdapter } from '../../outbound/swap-execution/SolanaExecutionSubmissionAdapter.js';
 import { createDb } from '../../outbound/storage/db.js';
 import type { ClockPort, IdGeneratorPort } from '@clmm/application';
@@ -18,6 +19,7 @@ import {
   TRIGGER_REPOSITORY,
   EXECUTION_REPOSITORY,
   EXECUTION_HISTORY_REPOSITORY,
+  EXECUTION_PREPARATION_PORT,
   EXECUTION_SUBMISSION_PORT,
   SUPPORTED_POSITION_READ_PORT,
   SWAP_QUOTE_PORT,
@@ -44,6 +46,7 @@ const orcaPositionRead = new OrcaPositionReadAdapter(rpcUrl);
 const operationalStorage = new OperationalStorageAdapter(db, systemIds, orcaPositionRead);
 const historyStorage = new OffChainHistoryStorageAdapter(db);
 const jupiterQuote = new JupiterQuoteAdapter();
+const solanaPreparation = new SolanaExecutionPreparationAdapter(rpcUrl);
 const solanaSubmission = new SolanaExecutionSubmissionAdapter(rpcUrl);
 const monitoredWalletStorage = new MonitoredWalletStorageAdapter(db);
 
@@ -53,6 +56,7 @@ const monitoredWalletStorage = new MonitoredWalletStorageAdapter(db);
     { provide: TRIGGER_REPOSITORY, useValue: operationalStorage },
     { provide: EXECUTION_REPOSITORY, useValue: operationalStorage },
     { provide: EXECUTION_HISTORY_REPOSITORY, useValue: historyStorage },
+    { provide: EXECUTION_PREPARATION_PORT, useValue: solanaPreparation },
     { provide: EXECUTION_SUBMISSION_PORT, useValue: solanaSubmission },
     { provide: SUPPORTED_POSITION_READ_PORT, useValue: orcaPositionRead },
     { provide: SWAP_QUOTE_PORT, useValue: jupiterQuote },

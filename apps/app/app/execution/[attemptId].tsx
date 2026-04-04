@@ -1,7 +1,7 @@
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useQuery } from '@tanstack/react-query';
 import { ExecutionResultScreen } from '@clmm/ui';
-import { fetchExecution } from '../../src/api/executions.js';
+import { fetchExecution } from '../../src/api/executions';
 
 export default function ExecutionResultRoute() {
   const { attemptId } = useLocalSearchParams<{ attemptId: string }>();

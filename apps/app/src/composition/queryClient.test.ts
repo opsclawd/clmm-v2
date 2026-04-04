@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { queryClient } from './queryClient.js';
+import { queryClient } from './queryClient';
 
 describe('queryClient', () => {
   it('disables automatic retries by default', () => {

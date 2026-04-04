@@ -8,6 +8,7 @@ export type {
   ExecutionPreviewDto,
   PreviewStepDto,
   ExecutionAttemptDto,
+  PreparedPayloadDto,
   ActionableAlertDto,
   HistoryEventDto,
   MonitoringReadinessDto,

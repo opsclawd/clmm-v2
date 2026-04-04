@@ -3,7 +3,7 @@ import type { PlatformCapabilityState } from '@clmm/application/public';
 import {
   createWalletSessionStore,
   type WalletConnectionKind,
-} from './walletSessionStore.js';
+} from './walletSessionStore';
 
 const caps: PlatformCapabilityState = {
   nativePushAvailable: false,

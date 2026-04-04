@@ -2,8 +2,8 @@ import { useRouter } from 'expo-router';
 import { useQuery } from '@tanstack/react-query';
 import { AlertsListScreen } from '@clmm/ui';
 import { useStore } from 'zustand';
-import { fetchAlerts } from '../../src/api/alerts.js';
-import { walletSessionStore } from '../../src/state/walletSessionStore.js';
+import { fetchAlerts } from '../../src/api/alerts';
+import { walletSessionStore } from '../../src/state/walletSessionStore';
 
 export default function AlertsRoute() {
   const router = useRouter();
