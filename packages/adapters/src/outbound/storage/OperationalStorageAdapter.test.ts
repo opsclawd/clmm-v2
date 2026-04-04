@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import { OperationalStorageAdapter } from './OperationalStorageAdapter.js';
 import { FIXTURE_POSITION_IN_RANGE, FIXTURE_WALLET_ID, FakeIdGeneratorPort } from '@clmm/testing';
-import { makeClockTimestamp, makePositionId } from '@clmm/domain';
+import { LOWER_BOUND_BREACH, makeClockTimestamp, makePositionId } from '@clmm/domain';
 import type { SupportedPositionReadPort } from '@clmm/application';
 import type { LiquidityPosition, PositionId, WalletId } from '@clmm/domain';
 import type { Db } from './db.js';
@@ -44,6 +44,74 @@ function makeDbWithTriggerRows(rows: Array<{
   } as unknown as Db;
 }
 
+function makeDbForFinalizeQualification(params: {
+  episode: {
+    episodeId: string;
+    positionId: string;
+    directionKind: string;
+    status: 'open' | 'closed';
+    consecutiveCount: number;
+    startedAt: number;
+    lastObservedAt: number;
+    triggerId: string | null;
+    closedAt: number | null;
+    closeReason: 'position-recovered' | 'direction-reversed' | null;
+  };
+  existingTriggerByEpisodeId?: string;
+}) {
+  const calls = {
+    transaction: 0,
+    insertExitTriggers: 0,
+    updateEpisodes: 0,
+  };
+
+  const existingTriggerRows = params.existingTriggerByEpisodeId == null
+    ? []
+    : [{ triggerId: params.existingTriggerByEpisodeId }];
+
+  const db = {
+    transaction: async (fn: (tx: unknown) => Promise<unknown>) => {
+      calls.transaction += 1;
+      const tx = {
+        select: () => ({
+          from: () => ({
+            where: () => {
+              return {
+                for: async () => [params.episode],
+                then: (resolve: (value: unknown[]) => unknown, _reject?: (reason?: unknown) => unknown) => resolve(existingTriggerRows),
+              };
+            },
+          }),
+        }),
+        insert: () => ({
+          values: () => {
+            calls.insertExitTriggers += 1;
+            return {
+              onConflictDoNothing: () => ({
+                returning: async () => [],
+              }),
+            };
+          },
+        }),
+        update: () => ({
+          set: () => {
+            calls.updateEpisodes += 1;
+            return {
+              where: async () => undefined,
+            };
+          },
+        }),
+      };
+      return fn(tx);
+    },
+  };
+
+  return {
+    db: db as unknown as Db,
+    calls,
+  };
+}
+
 describe('OperationalStorageAdapter', () => {
   it('scopes actionable triggers to positions owned by the requested wallet', async () => {
     const positionReadPort = new WalletScopedPositionReadPort([FIXTURE_POSITION_IN_RANGE]);
@@ -76,5 +144,114 @@ describe('OperationalStorageAdapter', () => {
     expect(triggers).toHaveLength(1);
     expect(triggers[0]?.triggerId).toBe('trigger-owned');
     expect(triggers[0]?.positionId).toBe(FIXTURE_POSITION_IN_RANGE.positionId);
+  });
+
+  it('returns duplicate-suppressed for closed episodes with an existing trigger and does not insert', async () => {
+    const episodeId = 'episode-closed-with-trigger';
+    const triggerId = 'trigger-existing';
+    const { db, calls } = makeDbForFinalizeQualification({
+      episode: {
+        episodeId,
+        positionId: FIXTURE_POSITION_IN_RANGE.positionId,
+        directionKind: 'lower-bound-breach',
+        status: 'closed',
+        consecutiveCount: 2,
+        startedAt: makeClockTimestamp(1_000),
+        lastObservedAt: makeClockTimestamp(1_100),
+        triggerId,
+        closedAt: makeClockTimestamp(1_100),
+        closeReason: 'position-recovered',
+      },
+    });
+    const adapter = new OperationalStorageAdapter(
+      db,
+      new FakeIdGeneratorPort('storage'),
+      new WalletScopedPositionReadPort([FIXTURE_POSITION_IN_RANGE]),
+    );
+
+    const result = await adapter.finalizeQualification(episodeId as never, {
+      triggerId: 'trigger-new' as never,
+      positionId: FIXTURE_POSITION_IN_RANGE.positionId,
+      episodeId: episodeId as never,
+      breachDirection: LOWER_BOUND_BREACH,
+      triggeredAt: makeClockTimestamp(1_200),
+      confirmationEvaluatedAt: makeClockTimestamp(1_201),
+      confirmationPassed: true,
+    });
+
+    expect(result).toEqual({
+      kind: 'duplicate-suppressed',
+      existingTriggerId: triggerId,
+    });
+    expect(calls.insertExitTriggers).toBe(0);
+  });
+
+  it('throws when qualifying a closed episode without an existing trigger', async () => {
+    const episodeId = 'episode-closed-no-trigger';
+    const { db, calls } = makeDbForFinalizeQualification({
+      episode: {
+        episodeId,
+        positionId: FIXTURE_POSITION_IN_RANGE.positionId,
+        directionKind: 'lower-bound-breach',
+        status: 'closed',
+        consecutiveCount: 1,
+        startedAt: makeClockTimestamp(2_000),
+        lastObservedAt: makeClockTimestamp(2_100),
+        triggerId: null,
+        closedAt: makeClockTimestamp(2_100),
+        closeReason: 'position-recovered',
+      },
+    });
+    const adapter = new OperationalStorageAdapter(
+      db,
+      new FakeIdGeneratorPort('storage'),
+      new WalletScopedPositionReadPort([FIXTURE_POSITION_IN_RANGE]),
+    );
+
+    await expect(() => adapter.finalizeQualification(episodeId as never, {
+      triggerId: 'trigger-new' as never,
+      positionId: FIXTURE_POSITION_IN_RANGE.positionId,
+      episodeId: episodeId as never,
+      breachDirection: LOWER_BOUND_BREACH,
+      triggeredAt: makeClockTimestamp(2_200),
+      confirmationEvaluatedAt: makeClockTimestamp(2_201),
+      confirmationPassed: true,
+    })).rejects.toThrow(`finalizeQualification: episode ${episodeId} is closed without an existing trigger`);
+    expect(calls.insertExitTriggers).toBe(0);
+  });
+
+  it('rejects finalizeQualification when trigger episodeId mismatches argument', async () => {
+    const episodeId = 'episode-a';
+    const { db, calls } = makeDbForFinalizeQualification({
+      episode: {
+        episodeId,
+        positionId: FIXTURE_POSITION_IN_RANGE.positionId,
+        directionKind: 'lower-bound-breach',
+        status: 'open',
+        consecutiveCount: 1,
+        startedAt: makeClockTimestamp(3_000),
+        lastObservedAt: makeClockTimestamp(3_100),
+        triggerId: null,
+        closedAt: null,
+        closeReason: null,
+      },
+    });
+    const adapter = new OperationalStorageAdapter(
+      db,
+      new FakeIdGeneratorPort('storage'),
+      new WalletScopedPositionReadPort([FIXTURE_POSITION_IN_RANGE]),
+    );
+
+    await expect(() => adapter.finalizeQualification(episodeId as never, {
+      triggerId: 'trigger-new' as never,
+      positionId: FIXTURE_POSITION_IN_RANGE.positionId,
+      episodeId: 'episode-b' as never,
+      breachDirection: LOWER_BOUND_BREACH,
+      triggeredAt: makeClockTimestamp(3_200),
+      confirmationEvaluatedAt: makeClockTimestamp(3_201),
+      confirmationPassed: true,
+    })).rejects.toThrow('finalizeQualification: trigger episode mismatch');
+    expect(calls.transaction).toBe(0);
+    expect(calls.insertExitTriggers).toBe(0);
   });
 });

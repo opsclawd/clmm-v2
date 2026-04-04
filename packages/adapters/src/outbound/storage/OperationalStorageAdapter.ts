@@ -212,6 +212,12 @@ export class OperationalStorageAdapter
     episodeId: BreachEpisodeId,
     trigger: ExitTrigger,
   ): Promise<FinalizationResult> {
+    if (trigger.episodeId !== episodeId) {
+      throw new Error(
+        `finalizeQualification: trigger episode mismatch (expected ${episodeId}, got ${trigger.episodeId})`,
+      );
+    }
+
     return this.db.transaction(async (tx) => {
       const episodeRows = await tx
         .select()
@@ -222,6 +228,17 @@ export class OperationalStorageAdapter
 
       if (!episode) {
         throw new Error(`finalizeQualification: episode not found ${episodeId}`);
+      }
+
+      if (episode.status !== 'open') {
+        if (episode.triggerId) {
+          return {
+            kind: 'duplicate-suppressed',
+            existingTriggerId: episode.triggerId as ExitTriggerId,
+          };
+        }
+
+        throw new Error(`finalizeQualification: episode ${episodeId} is closed without an existing trigger`);
       }
 
       if (episode.triggerId) {
