@@ -7,7 +7,7 @@ import { fetchPositionDetail } from '../../src/api/positions';
 import { walletSessionStore } from '../../src/state/walletSessionStore';
 
 export default function PositionDetailRoute() {
-  const { id, triggerId } = useLocalSearchParams<{ id: string; triggerId?: string }>();
+  const { id, triggerId } = useLocalSearchParams<{ id?: string | string[]; triggerId?: string | string[] }>();
   const router = useRouter();
   const walletAddress = useStore(walletSessionStore, (state) => state.walletAddress);
   const positionId = typeof id === 'string' ? id : undefined;
@@ -40,7 +40,7 @@ export default function PositionDetailRoute() {
   const position = positionQuery.data
     ? {
         ...positionQuery.data,
-        triggerId: positionQuery.data.triggerId ?? alertTriggerId,
+        triggerId: alertTriggerId ?? positionQuery.data.triggerId,
       }
     : undefined;
 
