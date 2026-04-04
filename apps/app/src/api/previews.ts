@@ -21,7 +21,13 @@ function isPostExitAssetPosture(value: unknown): boolean {
 }
 
 function isTokenAmountEstimate(value: unknown): boolean {
-  return isRecord(value) && typeof value['raw'] === 'bigint' && typeof value['symbol'] === 'string';
+  return (
+    isRecord(value) &&
+    (typeof value['raw'] === 'bigint' ||
+      typeof value['raw'] === 'string' ||
+      typeof value['raw'] === 'number') &&
+    typeof value['symbol'] === 'string'
+  );
 }
 
 function isPreviewStepDto(value: unknown): boolean {

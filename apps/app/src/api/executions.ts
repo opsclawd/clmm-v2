@@ -39,7 +39,7 @@ type SubmitExecutionResponse =
   | { result: 'pending' }
   | { result: 'confirmed' }
   | { result: 'failed' }
-  | { result: 'partial'; confirmedSteps: string[] };
+  | { result: 'partial'; confirmedSteps: Array<(typeof VALID_EXECUTION_STEP_KINDS)[number]> };
 
 const VALID_BREACH_DIRECTIONS = ['lower-bound-breach', 'upper-bound-breach'] as const;
 const VALID_EXECUTION_LIFECYCLE_STATES = [
@@ -167,7 +167,11 @@ function conflictDetailError(cause: unknown): Error | null {
   }
 
   const detailMatch = /^HTTP 409: (.+)$/.exec(cause.message);
-  return detailMatch?.[1] != null ? new Error(detailMatch[1], { cause }) : null;
+  if (detailMatch?.[1] != null) {
+    return new Error(detailMatch[1], { cause });
+  }
+
+  return cause.message.length > 0 ? new Error(cause.message, { cause }) : null;
 }
 
 function isSignatureDeclineResponse(
@@ -188,7 +192,7 @@ function isSubmitExecutionResponse(value: unknown): value is SubmitExecutionResp
   }
 
   if (value['result'] === 'partial') {
-    return Array.isArray(value['confirmedSteps']);
+    return Array.isArray(value['confirmedSteps']) && value['confirmedSteps'].every(isExecutionStepKind);
   }
 
   return value['result'] === 'pending' || value['result'] === 'confirmed' || value['result'] === 'failed';
@@ -328,6 +332,10 @@ export async function prepareExecution(attemptId: string, walletId: string): Pro
 
     return payload as PrepareResponse;
   } catch (cause: unknown) {
+    if (cause instanceof Error) {
+      throw cause;
+    }
+
     throw new Error('Could not prepare execution', { cause });
   }
 }
@@ -352,6 +360,10 @@ export async function submitExecution(
 
     return payload;
   } catch (cause: unknown) {
+    if (cause instanceof Error) {
+      throw cause;
+    }
+
     throw new Error('Could not submit execution', { cause });
   }
 }
