@@ -68,11 +68,16 @@ export class SolanaExecutionPreparationAdapter implements ExecutionPreparationPo
     }
 
     const { instructions: orcaInstructions, tokenAmounts } = await this.buildOrcaInstructions(rpc, positionData, walletId);
-    const swapInstruction = await this.buildSwapInstruction(plan, walletId, tokenAmounts);
+    const swapInstructions = await this.buildSwapInstructions(plan, walletId, tokenAmounts);
 
     const allInstructions: Instruction[] = [...orcaInstructions];
-    if (swapInstruction) {
-      allInstructions.push(swapInstruction);
+    if (swapInstructions.length > 0) {
+      allInstructions.push(...swapInstructions);
+    }
+
+    const requiresSwapStep = plan.steps.some((step) => step.kind === 'swap-assets');
+    if (requiresSwapStep && swapInstructions.length === 0) {
+      throw new Error('Swap step is required by the execution plan but no swap instructions were prepared');
     }
 
     const message = pipe(
@@ -163,14 +168,14 @@ export class SolanaExecutionPreparationAdapter implements ExecutionPreparationPo
     }
   }
 
-  private async buildSwapInstruction(
+  private async buildSwapInstructions(
     plan: ExecutionPlan,
     walletId: WalletId,
     tokenAmounts: { tokenA: bigint; tokenB: bigint }
-  ): Promise<Instruction | null> {
+  ): Promise<Instruction[]> {
     const swapStep = plan.steps.find((s) => s.kind === 'swap-assets');
     if (!swapStep || swapStep.kind !== 'swap-assets') {
-      return null;
+      return [];
     }
 
     try {
@@ -183,17 +188,17 @@ export class SolanaExecutionPreparationAdapter implements ExecutionPreparationPo
       // token A = SOL (lower-bound breach swaps SOL→USDC), token B = USDC (upper-bound swaps USDC→SOL).
       const swapAmount = fromAsset === 'SOL' ? tokenAmounts.tokenA : tokenAmounts.tokenB;
       if (swapAmount === 0n) {
-        return null;
+        return [];
       }
 
       const quoteResponse = await this.getJupiterQuote(inputMint, outputMint, swapAmount.toString());
       if (!quoteResponse) {
-        return null;
+        return [];
       }
 
       const swapTransaction = await this.getJupiterSwapTransaction(quoteResponse, walletId);
       if (!swapTransaction) {
-        return null;
+        return [];
       }
 
       const encoder = getBase64Encoder();
@@ -208,14 +213,10 @@ export class SolanaExecutionPreparationAdapter implements ExecutionPreparationPo
         this.getRpc(),
       );
 
-      if (transactionMessage.instructions.length > 0) {
-        return transactionMessage.instructions[0];
-      }
-
-      return null;
+      return [...transactionMessage.instructions];
     } catch (error) {
       console.error('Failed to build swap instruction:', error);
-      return null;
+      return [];
     }
   }
 
