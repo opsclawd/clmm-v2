@@ -15,6 +15,7 @@ type Props = {
 };
 
 export function AlertsListScreen({ alerts, alertsLoading, alertsError, onSelectAlert, platformCapabilities }: Props) {
+  const isLoading = alertsLoading ?? (alerts == null && alertsError == null);
   const alertItems = alerts ?? [];
   const isEmpty = alertItems.length === 0;
 
@@ -30,7 +31,7 @@ export function AlertsListScreen({ alerts, alertsLoading, alertsError, onSelectA
 
       <DegradedCapabilityBanner capabilities={platformCapabilities} />
 
-      {isEmpty && alertsLoading ? (
+      {isEmpty && isLoading ? (
         <View style={{ alignItems: 'center', justifyContent: 'center', paddingVertical: 48, paddingHorizontal: 24 }}>
           <ActivityIndicator color={colors.primary} />
           <Text style={{
