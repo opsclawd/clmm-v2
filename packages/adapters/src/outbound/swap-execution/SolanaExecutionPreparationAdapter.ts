@@ -31,7 +31,7 @@ import {
   prependTransactionMessageInstructions,
 } from '@solana/kit';
 import { fetchPosition, fetchWhirlpool, getPositionAddress } from '@orca-so/whirlpools-client';
-import { closePositionInstructions, swapInstructions } from '@orca-so/whirlpools';
+import { closePositionInstructions, swapInstructions, setNativeMintWrappingStrategy } from '@orca-so/whirlpools';
 import type { Instruction } from '@solana/kit';
 import type { ExecutionPreparationPort } from '@clmm/application';
 import type { ExecutionPlan, WalletId, PositionId, PoolId, ClockTimestamp, LiquidityPosition } from '@clmm/domain';
@@ -294,6 +294,10 @@ export class SolanaExecutionPreparationAdapter implements ExecutionPreparationPo
     inputMint: string,
     inputAmount: bigint,
   ): Promise<Instruction[]> {
+    // Ensure fallback swap does not depend on an ephemeral keypair signer for SOL wrapping.
+    // In this architecture only the end-user wallet can sign the prepared transaction.
+    setNativeMintWrappingStrategy('ata');
+
     const authority = createNoopSigner(address(walletId));
     const result = await swapInstructions(
       rpc,
