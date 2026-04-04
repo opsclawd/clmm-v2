@@ -7,7 +7,7 @@ import type {
   IdGeneratorPort,
   ExecutionPreviewDto,
 } from '@clmm/application';
-import { getExecutionPreview, refreshExecutionPreview } from '@clmm/application';
+import { createExecutionPreview, getExecutionPreview, refreshExecutionPreview } from '@clmm/application';
 import type { ExitTriggerId, ExecutionPreview, PositionId, BreachDirection } from '@clmm/domain';
 import {
   EXECUTION_REPOSITORY,
@@ -68,6 +68,27 @@ export class PreviewController {
     }
     return {
       preview: toPreviewDto(previewId, result.positionId, result.breachDirection, result.preview),
+    };
+  }
+
+  @Post(':triggerId')
+  async createPreview(@Param('triggerId') triggerId: string) {
+    const trigger = await this.triggerRepo.getTrigger(triggerId as ExitTriggerId);
+    if (!trigger) {
+      throw new NotFoundException(`Trigger not found: ${triggerId}`);
+    }
+
+    const result = await createExecutionPreview({
+      positionId: trigger.positionId,
+      breachDirection: trigger.breachDirection,
+      swapQuotePort: this.swapQuotePort,
+      executionRepo: this.executionRepo,
+      clock: this.clock,
+      ids: this.ids,
+    });
+
+    return {
+      preview: toPreviewDto(result.previewId, trigger.positionId, trigger.breachDirection, result.preview),
     };
   }
 

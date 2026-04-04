@@ -1,27 +1,30 @@
 import { useLocalSearchParams, useRouter } from 'expo-router';
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { useEffect } from 'react';
+import { useMutation } from '@tanstack/react-query';
 import { ExecutionPreviewScreen } from '@clmm/ui';
-import { refreshPreview } from '../../src/api/previews';
+import { createPreview, refreshPreview } from '../../src/api/previews';
 import { getBffBaseUrl } from '../../src/api/http';
 
 export default function PreviewRoute() {
   const { triggerId } = useLocalSearchParams<{ triggerId: string }>();
   const router = useRouter();
-  const queryClient = useQueryClient();
 
-  // Create a fresh preview by refreshing from the trigger
-  const previewQuery = useQuery({
-    queryKey: ['preview', triggerId],
-    queryFn: () => refreshPreview(triggerId!),
-    enabled: triggerId != null && triggerId.length > 0,
+  const createPreviewMutation = useMutation({
+    mutationFn: createPreview,
+    retry: 0,
   });
 
   const refreshMutation = useMutation({
     mutationFn: () => refreshPreview(triggerId!),
-    onSuccess: (data) => {
-      queryClient.setQueryData(['preview', triggerId], data);
-    },
   });
+
+  useEffect(() => {
+    if (triggerId == null || triggerId.length === 0) {
+      return;
+    }
+
+    void createPreviewMutation.mutateAsync(triggerId);
+  }, [createPreviewMutation, triggerId]);
 
   const approveMutation = useMutation({
     mutationFn: async () => {
@@ -30,7 +33,7 @@ export default function PreviewRoute() {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          previewId: previewQuery.data?.previewId,
+          previewId: createPreviewMutation.data?.previewId,
           triggerId,
         }),
       });
@@ -44,7 +47,7 @@ export default function PreviewRoute() {
 
   return (
     <ExecutionPreviewScreen
-      {...(previewQuery.data ? { preview: previewQuery.data } : {})}
+      {...(createPreviewMutation.data ? { preview: createPreviewMutation.data } : {})}
       onApprove={() => approveMutation.mutate()}
       onRefresh={() => refreshMutation.mutate()}
     />
