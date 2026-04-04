@@ -9,6 +9,10 @@ function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null && !Array.isArray(value);
 }
 
+function isExecutionPreviewDto(value: unknown): value is ExecutionPreviewDto {
+  return isRecord(value) && typeof value['previewId'] === 'string';
+}
+
 export async function fetchPreview(previewId: string): Promise<ExecutionPreviewDto> {
   try {
     const payload = (await fetchJson(`/previews/${previewId}`)) as Partial<PreviewResponse>;
@@ -42,10 +46,10 @@ export async function refreshPreview(triggerId: string): Promise<ExecutionPrevie
 export async function createPreview(triggerId: string): Promise<ExecutionPreviewDto> {
   try {
     const payload = await fetchJson(`/previews/${triggerId}`, { method: 'POST' });
-    if (!isRecord(payload) || !isRecord(payload['preview'])) {
+    if (!isRecord(payload) || !isExecutionPreviewDto(payload['preview'])) {
       throw new Error('Invalid create-preview response');
     }
-    return payload['preview'] as ExecutionPreviewDto;
+    return payload['preview'];
   } catch (cause: unknown) {
     throw new Error('Could not create preview', { cause });
   }

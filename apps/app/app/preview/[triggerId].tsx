@@ -9,7 +9,7 @@ export default function PreviewRoute() {
   const { triggerId } = useLocalSearchParams<{ triggerId: string }>();
   const router = useRouter();
 
-  const createPreviewMutation = useMutation({
+  const { data: createdPreview, mutateAsync: createPreviewMutateAsync } = useMutation({
     mutationFn: createPreview,
     retry: 0,
   });
@@ -23,10 +23,10 @@ export default function PreviewRoute() {
       return;
     }
 
-    void createPreviewMutation.mutateAsync(triggerId);
-  }, [createPreviewMutation, triggerId]);
+    void createPreviewMutateAsync(triggerId);
+  }, [createPreviewMutateAsync, triggerId]);
 
-  const activePreview = refreshMutation.data ?? createPreviewMutation.data;
+  const activePreview = refreshMutation.data ?? createdPreview;
 
   const approveMutation = useMutation({
     mutationFn: async () => {
