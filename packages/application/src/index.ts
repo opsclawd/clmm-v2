@@ -6,7 +6,6 @@ export * from './use-cases/triggers/QualifyActionableTrigger.js';
 export * from './use-cases/previews/CreateExecutionPreview.js';
 export * from './use-cases/previews/RefreshExecutionPreview.js';
 export * from './use-cases/previews/GetExecutionPreview.js';
-export * from './use-cases/execution/ApproveExecution.js';
 export * from './use-cases/execution/ReconcileExecutionAttempt.js';
 export * from './use-cases/execution/GetExecutionAttemptDetail.js';
 export * from './use-cases/execution/GetExecutionHistory.js';

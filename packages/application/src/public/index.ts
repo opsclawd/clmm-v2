@@ -41,7 +41,7 @@ export { scanPositionsForBreaches } from '../use-cases/triggers/ScanPositionsFor
 export { qualifyActionableTrigger } from '../use-cases/triggers/QualifyActionableTrigger.js';
 export { createExecutionPreview } from '../use-cases/previews/CreateExecutionPreview.js';
 export { refreshExecutionPreview } from '../use-cases/previews/RefreshExecutionPreview.js';
-export { approveExecution } from '../use-cases/execution/ApproveExecution.js';
-export type { ApproveExecutionResult } from '../use-cases/execution/ApproveExecution.js';
+export { requestWalletSignature } from '../use-cases/execution/RequestWalletSignature.js';
+export type { RequestWalletSignatureResult } from '../use-cases/execution/RequestWalletSignature.js';
 export { resumeExecutionAttempt } from '../use-cases/execution/ResumeExecutionAttempt.js';
 export { reconcileExecutionAttempt } from '../use-cases/execution/ReconcileExecutionAttempt.js';

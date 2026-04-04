@@ -1,52 +1,72 @@
 import type {
   ExecutionRepository,
   ExecutionPreparationPort,
-  WalletSigningPort,
   ExecutionHistoryRepository,
   ClockPort,
   IdGeneratorPort,
 } from '../../ports/index.js';
-import type { WalletId, PositionId, BreachDirection } from '@clmm/domain';
+import type { WalletId, BreachDirection } from '@clmm/domain';
 
-export type RequestWalletSignatureResult =
-  | { kind: 'signed'; attemptId: string; signedPayload: Uint8Array }
-  | { kind: 'declined'; attemptId: string }
-  | { kind: 'interrupted'; attemptId: string };
+const PREPARED_PAYLOAD_VERSION = 'v1';
+
+export class PreviewNotFoundError extends Error {
+  constructor(previewId: string) {
+    super(`Preview not found: ${previewId}`);
+    this.name = 'PreviewNotFoundError';
+  }
+}
+
+export class PreviewApprovalNotAllowedError extends Error {
+  constructor(reason: string) {
+    super(`Preview approval not allowed: ${reason}`);
+    this.name = 'PreviewApprovalNotAllowedError';
+  }
+}
+
+export type RequestWalletSignatureResult = {
+  readonly attemptId: string;
+  readonly lifecycleState: { readonly kind: 'awaiting-signature' };
+  readonly breachDirection: BreachDirection;
+};
 
 export async function requestWalletSignature(params: {
-  previewId: string;
-  walletId: WalletId;
-  positionId: PositionId;
-  breachDirection: BreachDirection;
-  executionRepo: ExecutionRepository;
-  prepPort: ExecutionPreparationPort;
-  signingPort: WalletSigningPort;
-  historyRepo: ExecutionHistoryRepository;
-  clock: ClockPort;
-  ids: IdGeneratorPort;
+  readonly previewId: string;
+  readonly walletId: WalletId;
+  readonly executionRepo: ExecutionRepository;
+  readonly prepPort: ExecutionPreparationPort;
+  readonly historyRepo: ExecutionHistoryRepository;
+  readonly clock: ClockPort;
+  readonly ids: IdGeneratorPort;
 }): Promise<RequestWalletSignatureResult> {
   const {
-    previewId, walletId, positionId, breachDirection,
-    executionRepo, prepPort, signingPort, historyRepo, clock, ids,
+    previewId,
+    walletId,
+    executionRepo,
+    prepPort,
+    historyRepo,
+    clock,
+    ids,
   } = params;
 
   const previewRecord = await executionRepo.getPreview(previewId);
   if (!previewRecord) {
-    throw new Error(`Preview not found: ${previewId}`);
+    throw new PreviewNotFoundError(previewId);
   }
 
-  if (positionId !== previewRecord.positionId) {
-    throw new Error(`requestWalletSignature: positionId mismatch for preview ${previewId}`);
-  }
-
-  if (breachDirection.kind !== previewRecord.breachDirection.kind) {
-    throw new Error(`requestWalletSignature: breachDirection mismatch for preview ${previewId}`);
+  if (previewRecord.preview.freshness.kind !== 'fresh') {
+    throw new PreviewApprovalNotAllowedError(`preview ${previewId} is ${previewRecord.preview.freshness.kind}`);
   }
 
   const attemptId = ids.generateId();
+  const { serializedPayload } = await prepPort.prepareExecution({
+    plan: previewRecord.preview.plan,
+    walletId,
+    positionId: previewRecord.positionId,
+  });
 
   await executionRepo.saveAttempt({
     attemptId,
+    previewId,
     positionId: previewRecord.positionId,
     breachDirection: previewRecord.breachDirection,
     lifecycleState: { kind: 'awaiting-signature' },
@@ -54,47 +74,28 @@ export async function requestWalletSignature(params: {
     transactionReferences: [],
   });
 
+  const now = clock.now();
+  await executionRepo.savePreparedPayload({
+    payloadId: ids.generateId(),
+    attemptId,
+    unsignedPayload: serializedPayload,
+    payloadVersion: PREPARED_PAYLOAD_VERSION,
+    expiresAt: previewRecord.preview.freshness.expiresAt,
+    createdAt: now,
+  });
+
   await historyRepo.appendEvent({
     eventId: ids.generateId(),
     positionId: previewRecord.positionId,
     eventType: 'signature-requested',
     breachDirection: previewRecord.breachDirection,
-    occurredAt: clock.now(),
+    occurredAt: now,
     lifecycleState: { kind: 'awaiting-signature' },
   });
 
-  const { serializedPayload } = await prepPort.prepareExecution({
-    plan: previewRecord.preview.plan,
-    walletId,
-    positionId: previewRecord.positionId,
-  });
-
-  const sigResult = await signingPort.requestSignature(serializedPayload, walletId);
-
-  if (sigResult.kind === 'declined') {
-    await executionRepo.updateAttemptState(attemptId, { kind: 'abandoned' });
-    await historyRepo.appendEvent({
-      eventId: ids.generateId(),
-      positionId: previewRecord.positionId,
-      eventType: 'signature-declined',
-      breachDirection: previewRecord.breachDirection,
-      occurredAt: clock.now(),
-      lifecycleState: { kind: 'abandoned' },
-    });
-    return { kind: 'declined', attemptId };
-  }
-
-  if (sigResult.kind === 'interrupted') {
-    await historyRepo.appendEvent({
-      eventId: ids.generateId(),
-      positionId: previewRecord.positionId,
-      eventType: 'signature-interrupted',
-      breachDirection: previewRecord.breachDirection,
-      occurredAt: clock.now(),
-      lifecycleState: { kind: 'awaiting-signature' },
-    });
-    return { kind: 'interrupted', attemptId };
-  }
-
-  return { kind: 'signed', attemptId, signedPayload: sigResult.signedPayload };
+  return {
+    attemptId,
+    lifecycleState: { kind: 'awaiting-signature' },
+    breachDirection: previewRecord.breachDirection,
+  };
 }

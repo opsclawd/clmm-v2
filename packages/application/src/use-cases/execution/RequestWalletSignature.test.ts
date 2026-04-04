@@ -1,5 +1,9 @@
 import { describe, it, expect, beforeEach } from 'vitest';
-import { requestWalletSignature } from './RequestWalletSignature.js';
+import {
+  requestWalletSignature,
+  PreviewApprovalNotAllowedError,
+  PreviewNotFoundError,
+} from './RequestWalletSignature.js';
 import { createExecutionPreview } from '../previews/CreateExecutionPreview.js';
 import {
   FakeClockPort,
@@ -7,7 +11,6 @@ import {
   FakeSwapQuotePort,
   FakeExecutionRepository,
   FakeExecutionPreparationPort,
-  FakeWalletSigningPort,
   FakeExecutionHistoryRepository,
   FIXTURE_POSITION_ID,
   FIXTURE_WALLET_ID,
@@ -19,7 +22,6 @@ describe('RequestWalletSignature', () => {
   let ids: FakeIdGeneratorPort;
   let executionRepo: FakeExecutionRepository;
   let prepPort: FakeExecutionPreparationPort;
-  let signingPort: FakeWalletSigningPort;
   let historyRepo: FakeExecutionHistoryRepository;
   let previewId: string;
 
@@ -28,7 +30,6 @@ describe('RequestWalletSignature', () => {
     ids = new FakeIdGeneratorPort();
     executionRepo = new FakeExecutionRepository();
     prepPort = new FakeExecutionPreparationPort();
-    signingPort = new FakeWalletSigningPort();
     historyRepo = new FakeExecutionHistoryRepository();
 
     const swapQuote = new FakeSwapQuotePort();
@@ -43,63 +44,91 @@ describe('RequestWalletSignature', () => {
     previewId = created.previewId;
   });
 
-  it('returns signed payload when user approves', async () => {
+  it('persists awaiting-signature attempt, prepared payload, and history for a fresh preview', async () => {
     const result = await requestWalletSignature({
       previewId,
       walletId: FIXTURE_WALLET_ID,
-      positionId: FIXTURE_POSITION_ID,
-      breachDirection: LOWER_BOUND_BREACH,
       executionRepo,
       prepPort,
-      signingPort,
       historyRepo,
       clock,
       ids,
     });
 
-    expect(result.kind).toBe('signed');
-    if (result.kind === 'signed') {
-      expect(result.attemptId).toBeTruthy();
-      expect(result.signedPayload).toBeInstanceOf(Uint8Array);
-    }
+    expect(result).toEqual({
+      attemptId: 'fake-1',
+      lifecycleState: { kind: 'awaiting-signature' },
+      breachDirection: LOWER_BOUND_BREACH,
+    });
+    expect(result).not.toHaveProperty('kind');
+    expect(result).not.toHaveProperty('signedPayload');
+
+    await expect(executionRepo.getAttempt(result.attemptId)).resolves.toEqual({
+      attemptId: result.attemptId,
+      previewId,
+      positionId: FIXTURE_POSITION_ID,
+      breachDirection: LOWER_BOUND_BREACH,
+      lifecycleState: { kind: 'awaiting-signature' },
+      completedSteps: [],
+      transactionReferences: [],
+    });
+    expect(executionRepo.preparedPayloads.get(result.attemptId)).toEqual({
+      payloadId: 'fake-2',
+      attemptId: result.attemptId,
+      unsignedPayload: new Uint8Array([9, 8, 7]),
+      payloadVersion: 'v1',
+      expiresAt: 1_060_000,
+      createdAt: 1_000_000,
+    });
+    expect(historyRepo.events).toEqual([
+      {
+        eventId: 'fake-3',
+        positionId: FIXTURE_POSITION_ID,
+        eventType: 'signature-requested',
+        breachDirection: LOWER_BOUND_BREACH,
+        occurredAt: 1_000_000,
+        lifecycleState: { kind: 'awaiting-signature' },
+      },
+    ]);
   });
 
-  it('returns declined when user declines', async () => {
-    signingPort.willDecline();
-    const result = await requestWalletSignature({
-      previewId,
+  it('throws PreviewNotFoundError when the preview record does not exist', async () => {
+    await expect(requestWalletSignature({
+      previewId: 'missing-preview',
       walletId: FIXTURE_WALLET_ID,
-      positionId: FIXTURE_POSITION_ID,
-      breachDirection: LOWER_BOUND_BREACH,
       executionRepo,
       prepPort,
-      signingPort,
       historyRepo,
       clock,
       ids,
-    });
-
-    expect(result.kind).toBe('declined');
+    })).rejects.toThrow(PreviewNotFoundError);
   });
 
-  it('returns interrupted when signing interrupted (e.g. MWA handoff)', async () => {
-    signingPort.willInterrupt();
-    const result = await requestWalletSignature({
+  it('throws PreviewApprovalNotAllowedError when the preview is not fresh', async () => {
+    const storedPreview = executionRepo.previews.get(previewId);
+    if (!storedPreview) {
+      throw new Error('Expected preview fixture to exist');
+    }
+
+    executionRepo.previews.set(previewId, {
+      ...storedPreview,
+      preview: {
+        ...storedPreview.preview,
+        freshness: { kind: 'stale' },
+      },
+    });
+
+    await expect(requestWalletSignature({
       previewId,
       walletId: FIXTURE_WALLET_ID,
-      positionId: FIXTURE_POSITION_ID,
-      breachDirection: LOWER_BOUND_BREACH,
       executionRepo,
       prepPort,
-      signingPort,
       historyRepo,
       clock,
       ids,
-    });
-
-    expect(result.kind).toBe('interrupted');
-    if (result.kind === 'interrupted') {
-      expect(result.attemptId).toBeTruthy();
-    }
+    })).rejects.toThrow(PreviewApprovalNotAllowedError);
+    expect(executionRepo.attempts.size).toBe(0);
+    expect(executionRepo.preparedPayloads.size).toBe(0);
+    expect(historyRepo.events).toEqual([]);
   });
 });
