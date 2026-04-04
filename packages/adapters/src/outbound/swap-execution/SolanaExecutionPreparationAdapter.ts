@@ -40,6 +40,10 @@ import { makeClockTimestamp } from '@clmm/domain';
 const JUPITER_API_BASE = 'https://api.jup.ag/swap/v1';
 
 const SOL_MINT = 'So11111111111111111111111111111111111111112';
+const TOKEN_MINTS: Record<'SOL' | 'USDC', string> = {
+  SOL: SOL_MINT,
+  USDC: 'EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v',
+};
 
 export class SolanaExecutionPreparationAdapter implements ExecutionPreparationPort {
   constructor(private readonly rpcUrl: string) {}
@@ -181,8 +185,11 @@ export class SolanaExecutionPreparationAdapter implements ExecutionPreparationPo
     try {
       const fromAsset = swapStep.instruction.fromAsset;
       const toAsset = swapStep.instruction.toAsset;
-      const inputMint = fromAsset === 'SOL' ? SOL_MINT : fromAsset;
-      const outputMint = toAsset === 'SOL' ? SOL_MINT : toAsset;
+      const inputMint = TOKEN_MINTS[fromAsset];
+      const outputMint = TOKEN_MINTS[toAsset];
+      if (!inputMint || !outputMint) {
+        throw new Error(`Unsupported swap pair ${fromAsset}->${toAsset} for Jupiter quote`);
+      }
 
       // Use the actual token amount from the Orca close quote.
       // token A = SOL (lower-bound breach swaps SOL→USDC), token B = USDC (upper-bound swaps USDC→SOL).

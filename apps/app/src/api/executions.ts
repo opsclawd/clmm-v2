@@ -235,6 +235,10 @@ export async function approveExecutionPreview(
 
     return payload.approval;
   } catch (cause: unknown) {
+    if (cause instanceof Error) {
+      throw cause;
+    }
+
     throw new Error('Could not approve execution preview', { cause });
   }
 }
