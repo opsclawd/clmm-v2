@@ -1,5 +1,3 @@
-import { VersionedTransaction } from '@solana/web3.js';
-
 export type BrowserWalletPublicKey = {
   toBase58(): string;
 };
@@ -9,7 +7,7 @@ export type BrowserWalletProvider = {
   publicKey?: BrowserWalletPublicKey | null;
   connect(): Promise<{ publicKey?: BrowserWalletPublicKey | null } | null | undefined>;
   disconnect?(): Promise<void>;
-  signTransaction?(transaction: VersionedTransaction): Promise<unknown>;
+  signTransaction?(payload: Uint8Array): Promise<unknown>;
 };
 
 export type BrowserWalletWindow = {
@@ -62,7 +60,15 @@ function isSerializedTransaction(value: unknown): value is { serialize(): Uint8A
   return typeof Reflect.get(value, 'serialize') === 'function';
 }
 
-function normalizeSignedTransactionPayload(payload: unknown): Uint8Array {
+function decodeBase64Payload(value: string): Uint8Array {
+  return Uint8Array.from(Buffer.from(value, 'base64'));
+}
+
+function encodeBase64Payload(value: Uint8Array): string {
+  return Buffer.from(value).toString('base64');
+}
+
+function normalizeSignedResult(payload: unknown): Uint8Array {
   if (payload instanceof Uint8Array) {
     return payload;
   }
@@ -71,32 +77,28 @@ function normalizeSignedTransactionPayload(payload: unknown): Uint8Array {
     return new Uint8Array(payload);
   }
 
-  if (payload instanceof VersionedTransaction) {
-    return payload.serialize();
-  }
-
   if (isSerializedTransaction(payload)) {
-    return normalizeSignedTransactionPayload(payload.serialize());
+    return normalizeSignedResult(payload.serialize());
   }
 
   throw new Error('Wallet returned an unsupported signed transaction payload');
 }
 
-export async function signTransactionWithBrowserWallet(
-  browserWindow: BrowserWalletWindow | undefined,
-  serializedTransaction: Uint8Array,
-): Promise<Uint8Array> {
-  const provider = getInjectedBrowserProvider(browserWindow);
+export async function signBrowserTransaction(params: {
+  browserWindow: BrowserWalletWindow | undefined;
+  serializedPayload: string;
+}): Promise<string> {
+  const provider = getInjectedBrowserProvider(params.browserWindow);
 
   if (!provider) {
     throw new Error('No supported browser wallet detected on this device');
   }
 
   if (provider.signTransaction == null) {
-    throw new Error('Wallet does not support transaction signing');
+    throw new Error('Connected browser wallet cannot sign transactions');
   }
 
-  const transaction = VersionedTransaction.deserialize(serializedTransaction);
-  const signedPayload = await provider.signTransaction(transaction);
-  return normalizeSignedTransactionPayload(signedPayload);
+  const payloadBytes = decodeBase64Payload(params.serializedPayload);
+  const signedPayload = await provider.signTransaction(payloadBytes);
+  return encodeBase64Payload(normalizeSignedResult(signedPayload));
 }

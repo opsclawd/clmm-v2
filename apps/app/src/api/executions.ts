@@ -343,14 +343,14 @@ export async function prepareExecution(attemptId: string, walletId: string): Pro
 export async function submitExecution(
   attemptId: string,
   signedPayload: string,
-  payloadVersion: string,
+  payloadVersion?: string,
 ): Promise<SubmitExecutionResponse> {
   try {
     const payload = (await fetchJson(`/executions/${attemptId}/submit`, {
       method: 'POST',
       body: JSON.stringify({
         signedPayload,
-        payloadVersion,
+        ...(payloadVersion ? { payloadVersion } : {}),
       }),
     })) as Partial<SubmitExecutionResponse>;
 

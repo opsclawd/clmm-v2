@@ -1,57 +1,82 @@
-import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useEffect } from 'react';
+import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useMutation } from '@tanstack/react-query';
 import { ExecutionPreviewScreen } from '@clmm/ui';
+import { useStore } from 'zustand';
+import { approveExecutionPreview } from '../../src/api/executions';
 import { createPreview, refreshPreview } from '../../src/api/previews';
-import { getBffBaseUrl } from '../../src/api/http';
+import { walletSessionStore } from '../../src/state/walletSessionStore';
+
+function readTriggerId(value: string | string[] | undefined): string | null {
+  return typeof value === 'string' && value.length > 0 ? value : null;
+}
 
 export default function PreviewRoute() {
-  const { triggerId } = useLocalSearchParams<{ triggerId: string }>();
   const router = useRouter();
+  const params = useLocalSearchParams<{ triggerId?: string | string[] }>();
+  const triggerId = readTriggerId(params.triggerId);
+  const walletAddress = useStore(walletSessionStore, (state) => state.walletAddress);
 
-  const { data: createdPreview, mutateAsync: createPreviewMutateAsync } = useMutation({
+  const createMutation = useMutation({
     mutationFn: createPreview,
     retry: 0,
   });
 
   const refreshMutation = useMutation({
-    mutationFn: () => refreshPreview(triggerId!),
+    mutationFn: refreshPreview,
+    retry: 0,
+  });
+
+  const approvalMutation = useMutation({
+    mutationFn: approveExecutionPreview,
+    retry: 0,
   });
 
   useEffect(() => {
-    if (triggerId == null || triggerId.length === 0) {
+    if (triggerId == null) {
       return;
     }
 
-    void createPreviewMutateAsync(triggerId);
-  }, [createPreviewMutateAsync, triggerId]);
+    void createMutation.mutateAsync(triggerId);
+  }, [triggerId, createMutation]);
 
-  const activePreview = refreshMutation.data ?? createdPreview;
-
-  const approveMutation = useMutation({
-    mutationFn: async () => {
-      // Create an execution attempt from the preview
-      const response = await fetch(`${getBffBaseUrl()}/executions/approve`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          previewId: activePreview?.previewId,
-          triggerId,
-        }),
-      });
-      if (!response.ok) throw new Error(`Approve failed: HTTP ${response.status}`);
-      return response.json() as Promise<{ attemptId: string }>;
-    },
-    onSuccess: (data) => {
-      router.push(`/signing/${data.attemptId}`);
-    },
-  });
+  const preview = refreshMutation.data ?? createMutation.data;
 
   return (
     <ExecutionPreviewScreen
-      {...(activePreview ? { preview: activePreview } : {})}
-      onApprove={() => approveMutation.mutate()}
-      onRefresh={() => refreshMutation.mutate()}
+      {...(preview != null ? { preview } : {})}
+      previewLoading={createMutation.isPending || refreshMutation.isPending || approvalMutation.isPending}
+      previewError={
+        createMutation.error instanceof Error
+          ? createMutation.error.message
+          : refreshMutation.error instanceof Error
+            ? refreshMutation.error.message
+            : approvalMutation.error instanceof Error
+              ? approvalMutation.error.message
+              : null
+      }
+      {...(preview != null && walletAddress != null
+        ? {
+            onApprove: async () => {
+              const approval = await approvalMutation.mutateAsync({
+                previewId: preview.previewId,
+                walletId: walletAddress,
+              });
+
+              router.push({
+                pathname: '/signing/[attemptId]',
+                params: { attemptId: approval.attemptId },
+              });
+            },
+          }
+        : {})}
+      {...(triggerId != null
+        ? {
+            onRefresh: () => {
+              void refreshMutation.mutateAsync(triggerId);
+            },
+          }
+        : {})}
     />
   );
 }

@@ -1,25 +1,13 @@
 import { describe, expect, it } from 'vitest';
-import { VersionedTransaction } from '@solana/web3.js';
 import {
   connectBrowserWallet,
   disconnectBrowserWallet,
   getInjectedBrowserProvider,
   normalizeBrowserWalletAddress,
-  signTransactionWithBrowserWallet,
+  signBrowserTransaction,
 } from './browserWallet';
 
-// Minimal valid serialized v0 transaction: 1 sig slot + v0 message with 1 account key, no instructions
-const VALID_VERSIONED_TX_BYTES = new Uint8Array([
-  0x01, // compact-u16: 1 signature
-  ...new Array(64).fill(0), // placeholder signature (64 zero bytes)
-  0x80, // version prefix: v0
-  0x01, 0x00, 0x00, // header: 1 required signer, 0 readonly signed, 0 readonly unsigned
-  0x01, // compact-u16: 1 account key
-  ...new Array(32).fill(0), // account key (32 zero bytes)
-  ...new Array(32).fill(0), // recent blockhash (32 zero bytes)
-  0x00, // compact-u16: 0 instructions
-  0x00, // compact-u16: 0 address table lookups
-]);
+const VALID_SERIALIZED_PAYLOAD = Buffer.from([1, 2, 3, 4]).toString('base64');
 
 describe('browserWallet helpers', () => {
   it('returns null when no browser wallet provider exists', () => {
@@ -117,60 +105,76 @@ describe('browserWallet helpers', () => {
     expect(disconnectCalls).toBe(1);
   });
 
-  it('signTransactionWithBrowserWallet deserializes bytes and passes VersionedTransaction to provider', async () => {
+  it('signBrowserTransaction decodes payload and passes bytes to provider', async () => {
     let received: unknown;
     const provider = {
       connect: () => Promise.resolve({ publicKey: null }),
-      signTransaction: (transaction: unknown) => {
-        received = transaction;
+      signTransaction: (payload: unknown) => {
+        received = payload;
         return Promise.resolve(new Uint8Array([4, 5, 6]));
       },
     };
 
-    await signTransactionWithBrowserWallet({ solana: provider }, VALID_VERSIONED_TX_BYTES);
+    await signBrowserTransaction({
+      browserWindow: { solana: provider },
+      serializedPayload: VALID_SERIALIZED_PAYLOAD,
+    });
 
-    expect(received).toBeInstanceOf(VersionedTransaction);
+    expect(received).toBeInstanceOf(Uint8Array);
+    expect(Array.from(received as Uint8Array)).toEqual([1, 2, 3, 4]);
   });
 
-  it('signTransactionWithBrowserWallet normalizes VersionedTransaction result into Uint8Array', async () => {
-    const signedBytes = new Uint8Array([4, 5, 6]);
-    const fakeSignedTx = {
-      serialize: () => signedBytes,
-    } as unknown as VersionedTransaction;
+  it('signBrowserTransaction normalizes serialized result and re-encodes as base64', async () => {
+    const signedPayload = new Uint8Array([4, 5, 6]);
+    const fakeSignedPayload = {
+      serialize: () => signedPayload,
+    };
     const provider = {
       connect: () => Promise.resolve({ publicKey: null }),
-      signTransaction: () => Promise.resolve(fakeSignedTx),
+      signTransaction: () => Promise.resolve(fakeSignedPayload),
     };
 
-    const result = await signTransactionWithBrowserWallet({ solana: provider }, VALID_VERSIONED_TX_BYTES);
+    const result = await signBrowserTransaction({
+      browserWindow: { solana: provider },
+      serializedPayload: VALID_SERIALIZED_PAYLOAD,
+    });
 
-    expect(result).toBe(signedBytes);
+    expect(result).toBe(Buffer.from([4, 5, 6]).toString('base64'));
   });
 
-  it('signTransactionWithBrowserWallet throws a clear error when the provider returns an unsupported result shape', async () => {
+  it('signBrowserTransaction throws a clear error when the provider returns an unsupported result shape', async () => {
     const provider = {
       connect: () => Promise.resolve({ publicKey: null }),
       signTransaction: () => Promise.resolve('signed-payload'),
     };
 
     await expect(
-      signTransactionWithBrowserWallet({ solana: provider }, VALID_VERSIONED_TX_BYTES),
+      signBrowserTransaction({
+        browserWindow: { solana: provider },
+        serializedPayload: VALID_SERIALIZED_PAYLOAD,
+      }),
     ).rejects.toThrow('Wallet returned an unsupported signed transaction payload');
   });
 
-  it('signTransactionWithBrowserWallet throws when no browser wallet provider is injected', async () => {
+  it('signBrowserTransaction throws when no browser wallet provider is injected', async () => {
     await expect(
-      signTransactionWithBrowserWallet(undefined, new Uint8Array([1, 2, 3])),
+      signBrowserTransaction({
+        browserWindow: undefined,
+        serializedPayload: VALID_SERIALIZED_PAYLOAD,
+      }),
     ).rejects.toThrow('No supported browser wallet detected on this device');
   });
 
-  it('signTransactionWithBrowserWallet throws when the provider cannot sign transactions', async () => {
+  it('signBrowserTransaction throws when the provider cannot sign transactions', async () => {
     const provider = {
       connect: () => Promise.resolve({ publicKey: null }),
     };
 
     await expect(
-      signTransactionWithBrowserWallet({ solana: provider }, new Uint8Array([1, 2, 3])),
-    ).rejects.toThrow('Wallet does not support transaction signing');
+      signBrowserTransaction({
+        browserWindow: { solana: provider },
+        serializedPayload: VALID_SERIALIZED_PAYLOAD,
+      }),
+    ).rejects.toThrow('Connected browser wallet cannot sign transactions');
   });
 });

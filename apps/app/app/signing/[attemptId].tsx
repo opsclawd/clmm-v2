@@ -1,178 +1,215 @@
-import { useEffect, useState } from 'react';
-import { useLocalSearchParams, useRouter } from 'expo-router';
-import { useQuery } from '@tanstack/react-query';
-import { SigningStatusScreen, colors, typography } from '@clmm/ui';
-import { Text, TouchableOpacity, View } from 'react-native';
+import { useRouter, useLocalSearchParams } from 'expo-router';
+import { useState } from 'react';
+import { useQuery, useMutation } from '@tanstack/react-query';
+import { SigningStatusScreen } from '@clmm/ui';
 import { useStore } from 'zustand';
-import { Buffer } from 'buffer';
-import { fetchExecution, prepareExecution, submitExecution } from '../../src/api/executions';
-import { signTransactionWithBrowserWallet } from '../../src/platform/browserWallet';
+import {
+  fetchExecution,
+  fetchExecutionSigningPayload,
+  recordSignatureDecline,
+  recordSignatureInterruption,
+  submitExecution,
+} from '../../src/api/executions';
+import { signBrowserTransaction } from '../../src/platform/browserWallet';
+import { signNativeTransaction } from '../../src/platform/nativeWallet';
+import { mapWalletErrorToOutcome } from '../../src/platform/walletConnection';
 import { walletSessionStore } from '../../src/state/walletSessionStore';
+import type { ExecutionAttemptDto } from '@clmm/application/public';
 
-type SigningState = 'idle' | 'preparing' | 'signing' | 'submitting' | 'error';
-
-function decodeBase64ToBytes(encodedValue: string): Uint8Array {
-  return Uint8Array.from(Buffer.from(encodedValue, 'base64'));
+function readAttemptId(value: string | string[] | undefined): string | null {
+  return typeof value === 'string' && value.length > 0 ? value : null;
 }
 
-function encodeBytesToBase64(bytes: Uint8Array): string {
-  return Buffer.from(bytes).toString('base64');
+function canDeclineSigning(params: { displayedExecution: ExecutionAttemptDto | undefined }): boolean {
+  return params.displayedExecution?.lifecycleState.kind === 'awaiting-signature';
 }
 
-function getExecutionQueryErrorMessage(error: unknown): string {
-  if (error instanceof Error && error.message.length > 0) {
-    return error.message;
+async function recordSigningOutcome(params: {
+  recordOutcome: () => Promise<unknown>;
+  refetchExecution: () => Promise<unknown>;
+  setStatusNotice: (notice: string | null) => void;
+  successNotice: string;
+}): Promise<void> {
+  try {
+    await params.recordOutcome();
+    await params.refetchExecution();
+    params.setStatusNotice(params.successNotice);
+  } catch (error: unknown) {
+    await params.refetchExecution();
+    throw error;
   }
-
-  return 'Could not load signing status for this execution attempt.';
 }
 
 export default function SigningRoute() {
-  const { attemptId } = useLocalSearchParams<{ attemptId: string }>();
   const router = useRouter();
+  const params = useLocalSearchParams<{ attemptId?: string | string[] }>();
+  const attemptId = readAttemptId(params.attemptId);
   const walletAddress = useStore(walletSessionStore, (state) => state.walletAddress);
-  const [signingState, setSigningState] = useState<SigningState>('idle');
-  const [signingError, setSigningError] = useState<string | undefined>();
-  const resolvedAttemptId = typeof attemptId === 'string' && attemptId.length > 0 ? attemptId : undefined;
+  const connectionKind = useStore(walletSessionStore, (state) => state.connectionKind);
+  const [statusNotice, setStatusNotice] = useState<string | null>(null);
 
   const executionQuery = useQuery({
-    queryKey: ['execution', resolvedAttemptId],
-    queryFn: async () => {
-      if (!resolvedAttemptId) {
-        throw new Error('Missing execution attempt id');
+    queryKey: ['execution-attempt', attemptId],
+    queryFn: () => fetchExecution(attemptId!),
+    enabled: attemptId != null,
+  });
+
+  const signingPayloadQuery = useQuery({
+    queryKey: ['execution-signing-payload', attemptId],
+    queryFn: () => fetchExecutionSigningPayload(attemptId!),
+    enabled: attemptId != null && executionQuery.data?.lifecycleState.kind === 'awaiting-signature',
+  });
+
+  const staleExecutionQuery = useQuery({
+    queryKey: ['execution-attempt-stale-refresh', attemptId],
+    queryFn: () => fetchExecution(attemptId!),
+    enabled:
+      attemptId != null &&
+      signingPayloadQuery.error instanceof Error &&
+      executionQuery.data?.lifecycleState.kind === 'awaiting-signature',
+  });
+
+  const displayedExecution =
+    signingPayloadQuery.error instanceof Error
+      ? (staleExecutionQuery.data ?? executionQuery.data)
+      : executionQuery.data;
+
+  const declineAvailable = canDeclineSigning({ displayedExecution });
+
+  const signMutation = useMutation({
+    mutationFn: async () => {
+      if (
+        attemptId == null ||
+        walletAddress == null ||
+        connectionKind == null ||
+        displayedExecution?.lifecycleState.kind !== 'awaiting-signature' ||
+        signingPayloadQuery.error instanceof Error ||
+        signingPayloadQuery.data == null
+      ) {
+        throw new Error('Signing is not available for this attempt');
       }
 
-      return fetchExecution(resolvedAttemptId);
-    },
-    enabled: resolvedAttemptId != null,
-    refetchInterval: (query) => {
-      const state = query.state.data?.lifecycleState?.kind;
-      if (state === 'submitted') {
-        return 5_000;
+      setStatusNotice(null);
+
+      try {
+        const refreshedSigningPayload = await signingPayloadQuery.refetch();
+
+        if (refreshedSigningPayload.error instanceof Error) {
+          throw refreshedSigningPayload.error;
+        }
+
+        const signingPayload = refreshedSigningPayload.data;
+        if (signingPayload == null) {
+          throw new Error('Signing payload is no longer available for this attempt.');
+        }
+
+        const signedPayload =
+          connectionKind === 'browser'
+            ? await signBrowserTransaction({
+                browserWindow: typeof window === 'undefined' ? undefined : { solana: Reflect.get(window, 'solana') },
+                serializedPayload: signingPayload.serializedPayload,
+              })
+            : await signNativeTransaction({
+                serializedPayload: signingPayload.serializedPayload,
+                walletId: walletAddress,
+              });
+
+        await submitExecution(attemptId, signedPayload);
+        await executionQuery.refetch();
+        router.replace(`/execution/${attemptId}`);
+      } catch (error: unknown) {
+        const outcome = mapWalletErrorToOutcome(error);
+
+        if (outcome.kind === 'cancelled') {
+          await recordSigningOutcome({
+            recordOutcome: () => recordSignatureDecline(attemptId),
+            refetchExecution: () => executionQuery.refetch(),
+            setStatusNotice,
+            successNotice: 'You declined wallet signing.',
+          });
+          return;
+        }
+
+        if (outcome.kind === 'interrupted') {
+          await recordSigningOutcome({
+            recordOutcome: () => recordSignatureInterruption(attemptId),
+            refetchExecution: () => executionQuery.refetch(),
+            setStatusNotice,
+            successNotice: 'Wallet signing was interrupted. Retry when you are ready.',
+          });
+          return;
+        }
+
+        await executionQuery.refetch();
+        throw error;
       }
-      return false;
     },
   });
 
-  const attempt = executionQuery.data;
-
-  const currentState = attempt?.lifecycleState?.kind;
-
-  useEffect(() => {
-    if (!resolvedAttemptId) {
-      return;
-    }
-
-    if (
-      currentState === 'confirmed' ||
-      currentState === 'failed' ||
-      currentState === 'partial' ||
-      currentState === 'abandoned'
-    ) {
-      router.replace(`/execution/${resolvedAttemptId}`);
-    }
-  }, [currentState, resolvedAttemptId, router]);
-
-  async function handleSignAndExecute() {
-    if (!resolvedAttemptId) {
-      setSigningState('error');
-      setSigningError('Missing execution attempt id');
-      return;
-    }
-
-    if (!walletAddress) {
-      setSigningState('error');
-      setSigningError('Connect a wallet to continue');
-      return;
-    }
-
-    if (attempt?.lifecycleState.kind !== 'awaiting-signature') {
-      router.replace(`/execution/${resolvedAttemptId}`);
-      return;
-    }
-
-    if (typeof window === 'undefined') {
-      setSigningState('error');
-      setSigningError('Browser wallet signing is only supported in this pass.');
-      return;
-    }
-
-    try {
-      setSigningState('preparing');
-      setSigningError(undefined);
-
-      const prepared = await prepareExecution(resolvedAttemptId, walletAddress);
-
-      setSigningState('signing');
-      const unsignedPayload = decodeBase64ToBytes(prepared.unsignedPayloadBase64);
-      const browserWindow = { solana: Reflect.get(window, 'solana') as unknown };
-      const signedPayload = await signTransactionWithBrowserWallet(browserWindow, unsignedPayload);
-      const signedPayloadBase64 = encodeBytesToBase64(signedPayload);
-
-      setSigningState('submitting');
-      await submitExecution(resolvedAttemptId, signedPayloadBase64, prepared.payloadVersion);
-
-      const refreshedAttempt = await executionQuery.refetch();
-      const refreshedState = refreshedAttempt.data?.lifecycleState?.kind;
-
-      if (
-        refreshedState !== 'submitted' &&
-        refreshedState !== 'confirmed' &&
-        refreshedState !== 'failed' &&
-        refreshedState !== 'partial'
-      ) {
-        setSigningState('idle');
+  const declineMutation = useMutation({
+    mutationFn: async () => {
+      if (attemptId == null) {
+        throw new Error('Signing attempt is not available');
       }
-    } catch (error: unknown) {
-      setSigningState('error');
-      setSigningError(error instanceof Error ? error.message : 'Signing failed');
-    }
-  }
 
-  if (executionQuery.isError) {
-    return (
-      <View style={{ flex: 1, backgroundColor: colors.background, padding: 16, justifyContent: 'center' }}>
-        <Text style={{ color: colors.text, fontSize: typography.fontSize.xl, fontWeight: typography.fontWeight.bold }}>
-          Signing Status
-        </Text>
-        <Text style={{ color: colors.textSecondary, marginTop: 8 }}>
-          {getExecutionQueryErrorMessage(executionQuery.error)}
-        </Text>
-        <TouchableOpacity
-          onPress={() => {
-            void executionQuery.refetch();
-          }}
-          style={{
-            marginTop: 20,
-            padding: 16,
-            backgroundColor: colors.primary,
-            borderRadius: 8,
-            alignItems: 'center',
-          }}
-        >
-          <Text style={{
-            color: colors.background,
-            fontSize: typography.fontSize.base,
-            fontWeight: typography.fontWeight.bold,
-          }}>
-            Retry Load
-          </Text>
-        </TouchableOpacity>
-      </View>
-    );
-  }
-
-  const signingStatusScreenProps = {
-    signingState,
-    walletConnected: walletAddress != null && walletAddress.length > 0,
-    onSignAndExecute: () => {
-      void handleSignAndExecute();
+      setStatusNotice(null);
+      await recordSigningOutcome({
+        recordOutcome: () => recordSignatureDecline(attemptId),
+        refetchExecution: () => executionQuery.refetch(),
+        setStatusNotice,
+        successNotice: 'You declined wallet signing.',
+      });
     },
-    ...(attempt?.lifecycleState && { lifecycleState: attempt.lifecycleState }),
-    ...(attempt?.breachDirection && { breachDirection: attempt.breachDirection }),
-    ...(attempt?.retryEligible != null && { retryEligible: attempt.retryEligible }),
-    ...(signingError != null && { signingError }),
-  };
+  });
 
-  return <SigningStatusScreen {...signingStatusScreenProps} />;
+  return (
+    <SigningStatusScreen
+      {...(displayedExecution != null
+        ? {
+            lifecycleState: displayedExecution.lifecycleState,
+            breachDirection: displayedExecution.breachDirection,
+            retryEligible: displayedExecution.retryEligible,
+          }
+        : {})}
+      statusLoading={
+        executionQuery.isLoading ||
+        staleExecutionQuery.isLoading ||
+        signingPayloadQuery.isLoading ||
+        signMutation.isPending ||
+        declineMutation.isPending
+      }
+      statusError={
+        executionQuery.error instanceof Error
+          ? executionQuery.error.message
+          : staleExecutionQuery.error instanceof Error
+            ? staleExecutionQuery.error.message
+            : signingPayloadQuery.error instanceof Error
+              ? signingPayloadQuery.error.message
+              : signMutation.error instanceof Error
+                ? signMutation.error.message
+                : declineMutation.error instanceof Error
+                  ? declineMutation.error.message
+                  : null
+      }
+      statusNotice={statusNotice}
+      {...(declineAvailable
+        ? {
+            ...(declineAvailable
+              ? {
+                  onDecline: () => {
+                    void declineMutation.mutateAsync();
+                  },
+                }
+              : {}),
+          }
+        : {})}
+      {...(attemptId != null ? { onViewResult: () => router.push(`/execution/${attemptId}`) } : {})}
+      signingState={signMutation.isPending ? 'signing' : 'idle'}
+      walletConnected={walletAddress != null}
+      onSignAndExecute={() => {
+        void signMutation.mutateAsync();
+      }}
+      {...(signMutation.error instanceof Error ? { signingError: signMutation.error.message } : {})}
+    />
+  );
 }

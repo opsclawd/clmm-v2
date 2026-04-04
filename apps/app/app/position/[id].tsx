@@ -37,18 +37,13 @@ export default function PositionDetailRoute() {
     );
   }
 
-  const position = positionQuery.data
-    ? {
-        ...positionQuery.data,
-        triggerId: alertTriggerId ?? positionQuery.data.triggerId,
-      }
-    : undefined;
+  const position = positionQuery.data;
 
   return (
     <PositionDetailScreen
       {...(position ? { position } : {})}
       onViewPreview={(resolvedTriggerId: string) =>
-        router.push(`/preview/${resolvedTriggerId}`)
+        router.push(`/preview/${alertTriggerId ?? resolvedTriggerId}`)
       }
     />
   );

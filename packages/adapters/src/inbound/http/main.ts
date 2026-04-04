@@ -8,7 +8,9 @@ export async function bootstrap(): Promise<void> {
   const app = await NestFactory.create(AppModule, new FastifyAdapter());
   app.enableCors();
   // boundary: process.env values are untyped at runtime; validated via env schema at deploy
-  const port = (process.env as Record<string, string | undefined>)['PORT'] ?? 3001;
+  const rawPort = (process.env as Record<string, string | undefined>)['PORT'];
+  const parsedPort = rawPort == null ? Number.NaN : Number(rawPort);
+  const port = Number.isFinite(parsedPort) ? parsedPort : 3001;
   await app.listen(port);
   console.log(`BFF listening on port ${port}`);
 }

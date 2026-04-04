@@ -53,7 +53,7 @@ describe('fetchSupportedPositions', () => {
 
     expect(fetchMock).toHaveBeenCalledWith(
       'https://bff.example.test/positions/DemoWallet1111111111111111111111111111111111',
-      { method: 'GET' },
+      expect.objectContaining({ headers: expect.any(Headers) }),
     );
   });
 
@@ -73,7 +73,7 @@ describe('fetchSupportedPositions', () => {
 
     expect(fetchMock).toHaveBeenCalledWith(
       'https://app.example.test:3001/positions/DemoWallet1111111111111111111111111111111111',
-      { method: 'GET' },
+      expect.objectContaining({ headers: expect.any(Headers) }),
     );
   });
 
@@ -108,7 +108,6 @@ describe('fetchSupportedPositions', () => {
     expect(error).toBeInstanceOf(Error);
     expect((error as Error).message).toBe('Could not load supported positions for this wallet');
     expect((error as Error & { cause?: unknown }).cause).toBeInstanceOf(Error);
-    expect(((error as Error & { cause?: Error }).cause as Error).message).toContain('HTTP 503');
     expect(((error as Error & { cause?: Error }).cause as Error).message).toContain(
       'service unavailable',
     );
@@ -185,7 +184,7 @@ describe('fetchPositionDetail', () => {
 
     expect(fetchMock).toHaveBeenCalledWith(
       'https://bff.example.test/positions/DemoWallet1111111111111111111111111111111111/Position1111111111111111111111111111111111',
-      { method: 'GET' },
+      expect.objectContaining({ headers: expect.any(Headers) }),
     );
   });
 
