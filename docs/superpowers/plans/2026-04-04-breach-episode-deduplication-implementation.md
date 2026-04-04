@@ -1,10 +1,10 @@
 # Breach Episode Deduplication & Stale Attempt Cancellation — Implementation Plan
 
-> **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
+> **For agentic workers:** REQUIRED SUB-SKILL: Use `superpowers:subagent-driven-development` (recommended) or `superpowers:executing-plans` to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** Fix three structural defects in the breach detection pipeline: make episode IDs stable across scans, accumulate real consecutive counts, and abandon stale execution attempts when conditions change.
 
-**Architecture:** Introduce persisted breach episode lifecycle as the source of truth. A dedicated `BreachEpisodeRepository` port provides atomic state-transition methods (`recordInRange`, `recordOutOfRange`) that enforce the unique-open-episode-per-position invariant. Qualification uses the episode's `trigger_id` as the single dedup authority. Abandonment is inline in the scan handler, targeted by episode ID.
+**Architecture:** Introduce persisted breach episode lifecycle as the source of truth. A dedicated `BreachEpisodeRepository` port provides atomic state-transition methods (`recordInRange`, `recordOutOfRange`) that enforce the unique-open-episode-per-position invariant. Qualification uses the episode's `trigger_id` as the single dedup authority. Abandonment is inline in the scan handler, targeted by episode ID. Trigger finalization is the sole atomic trigger persistence path for this feature.
 
 **Tech Stack:** TypeScript, Vitest, Drizzle ORM (Postgres), NestJS DI, pg-boss job queues.
 
@@ -21,23 +21,26 @@
 | Modify | `packages/testing/src/fakes/index.ts` | Re-export new fake |
 | Modify | `packages/testing/src/fixtures/triggers.ts` | Add episode fixtures for new schema shape |
 | Modify | `packages/domain/src/triggers/index.ts` | Update `BreachEpisode` type to match new schema (add `status`, `consecutiveCount`, `triggerId`, `closedAt`, `closeReason`) |
-| Modify | `packages/application/src/ports/index.ts` | Add `episodeId` to `StoredExecutionAttempt`; export new port; remove `getActiveEpisodeTrigger` and `saveEpisode` from `TriggerRepository` |
+| Modify | `packages/domain/src/index.ts` | Replace `qualifyTrigger` export with `evaluateConfirmationThreshold` and `buildExitTrigger` |
+| Modify | `packages/domain/src/triggers/TriggerQualificationService.ts` | Refactor domain qualification into threshold evaluation + trigger builder |
+| Modify | `packages/domain/src/triggers/TriggerQualificationService.test.ts` | Rewrite tests for threshold evaluation and trigger building |
+| Modify | `packages/application/src/ports/index.ts` | Add `episodeId` to `StoredExecutionAttempt`; export new port; remove `getActiveEpisodeTrigger`, `saveEpisode`, and `saveTrigger` from `TriggerRepository` |
 | Modify | `packages/application/src/use-cases/triggers/ScanPositionsForBreaches.ts` | Replace stateless scan with episode-transition-based scan; emit observations + abandonments |
 | Modify | `packages/application/src/use-cases/triggers/ScanPositionsForBreaches.test.ts` | Rewrite tests for new stateful scan behavior |
-| Modify | `packages/application/src/use-cases/triggers/QualifyActionableTrigger.ts` | Use episode-authoritative dedup; call `finalizeQualification` port |
+| Modify | `packages/application/src/use-cases/triggers/QualifyActionableTrigger.ts` | Use threshold-only domain logic + episode-authoritative dedup; call `finalizeQualification` only |
 | Modify | `packages/application/src/use-cases/triggers/QualifyActionableTrigger.test.ts` | Update tests for new qualification flow |
-| Modify | `packages/adapters/src/inbound/jobs/BreachScanJobHandler.ts` | Process abandonments inline; pass `consecutiveCount` in qualify-trigger payload |
-| Modify | `packages/adapters/src/inbound/jobs/BreachScanJobHandler.test.ts` | Add tests for abandonment dispatch and new payload shape |
-| Modify | `packages/adapters/src/inbound/jobs/TriggerQualificationJobHandler.ts` | Read `consecutiveCount` from payload instead of hardcoding `3` |
+| Modify | `packages/adapters/src/inbound/jobs/BreachScanJobHandler.ts` | Process abandonments inline; pass `consecutiveCount` in qualify-trigger payload; warn on integrity violations |
+| Modify | `packages/adapters/src/inbound/jobs/BreachScanJobHandler.test.ts` | Add tests for abandonment dispatch, warning path, and new payload shape |
+| Modify | `packages/adapters/src/inbound/jobs/TriggerQualificationJobHandler.ts` | Read `consecutiveCount` from payload instead of hardcoding `3`; inject `BreachEpisodeRepository` |
 | Modify | `packages/adapters/src/inbound/jobs/TriggerQualificationJobHandler.test.ts` | Update tests |
-| Modify | `packages/adapters/src/outbound/storage/schema/triggers.ts` | Add `status`, `consecutive_count`, `closed_at`, `close_reason` columns; rename `active_trigger_id` → `trigger_id`; add unique partial index + check constraint |
-| Modify | `packages/adapters/src/outbound/storage/schema/executions.ts` | Add `episode_id` column to `execution_attempts` |
-| Modify | `packages/adapters/src/outbound/storage/OperationalStorageAdapter.ts` | Implement `BreachEpisodeRepository` + `finalizeQualification`; write/read `episodeId` on attempts; add `listAwaitingSignatureAttemptsByEpisode`; add unique index on `exit_triggers.episode_id` |
+| Modify | `packages/adapters/src/outbound/storage/schema/triggers.ts` | Add `status`, `consecutive_count`, `closed_at`, `close_reason` columns; rename `active_trigger_id` → `trigger_id`; add unique partial index, check constraint, and episode FK if consistent with schema conventions |
+| Modify | `packages/adapters/src/outbound/storage/schema/executions.ts` | Add `episode_id` column to `execution_attempts`; add FK if consistent with schema conventions |
+| Modify | `packages/adapters/src/outbound/storage/OperationalStorageAdapter.ts` | Implement `BreachEpisodeRepository` + `finalizeQualification`; write/read `episodeId` on attempts; add `listAwaitingSignatureAttemptsByEpisode` |
 | Modify | `packages/adapters/src/inbound/jobs/tokens.ts` | Add `BREACH_EPISODE_REPOSITORY` token |
 | Modify | `packages/adapters/src/composition/AdaptersModule.ts` | Wire `BREACH_EPISODE_REPOSITORY` provider |
 | Modify | `packages/application/src/index.ts` | Export new port |
-| Modify | `packages/application/src/use-cases/execution/RequestWalletSignature.ts` | Thread `episodeId` into attempt creation |
-| Modify | `packages/testing/src/fakes/FakeTriggerRepository.ts` | Remove `getActiveEpisodeTrigger`, `saveEpisode` |
+| Modify | `packages/application/src/use-cases/execution/RequestWalletSignature.ts` | Require `episodeId` for trigger-derived attempt creation and persist it |
+| Modify | `packages/testing/src/fakes/FakeTriggerRepository.ts` | Remove `saveTrigger`, `getActiveEpisodeTrigger`, `saveEpisode` |
 | Modify | `packages/testing/src/fakes/FakeExecutionRepository.ts` | Add `listAwaitingSignatureAttemptsByEpisode` |
 
 ---
@@ -46,6 +49,7 @@
 
 **Files:**
 - Modify: `packages/domain/src/triggers/index.ts:10-17`
+- Modify: `packages/testing/src/fixtures/triggers.ts`
 
 - [ ] **Step 1: Update `BreachEpisode` type**
 
@@ -74,11 +78,12 @@ Remove the old `activeTriggerId` field.
 - [ ] **Step 2: Run domain type check**
 
 Run: `cd packages/domain && npx tsc --noEmit`
-Expected: Compilation errors in downstream consumers referencing `activeTriggerId` and missing new fields. This is expected — we'll fix consumers in later tasks.
+
+Expected: Compilation errors in downstream consumers referencing `activeTriggerId` and missing new fields. This is expected — fix consumers in later tasks.
 
 - [ ] **Step 3: Update trigger fixtures**
 
-Modify `packages/testing/src/fixtures/triggers.ts` — update `FIXTURE_LOWER_BREACH_EPISODE` to match new shape:
+Modify `packages/testing/src/fixtures/triggers.ts` — update `FIXTURE_LOWER_BREACH_EPISODE` to match the new shape:
 
 ```typescript
 export const FIXTURE_LOWER_BREACH_EPISODE: BreachEpisode = {
@@ -104,7 +109,7 @@ git commit -m "refactor: update BreachEpisode type for persisted lifecycle model
 
 ---
 
-## Task 2: BreachEpisodeRepository Port + EpisodeTransition Types
+## Task 2: BreachEpisodeRepository Port + Port Surface Cleanup
 
 **Files:**
 - Create: `packages/application/src/ports/BreachEpisodeRepository.ts`
@@ -116,9 +121,15 @@ git commit -m "refactor: update BreachEpisode type for persisted lifecycle model
 Create `packages/application/src/ports/BreachEpisodeRepository.ts`:
 
 ```typescript
-import type { PositionId, BreachDirection, BreachEpisodeId, ClockTimestamp, BreachEpisode, ExitTrigger, ExitTriggerId } from '@clmm/domain';
-
-// --- Episode Transition Result Types ---
+import type {
+  PositionId,
+  BreachDirection,
+  BreachEpisodeId,
+  ClockTimestamp,
+  BreachEpisode,
+  ExitTrigger,
+  ExitTriggerId,
+} from '@clmm/domain';
 
 export type EpisodeTransition =
   | { readonly kind: 'no-op' }
@@ -148,13 +159,9 @@ export type EpisodeTransition =
       readonly consecutiveCount: number;
     };
 
-// --- Qualification Finalization Result ---
-
 export type FinalizationResult =
   | { readonly kind: 'qualified'; readonly triggerId: ExitTriggerId }
   | { readonly kind: 'duplicate-suppressed'; readonly existingTriggerId: ExitTriggerId };
-
-// --- Port Interface ---
 
 export interface BreachEpisodeRepository {
   recordInRange(positionId: PositionId, observedAt: ClockTimestamp): Promise<EpisodeTransition>;
@@ -166,19 +173,24 @@ export interface BreachEpisodeRepository {
 
 - [ ] **Step 2: Export from ports barrel**
 
-Add to `packages/application/src/ports/index.ts` at the end:
+Add to `packages/application/src/ports/index.ts`:
 
 ```typescript
-export type { EpisodeTransition, FinalizationResult, BreachEpisodeRepository } from './BreachEpisodeRepository.js';
+export type {
+  EpisodeTransition,
+  FinalizationResult,
+  BreachEpisodeRepository,
+} from './BreachEpisodeRepository.js';
 ```
 
 - [ ] **Step 3: Remove stale methods from `TriggerRepository`**
 
-In `packages/application/src/ports/index.ts`, remove `getActiveEpisodeTrigger` and `saveEpisode` from the `TriggerRepository` interface:
+`TriggerRepository` should no longer participate in qualification writes. Remove `saveTrigger`, `getActiveEpisodeTrigger`, and `saveEpisode`.
+
+Use this interface:
 
 ```typescript
 export interface TriggerRepository {
-  saveTrigger(trigger: ExitTrigger): Promise<void>;
   getTrigger(triggerId: ExitTriggerId): Promise<ExitTrigger | null>;
   listActionableTriggers(walletId: WalletId): Promise<ExitTrigger[]>;
   deleteTrigger(triggerId: ExitTriggerId): Promise<void>;
@@ -199,14 +211,16 @@ export type StoredExecutionAttempt = ExecutionAttempt & {
 };
 ```
 
-Note: `episodeId` is optional only for legacy/manual execution paths that predate this feature. For any trigger-derived execution attempt, `episodeId` MUST be provided. The optional typing accommodates existing attempts that were created before this migration, but new trigger-driven flows must always populate it.
+`episodeId` is optional only for legacy/manual execution paths that predate this feature. For any trigger-derived execution attempt, `episodeId` MUST be provided.
 
 - [ ] **Step 5: Add `listAwaitingSignatureAttemptsByEpisode` to `ExecutionRepository`**
 
-In `packages/application/src/ports/index.ts`, add to the `ExecutionRepository` interface:
+In `packages/application/src/ports/index.ts`, add:
 
 ```typescript
-listAwaitingSignatureAttemptsByEpisode(episodeId: BreachEpisodeId): Promise<StoredExecutionAttempt[]>;
+listAwaitingSignatureAttemptsByEpisode(
+  episodeId: BreachEpisodeId,
+): Promise<StoredExecutionAttempt[]>;
 ```
 
 - [ ] **Step 6: Export from application barrel**
@@ -220,18 +234,19 @@ export * from './ports/BreachEpisodeRepository.js';
 - [ ] **Step 7: Run type check**
 
 Run: `cd packages/application && npx tsc --noEmit`
-Expected: Errors in consumers of old `TriggerRepository` methods. Expected — fixed in later tasks.
+
+Expected: Errors in consumers of removed `TriggerRepository` methods. Expected — fix them in later tasks.
 
 - [ ] **Step 8: Commit**
 
 ```bash
 git add packages/application/src/ports/BreachEpisodeRepository.ts packages/application/src/ports/index.ts packages/application/src/index.ts
-git commit -m "feat: add BreachEpisodeRepository port with atomic transition methods"
+git commit -m "feat: add BreachEpisodeRepository port and remove stale trigger write surface"
 ```
 
 ---
 
-## Task 3: FakeBreachEpisodeRepository + Update Existing Fakes
+## Task 3: FakeBreachEpisodeRepository + Fake Port Updates
 
 **Files:**
 - Create: `packages/testing/src/fakes/FakeBreachEpisodeRepository.ts`
@@ -244,8 +259,19 @@ git commit -m "feat: add BreachEpisodeRepository port with atomic transition met
 Create `packages/testing/src/fakes/FakeBreachEpisodeRepository.ts`:
 
 ```typescript
-import type { BreachEpisodeRepository, EpisodeTransition, FinalizationResult } from '@clmm/application';
-import type { PositionId, BreachDirection, BreachEpisodeId, ClockTimestamp, BreachEpisode, ExitTrigger, ExitTriggerId } from '@clmm/domain';
+import type {
+  BreachEpisodeRepository,
+  EpisodeTransition,
+  FinalizationResult,
+} from '@clmm/application';
+import type {
+  PositionId,
+  BreachDirection,
+  BreachEpisodeId,
+  ClockTimestamp,
+  BreachEpisode,
+  ExitTrigger,
+} from '@clmm/domain';
 
 let _fakeEpisodeCounter = 0;
 
@@ -263,7 +289,10 @@ export class FakeBreachEpisodeRepository implements BreachEpisodeRepository {
     return this.getOpenEpisodeForPosition(positionId);
   }
 
-  async recordInRange(positionId: PositionId, observedAt: ClockTimestamp): Promise<EpisodeTransition> {
+  async recordInRange(
+    positionId: PositionId,
+    observedAt: ClockTimestamp,
+  ): Promise<EpisodeTransition> {
     const open = this.getOpenEpisodeForPosition(positionId);
     if (!open) return { kind: 'no-op' };
 
@@ -274,6 +303,7 @@ export class FakeBreachEpisodeRepository implements BreachEpisodeRepository {
       closeReason: 'position-recovered',
     };
     this.episodes.set(open.episodeId, closed);
+
     return {
       kind: 'episode-closed-recovered',
       closedEpisodeId: open.episodeId,
@@ -281,10 +311,13 @@ export class FakeBreachEpisodeRepository implements BreachEpisodeRepository {
     };
   }
 
-  async recordOutOfRange(positionId: PositionId, direction: BreachDirection, observedAt: ClockTimestamp): Promise<EpisodeTransition> {
+  async recordOutOfRange(
+    positionId: PositionId,
+    direction: BreachDirection,
+    observedAt: ClockTimestamp,
+  ): Promise<EpisodeTransition> {
     const open = this.getOpenEpisodeForPosition(positionId);
 
-    // No open episode — start new
     if (!open) {
       const episodeId = `fake-episode-${++_fakeEpisodeCounter}` as BreachEpisodeId;
       const episode: BreachEpisode = {
@@ -303,21 +336,31 @@ export class FakeBreachEpisodeRepository implements BreachEpisodeRepository {
       return { kind: 'episode-started', episodeId, direction, consecutiveCount: 1 };
     }
 
-    // Same direction — continue (with idempotency guard)
     if (open.direction.kind === direction.kind) {
       if (observedAt <= open.lastObservedAt) {
-        return { kind: 'episode-continued', episodeId: open.episodeId, direction: open.direction, consecutiveCount: open.consecutiveCount };
+        return {
+          kind: 'episode-continued',
+          episodeId: open.episodeId,
+          direction: open.direction,
+          consecutiveCount: open.consecutiveCount,
+        };
       }
+
       const updated: BreachEpisode = {
         ...open,
         lastObservedAt: observedAt,
         consecutiveCount: open.consecutiveCount + 1,
       };
       this.episodes.set(open.episodeId, updated);
-      return { kind: 'episode-continued', episodeId: open.episodeId, direction: open.direction, consecutiveCount: updated.consecutiveCount };
+
+      return {
+        kind: 'episode-continued',
+        episodeId: open.episodeId,
+        direction: open.direction,
+        consecutiveCount: updated.consecutiveCount,
+      };
     }
 
-    // Opposite direction — reverse
     const closed: BreachEpisode = {
       ...open,
       status: 'closed',
@@ -351,7 +394,10 @@ export class FakeBreachEpisodeRepository implements BreachEpisodeRepository {
     };
   }
 
-  async finalizeQualification(episodeId: BreachEpisodeId, trigger: ExitTrigger): Promise<FinalizationResult> {
+  async finalizeQualification(
+    episodeId: BreachEpisodeId,
+    trigger: ExitTrigger,
+  ): Promise<FinalizationResult> {
     const episode = this.episodes.get(episodeId);
     if (!episode) throw new Error(`finalizeQualification: episode ${episodeId} not found`);
     if (episode.triggerId) {
@@ -361,7 +407,6 @@ export class FakeBreachEpisodeRepository implements BreachEpisodeRepository {
     return { kind: 'qualified', triggerId: trigger.triggerId };
   }
 
-  /** Reset counter between tests */
   static resetCounter(): void {
     _fakeEpisodeCounter = 0;
   }
@@ -370,7 +415,9 @@ export class FakeBreachEpisodeRepository implements BreachEpisodeRepository {
 
 - [ ] **Step 2: Update `FakeTriggerRepository`**
 
-Remove `getActiveEpisodeTrigger`, `saveEpisode`, `episodes`, and `episodeTriggerMap` from `packages/testing/src/fakes/FakeTriggerRepository.ts`:
+Remove `saveTrigger`, `getActiveEpisodeTrigger`, `saveEpisode`, `episodes`, and `episodeTriggerMap`.
+
+Use:
 
 ```typescript
 import type { TriggerRepository } from '@clmm/application';
@@ -379,10 +426,6 @@ import type { ExitTrigger, ExitTriggerId, WalletId } from '@clmm/domain';
 export class FakeTriggerRepository implements TriggerRepository {
   readonly triggers = new Map<string, ExitTrigger>();
   lastListedWalletId: WalletId | null = null;
-
-  async saveTrigger(trigger: ExitTrigger): Promise<void> {
-    this.triggers.set(trigger.triggerId, trigger);
-  }
 
   async getTrigger(triggerId: ExitTriggerId): Promise<ExitTrigger | null> {
     return this.triggers.get(triggerId) ?? null;
@@ -401,10 +444,12 @@ export class FakeTriggerRepository implements TriggerRepository {
 
 - [ ] **Step 3: Add `listAwaitingSignatureAttemptsByEpisode` to `FakeExecutionRepository`**
 
-Add to `packages/testing/src/fakes/FakeExecutionRepository.ts`:
+Add:
 
 ```typescript
-async listAwaitingSignatureAttemptsByEpisode(episodeId: BreachEpisodeId): Promise<StoredExecutionAttempt[]> {
+async listAwaitingSignatureAttemptsByEpisode(
+  episodeId: BreachEpisodeId,
+): Promise<StoredExecutionAttempt[]> {
   return Array.from(this.attempts.values()).filter(
     (a) => a.episodeId === episodeId && a.lifecycleState.kind === 'awaiting-signature',
   );
@@ -419,16 +464,17 @@ Add to `packages/testing/src/fakes/index.ts`:
 export { FakeBreachEpisodeRepository } from './FakeBreachEpisodeRepository.js';
 ```
 
-- [ ] **Step 5: Run tests**
+- [ ] **Step 5: Run type check**
 
 Run: `cd packages/testing && npx tsc --noEmit`
-Expected: PASS (no tests here, just type-checking the fakes compile)
+
+Expected: PASS.
 
 - [ ] **Step 6: Commit**
 
 ```bash
 git add packages/testing/src/fakes/
-git commit -m "feat: add FakeBreachEpisodeRepository and update existing fakes"
+git commit -m "feat: add FakeBreachEpisodeRepository and update fake ports for episode refactor"
 ```
 
 ---
@@ -455,7 +501,6 @@ import {
   FIXTURE_POSITION_ABOVE_RANGE,
   FIXTURE_POSITION_IN_RANGE,
 } from '@clmm/testing';
-import { makeClockTimestamp } from '@clmm/domain';
 
 describe('ScanPositionsForBreaches', () => {
   let clock: FakeClockPort;
@@ -475,6 +520,7 @@ describe('ScanPositionsForBreaches', () => {
       clock,
       episodeRepo,
     });
+
     expect(observations).toHaveLength(1);
     expect(observations[0]?.consecutiveCount).toBe(1);
     expect(observations[0]?.direction.kind).toBe('lower-bound-breach');
@@ -483,9 +529,21 @@ describe('ScanPositionsForBreaches', () => {
   it('increments consecutiveCount on subsequent scans in same direction', async () => {
     const positionRead = new FakeSupportedPositionReadPort([FIXTURE_POSITION_BELOW_RANGE]);
 
-    await scanPositionsForBreaches({ walletId: FIXTURE_WALLET_ID, positionReadPort: positionRead, clock, episodeRepo });
-    clock.advance(60_000); // advance 1 minute
-    const { observations } = await scanPositionsForBreaches({ walletId: FIXTURE_WALLET_ID, positionReadPort: positionRead, clock, episodeRepo });
+    await scanPositionsForBreaches({
+      walletId: FIXTURE_WALLET_ID,
+      positionReadPort: positionRead,
+      clock,
+      episodeRepo,
+    });
+
+    clock.advance(60_000);
+
+    const { observations } = await scanPositionsForBreaches({
+      walletId: FIXTURE_WALLET_ID,
+      positionReadPort: positionRead,
+      clock,
+      episodeRepo,
+    });
 
     expect(observations[0]?.consecutiveCount).toBe(2);
   });
@@ -493,9 +551,21 @@ describe('ScanPositionsForBreaches', () => {
   it('reuses same episodeId across scans in same direction', async () => {
     const positionRead = new FakeSupportedPositionReadPort([FIXTURE_POSITION_BELOW_RANGE]);
 
-    const first = await scanPositionsForBreaches({ walletId: FIXTURE_WALLET_ID, positionReadPort: positionRead, clock, episodeRepo });
+    const first = await scanPositionsForBreaches({
+      walletId: FIXTURE_WALLET_ID,
+      positionReadPort: positionRead,
+      clock,
+      episodeRepo,
+    });
+
     clock.advance(60_000);
-    const second = await scanPositionsForBreaches({ walletId: FIXTURE_WALLET_ID, positionReadPort: positionRead, clock, episodeRepo });
+
+    const second = await scanPositionsForBreaches({
+      walletId: FIXTURE_WALLET_ID,
+      positionReadPort: positionRead,
+      clock,
+      episodeRepo,
+    });
 
     expect(second.observations[0]?.episodeId).toBe(first.observations[0]?.episodeId);
   });
@@ -508,17 +578,30 @@ describe('ScanPositionsForBreaches', () => {
       clock,
       episodeRepo,
     });
+
     expect(observations).toHaveLength(0);
     expect(abandonments).toHaveLength(0);
   });
 
   it('emits abandonment when position recovers to in-range', async () => {
     const belowRead = new FakeSupportedPositionReadPort([FIXTURE_POSITION_BELOW_RANGE]);
-    await scanPositionsForBreaches({ walletId: FIXTURE_WALLET_ID, positionReadPort: belowRead, clock, episodeRepo });
+
+    await scanPositionsForBreaches({
+      walletId: FIXTURE_WALLET_ID,
+      positionReadPort: belowRead,
+      clock,
+      episodeRepo,
+    });
 
     clock.advance(60_000);
+
     const inRangeRead = new FakeSupportedPositionReadPort([FIXTURE_POSITION_IN_RANGE]);
-    const { abandonments } = await scanPositionsForBreaches({ walletId: FIXTURE_WALLET_ID, positionReadPort: inRangeRead, clock, episodeRepo });
+    const { abandonments } = await scanPositionsForBreaches({
+      walletId: FIXTURE_WALLET_ID,
+      positionReadPort: inRangeRead,
+      clock,
+      episodeRepo,
+    });
 
     expect(abandonments).toHaveLength(1);
     expect(abandonments[0]?.reason).toBe('position-recovered');
@@ -526,11 +609,23 @@ describe('ScanPositionsForBreaches', () => {
 
   it('emits abandonment and starts new episode on direction reversal', async () => {
     const belowRead = new FakeSupportedPositionReadPort([FIXTURE_POSITION_BELOW_RANGE]);
-    await scanPositionsForBreaches({ walletId: FIXTURE_WALLET_ID, positionReadPort: belowRead, clock, episodeRepo });
+
+    await scanPositionsForBreaches({
+      walletId: FIXTURE_WALLET_ID,
+      positionReadPort: belowRead,
+      clock,
+      episodeRepo,
+    });
 
     clock.advance(60_000);
+
     const aboveRead = new FakeSupportedPositionReadPort([FIXTURE_POSITION_ABOVE_RANGE]);
-    const { observations, abandonments } = await scanPositionsForBreaches({ walletId: FIXTURE_WALLET_ID, positionReadPort: aboveRead, clock, episodeRepo });
+    const { observations, abandonments } = await scanPositionsForBreaches({
+      walletId: FIXTURE_WALLET_ID,
+      positionReadPort: aboveRead,
+      clock,
+      episodeRepo,
+    });
 
     expect(abandonments).toHaveLength(1);
     expect(abandonments[0]?.reason).toBe('direction-reversed');
@@ -542,9 +637,19 @@ describe('ScanPositionsForBreaches', () => {
   it('does not increment count on duplicate scan tick (idempotency)', async () => {
     const positionRead = new FakeSupportedPositionReadPort([FIXTURE_POSITION_BELOW_RANGE]);
 
-    const first = await scanPositionsForBreaches({ walletId: FIXTURE_WALLET_ID, positionReadPort: positionRead, clock, episodeRepo });
-    // Same clock time — no advance
-    const second = await scanPositionsForBreaches({ walletId: FIXTURE_WALLET_ID, positionReadPort: positionRead, clock, episodeRepo });
+    const first = await scanPositionsForBreaches({
+      walletId: FIXTURE_WALLET_ID,
+      positionReadPort: positionRead,
+      clock,
+      episodeRepo,
+    });
+
+    const second = await scanPositionsForBreaches({
+      walletId: FIXTURE_WALLET_ID,
+      positionReadPort: positionRead,
+      clock,
+      episodeRepo,
+    });
 
     expect(second.observations[0]?.consecutiveCount).toBe(first.observations[0]?.consecutiveCount);
   });
@@ -554,19 +659,23 @@ describe('ScanPositionsForBreaches', () => {
 - [ ] **Step 2: Run tests to verify they fail**
 
 Run: `cd packages/application && npx vitest run src/use-cases/triggers/ScanPositionsForBreaches.test.ts`
-Expected: FAIL — `scanPositionsForBreaches` doesn't accept `episodeRepo` yet.
+
+Expected: FAIL — `scanPositionsForBreaches` does not accept `episodeRepo` yet.
 
 - [ ] **Step 3: Rewrite `ScanPositionsForBreaches`**
 
 Replace `packages/application/src/use-cases/triggers/ScanPositionsForBreaches.ts`:
 
 ```typescript
+import type { SupportedPositionReadPort, ClockPort } from '../../ports/index.js';
+import type { BreachEpisodeRepository } from '../../ports/BreachEpisodeRepository.js';
 import type {
-  SupportedPositionReadPort,
-  ClockPort,
-} from '../../ports/index.js';
-import type { BreachEpisodeRepository, EpisodeTransition } from '../../ports/BreachEpisodeRepository.js';
-import type { WalletId, BreachDirection, PositionId, BreachEpisodeId, ClockTimestamp } from '@clmm/domain';
+  WalletId,
+  BreachDirection,
+  PositionId,
+  BreachEpisodeId,
+  ClockTimestamp,
+} from '@clmm/domain';
 import { LOWER_BOUND_BREACH, UPPER_BOUND_BREACH, makeClockTimestamp } from '@clmm/domain';
 
 export type BreachObservationResult = {
@@ -596,7 +705,7 @@ export async function scanPositionsForBreaches(params: {
 }): Promise<ScanResult> {
   const { walletId, positionReadPort, clock, episodeRepo } = params;
   const positions = await positionReadPort.listSupportedPositions(walletId);
-  // Truncate to minute boundary for scan-tick idempotency
+
   const now = makeClockTimestamp(Math.floor(clock.now() / 60_000) * 60_000);
   const observations: BreachObservationResult[] = [];
   const abandonments: AbandonmentDirective[] = [];
@@ -634,7 +743,10 @@ export async function scanPositionsForBreaches(params: {
         episodeId: transition.newEpisodeId,
         consecutiveCount: transition.consecutiveCount,
       });
-    } else if (transition.kind === 'episode-started' || transition.kind === 'episode-continued') {
+    } else if (
+      transition.kind === 'episode-started' ||
+      transition.kind === 'episode-continued'
+    ) {
       observations.push({
         positionId: position.positionId,
         direction: transition.direction,
@@ -652,7 +764,8 @@ export async function scanPositionsForBreaches(params: {
 - [ ] **Step 4: Run tests to verify they pass**
 
 Run: `cd packages/application && npx vitest run src/use-cases/triggers/ScanPositionsForBreaches.test.ts`
-Expected: PASS
+
+Expected: PASS.
 
 - [ ] **Step 5: Commit**
 
@@ -663,23 +776,24 @@ git commit -m "feat: rewrite ScanPositionsForBreaches with persisted episode tra
 
 ---
 
-## Task 5: Rewrite QualifyActionableTrigger + Refactor Domain qualifyTrigger
+## Task 5: Rewrite Qualification Path + Refactor Domain TriggerQualificationService
 
 **Files:**
 - Modify: `packages/domain/src/triggers/TriggerQualificationService.ts`
 - Modify: `packages/domain/src/triggers/TriggerQualificationService.test.ts`
+- Modify: `packages/domain/src/index.ts`
 - Modify: `packages/application/src/use-cases/triggers/QualifyActionableTrigger.ts`
 - Modify: `packages/application/src/use-cases/triggers/QualifyActionableTrigger.test.ts`
 
-**Design decisions (from review feedback):**
+**Design decisions:**
 
-- **Domain = threshold only.** `qualifyTrigger` evaluates whether `consecutiveOutOfRangeCount` meets the threshold. It does NOT do dedup — no `existingTriggerIdForEpisode` parameter.
-- **Application + persistence = dedup.** `qualifyActionableTrigger` checks threshold via domain, then calls `finalizeQualification` which atomically handles dedup + trigger persistence as a single write path.
-- **Trigger ID constructed in application layer**, not hidden inside domain code. The application layer uses `IdGeneratorPort` to generate the trigger ID and passes it into a domain function that builds the trigger object. Pure domain code does not invent IDs by side effect.
-- **`observation.observedAt` is the timestamp for trigger construction**, not `clock.now()`. Detection time and observation time are different; do not overwrite one with the other.
-- **`finalizeQualification` is the sole trigger persistence path.** `triggerRepo.saveTrigger` is NOT called separately — that would be two writers for the same row.
+- **Domain = threshold only.** `qualifyTrigger` goes away. Domain code evaluates the threshold and builds trigger objects, but does not do dedup.
+- **Application + persistence = dedup.** `qualifyActionableTrigger` checks threshold, builds a trigger, and calls `finalizeQualification`, which atomically handles dedup + trigger persistence.
+- **Trigger IDs are constructed in the application layer** via `IdGeneratorPort`. Pure domain code does not invent IDs by side effect.
+- **`observation.observedAt` is the timestamp for trigger construction**, not `clock.now()`.
+- **`finalizeQualification` is the sole trigger persistence path.** No separate `triggerRepo.saveTrigger` call remains.
 
-- [ ] **Step 1: Refactor domain `qualifyTrigger` — remove dedup, extract trigger construction**
+- [ ] **Step 1: Refactor domain `TriggerQualificationService`**
 
 Rewrite `packages/domain/src/triggers/TriggerQualificationService.ts`:
 
@@ -702,6 +816,7 @@ export function evaluateConfirmationThreshold(
       reason: `confirmation threshold not met: need ${MVP_CONFIRMATION_THRESHOLD} consecutive observations, got ${consecutiveOutOfRangeCount}`,
     };
   }
+
   return { kind: 'met' };
 }
 
@@ -724,22 +839,39 @@ export function buildExitTrigger(params: {
 }
 ```
 
-- [ ] **Step 2: Update domain barrel export**
+- [ ] **Step 2: Update domain barrel exports**
 
-In `packages/domain/src/index.ts`, replace the `qualifyTrigger` export:
+In `packages/domain/src/index.ts`, replace the `qualifyTrigger` export with:
 
 ```typescript
-export { evaluateConfirmationThreshold, buildExitTrigger } from './triggers/TriggerQualificationService.js';
+export {
+  evaluateConfirmationThreshold,
+  buildExitTrigger,
+} from './triggers/TriggerQualificationService.js';
 export type { ThresholdEvaluation } from './triggers/TriggerQualificationService.js';
 ```
 
-Remove the old `export { qualifyTrigger }` line.
+- [ ] **Step 3: Replace remaining `qualifyTrigger` imports/usages across the repo**
 
-- [ ] **Step 3: Update domain tests**
+Search for all imports/usages of `qualifyTrigger` and replace them with the new threshold + trigger-construction flow, or remove them if unused.
 
-Rewrite `packages/domain/src/triggers/TriggerQualificationService.test.ts` to test `evaluateConfirmationThreshold` and `buildExitTrigger` separately. The threshold function is pure: below 3 returns `not-met`, at or above 3 returns `met`. `buildExitTrigger` returns an `ExitTrigger` with the exact fields passed in.
+Run:
 
-- [ ] **Step 4: Write failing application tests**
+```bash
+rg "qualifyTrigger" packages/
+```
+
+Expected: no remaining production imports after this task.
+
+- [ ] **Step 4: Update domain tests**
+
+Rewrite `packages/domain/src/triggers/TriggerQualificationService.test.ts` to test:
+- `evaluateConfirmationThreshold(2)` returns `not-met`
+- `evaluateConfirmationThreshold(3)` returns `met`
+- `evaluateConfirmationThreshold(4)` returns `met`
+- `buildExitTrigger(...)` returns an `ExitTrigger` with the exact fields passed in
+
+- [ ] **Step 5: Write failing application tests**
 
 Rewrite `packages/application/src/use-cases/triggers/QualifyActionableTrigger.test.ts`:
 
@@ -747,7 +879,6 @@ Rewrite `packages/application/src/use-cases/triggers/QualifyActionableTrigger.te
 import { describe, it, expect, beforeEach } from 'vitest';
 import { qualifyActionableTrigger } from './QualifyActionableTrigger.js';
 import {
-  FakeClockPort,
   FakeIdGeneratorPort,
   FakeBreachEpisodeRepository,
   FIXTURE_POSITION_ID,
@@ -783,53 +914,68 @@ describe('QualifyActionableTrigger', () => {
       episodeRepo,
       ids,
     });
+
     expect(result.kind).toBe('not-qualified');
   });
 
   it('creates trigger and finalizes on episode when threshold met', async () => {
-    // Seed the episode so finalization can find it
-    await episodeRepo.recordOutOfRange(FIXTURE_POSITION_ID, LOWER_BOUND_BREACH, makeClockTimestamp(1_000_000));
+    await episodeRepo.recordOutOfRange(
+      FIXTURE_POSITION_ID,
+      LOWER_BOUND_BREACH,
+      makeClockTimestamp(1_000_000),
+    );
 
     const result = await qualifyActionableTrigger({
       observation: makeObs(),
       episodeRepo,
       ids,
     });
+
     expect(result.kind).toBe('trigger-created');
     if (result.kind === 'trigger-created') {
       expect(result.trigger.breachDirection.kind).toBe('lower-bound-breach');
-      // Trigger uses observation.observedAt, not some other timestamp
       expect(result.trigger.triggeredAt).toBe(1_000_000);
     }
-    // Episode should now have triggerId set
+
     const ep = episodeRepo.episodes.get('fake-episode-1' as BreachEpisodeId);
     expect(ep?.triggerId).not.toBeNull();
   });
 
   it('returns duplicate-suppressed when episode already has a trigger', async () => {
-    await episodeRepo.recordOutOfRange(FIXTURE_POSITION_ID, LOWER_BOUND_BREACH, makeClockTimestamp(1_000_000));
+    await episodeRepo.recordOutOfRange(
+      FIXTURE_POSITION_ID,
+      LOWER_BOUND_BREACH,
+      makeClockTimestamp(1_000_000),
+    );
 
     await qualifyActionableTrigger({
       observation: makeObs(),
       episodeRepo,
       ids,
     });
+
     const result = await qualifyActionableTrigger({
       observation: makeObs(),
       episodeRepo,
       ids,
     });
+
     expect(result.kind).toBe('duplicate-suppressed');
   });
 
-  it('uses IdGeneratorPort for trigger ID, not hidden domain construction', async () => {
-    await episodeRepo.recordOutOfRange(FIXTURE_POSITION_ID, LOWER_BOUND_BREACH, makeClockTimestamp(1_000_000));
+  it('uses IdGeneratorPort for trigger ID', async () => {
+    await episodeRepo.recordOutOfRange(
+      FIXTURE_POSITION_ID,
+      LOWER_BOUND_BREACH,
+      makeClockTimestamp(1_000_000),
+    );
 
     const result = await qualifyActionableTrigger({
       observation: makeObs(),
       episodeRepo,
       ids,
     });
+
     if (result.kind === 'trigger-created') {
       expect(result.trigger.triggerId).toMatch(/^trigger-/);
     }
@@ -837,12 +983,13 @@ describe('QualifyActionableTrigger', () => {
 });
 ```
 
-- [ ] **Step 5: Run tests to verify they fail**
+- [ ] **Step 6: Run tests to verify they fail**
 
 Run: `cd packages/application && npx vitest run src/use-cases/triggers/QualifyActionableTrigger.test.ts`
-Expected: FAIL
 
-- [ ] **Step 6: Rewrite `QualifyActionableTrigger`**
+Expected: FAIL.
+
+- [ ] **Step 7: Rewrite `QualifyActionableTrigger`**
 
 Replace `packages/application/src/use-cases/triggers/QualifyActionableTrigger.ts`:
 
@@ -865,13 +1012,11 @@ export async function qualifyActionableTrigger(params: {
 }): Promise<QualifyResult> {
   const { observation, episodeRepo, ids } = params;
 
-  // 1. Threshold evaluation — domain layer, pure
   const threshold = evaluateConfirmationThreshold(observation.consecutiveCount);
   if (threshold.kind === 'not-met') {
     return { kind: 'not-qualified', reason: threshold.reason };
   }
 
-  // 2. Build trigger — application layer constructs ID, domain builds object
   const trigger = buildExitTrigger({
     triggerId: ids.generateId() as ExitTriggerId,
     positionId: observation.positionId,
@@ -880,8 +1025,6 @@ export async function qualifyActionableTrigger(params: {
     episodeId: observation.episodeId as BreachEpisodeId,
   });
 
-  // 3. Atomic finalization — single write path for trigger + episode link
-  //    This is the ONLY place triggers are persisted. No separate saveTrigger call.
   const finalization = await episodeRepo.finalizeQualification(
     observation.episodeId as BreachEpisodeId,
     trigger,
@@ -898,16 +1041,17 @@ export async function qualifyActionableTrigger(params: {
 }
 ```
 
-- [ ] **Step 7: Run tests to verify they pass**
+- [ ] **Step 8: Run tests to verify they pass**
 
 Run: `cd packages/application && npx vitest run src/use-cases/triggers/QualifyActionableTrigger.test.ts`
-Expected: PASS
 
-- [ ] **Step 8: Commit**
+Expected: PASS.
+
+- [ ] **Step 9: Commit**
 
 ```bash
 git add packages/domain/src/triggers/TriggerQualificationService.ts packages/domain/src/triggers/TriggerQualificationService.test.ts packages/domain/src/index.ts packages/application/src/use-cases/triggers/QualifyActionableTrigger.ts packages/application/src/use-cases/triggers/QualifyActionableTrigger.test.ts
-git commit -m "feat: clean qualification path — domain=threshold, app+persistence=dedup"
+git commit -m "feat: clean qualification path — domain threshold, app ids, atomic finalization"
 ```
 
 ---
@@ -930,10 +1074,12 @@ export const BREACH_EPISODE_REPOSITORY = 'BREACH_EPISODE_REPOSITORY';
 - [ ] **Step 2: Rewrite `BreachScanJobHandler`**
 
 The handler must:
-- Inject `BreachEpisodeRepository` instead of `IdGeneratorPort` (scan no longer needs ids)
+- Add `BreachEpisodeRepository` to the handler dependencies
+- Keep `IdGeneratorPort` because inline abandonment still calls `recordExecutionAbandonment`
 - Inject `ExecutionRepository` and `ExecutionHistoryRepository` for inline abandonment
 - Pass `episodeRepo` to `scanPositionsForBreaches`
 - Pass `consecutiveCount` in the `qualify-trigger` job payload
+- Log a warning if more than one awaiting-signature attempt is found for a single episode
 - Process `abandonments[]` inline by looking up attempts and calling `recordExecutionAbandonment`
 
 Update `packages/adapters/src/inbound/jobs/BreachScanJobHandler.ts`:
@@ -1031,7 +1177,22 @@ export class BreachScanJobHandler {
         }
 
         for (const abandonment of abandonments) {
-          const staleAttempts = await this.executionRepo.listAwaitingSignatureAttemptsByEpisode(abandonment.episodeId);
+          const staleAttempts = await this.executionRepo.listAwaitingSignatureAttemptsByEpisode(
+            abandonment.episodeId,
+          );
+
+          if (staleAttempts.length > 1) {
+            this.observability.log(
+              'warn',
+              'Multiple awaiting-signature attempts found for episode',
+              {
+                episodeId: abandonment.episodeId,
+                positionId: abandonment.positionId,
+                count: staleAttempts.length,
+              },
+            );
+          }
+
           for (const attempt of staleAttempts) {
             await recordExecutionAbandonment({
               attemptId: attempt.attemptId,
@@ -1042,6 +1203,7 @@ export class BreachScanJobHandler {
               clock: this.clock,
               ids: this.ids,
             });
+
             this.observability.log('info', `Abandoned stale attempt ${attempt.attemptId}`, {
               positionId: abandonment.positionId,
               reason: abandonment.reason,
@@ -1064,18 +1226,21 @@ export class BreachScanJobHandler {
 
 - [ ] **Step 3: Update `BreachScanJobHandler.test.ts`**
 
-Read the existing test file, then update it to:
-- Replace `FakeIdGeneratorPort` with `FakeBreachEpisodeRepository` in the scan constructor
+Update the test file to:
+- Add `FakeBreachEpisodeRepository` to the handler construction
+- Keep `FakeIdGeneratorPort` because abandonment still needs IDs
 - Add `FakeExecutionRepository` and `FakeExecutionHistoryRepository` for abandonment
-- Add test: "enqueues qualify-trigger with consecutiveCount from episode"
-- Add test: "abandons stale awaiting-signature attempt when position recovers"
-- Add test: "abandons stale attempt on direction reversal"
+- Add test: `enqueues qualify-trigger with consecutiveCount from episode`
+- Add test: `abandons stale awaiting-signature attempt when position recovers`
+- Add test: `abandons stale attempt on direction reversal`
+- Add test: `logs warning when multiple awaiting-signature attempts exist for one episode`
 - Verify the enqueue payload includes `consecutiveCount`
 
 - [ ] **Step 4: Run tests**
 
 Run: `cd packages/adapters && npx vitest run src/inbound/jobs/BreachScanJobHandler.test.ts`
-Expected: PASS
+
+Expected: PASS.
 
 - [ ] **Step 5: Commit**
 
@@ -1098,9 +1263,10 @@ In `packages/adapters/src/inbound/jobs/TriggerQualificationJobHandler.ts`:
 
 1. Add `consecutiveCount: number` to `QualifyTriggerPayload`
 2. Add `BreachEpisodeRepository` injection via `BREACH_EPISODE_REPOSITORY` token
-3. Pass `observation.consecutiveCount` from payload instead of hardcoded `3`
-4. Pass `episodeRepo` to `qualifyActionableTrigger`
-5. Remove `consecutiveCount` parameter from the call (it now lives on the observation)
+3. Pass `data.consecutiveCount` from payload instead of hardcoded `3`
+4. Pass `episodeRepo` and `ids` to `qualifyActionableTrigger`
+
+Use:
 
 ```typescript
 type QualifyTriggerPayload = {
@@ -1113,31 +1279,27 @@ type QualifyTriggerPayload = {
 };
 ```
 
-The handler call changes from:
-
-```typescript
-consecutiveCount: 3, // MVP confirmation threshold
-```
-
-to reading `data.consecutiveCount` and passing it on the observation object.
+Construct the observation with `observedAt: data.observedAt`, `episodeId: data.episodeId`, and `consecutiveCount: data.consecutiveCount`.
 
 - [ ] **Step 2: Update tests**
 
-Read existing `TriggerQualificationJobHandler.test.ts`, then update:
+Update `TriggerQualificationJobHandler.test.ts` to:
 - Add `consecutiveCount` to all test payloads
 - Add `FakeBreachEpisodeRepository` to handler construction
-- Add test: "passes real consecutiveCount from payload to qualifier"
+- Seed the fake episode before testing successful qualification
+- Add test: `passes real consecutiveCount from payload to qualifier`
 
 - [ ] **Step 3: Run tests**
 
 Run: `cd packages/adapters && npx vitest run src/inbound/jobs/TriggerQualificationJobHandler.test.ts`
-Expected: PASS
+
+Expected: PASS.
 
 - [ ] **Step 4: Commit**
 
 ```bash
 git add packages/adapters/src/inbound/jobs/TriggerQualificationJobHandler.ts packages/adapters/src/inbound/jobs/TriggerQualificationJobHandler.test.ts
-git commit -m "feat: pass real consecutiveCount in qualification payload instead of hardcoding 3"
+git commit -m "feat: pass real consecutiveCount in qualification payload and inject episode repository"
 ```
 
 ---
@@ -1150,11 +1312,19 @@ git commit -m "feat: pass real consecutiveCount in qualification payload instead
 
 - [ ] **Step 1: Update `breach_episodes` schema**
 
-In `packages/adapters/src/outbound/storage/schema/triggers.ts`, update the `breachEpisodes` table:
+In `packages/adapters/src/outbound/storage/schema/triggers.ts`, update `breachEpisodes`:
 
 ```typescript
 import { sql } from 'drizzle-orm';
-import { pgTable, text, boolean, bigint, integer, check, uniqueIndex } from 'drizzle-orm/pg-core';
+import {
+  pgTable,
+  text,
+  boolean,
+  bigint,
+  integer,
+  check,
+  uniqueIndex,
+} from 'drizzle-orm/pg-core';
 
 export const breachEpisodes = pgTable('breach_episodes', {
   episodeId: text('episode_id').primaryKey(),
@@ -1207,56 +1377,72 @@ export const exitTriggers = pgTable('exit_triggers', {
 
 - [ ] **Step 2: Add `episode_id` to `execution_attempts`**
 
-In `packages/adapters/src/outbound/storage/schema/executions.ts`, add to `executionAttempts`:
+In `packages/adapters/src/outbound/storage/schema/executions.ts`, add:
 
 ```typescript
 episodeId: text('episode_id'),
 ```
 
-- [ ] **Step 3: Determine migration strategy**
+- [ ] **Step 3: Add foreign-key constraints for episode-linked flows if consistent with existing schema conventions**
 
-Check whether `drizzle-kit` is configured by running `ls packages/adapters/drizzle.config.*` and checking `package.json` for drizzle-kit scripts. Then:
-- If a `drizzle.config.ts` exists and migration files are present in a `drizzle/` or `migrations/` directory: run `cd packages/adapters && npx drizzle-kit generate` to create the migration.
-- If no migration directory exists and `drizzle-kit push` is used (common in early-stage projects): schema changes will be applied via push. No migration file needed.
-- Document which path was taken in the commit message.
+Prefer:
+- `exit_triggers.episode_id` → `breach_episodes.episode_id`
+- `execution_attempts.episode_id` → `breach_episodes.episode_id`
+- optional: `breach_episodes.trigger_id` → `exit_triggers.trigger_id`
 
-- [ ] **Step 4: Commit**
+If this codebase intentionally avoids DB foreign keys, document that explicitly in the schema/migration notes and preserve the relationships in application code.
+
+- [ ] **Step 4: Determine migration strategy**
+
+Check whether `drizzle-kit` is configured:
+
+```bash
+ls packages/adapters/drizzle.config.*
+```
+
+Check `package.json` for drizzle-kit scripts.
+
+Then:
+- If a `drizzle.config.ts` exists and migration files are present in a `drizzle/` or `migrations/` directory: run `cd packages/adapters && npx drizzle-kit generate`
+- If no migration directory exists and `drizzle-kit push` is used: apply via push and document that path in the commit message
+
+- [ ] **Step 5: Commit**
 
 ```bash
 git add packages/adapters/src/outbound/storage/schema/
-git commit -m "feat: update breach_episodes schema with lifecycle columns and constraints"
+git commit -m "feat: update breach_episodes and execution_attempts schema for episode-linked lifecycle"
 ```
 
 ---
 
-## Task 9: OperationalStorageAdapter — BreachEpisodeRepository Implementation
+## Task 9: OperationalStorageAdapter — Implement BreachEpisodeRepository
 
 **Files:**
 - Modify: `packages/adapters/src/outbound/storage/OperationalStorageAdapter.ts`
 
 - [ ] **Step 1: Implement `BreachEpisodeRepository` on `OperationalStorageAdapter`**
 
-The adapter must now also implement `BreachEpisodeRepository`. Add to the class declaration:
+Update the class declaration:
 
 ```typescript
 export class OperationalStorageAdapter
   implements TriggerRepository, ExecutionRepository, ExecutionSessionRepository, BreachEpisodeRepository
 ```
 
-Implement `recordInRange` (transactional — closing an episode is a state transition with concurrency consequences):
+Implement `recordInRange` as a **transactional** close path:
 - Wrap in `db.transaction()`
-- SELECT open episode for positionId `FOR UPDATE`
+- SELECT open episode for `positionId` `FOR UPDATE`
 - If none, return `{ kind: 'no-op' }`
-- UPDATE to closed with `close_reason = 'position-recovered'`, `closed_at`, `status = 'closed'`
+- UPDATE to closed with `status = 'closed'`, `close_reason = 'position-recovered'`, `closed_at = observedAt`
 - Return `episode-closed-recovered`
 
-Implement `recordOutOfRange` (transactional with row lock):
+Implement `recordOutOfRange` as a **transactional** state transition:
 - Wrap in `db.transaction()`
-- SELECT open episode for positionId `FOR UPDATE`
+- SELECT open episode for `positionId` `FOR UPDATE`
 - If none: INSERT new episode, return `episode-started`
-- If same direction + `observedAt > last_seen_at`: UPDATE `consecutive_count + 1`, `last_observed_at`, return `episode-continued`
-- If same direction + `observedAt <= last_seen_at`: return `episode-continued` with current state (idempotent no-op)
-- If opposite direction: UPDATE old to closed (`direction-reversed`), INSERT new, return `episode-reversed`
+- If same direction and `observedAt > last_observed_at`: UPDATE `consecutive_count + 1`, `last_observed_at`, return `episode-continued`
+- If same direction and `observedAt <= last_observed_at`: return `episode-continued` with current state (idempotent no-op)
+- If opposite direction: UPDATE old to closed with `direction-reversed`, INSERT new episode, return `episode-reversed`
 
 Implement `getOpenEpisode`:
 - SELECT where `position_id = ? AND status = 'open'`
@@ -1265,41 +1451,51 @@ Implement `finalizeQualification` — **this is the sole trigger persistence pat
 - Wrap in `db.transaction()`
 - SELECT episode `FOR UPDATE`
 - If `trigger_id` is already set, return `{ kind: 'duplicate-suppressed', existingTriggerId }`
-- INSERT trigger into `exit_triggers` (with `ON CONFLICT DO NOTHING` on `episode_id` unique constraint as backstop)
-- Check the insert result: if the insert was a no-op (conflict), re-read the existing trigger and return `duplicate-suppressed`. Do NOT continue as if qualification succeeded.
-- UPDATE `breach_episodes.trigger_id` to the new trigger's ID
+- INSERT trigger into `exit_triggers` using the episode unique constraint as a backstop
+- If the insert conflicts / is a no-op, re-read the existing trigger by `episode_id` and return `duplicate-suppressed`
+- UPDATE `breach_episodes.trigger_id` to the new trigger ID
 - Return `{ kind: 'qualified', triggerId }`
 
-**Critical:** The application layer (`QualifyActionableTrigger`) does NOT call `triggerRepo.saveTrigger` separately. `finalizeQualification` handles both the trigger insert and the episode link atomically. This prevents double-write races.
+- [ ] **Step 2: Remove old episode/dedup methods**
 
-- [ ] **Step 2: Remove old `saveEpisode` and `getActiveEpisodeTrigger` methods**
-
-Delete these methods from `OperationalStorageAdapter`. They are replaced by `finalizeQualification` and the episode transition methods.
+Delete `saveEpisode` and `getActiveEpisodeTrigger`. They are replaced by the new transition methods and `finalizeQualification`.
 
 - [ ] **Step 3: Add `listAwaitingSignatureAttemptsByEpisode`**
 
 ```typescript
-async listAwaitingSignatureAttemptsByEpisode(episodeId: BreachEpisodeId): Promise<StoredExecutionAttempt[]> {
-  const rows = await this.db.select().from(executionAttempts)
-    .where(sql`${executionAttempts.episodeId} = ${episodeId} AND ${executionAttempts.lifecycleStateKind} = 'awaiting-signature'`);
+async listAwaitingSignatureAttemptsByEpisode(
+  episodeId: BreachEpisodeId,
+): Promise<StoredExecutionAttempt[]> {
+  const rows = await this.db
+    .select()
+    .from(executionAttempts)
+    .where(
+      sql`${executionAttempts.episodeId} = ${episodeId} AND ${executionAttempts.lifecycleStateKind} = 'awaiting-signature'`,
+    );
+
   return rows.map((row) => this.mapAttemptRow(row));
 }
 ```
 
-- [ ] **Step 4: Update `saveAttempt` and `getAttempt` to include `episodeId`**
+- [ ] **Step 4: Update attempt persistence to include `episodeId`**
 
-Write `episodeId` when saving, read it when loading.
+Update `saveAttempt` and `getAttempt` to write/read `episodeId`.
 
-- [ ] **Step 5: Run type check**
+- [ ] **Step 5: Remove or adapt stale `saveTrigger` implementation**
+
+Since qualification writes now go through `finalizeQualification`, remove or adapt any old `saveTrigger` implementation to match the new `TriggerRepository` interface from Task 2.
+
+- [ ] **Step 6: Run type check**
 
 Run: `cd packages/adapters && npx tsc --noEmit`
-Expected: PASS
 
-- [ ] **Step 6: Commit**
+Expected: PASS.
+
+- [ ] **Step 7: Commit**
 
 ```bash
 git add packages/adapters/src/outbound/storage/OperationalStorageAdapter.ts
-git commit -m "feat: implement BreachEpisodeRepository on OperationalStorageAdapter"
+git commit -m "feat: implement BreachEpisodeRepository and atomic trigger finalization in storage adapter"
 ```
 
 ---
@@ -1316,35 +1512,36 @@ Import the token and add to `sharedProviders`:
 ```typescript
 import { BREACH_EPISODE_REPOSITORY } from '../inbound/jobs/tokens.js';
 
-// In sharedProviders array:
+// In sharedProviders:
 { provide: BREACH_EPISODE_REPOSITORY, useValue: operationalStorage },
 ```
 
-`operationalStorage` already implements `BreachEpisodeRepository` after Task 9.
+`operationalStorage` implements `BreachEpisodeRepository` after Task 9.
 
-- [ ] **Step 2: Add `EXECUTION_HISTORY_REPOSITORY` to exports if missing**
+- [ ] **Step 2: Verify `EXECUTION_HISTORY_REPOSITORY` is exported/injectable**
 
-Verify `EXECUTION_HISTORY_REPOSITORY` is already in the providers array (it is — line 67). Confirm `BreachScanJobHandler` can inject it.
+Confirm `EXECUTION_HISTORY_REPOSITORY` is already available for `BreachScanJobHandler`.
 
 - [ ] **Step 3: Commit**
 
 ```bash
 git add packages/adapters/src/composition/AdaptersModule.ts
-git commit -m "feat: wire BREACH_EPISODE_REPOSITORY in composition root"
+git commit -m "feat: wire BreachEpisodeRepository in composition root"
 ```
 
 ---
 
-## Task 11: Thread `episodeId` Through Execution Attempt Creation
+## Task 11: Thread `episodeId` Through Trigger-Derived Execution Attempt Creation
 
 **Files:**
-- Modify: `packages/application/src/use-cases/execution/RequestWalletSignature.ts:73-81`
+- Modify: `packages/application/src/use-cases/execution/RequestWalletSignature.ts`
+- Modify: trigger/approval caller(s) that invoke `requestWalletSignature`
 
-- [ ] **Step 1: Thread `episodeId` into attempt**
+- [ ] **Step 1: Thread `episodeId` into trigger-derived attempt creation**
 
-The preview record does not carry `episodeId`. The simplest correct approach: add `episodeId` as an optional parameter to `requestWalletSignature` and pass it through to `saveAttempt`.
+For any trigger-derived execution attempt, `episodeId` must be propagated from the trigger/approval context into `requestWalletSignature` and persisted on the attempt. Optional typing is only for legacy/manual paths created before this feature.
 
-Read `RequestWalletSignature.ts` to confirm the exact insertion point, then add `episodeId?: string` to the params and include it in the `saveAttempt` call:
+Add `episodeId?: BreachEpisodeId` to `requestWalletSignature` params and pass it through to `saveAttempt`:
 
 ```typescript
 await executionRepo.saveAttempt({
@@ -1359,20 +1556,25 @@ await executionRepo.saveAttempt({
 });
 ```
 
-- [ ] **Step 2: Update callers that invoke `requestWalletSignature`**
+- [ ] **Step 2: Modify upstream trigger/approval flow so trigger-derived requests always carry `episodeId`**
 
-Search for callers of `requestWalletSignature` and add `episodeId` to the call site where available. If the HTTP handler / route has access to `episodeId` (from the trigger or notification context), pass it through.
+Search for the caller that invokes `requestWalletSignature` from the actionable trigger / approval flow. Add `episodeId` to that DTO or call path and pass it through unconditionally for trigger-derived flows.
 
-- [ ] **Step 3: Run all tests**
+- [ ] **Step 3: Add a guard for trigger-derived flows**
+
+If `requestWalletSignature` is being called for a trigger-derived execution and `episodeId` is missing, throw an error instead of silently creating an unlinked attempt.
+
+- [ ] **Step 4: Run application tests**
 
 Run: `cd packages/application && npx vitest run`
-Expected: PASS (episodeId is optional, so existing callers without it still work)
 
-- [ ] **Step 4: Commit**
+Expected: PASS.
+
+- [ ] **Step 5: Commit**
 
 ```bash
 git add packages/application/src/use-cases/execution/RequestWalletSignature.ts
-git commit -m "feat: thread episodeId through execution attempt creation"
+git commit -m "feat: require episodeId for trigger-derived execution attempts"
 ```
 
 ---
@@ -1380,26 +1582,26 @@ git commit -m "feat: thread episodeId through execution attempt creation"
 ## Task 12: Verify Abandoned State in Signing Flow
 
 **Files:**
-- No code changes expected — verification only
+- No code changes expected — verification only unless a small gap is found
 
-- [ ] **Step 1: Verify `abandoned` is handled as terminal in signing page**
+- [ ] **Step 1: Verify `abandoned` is terminal in signing flow**
 
-Search the frontend/UI codebase for how `abandoned` lifecycle state is rendered on the signing page. Check:
+Search the UI/frontend codebase for how `abandoned` is rendered on the signing page and result page.
+
+Check:
 - Does the signing screen stop prompting for wallet signature when state is `abandoned`?
 - Does the result page show a sensible message for `abandoned`?
 - Does any polling endpoint return `abandoned` correctly?
 
-Run: Search for `abandoned` in the UI/frontend codebase.
+- [ ] **Step 2: If gaps are found, create follow-up tasks or minimal fixes**
 
-- [ ] **Step 2: If gaps found, create follow-up tasks**
+If `abandoned` is not handled correctly, record the exact gaps. Apply only minimal fixes required to correctly reflect terminal abandoned state.
 
-If `abandoned` is not handled correctly in the UI, note the specific gaps. The story says UI changes are out of scope beyond reflecting the `abandoned` state, so this should already work. If not, flag it.
-
-- [ ] **Step 3: Commit (if any small fixes needed)**
+- [ ] **Step 3: Commit (if any small fixes were needed)**
 
 ---
 
-## Task 13: Full Test Suite + Type Check
+## Task 13: Full Type Check + Test Suite + Search Cleanup
 
 **Files:**
 - None — verification only
@@ -1413,36 +1615,57 @@ npx tsc --noEmit -p packages/adapters/tsconfig.json && \
 npx tsc --noEmit -p packages/testing/tsconfig.json
 ```
 
-Expected: PASS
+Expected: PASS.
 
-- [ ] **Step 2: Run full test suite**
+- [ ] **Step 2: Run focused grep checks for removed surfaces**
+
+Run:
+
+```bash
+rg "qualifyTrigger" packages/
+rg "getActiveEpisodeTrigger|saveEpisode|saveTrigger" packages/
+```
+
+Expected:
+- no production `qualifyTrigger` imports
+- no stale episode/trigger write method usage
+- any remaining `saveTrigger` references should be test-only leftovers you intentionally retained, otherwise remove them
+
+- [ ] **Step 3: Run full test suite**
 
 ```bash
 npx vitest run --reporter=verbose
 ```
 
-Expected: All tests PASS.
+Expected: all tests PASS.
 
-- [ ] **Step 3: Fix any failures**
+- [ ] **Step 4: Fix failures and stale references**
 
-If tests fail, diagnose root cause. Common issues:
-- Old test files still referencing removed `TriggerRepository` methods → update imports
-- Missing `episodeId` in test fixtures → add to `beforeEach` setup
-- `BreachScanJobHandler.test.ts` constructor mismatch → update DI setup
+Common remaining issues:
+- old tests still referencing removed `TriggerRepository` methods
+- missing `episodeId` in trigger-derived test setup
+- stale constructor wiring in `BreachScanJobHandler.test.ts`
+- lingering `qualifyTrigger` imports
+- stale `saveTrigger` implementations/imports after interface cleanup
 
-- [ ] **Step 4: Final commit**
+- [ ] **Step 5: Final commit**
 
 ```bash
 git add -A
-git commit -m "fix: resolve remaining type errors and test failures from episode refactor"
+git commit -m "fix: resolve remaining type errors and test failures from breach episode lifecycle refactor"
 ```
 
 ---
 
 ## Policy Notes for Implementer
 
-1. **When `listAwaitingSignatureAttemptsByEpisode` returns >1 result:** Log a warning (integrity violation), then abandon all of them. This is not an error the user should see.
+1. **When `listAwaitingSignatureAttemptsByEpisode` returns >1 result:** log a warning (integrity violation), then abandon all of them. This is not a user-facing error.
 
-2. **Direction reversal creates a new episode at `consecutiveCount = 1`.** It does not immediately qualify. The new episode must reach threshold (3) through normal scan accumulation. Do not short-circuit this.
+2. **Direction reversal starts a fresh episode at `consecutiveCount = 1`.** It does not immediately qualify. The new episode must still reach threshold `3` via normal scan accumulation.
 
-3. **`observedAt` must be truncated to minute boundary** before passing to `recordOutOfRange`/`recordInRange`. The truncation should happen in `ScanPositionsForBreaches` where `clock.now()` is called. Use: `Math.floor(now / 60_000) * 60_000`.
+3. **`observedAt` must be truncated to minute boundary** before passing to `recordOutOfRange` / `recordInRange`. The truncation belongs in `ScanPositionsForBreaches` where `clock.now()` is read. Use:
+   `Math.floor(now / 60_000) * 60_000`.
+
+4. **Trigger finalization is the only write path for exit triggers in this feature.** Do not reintroduce a second write path from `QualifyActionableTrigger` or a job handler.
+
+5. **For trigger-derived execution attempts, missing `episodeId` is a correctness bug.** Fail fast instead of creating an unlinked attempt that cannot later be abandoned precisely.
