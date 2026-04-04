@@ -23,12 +23,15 @@ export function getBffBaseUrl(): string {
 }
 
 export async function fetchJson(path: string, init?: RequestInit): Promise<unknown> {
+  const headers = new Headers(init?.headers);
+
+  if (!headers.has('Content-Type')) {
+    headers.set('Content-Type', 'application/json');
+  }
+
   const response = await fetch(`${getBffBaseUrl()}${path}`, {
     ...init,
-    headers: {
-      'Content-Type': 'application/json',
-      ...init?.headers,
-    },
+    headers,
   });
 
   if (!response.ok) {
@@ -49,16 +52,21 @@ function isRecord(value: unknown): value is Record<string, unknown> {
 
 async function extractErrorDetail(response: Response): Promise<string> {
   const fallback = `HTTP ${response.status}: ${response.statusText}`;
+  const bodyText = await response.text().catch(() => '');
 
   try {
-    const body: unknown = await response.json();
+    if (bodyText.length === 0) {
+      return fallback;
+    }
+
+    const body: unknown = JSON.parse(bodyText);
 
     if (isRecord(body) && typeof body['message'] === 'string') {
       return body['message'];
     }
 
-    return fallback;
+    return bodyText;
   } catch {
-    return fallback;
+    return bodyText.length > 0 ? bodyText : fallback;
   }
 }
