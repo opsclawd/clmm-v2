@@ -44,7 +44,11 @@ export async function reconcileExecutionAttempt(params: {
     return { kind: 'pending' };
   }
 
-  await executionRepo.updateAttemptState(attemptId, finalState);
+  await executionRepo.saveAttempt({
+    ...attempt,
+    lifecycleState: finalState,
+    completedSteps: [...confirmedSteps],
+  });
 
   const eventType =
     finalState.kind === 'confirmed' ? 'confirmed' :

@@ -106,6 +106,9 @@ describe('SubmitExecutionAttempt', () => {
 
     const stored = await executionRepo.getAttempt('attempt-1');
     expect(stored?.lifecycleState.kind).toBe('submitted');
+    expect(stored?.transactionReferences).toEqual(
+      result.kind === 'submitted' ? result.references : [],
+    );
   });
 
   it('preserves legacy submission behavior when no prepared payload is stored', async () => {
@@ -135,7 +138,11 @@ describe('SubmitExecutionAttempt', () => {
     });
 
     expect(result.kind).toBe('submitted');
-    expect((await executionRepo.getAttempt('attempt-1'))?.lifecycleState.kind).toBe('submitted');
+    const stored = await executionRepo.getAttempt('attempt-1');
+    expect(stored?.lifecycleState.kind).toBe('submitted');
+    expect(stored?.transactionReferences).toEqual(
+      result.kind === 'submitted' ? result.references : [],
+    );
   });
 
   it('returns not-found when attempt does not exist', async () => {

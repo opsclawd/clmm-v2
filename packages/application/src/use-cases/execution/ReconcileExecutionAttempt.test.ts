@@ -62,6 +62,7 @@ describe('ReconcileExecutionAttempt', () => {
       ids,
     });
     expect(result.kind).toBe('partial');
+    expect((await executionRepo.getAttempt('attempt-1'))?.completedSteps).toEqual(['remove-liquidity']);
   });
 
   it('preserves directional context in history events', async () => {
@@ -135,5 +136,44 @@ describe('ReconcileExecutionAttempt', () => {
       confirmedSteps: ['remove-liquidity'],
     });
     expect(reconcileSpy).not.toHaveBeenCalled();
+  });
+
+  it('short-circuits a second reconcile after persisting partial completed steps', async () => {
+    const reconcileSpy = vi.spyOn(submissionPort, 'reconcileExecution');
+    submissionPort.setConfirmedSteps(['remove-liquidity']);
+
+    const firstResult = await reconcileExecutionAttempt({
+      attemptId: 'attempt-1',
+      positionId: FIXTURE_POSITION_ID,
+      breachDirection: LOWER_BOUND_BREACH,
+      executionRepo,
+      submissionPort,
+      historyRepo,
+      clock,
+      ids,
+    });
+
+    expect(firstResult).toEqual({
+      kind: 'partial',
+      confirmedSteps: ['remove-liquidity'],
+    });
+    expect(reconcileSpy).toHaveBeenCalledTimes(1);
+
+    const secondResult = await reconcileExecutionAttempt({
+      attemptId: 'attempt-1',
+      positionId: FIXTURE_POSITION_ID,
+      breachDirection: LOWER_BOUND_BREACH,
+      executionRepo,
+      submissionPort,
+      historyRepo,
+      clock,
+      ids,
+    });
+
+    expect(secondResult).toEqual({
+      kind: 'partial',
+      confirmedSteps: ['remove-liquidity'],
+    });
+    expect(reconcileSpy).toHaveBeenCalledTimes(1);
   });
 });

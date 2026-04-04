@@ -49,7 +49,11 @@ export async function submitExecutionAttempt(params: {
 
   const { references } = await submissionPort.submitExecution(signedPayload);
 
-  await executionRepo.updateAttemptState(attemptId, { kind: 'submitted' });
+  await executionRepo.saveAttempt({
+    ...attempt,
+    lifecycleState: { kind: 'submitted' },
+    transactionReferences: [...references],
+  });
 
   const firstReference = references[0];
   if (firstReference) {
