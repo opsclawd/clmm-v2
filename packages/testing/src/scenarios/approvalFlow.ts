@@ -1,4 +1,4 @@
-import type { TransactionReference, WalletId } from '@clmm/domain';
+import type { BreachEpisodeId, TransactionReference, WalletId } from '@clmm/domain';
 import {
   requestWalletSignature,
   getAwaitingSignaturePayload,
@@ -23,6 +23,8 @@ export type ScenarioApprovalOutcome =
 
 export async function runApprovalFlow(params: {
   previewId: string;
+  episodeId?: BreachEpisodeId;
+  isTriggerDerivedApproval?: boolean;
   walletId: WalletId;
   executionRepo: ExecutionRepository;
   prepPort: ExecutionPreparationPort;
@@ -34,6 +36,10 @@ export async function runApprovalFlow(params: {
 }): Promise<ScenarioApprovalOutcome> {
   const signatureRequest = await requestWalletSignature({
     previewId: params.previewId,
+    ...(params.episodeId ? { episodeId: params.episodeId } : {}),
+    ...(params.isTriggerDerivedApproval !== undefined
+      ? { isTriggerDerivedApproval: params.isTriggerDerivedApproval }
+      : {}),
     walletId: params.walletId,
     executionRepo: params.executionRepo,
     prepPort: params.prepPort,

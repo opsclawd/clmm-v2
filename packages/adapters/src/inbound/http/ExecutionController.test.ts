@@ -132,6 +132,8 @@ describe('ExecutionController', () => {
 
     const result = await controller.approveExecution({
       previewId,
+      episodeId: 'episode-approve-1',
+      isTriggerDerivedApproval: true,
       walletId: FIXTURE_WALLET_ID,
     });
 
@@ -142,6 +144,19 @@ describe('ExecutionController', () => {
     });
     const storedAttempt = await executionRepo.getAttempt(result.approval.attemptId);
     expect(storedAttempt?.previewId).toBe(previewId);
+    expect(storedAttempt?.episodeId).toBe('episode-approve-1');
+  });
+
+  it('maps trigger-derived approvals without episodeId to 400', async () => {
+    const { previewId } = await savePreview(LOWER_BOUND_BREACH);
+
+    await expect(
+      controller.approveExecution({
+        previewId,
+        walletId: FIXTURE_WALLET_ID,
+        isTriggerDerivedApproval: true,
+      }),
+    ).rejects.toBeInstanceOf(BadRequestException);
   });
 
   it('maps missing preview approval attempts to 404', async () => {

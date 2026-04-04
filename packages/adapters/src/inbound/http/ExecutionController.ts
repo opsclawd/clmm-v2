@@ -32,6 +32,7 @@ import {
   requestWalletSignature,
   PreviewApprovalNotAllowedError,
   PreviewNotFoundError,
+  MissingEpisodeIdForTriggerDerivedApprovalError,
 } from '@clmm/application';
 import type {
   PositionId,
@@ -42,6 +43,7 @@ import type {
   ClockTimestamp,
   TransactionReference,
   WalletId,
+  BreachEpisodeId,
 } from '@clmm/domain';
 import {
   applyDirectionalExitPolicy,
@@ -166,11 +168,17 @@ export class ExecutionController {
     @Body() body: {
       previewId: string;
       walletId: string;
+      episodeId?: string;
+      isTriggerDerivedApproval?: boolean;
     },
   ): Promise<{ approval: ExecutionApprovalDto }> {
     try {
       const approval = await requestWalletSignature({
         previewId: body.previewId,
+        ...(body.episodeId ? { episodeId: body.episodeId as BreachEpisodeId } : {}),
+        ...(body.isTriggerDerivedApproval !== undefined
+          ? { isTriggerDerivedApproval: body.isTriggerDerivedApproval }
+          : {}),
         walletId: body.walletId as WalletId,
         executionRepo: this.executionRepo,
         prepPort: this.preparationPort,
@@ -185,6 +193,9 @@ export class ExecutionController {
         throw new NotFoundException(error.message);
       }
       if (error instanceof PreviewApprovalNotAllowedError) {
+        throw new BadRequestException(error.message);
+      }
+      if (error instanceof MissingEpisodeIdForTriggerDerivedApprovalError) {
         throw new BadRequestException(error.message);
       }
       throw error;

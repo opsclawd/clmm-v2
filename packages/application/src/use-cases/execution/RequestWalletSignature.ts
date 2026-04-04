@@ -6,7 +6,7 @@ import type {
   IdGeneratorPort,
 } from '../../ports/index.js';
 import { makeClockTimestamp } from '@clmm/domain';
-import type { WalletId, BreachDirection } from '@clmm/domain';
+import type { WalletId, BreachDirection, BreachEpisodeId } from '@clmm/domain';
 
 const PREPARED_PAYLOAD_VERSION = 'v1';
 
@@ -24,6 +24,13 @@ export class PreviewApprovalNotAllowedError extends Error {
   }
 }
 
+export class MissingEpisodeIdForTriggerDerivedApprovalError extends Error {
+  constructor() {
+    super('episodeId is required for trigger-derived approval');
+    this.name = 'MissingEpisodeIdForTriggerDerivedApprovalError';
+  }
+}
+
 export type RequestWalletSignatureResult = {
   readonly attemptId: string;
   readonly lifecycleState: { readonly kind: 'awaiting-signature' };
@@ -32,6 +39,8 @@ export type RequestWalletSignatureResult = {
 
 export async function requestWalletSignature(params: {
   readonly previewId: string;
+  readonly episodeId?: BreachEpisodeId;
+  readonly isTriggerDerivedApproval?: boolean;
   readonly walletId: WalletId;
   readonly executionRepo: ExecutionRepository;
   readonly prepPort: ExecutionPreparationPort;
@@ -41,6 +50,8 @@ export async function requestWalletSignature(params: {
 }): Promise<RequestWalletSignatureResult> {
   const {
     previewId,
+    episodeId,
+    isTriggerDerivedApproval,
     walletId,
     executionRepo,
     prepPort,
@@ -48,6 +59,10 @@ export async function requestWalletSignature(params: {
     clock,
     ids,
   } = params;
+
+  if (isTriggerDerivedApproval && !episodeId) {
+    throw new MissingEpisodeIdForTriggerDerivedApprovalError();
+  }
 
   const previewRecord = await executionRepo.getPreview(previewId);
   if (!previewRecord) {
@@ -75,6 +90,7 @@ export async function requestWalletSignature(params: {
     previewId,
     positionId: previewRecord.positionId,
     breachDirection: previewRecord.breachDirection,
+    ...(episodeId ? { episodeId } : {}),
     lifecycleState: { kind: 'awaiting-signature' },
     completedSteps: [],
     transactionReferences: [],

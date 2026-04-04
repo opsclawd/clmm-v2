@@ -3,6 +3,7 @@ import {
   requestWalletSignature,
   PreviewApprovalNotAllowedError,
   PreviewNotFoundError,
+  MissingEpisodeIdForTriggerDerivedApprovalError,
 } from './RequestWalletSignature.js';
 import { createExecutionPreview } from '../previews/CreateExecutionPreview.js';
 import {
@@ -12,6 +13,7 @@ import {
   FakeExecutionRepository,
   FakeExecutionPreparationPort,
   FakeExecutionHistoryRepository,
+  FIXTURE_BREACH_EPISODE_ID,
   FIXTURE_POSITION_ID,
   FIXTURE_WALLET_ID,
 } from '@clmm/testing';
@@ -47,6 +49,8 @@ describe('RequestWalletSignature', () => {
   it('persists awaiting-signature attempt, prepared payload, and history for a fresh preview', async () => {
     const result = await requestWalletSignature({
       previewId,
+      episodeId: FIXTURE_BREACH_EPISODE_ID,
+      isTriggerDerivedApproval: true,
       walletId: FIXTURE_WALLET_ID,
       executionRepo,
       prepPort,
@@ -68,6 +72,7 @@ describe('RequestWalletSignature', () => {
       previewId,
       positionId: FIXTURE_POSITION_ID,
       breachDirection: LOWER_BOUND_BREACH,
+      episodeId: FIXTURE_BREACH_EPISODE_ID,
       lifecycleState: { kind: 'awaiting-signature' },
       completedSteps: [],
       transactionReferences: [],
@@ -144,6 +149,23 @@ describe('RequestWalletSignature', () => {
       clock,
       ids,
     })).rejects.toThrow(PreviewApprovalNotAllowedError);
+    expect(executionRepo.attempts.size).toBe(0);
+    expect(executionRepo.preparedPayloads.size).toBe(0);
+    expect(historyRepo.events).toEqual([]);
+  });
+
+  it('throws when trigger-derived approval omits episodeId', async () => {
+    await expect(requestWalletSignature({
+      previewId,
+      isTriggerDerivedApproval: true,
+      walletId: FIXTURE_WALLET_ID,
+      executionRepo,
+      prepPort,
+      historyRepo,
+      clock,
+      ids,
+    })).rejects.toThrow(MissingEpisodeIdForTriggerDerivedApprovalError);
+
     expect(executionRepo.attempts.size).toBe(0);
     expect(executionRepo.preparedPayloads.size).toBe(0);
     expect(historyRepo.events).toEqual([]);
