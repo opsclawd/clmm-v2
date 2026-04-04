@@ -21,7 +21,7 @@ export default function AlertsRoute() {
     <AlertsListScreen
       alerts={alertsQuery.data ?? []}
       platformCapabilities={platformCapabilities}
-      onSelectAlert={(triggerId, positionId) => {
+      onSelectAlert={(triggerId: string, positionId: string) => {
         router.push({ pathname: '/position/[id]', params: { id: positionId, triggerId } });
       }}
     />

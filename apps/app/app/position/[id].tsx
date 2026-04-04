@@ -47,7 +47,7 @@ export default function PositionDetailRoute() {
   return (
     <PositionDetailScreen
       {...(position ? { position } : {})}
-      onViewPreview={(resolvedTriggerId) =>
+      onViewPreview={(resolvedTriggerId: string) =>
         router.push(`/preview/${resolvedTriggerId}`)
       }
     />
