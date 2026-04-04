@@ -25,7 +25,7 @@ export function getBffBaseUrl(): string {
 export async function fetchJson(path: string, init?: RequestInit): Promise<unknown> {
   const headers = new Headers(init?.headers);
 
-  if (!headers.has('Content-Type')) {
+  if (init?.body != null && !headers.has('Content-Type')) {
     headers.set('Content-Type', 'application/json');
   }
 
