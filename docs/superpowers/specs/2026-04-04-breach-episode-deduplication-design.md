@@ -32,8 +32,8 @@ The `breach_episodes` table is the source of truth for breach lifecycle. An epis
 | `direction_kind` | enum | `lower-bound` / `upper-bound` |
 | `status` | enum | `open` / `closed` |
 | `started_at` | timestamp | First out-of-range observation |
-| `last_seen_at` | timestamp | Updated every scan tick while open |
-| `consecutive_count` | int | Incremented each scan tick while open |
+| `last_seen_at` | timestamp | Updated every scan tick while open; truncated to minute boundary |
+| `consecutive_count` | int | Incremented at most once per scan bucket (see scan tick idempotency) |
 | `trigger_id` | nullable FK | Set once when qualification threshold is reached; dedup anchor |
 | `closed_at` | nullable timestamp | Set when episode closes |
 | `close_reason` | nullable enum | `position-recovered` / `direction-reversed` |
@@ -60,6 +60,8 @@ For each position:
 
 The application layer does not orchestrate multi-step close/open transaction flows manually. The persistence port provides atomic state-transition operations so uniqueness and lifecycle invariants remain enforced under retries and concurrent scans.
 
+**Scan tick idempotency:** The unique-open-episode constraint prevents duplicate open rows but does not prevent duplicate increments on the same episode from retried or overlapping scan jobs. `observedAt` must be truncated to a minute boundary (the scan cron resolution) to produce a stable scan bucket. `recordOutOfRange` must enforce `observedAt > last_seen_at` — if the truncated `observedAt` equals `last_seen_at`, the transition is a no-op that returns the current episode state without incrementing `consecutiveCount`. This guarantees that a retried or duplicated scan tick cannot inflate the count or reach the qualification threshold early.
+
 **Output shape:**
 
 - `observations[]` — for trigger qualification. Each carries `episodeId`, `consecutiveCount`, `direction`, `positionId`, `observedAt`.
@@ -79,7 +81,12 @@ Deduplication has a single source of truth: `breach_episodes.trigger_id`. `Quali
 - Create trigger, set `episode.trigger_id`, commit
 - Unique constraint on `exit_triggers.episode_id` as database backstop
 
-Duplicate suppression is a normal result type, not an exception. The qualification method returns a discriminated union: `qualified`, `duplicate-suppressed`, or `not-qualified`.
+Duplicate suppression is a normal result type, not an exception. The result types are split across two layers:
+
+- **Application service** (`QualifyActionableTrigger`) returns a 3-way result: `qualified`, `duplicate-suppressed`, or `not-qualified`. It performs threshold evaluation first — if `consecutiveCount < threshold`, it returns `not-qualified` without calling the persistence port. Only threshold-passing observations reach the port.
+- **Persistence port** (`finalizeQualification`) returns a 2-way result: `qualified` or `duplicate-suppressed`. It is only called for observations that have already passed threshold evaluation. It handles the atomic check-and-set of `trigger_id`.
+
+This separation keeps threshold logic in the application/domain layer and atomic finalization in the persistence layer.
 
 **Removed:** `getActiveEpisodeTrigger(episodeId)` — replaced by episode-authoritative dedup inside the atomic qualification path.
 
@@ -88,6 +95,8 @@ Duplicate suppression is a normal result type, not an exception. The qualificati
 `ScanPositionsForBreaches` emits abandonment directives whenever an open episode is closed due to `position-recovered` or `direction-reversed`. `BreachScanJobHandler` processes these inline by resolving the affected `awaiting-signature` execution attempt and calling `RecordExecutionAbandonment`. No separate job queue — this is a simple terminal-state transition that does not benefit from independent retry semantics.
 
 **Abandonment targeting:** Directives carry `{ positionId, episodeId, reason }`. The execution port looks up awaiting-signature attempts linked to the closed episode, not broad position-level lookup. This ensures abandonment precisely invalidates the stale attempt associated with the closed or superseded episode.
+
+**Attempt-episode linkage:** Execution attempts created from a qualified trigger must persist `episodeId` so stale-attempt abandonment can target the exact attempt associated with the closed or superseded breach episode. This requires adding `episodeId` to the `StoredExecutionAttempt` model and the underlying persistence schema. Without this linkage, episode-targeted abandonment is not implementable.
 
 **Idempotency:** If the same abandonment directive is processed twice due to retries, race conditions, or repeated scans before state propagation, `RecordExecutionAbandonment` must behave safely:
 
@@ -105,7 +114,7 @@ Atomic state-transition methods:
 | Method | Behavior |
 |---|---|
 | `recordInRange(positionId, observedAt)` | If open episode exists: close with reason `position-recovered`, return `episode-closed-recovered` with episode details. Otherwise: return `no-op`. |
-| `recordOutOfRange(positionId, direction, observedAt)` | No open episode: create new, return `episode-started` with new episode. Same-direction open episode: increment count, return `episode-continued` with updated episode. Opposite-direction open episode: atomically close old + create new, return `episode-reversed` with both episode IDs. |
+| `recordOutOfRange(positionId, direction, observedAt)` | No open episode: create new, return `episode-started` with new episode. Same-direction open episode with `observedAt > last_seen_at`: increment count, return `episode-continued` with updated episode. Same-direction open episode with `observedAt <= last_seen_at` (duplicate scan tick): return `episode-continued` with current state, no increment. Opposite-direction open episode: atomically close old + create new, return `episode-reversed` with both episode IDs. |
 
 Returns a rich `EpisodeTransition` discriminated union. Each variant carries all IDs, counts, and direction info needed by downstream qualification and abandonment. Callers do not infer hidden facts.
 
