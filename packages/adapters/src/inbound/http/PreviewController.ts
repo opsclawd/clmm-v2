@@ -8,7 +8,13 @@ import type {
   ExecutionPreviewDto,
 } from '@clmm/application';
 import { createExecutionPreview, getExecutionPreview, refreshExecutionPreview } from '@clmm/application';
-import type { ExitTriggerId, ExecutionPreview, PositionId, BreachDirection } from '@clmm/domain';
+import type {
+  ExitTriggerId,
+  ExecutionPreview,
+  PositionId,
+  BreachDirection,
+  BreachEpisodeId,
+} from '@clmm/domain';
 import {
   EXECUTION_REPOSITORY,
   TRIGGER_REPOSITORY,
@@ -22,11 +28,13 @@ function toPreviewDto(
   positionId: PositionId,
   breachDirection: BreachDirection,
   preview: ExecutionPreview,
+  episodeId?: BreachEpisodeId,
 ): ExecutionPreviewDto {
   const plan = preview.plan;
   return {
     previewId,
     positionId,
+    ...(episodeId ? { episodeId } : {}),
     breachDirection,
     postExitPosture: plan.postExitPosture,
     steps: plan.steps.map((step) => {
@@ -88,7 +96,13 @@ export class PreviewController {
     });
 
     return {
-      preview: toPreviewDto(result.previewId, trigger.positionId, trigger.breachDirection, result.preview),
+      preview: toPreviewDto(
+        result.previewId,
+        trigger.positionId,
+        trigger.breachDirection,
+        result.preview,
+        trigger.episodeId,
+      ),
     };
   }
 
@@ -108,7 +122,13 @@ export class PreviewController {
       ids: this.ids,
     });
     return {
-      preview: toPreviewDto(result.previewId, trigger.positionId, trigger.breachDirection, result.preview),
+      preview: toPreviewDto(
+        result.previewId,
+        trigger.positionId,
+        trigger.breachDirection,
+        result.preview,
+        trigger.episodeId,
+      ),
     };
   }
 }

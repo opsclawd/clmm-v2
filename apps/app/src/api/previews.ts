@@ -75,6 +75,7 @@ function isExecutionPreviewDto(value: unknown): value is ExecutionPreviewDto {
     isRecord(value) &&
     typeof value['previewId'] === 'string' &&
     typeof value['positionId'] === 'string' &&
+    (value['episodeId'] == null || typeof value['episodeId'] === 'string') &&
     isBreachDirection(value['breachDirection']) &&
     isPostExitAssetPosture(value['postExitPosture']) &&
     Array.isArray(value['steps']) &&

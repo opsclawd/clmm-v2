@@ -194,6 +194,8 @@ function isSubmitExecutionResponse(value: unknown): value is SubmitExecutionResp
 type ApproveExecutionPreviewInput = {
   previewId: string;
   walletId: string;
+  episodeId?: string;
+  isTriggerDerivedApproval?: boolean;
 };
 
 export async function fetchExecution(attemptId: string): Promise<ExecutionAttemptDto> {
@@ -219,6 +221,10 @@ export async function approveExecutionPreview(
       body: JSON.stringify({
         previewId: input.previewId,
         walletId: input.walletId,
+        ...(input.episodeId ? { episodeId: input.episodeId } : {}),
+        ...(input.isTriggerDerivedApproval !== undefined
+          ? { isTriggerDerivedApproval: input.isTriggerDerivedApproval }
+          : {}),
       }),
     })) as Partial<ExecutionApprovalResponse>;
 

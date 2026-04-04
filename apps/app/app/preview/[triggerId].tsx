@@ -51,12 +51,22 @@ export default function PreviewRoute() {
       {...(preview != null && walletAddress != null
         ? {
             onApprove: () => {
-              const signingParams: { attemptId: string; previewId: string; triggerId?: string } = {
+              const signingParams: {
+                attemptId: string;
+                previewId: string;
+                triggerId?: string;
+                episodeId?: string;
+                isTriggerDerivedApproval?: 'true';
+              } = {
                 attemptId: 'pending',
                 previewId: preview.previewId,
+                isTriggerDerivedApproval: 'true',
               };
               if (triggerId != null) {
                 signingParams.triggerId = triggerId;
+              }
+              if (preview.episodeId != null) {
+                signingParams.episodeId = preview.episodeId;
               }
 
               router.push({

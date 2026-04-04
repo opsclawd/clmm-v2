@@ -4,6 +4,7 @@ import type {
   BreachDirection,
   PostExitAssetPosture,
   AssetSymbol,
+  BreachEpisodeId,
   ClockTimestamp,
 } from '@clmm/domain';
 import type { ExecutionLifecycleState, PreviewFreshness, TransactionReference } from '@clmm/domain';
@@ -36,6 +37,7 @@ export type PreviewStepDto =
 export type ExecutionPreviewDto = {
   previewId: string;
   positionId: PositionId;
+  episodeId?: BreachEpisodeId;
   breachDirection: BreachDirection;
   postExitPosture: PostExitAssetPosture;
   steps: PreviewStepDto[];
