@@ -131,4 +131,21 @@ describe('RequestWalletSignature', () => {
     expect(executionRepo.preparedPayloads.size).toBe(0);
     expect(historyRepo.events).toEqual([]);
   });
+
+  it('throws PreviewApprovalNotAllowedError when a fresh preview is past expiresAt by clock time', async () => {
+    clock.advance(60_001);
+
+    await expect(requestWalletSignature({
+      previewId,
+      walletId: FIXTURE_WALLET_ID,
+      executionRepo,
+      prepPort,
+      historyRepo,
+      clock,
+      ids,
+    })).rejects.toThrow(PreviewApprovalNotAllowedError);
+    expect(executionRepo.attempts.size).toBe(0);
+    expect(executionRepo.preparedPayloads.size).toBe(0);
+    expect(historyRepo.events).toEqual([]);
+  });
 });

@@ -57,6 +57,11 @@ export async function requestWalletSignature(params: {
     throw new PreviewApprovalNotAllowedError(`preview ${previewId} is ${previewRecord.preview.freshness.kind}`);
   }
 
+  const now = clock.now();
+  if (now > previewRecord.preview.freshness.expiresAt) {
+    throw new PreviewApprovalNotAllowedError(`preview ${previewId} expired at ${previewRecord.preview.freshness.expiresAt}`);
+  }
+
   const attemptId = ids.generateId();
   const { serializedPayload } = await prepPort.prepareExecution({
     plan: previewRecord.preview.plan,
@@ -74,7 +79,6 @@ export async function requestWalletSignature(params: {
     transactionReferences: [],
   });
 
-  const now = clock.now();
   await executionRepo.savePreparedPayload({
     payloadId: ids.generateId(),
     attemptId,

@@ -1,6 +1,7 @@
 import type { TransactionReference, WalletId } from '@clmm/domain';
 import {
   requestWalletSignature,
+  getAwaitingSignaturePayload,
   submitExecutionAttempt,
   recordSignatureDecline,
   recordSignatureInterruption,
@@ -41,13 +42,21 @@ export async function runApprovalFlow(params: {
     ids: params.ids,
   });
 
-  const preparedPayload = await params.executionRepo.getPreparedPayload(signatureRequest.attemptId);
-  if (!preparedPayload) {
-    throw new Error(`Missing prepared payload for attempt ${signatureRequest.attemptId}`);
+  const signingPayload = await getAwaitingSignaturePayload({
+    attemptId: signatureRequest.attemptId,
+    executionRepo: params.executionRepo,
+    historyRepo: params.historyRepo,
+    clock: params.clock,
+    ids: params.ids,
+  });
+  if (signingPayload.kind !== 'found') {
+    throw new Error(
+      `Expected signable payload for attempt ${signatureRequest.attemptId}, got ${signingPayload.kind}`,
+    );
   }
 
   const signingResult = await params.signingPort.requestSignature(
-    preparedPayload.unsignedPayload,
+    signingPayload.serializedPayload,
     params.walletId,
   );
 
