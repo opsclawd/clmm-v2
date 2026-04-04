@@ -1,7 +1,10 @@
-import { eq, inArray } from 'drizzle-orm';
+import { and, eq, inArray } from 'drizzle-orm';
 import type { Db } from './db.js';
 import { breachEpisodes, exitTriggers, executionAttempts, executionSessions, executionPreviews, preparedPayloads } from './schema/index.js';
 import type {
+  BreachEpisodeRepository,
+  EpisodeTransition,
+  FinalizationResult,
   TriggerRepository,
   ExecutionRepository,
   ExecutionSessionRepository,
@@ -31,7 +34,7 @@ function directionFromKind(kind: string) {
 }
 
 export class OperationalStorageAdapter
-  implements TriggerRepository, ExecutionRepository, ExecutionSessionRepository
+  implements BreachEpisodeRepository, TriggerRepository, ExecutionRepository, ExecutionSessionRepository
 {
   constructor(
     private readonly db: Db,
@@ -39,19 +42,245 @@ export class OperationalStorageAdapter
     private readonly positionReadPort: SupportedPositionReadPort,
   ) {}
 
-  // --- TriggerRepository ---
+  // --- BreachEpisodeRepository ---
 
-  async saveTrigger(trigger: ExitTrigger): Promise<void> {
-    await this.db.insert(exitTriggers).values({
-      triggerId: trigger.triggerId,
-      positionId: trigger.positionId,
-      episodeId: trigger.episodeId,
-      directionKind: trigger.breachDirection.kind,
-      triggeredAt: trigger.triggeredAt,
-      confirmationEvaluatedAt: trigger.confirmationEvaluatedAt,
-      confirmationPassed: true,
-    }).onConflictDoNothing();
+  async recordInRange(positionId: PositionId, observedAt: ClockTimestamp): Promise<EpisodeTransition> {
+    return this.db.transaction(async (tx) => {
+      const rows = await tx
+        .select()
+        .from(breachEpisodes)
+        .where(and(
+          eq(breachEpisodes.positionId, positionId),
+          eq(breachEpisodes.status, 'open'),
+        ))
+        .for('update');
+
+      const [episode] = rows;
+      if (!episode) {
+        return { kind: 'no-op' };
+      }
+
+      const nextLastObservedAt = observedAt > episode.lastObservedAt
+        ? observedAt
+        : makeClockTimestamp(episode.lastObservedAt);
+
+      await tx
+        .update(breachEpisodes)
+        .set({
+          status: 'closed',
+          closeReason: 'position-recovered',
+          closedAt: observedAt,
+          lastObservedAt: nextLastObservedAt,
+        })
+        .where(eq(breachEpisodes.episodeId, episode.episodeId));
+
+      return {
+        kind: 'episode-closed-recovered',
+        closedEpisodeId: episode.episodeId as BreachEpisodeId,
+        direction: directionFromKind(episode.directionKind),
+      };
+    });
   }
+
+  async recordOutOfRange(
+    positionId: PositionId,
+    direction: BreachDirection,
+    observedAt: ClockTimestamp,
+  ): Promise<EpisodeTransition> {
+    return this.db.transaction(async (tx) => {
+      const rows = await tx
+        .select()
+        .from(breachEpisodes)
+        .where(and(
+          eq(breachEpisodes.positionId, positionId),
+          eq(breachEpisodes.status, 'open'),
+        ))
+        .for('update');
+
+      const [openEpisode] = rows;
+
+      if (!openEpisode) {
+        const episodeId = this.ids.generateId() as BreachEpisodeId;
+        await tx.insert(breachEpisodes).values({
+          episodeId,
+          positionId,
+          directionKind: direction.kind,
+          status: 'open',
+          consecutiveCount: 1,
+          startedAt: observedAt,
+          lastObservedAt: observedAt,
+          triggerId: null,
+          closedAt: null,
+          closeReason: null,
+        });
+
+        return {
+          kind: 'episode-started',
+          episodeId,
+          direction,
+          consecutiveCount: 1,
+        };
+      }
+
+      if (openEpisode.directionKind === direction.kind) {
+        if (observedAt > openEpisode.lastObservedAt) {
+          const consecutiveCount = openEpisode.consecutiveCount + 1;
+          await tx
+            .update(breachEpisodes)
+            .set({
+              consecutiveCount,
+              lastObservedAt: observedAt,
+            })
+            .where(eq(breachEpisodes.episodeId, openEpisode.episodeId));
+
+          return {
+            kind: 'episode-continued',
+            episodeId: openEpisode.episodeId as BreachEpisodeId,
+            direction,
+            consecutiveCount,
+          };
+        }
+
+        return {
+          kind: 'episode-continued',
+          episodeId: openEpisode.episodeId as BreachEpisodeId,
+          direction,
+          consecutiveCount: openEpisode.consecutiveCount,
+        };
+      }
+
+      await tx
+        .update(breachEpisodes)
+        .set({
+          status: 'closed',
+          closeReason: 'direction-reversed',
+          closedAt: observedAt,
+        })
+        .where(eq(breachEpisodes.episodeId, openEpisode.episodeId));
+
+      const newEpisodeId = this.ids.generateId() as BreachEpisodeId;
+      await tx.insert(breachEpisodes).values({
+        episodeId: newEpisodeId,
+        positionId,
+        directionKind: direction.kind,
+        status: 'open',
+        consecutiveCount: 1,
+        startedAt: observedAt,
+        lastObservedAt: observedAt,
+        triggerId: null,
+        closedAt: null,
+        closeReason: null,
+      });
+
+      return {
+        kind: 'episode-reversed',
+        closedEpisodeId: openEpisode.episodeId as BreachEpisodeId,
+        oldDirection: directionFromKind(openEpisode.directionKind),
+        newEpisodeId,
+        newDirection: direction,
+        consecutiveCount: 1,
+      };
+    });
+  }
+
+  async getOpenEpisode(positionId: PositionId): Promise<BreachEpisode | null> {
+    const rows = await this.db
+      .select()
+      .from(breachEpisodes)
+      .where(and(
+        eq(breachEpisodes.positionId, positionId),
+        eq(breachEpisodes.status, 'open'),
+      ));
+    const [row] = rows;
+    if (!row) return null;
+
+    return {
+      episodeId: row.episodeId as BreachEpisodeId,
+      positionId: row.positionId as PositionId,
+      direction: directionFromKind(row.directionKind),
+      status: row.status as BreachEpisode['status'],
+      startedAt: makeClockTimestamp(row.startedAt),
+      lastObservedAt: makeClockTimestamp(row.lastObservedAt),
+      consecutiveCount: row.consecutiveCount,
+      triggerId: (row.triggerId as ExitTriggerId | null) ?? null,
+      closedAt: row.closedAt === null ? null : makeClockTimestamp(row.closedAt),
+      closeReason: row.closeReason as BreachEpisode['closeReason'],
+    };
+  }
+
+  async finalizeQualification(
+    episodeId: BreachEpisodeId,
+    trigger: ExitTrigger,
+  ): Promise<FinalizationResult> {
+    return this.db.transaction(async (tx) => {
+      const episodeRows = await tx
+        .select()
+        .from(breachEpisodes)
+        .where(eq(breachEpisodes.episodeId, episodeId))
+        .for('update');
+      const [episode] = episodeRows;
+
+      if (!episode) {
+        throw new Error(`finalizeQualification: episode not found ${episodeId}`);
+      }
+
+      if (episode.triggerId) {
+        return {
+          kind: 'duplicate-suppressed',
+          existingTriggerId: episode.triggerId as ExitTriggerId,
+        };
+      }
+
+      const inserted = await tx
+        .insert(exitTriggers)
+        .values({
+          triggerId: trigger.triggerId,
+          positionId: trigger.positionId,
+          episodeId: trigger.episodeId,
+          directionKind: trigger.breachDirection.kind,
+          triggeredAt: trigger.triggeredAt,
+          confirmationEvaluatedAt: trigger.confirmationEvaluatedAt,
+          confirmationPassed: true,
+        })
+        .onConflictDoNothing()
+        .returning({ triggerId: exitTriggers.triggerId });
+
+      const [insertedTrigger] = inserted;
+      if (!insertedTrigger) {
+        const existingRows = await tx
+          .select({ triggerId: exitTriggers.triggerId })
+          .from(exitTriggers)
+          .where(eq(exitTriggers.episodeId, episodeId));
+        const [existingTrigger] = existingRows;
+
+        if (!existingTrigger) {
+          throw new Error(`finalizeQualification: missing existing trigger for episode ${episodeId}`);
+        }
+
+        await tx
+          .update(breachEpisodes)
+          .set({ triggerId: existingTrigger.triggerId })
+          .where(eq(breachEpisodes.episodeId, episodeId));
+
+        return {
+          kind: 'duplicate-suppressed',
+          existingTriggerId: existingTrigger.triggerId as ExitTriggerId,
+        };
+      }
+
+      await tx
+        .update(breachEpisodes)
+        .set({ triggerId: insertedTrigger.triggerId })
+        .where(eq(breachEpisodes.episodeId, episodeId));
+
+      return {
+        kind: 'qualified',
+        triggerId: insertedTrigger.triggerId as ExitTriggerId,
+      };
+    });
+  }
+
+  // --- TriggerRepository ---
 
   async getTrigger(triggerId: ExitTriggerId): Promise<ExitTrigger | null> {
     const rows = await this.db
@@ -93,32 +322,6 @@ export class OperationalStorageAdapter
       confirmationEvaluatedAt: makeClockTimestamp(row.confirmationEvaluatedAt),
       confirmationPassed: true as const,
     })).filter((trigger) => ownedPositionIds.has(trigger.positionId));
-  }
-
-  async getActiveEpisodeTrigger(episodeId: BreachEpisodeId): Promise<ExitTriggerId | null> {
-    const rows = await this.db
-      .select()
-      .from(breachEpisodes)
-      .where(eq(breachEpisodes.episodeId, episodeId));
-    const [row] = rows;
-    return (row?.activeTriggerId as ExitTriggerId | undefined) ?? null;
-  }
-
-  async saveEpisode(episode: BreachEpisode): Promise<void> {
-    await this.db.insert(breachEpisodes).values({
-      episodeId: episode.episodeId,
-      positionId: episode.positionId,
-      directionKind: episode.direction.kind,
-      startedAt: episode.startedAt,
-      lastObservedAt: episode.lastObservedAt,
-      activeTriggerId: episode.activeTriggerId ?? null,
-    }).onConflictDoUpdate({
-      target: breachEpisodes.episodeId,
-      set: {
-        lastObservedAt: episode.lastObservedAt,
-        activeTriggerId: episode.activeTriggerId ?? null,
-      },
-    });
   }
 
   async deleteTrigger(triggerId: ExitTriggerId): Promise<void> {
@@ -182,10 +385,14 @@ export class OperationalStorageAdapter
     if (attempt.previewId !== undefined) {
       Object.assign(updateSet, { previewId: attempt.previewId });
     }
+    if (attempt.episodeId !== undefined) {
+      Object.assign(updateSet, { episodeId: attempt.episodeId });
+    }
 
     await this.db.insert(executionAttempts).values({
       attemptId: attempt.attemptId,
       previewId: attempt.previewId ?? null,
+      episodeId: attempt.episodeId ?? null,
       positionId: attempt.positionId,
       directionKind: attempt.breachDirection.kind,
       lifecycleStateKind: attempt.lifecycleState.kind,
@@ -211,11 +418,34 @@ export class OperationalStorageAdapter
       positionId: row.positionId as PositionId,
       breachDirection: directionFromKind(row.directionKind),
       lifecycleState: { kind: row.lifecycleStateKind } as ExecutionLifecycleState,
+      ...(row.episodeId ? { episodeId: row.episodeId as BreachEpisodeId } : {}),
       ...(row.previewId ? { previewId: row.previewId } : {}),
       // boundary: Drizzle jsonb columns return unknown; runtime shape matches domain types
       completedSteps: (row.completedStepsJson as ExecutionAttempt['completedSteps']) ?? [],
       transactionReferences: (row.transactionRefsJson as ExecutionAttempt['transactionReferences']) ?? [],
     };
+  }
+
+  async listAwaitingSignatureAttemptsByEpisode(episodeId: BreachEpisodeId): Promise<StoredExecutionAttempt[]> {
+    const rows = await this.db
+      .select()
+      .from(executionAttempts)
+      .where(and(
+        eq(executionAttempts.episodeId, episodeId),
+        eq(executionAttempts.lifecycleStateKind, 'awaiting-signature'),
+      ));
+
+    return rows.map((row) => ({
+      attemptId: row.attemptId,
+      positionId: row.positionId as PositionId,
+      breachDirection: directionFromKind(row.directionKind),
+      lifecycleState: { kind: row.lifecycleStateKind } as ExecutionLifecycleState,
+      ...(row.episodeId ? { episodeId: row.episodeId as BreachEpisodeId } : {}),
+      ...(row.previewId ? { previewId: row.previewId } : {}),
+      // boundary: Drizzle jsonb columns return unknown; runtime shape matches domain types
+      completedSteps: (row.completedStepsJson as ExecutionAttempt['completedSteps']) ?? [],
+      transactionReferences: (row.transactionRefsJson as ExecutionAttempt['transactionReferences']) ?? [],
+    }));
   }
 
   async savePreparedPayload(params: {
