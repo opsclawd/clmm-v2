@@ -61,11 +61,31 @@ function isSerializedTransaction(value: unknown): value is { serialize(): Uint8A
 }
 
 function decodeBase64Payload(value: string): Uint8Array {
-  return Uint8Array.from(Buffer.from(value, 'base64'));
+  if (typeof globalThis.atob !== 'function') {
+    throw new Error('Base64 decoding is not available in this environment');
+  }
+
+  const binary = globalThis.atob(value);
+  const bytes = new Uint8Array(binary.length);
+
+  for (let index = 0; index < binary.length; index += 1) {
+    bytes[index] = binary.charCodeAt(index);
+  }
+
+  return bytes;
 }
 
 function encodeBase64Payload(value: Uint8Array): string {
-  return Buffer.from(value).toString('base64');
+  if (typeof globalThis.btoa !== 'function') {
+    throw new Error('Base64 encoding is not available in this environment');
+  }
+
+  let binary = '';
+  for (const byte of value) {
+    binary += String.fromCharCode(byte);
+  }
+
+  return globalThis.btoa(binary);
 }
 
 function normalizeSignedResult(payload: unknown): Uint8Array {
