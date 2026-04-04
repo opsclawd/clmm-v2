@@ -58,6 +58,19 @@ export type ExecutionAttemptDto = {
   retryReason?: string;
 };
 
+export type ExecutionApprovalDto = {
+  readonly attemptId: string;
+  readonly lifecycleState: ExecutionLifecycleState;
+  readonly breachDirection: BreachDirection;
+};
+
+export type ExecutionSigningPayloadDto = {
+  readonly attemptId: string;
+  readonly serializedPayload: string;
+  readonly lifecycleState: ExecutionLifecycleState;
+  readonly signingExpiresAt?: ClockTimestamp;
+};
+
 export type PreparedPayloadDto = {
   unsignedPayloadBase64: string;
   payloadVersion: string;

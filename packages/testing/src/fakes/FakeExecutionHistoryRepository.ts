@@ -4,13 +4,30 @@ import type {
   HistoryTimeline,
   ExecutionOutcomeSummary,
   PositionId,
+  WalletId,
 } from '@clmm/domain';
 
 export class FakeExecutionHistoryRepository implements ExecutionHistoryRepository {
   readonly events: HistoryEvent[] = [];
+  private readonly walletPositions = new Map<WalletId, Set<PositionId>>();
 
   async appendEvent(event: HistoryEvent): Promise<void> {
     this.events.push(event);
+  }
+
+  assignWalletToPosition(walletId: WalletId, positionId: PositionId): void {
+    const positions = this.walletPositions.get(walletId) ?? new Set<PositionId>();
+    positions.add(positionId);
+    this.walletPositions.set(walletId, positions);
+  }
+
+  async getWalletHistory(walletId: WalletId): Promise<readonly HistoryEvent[]> {
+    const positions = this.walletPositions.get(walletId);
+    if (!positions) {
+      return [];
+    }
+
+    return this.events.filter((event) => positions.has(event.positionId));
   }
 
   async getTimeline(positionId: PositionId): Promise<HistoryTimeline> {

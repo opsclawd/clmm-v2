@@ -189,6 +189,7 @@ export interface ExecutionSessionRepository {
 
 export interface ExecutionHistoryRepository {
   appendEvent(event: HistoryEvent): Promise<void>;
+  getWalletHistory(walletId: WalletId): Promise<readonly HistoryEvent[]>;
   getTimeline(positionId: PositionId): Promise<HistoryTimeline>;
   getOutcomeSummary(positionId: PositionId): Promise<ExecutionOutcomeSummary | null>;
 }
