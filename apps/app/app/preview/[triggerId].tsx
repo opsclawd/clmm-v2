@@ -38,7 +38,7 @@ export default function PreviewRoute() {
       return;
     }
 
-    void createMutation.mutateAsync(triggerId);
+    createMutation.mutate(triggerId);
     // Intentionally depend only on triggerId to avoid mutation-object re-render loops.
   }, [triggerId]);
 
@@ -64,32 +64,36 @@ export default function PreviewRoute() {
       }
       {...(preview != null && walletAddress != null
         ? {
-            onApprove: async () => {
+            onApprove: () => {
               if (isApprovingTransition || approvalMutation.isPending) {
                 return;
               }
 
               setIsApprovingTransition(true);
-              try {
-                const approval = await approvalMutation.mutateAsync({
+              approvalMutation.mutate(
+                {
                   previewId: preview.previewId,
                   walletId: walletAddress,
-                });
-
-                router.push({
-                  pathname: '/signing/[attemptId]',
-                  params: { attemptId: approval.attemptId },
-                });
-              } catch {
-                setIsApprovingTransition(false);
-              }
+                },
+                {
+                  onSuccess: (approval) => {
+                    router.push({
+                      pathname: '/signing/[attemptId]',
+                      params: { attemptId: approval.attemptId },
+                    });
+                  },
+                  onError: () => {
+                    setIsApprovingTransition(false);
+                  },
+                },
+              );
             },
           }
         : {})}
       {...(triggerId != null
         ? {
             onRefresh: () => {
-              void refreshMutation.mutateAsync(triggerId);
+              refreshMutation.mutate(triggerId);
             },
           }
         : {})}

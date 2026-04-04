@@ -197,7 +197,7 @@ export default function SigningRoute() {
             ...(declineAvailable
               ? {
                   onDecline: () => {
-                    void declineMutation.mutateAsync();
+                    declineMutation.mutate();
                   },
                 }
               : {}),
@@ -207,7 +207,7 @@ export default function SigningRoute() {
       signingState={signMutation.isPending ? 'signing' : 'idle'}
       walletConnected={walletAddress != null}
       onSignAndExecute={() => {
-        void signMutation.mutateAsync();
+        signMutation.mutate();
       }}
       {...(signMutation.error instanceof Error ? { signingError: signMutation.error.message } : {})}
     />
