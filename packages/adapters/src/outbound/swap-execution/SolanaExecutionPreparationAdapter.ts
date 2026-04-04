@@ -37,8 +37,11 @@ import type { ExecutionPreparationPort } from '@clmm/application';
 import type { ExecutionPlan, WalletId, PositionId, PoolId, ClockTimestamp, LiquidityPosition } from '@clmm/domain';
 import { makeClockTimestamp } from '@clmm/domain';
 
-const JUPITER_QUOTE_API_BASE = 'https://quote-api.jup.ag/v6';
-const JUPITER_SWAP_API_BASE = 'https://api.jup.ag/swap/v1';
+const JUPITER_SWAP_API_BASES = [
+  'https://lite-api.jup.ag/swap/v1',
+  'https://api.jup.ag/swap/v1',
+] as const;
+const JUPITER_API_KEY = (process.env as Record<string, string | undefined>)['JUPITER_API_KEY'];
 
 const SOL_MINT = 'So11111111111111111111111111111111111111112';
 const TOKEN_MINTS: Record<'SOL' | 'USDC', string> = {
@@ -221,20 +224,7 @@ export class SolanaExecutionPreparationAdapter implements ExecutionPreparationPo
       }
 
       const quoteResponse = await this.getJupiterQuote(inputMint, outputMint, swapAmount.toString());
-      if (!quoteResponse) {
-        return {
-          instructions: [],
-          failureReason: `Jupiter quote unavailable for ${inputMint}->${outputMint} amount ${swapAmount.toString()}`,
-        };
-      }
-
       const swapTransaction = await this.getJupiterSwapTransaction(quoteResponse, walletId);
-      if (!swapTransaction) {
-        return {
-          instructions: [],
-          failureReason: 'Jupiter swap transaction unavailable',
-        };
-      }
 
       const encoder = getBase64Encoder();
       const transactionBytes = encoder.encode(swapTransaction);
@@ -268,46 +258,72 @@ export class SolanaExecutionPreparationAdapter implements ExecutionPreparationPo
 
   // boundary: Jupiter v6 REST /quote response is untyped — no official SDK types available
   private async getJupiterQuote(inputMint: string, outputMint: string, amount: string): Promise<unknown> {
-    try {
-      const url = `${JUPITER_QUOTE_API_BASE}/quote?inputMint=${inputMint}&outputMint=${outputMint}&amount=${amount}&slippageBps=50`;
-      const response = await fetch(url);
-      if (!response.ok) {
-        return null;
+    const errors: string[] = [];
+
+    for (const base of JUPITER_SWAP_API_BASES) {
+      try {
+        const url = `${base}/quote?inputMint=${inputMint}&outputMint=${outputMint}&amount=${amount}&slippageBps=50`;
+        const response = await fetch(url, {
+          headers: JUPITER_API_KEY ? { 'x-api-key': JUPITER_API_KEY } : undefined,
+        });
+
+        if (!response.ok) {
+          const detail = await response.text().catch(() => '');
+          errors.push(`${base} -> HTTP ${response.status}${detail ? `: ${detail}` : ''}`);
+          continue;
+        }
+
+        // boundary: Jupiter REST /quote response is untyped JSON
+        return (await response.json()) as unknown;
+      } catch (error) {
+        errors.push(`${base} -> ${error instanceof Error ? error.message : 'request failed'}`);
       }
-      // boundary: Jupiter v6 REST /quote response is untyped JSON
-      return (await response.json()) as unknown;
-    } catch {
-      return null;
     }
+
+    throw new Error(`Jupiter quote unavailable (${errors.join(' | ')})`);
   }
 
   // boundary: Jupiter v6 REST /swap expects the raw /quote response object — no official SDK types
-  private async getJupiterSwapTransaction(quoteResponse: unknown, userPublicKey: string): Promise<string | null> {
-    try {
-      const response = await fetch(`${JUPITER_SWAP_API_BASE}/swap`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          quoteResponse,
-          userPublicKey,
-          wrapAndUnwrapSol: true,
-        }),
-      });
+  private async getJupiterSwapTransaction(quoteResponse: unknown, userPublicKey: string): Promise<string> {
+    const errors: string[] = [];
 
-      if (!response.ok) {
-        console.error(`Jupiter swap API error: ${response.statusText}`);
-        return null;
+    for (const base of JUPITER_SWAP_API_BASES) {
+      try {
+        const response = await fetch(`${base}/swap`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            ...(JUPITER_API_KEY ? { 'x-api-key': JUPITER_API_KEY } : {}),
+          },
+          body: JSON.stringify({
+            quoteResponse,
+            userPublicKey,
+            wrapAndUnwrapSol: true,
+          }),
+        });
+
+        if (!response.ok) {
+          const detail = await response.text().catch(() => '');
+          errors.push(`${base} -> HTTP ${response.status}${detail ? `: ${detail}` : ''}`);
+          continue;
+        }
+
+        // boundary: Jupiter REST /swap response is untyped JSON
+        const data: unknown = await response.json();
+        const swapTx = data != null && typeof data === 'object' && 'swapTransaction' in data
+          ? (data as { swapTransaction?: string }).swapTransaction
+          : undefined;
+
+        if (typeof swapTx === 'string' && swapTx.length > 0) {
+          return swapTx;
+        }
+
+        errors.push(`${base} -> swapTransaction missing in response`);
+      } catch (error) {
+        errors.push(`${base} -> ${error instanceof Error ? error.message : 'request failed'}`);
       }
-
-      // boundary: Jupiter v6 REST /swap response is untyped JSON
-      const data: unknown = await response.json();
-      const swapTx = data != null && typeof data === 'object' && 'swapTransaction' in data
-        ? (data as { swapTransaction?: string }).swapTransaction
-        : undefined;
-      return swapTx ?? null;
-    } catch (error) {
-      console.error('Failed to get Jupiter swap transaction:', error);
-      return null;
     }
+
+    throw new Error(`Jupiter swap transaction unavailable (${errors.join(' | ')})`);
   }
 }
