@@ -2,13 +2,13 @@ import { describe, it, expect, beforeEach } from 'vitest';
 import { TriggerQualificationJobHandler } from './TriggerQualificationJobHandler.js';
 import {
   FakeClockPort,
+  FakeBreachEpisodeRepository,
   FakeIdGeneratorPort,
-  FakeTriggerRepository,
   FakeObservabilityPort,
   FIXTURE_POSITION_ID,
   FIXTURE_WALLET_ID,
 } from '@clmm/testing';
-import { makeClockTimestamp } from '@clmm/domain';
+import { LOWER_BOUND_BREACH, makeClockTimestamp, type BreachEpisodeId } from '@clmm/domain';
 
 type ObservabilityLog = {
   level: 'info' | 'warn' | 'error';
@@ -24,6 +24,7 @@ function makePayload(overrides?: Partial<{
   directionKind: 'lower-bound-breach' | 'upper-bound-breach';
   observedAt: number;
   episodeId: string;
+  consecutiveCount: number;
 }>) {
   return {
     positionId: FIXTURE_POSITION_ID as string,
@@ -31,12 +32,32 @@ function makePayload(overrides?: Partial<{
     directionKind: 'lower-bound-breach' as const,
     observedAt: makeClockTimestamp(1_000_000) as number,
     episodeId: 'ep-test-1',
+    consecutiveCount: 3,
     ...overrides,
   };
 }
 
+function seedOpenEpisode(
+  repo: FakeBreachEpisodeRepository,
+  episodeId: string,
+  consecutiveCount = 3,
+): void {
+  repo.episodes.set(episodeId, {
+    episodeId: episodeId as BreachEpisodeId,
+    positionId: FIXTURE_POSITION_ID,
+    direction: LOWER_BOUND_BREACH,
+    status: 'open',
+    startedAt: makeClockTimestamp(900_000),
+    lastObservedAt: makeClockTimestamp(1_000_000),
+    consecutiveCount,
+    triggerId: null,
+    closedAt: null,
+    closeReason: null,
+  });
+}
+
 describe('TriggerQualificationJobHandler', () => {
-  let triggerRepo: FakeTriggerRepository;
+  let episodeRepo: FakeBreachEpisodeRepository;
   let clock: FakeClockPort;
   let ids: FakeIdGeneratorPort;
   let observability: FakeObservabilityPort;
@@ -44,7 +65,7 @@ describe('TriggerQualificationJobHandler', () => {
   let handler: TriggerQualificationJobHandler;
 
   beforeEach(() => {
-    triggerRepo = new FakeTriggerRepository();
+    episodeRepo = new FakeBreachEpisodeRepository();
     clock = new FakeClockPort();
     ids = new FakeIdGeneratorPort('trigger');
     observability = new FakeObservabilityPort();
@@ -55,7 +76,7 @@ describe('TriggerQualificationJobHandler', () => {
     };
 
     handler = new TriggerQualificationJobHandler(
-      triggerRepo,
+      episodeRepo,
       clock,
       ids,
       observability,
@@ -64,10 +85,13 @@ describe('TriggerQualificationJobHandler', () => {
   });
 
   it('creates a trigger and enqueues notification for lower-bound breach', async () => {
-    await handler.handle(makePayload());
+    const payload = makePayload();
+    seedOpenEpisode(episodeRepo, payload.episodeId);
+
+    await handler.handle(payload);
 
     // Trigger should be persisted
-    expect(triggerRepo.triggers.size).toBe(1);
+    expect(episodeRepo.episodes.get(payload.episodeId)?.triggerId).toBe('trigger-1');
 
     // Notification should be enqueued
     expect(enqueuedJobs).toHaveLength(1);
@@ -79,16 +103,19 @@ describe('TriggerQualificationJobHandler', () => {
   });
 
   it('suppresses duplicate trigger for same episode without throwing', async () => {
+    const payload = makePayload();
+    seedOpenEpisode(episodeRepo, payload.episodeId);
+
     // First call creates the trigger
-    await handler.handle(makePayload());
-    expect(triggerRepo.triggers.size).toBe(1);
+    await handler.handle(payload);
+    expect(episodeRepo.episodes.get(payload.episodeId)?.triggerId).toBe('trigger-1');
     expect(enqueuedJobs).toHaveLength(1);
 
     // Second call with same episodeId should suppress duplicate
-    await handler.handle(makePayload());
+    await handler.handle(payload);
 
     // Trigger count should NOT increase
-    expect(triggerRepo.triggers.size).toBe(1);
+    expect(episodeRepo.episodes.get(payload.episodeId)?.triggerId).toBe('trigger-1');
 
     // No additional notification enqueued
     expect(enqueuedJobs).toHaveLength(1);
@@ -101,13 +128,16 @@ describe('TriggerQualificationJobHandler', () => {
   });
 
   it('rethrows errors for pg-boss retry', async () => {
-    // Use a broken triggerRepo that throws
+    // Use a broken episodeRepo that throws
     const brokenRepo = {
-      ...triggerRepo,
-      getActiveEpisodeTrigger: () => {
+      ...episodeRepo,
+      finalizeQualification: () => {
         throw new Error('db down');
       },
-    } as unknown as FakeTriggerRepository;
+    } as unknown as FakeBreachEpisodeRepository;
+
+    const payload = makePayload();
+    seedOpenEpisode(episodeRepo, payload.episodeId);
 
     const brokenHandler = new TriggerQualificationJobHandler(
       brokenRepo,
@@ -117,10 +147,25 @@ describe('TriggerQualificationJobHandler', () => {
       async () => {},
     );
 
-    await expect(brokenHandler.handle(makePayload())).rejects.toThrow('db down');
+    await expect(brokenHandler.handle(payload)).rejects.toThrow('db down');
 
     // Error should be logged
     const errorLogs = observability.logs.filter((l: ObservabilityLog) => l.level === 'error');
     expect(errorLogs.length).toBeGreaterThan(0);
+  });
+
+  it('passes real consecutiveCount from payload to qualifier', async () => {
+    const payload = makePayload({ consecutiveCount: 2 });
+    seedOpenEpisode(episodeRepo, payload.episodeId, 2);
+
+    await handler.handle(payload);
+
+    expect(episodeRepo.episodes.get(payload.episodeId)?.triggerId).toBeNull();
+    expect(enqueuedJobs).toHaveLength(0);
+
+    const notQualifiedLogs = observability.logs.filter(
+      (l: ObservabilityLog) => l.level === 'info' && l.message.includes('Trigger not qualified'),
+    );
+    expect(notQualifiedLogs.length).toBeGreaterThan(0);
   });
 });

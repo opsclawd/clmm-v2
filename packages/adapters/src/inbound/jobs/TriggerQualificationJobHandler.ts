@@ -1,14 +1,14 @@
 import { Inject, Injectable } from '@nestjs/common';
 import { qualifyActionableTrigger } from '@clmm/application';
 import type {
-  TriggerRepository,
+  BreachEpisodeRepository,
   ClockPort,
   IdGeneratorPort,
   ObservabilityPort,
 } from '@clmm/application';
-import type { BreachDirection, PositionId, ClockTimestamp } from '@clmm/domain';
+import type { BreachDirection, PositionId, ClockTimestamp, BreachEpisodeId } from '@clmm/domain';
 import {
-  TRIGGER_REPOSITORY,
+  BREACH_EPISODE_REPOSITORY,
   CLOCK_PORT,
   ID_GENERATOR_PORT,
   OBSERVABILITY_PORT,
@@ -23,6 +23,7 @@ type QualifyTriggerPayload = {
   directionKind: 'lower-bound-breach' | 'upper-bound-breach';
   observedAt: number;
   episodeId: string;
+  consecutiveCount: number;
 };
 
 @Injectable()
@@ -30,8 +31,8 @@ export class TriggerQualificationJobHandler {
   static readonly JOB_NAME = 'qualify-trigger';
 
   constructor(
-    @Inject(TRIGGER_REPOSITORY)
-    private readonly triggerRepo: TriggerRepository,
+    @Inject(BREACH_EPISODE_REPOSITORY)
+    private readonly episodeRepo: BreachEpisodeRepository,
     @Inject(CLOCK_PORT)
     private readonly clock: ClockPort,
     @Inject(ID_GENERATOR_PORT)
@@ -51,11 +52,10 @@ export class TriggerQualificationJobHandler {
           positionId: data.positionId as PositionId,
           direction,
           observedAt: data.observedAt as ClockTimestamp,
-          episodeId: data.episodeId,
+          episodeId: data.episodeId as BreachEpisodeId,
+          consecutiveCount: data.consecutiveCount,
         },
-        consecutiveCount: 3, // MVP confirmation threshold
-        triggerRepo: this.triggerRepo,
-        clock: this.clock,
+        episodeRepo: this.episodeRepo,
         ids: this.ids,
       });
 
