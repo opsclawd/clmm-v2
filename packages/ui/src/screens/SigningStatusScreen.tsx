@@ -14,6 +14,11 @@ type Props = {
   retryEligible?: boolean;
   signingState: SigningState;
   signingError?: string;
+  statusLoading?: boolean;
+  statusError?: string | null;
+  statusNotice?: string | null;
+  onDecline?: () => void;
+  onViewResult?: () => void;
   onSignAndExecute: () => void;
   walletConnected: boolean;
 };
@@ -35,9 +40,84 @@ export function SigningStatusScreen({
   retryEligible,
   signingState,
   signingError,
+  statusLoading,
+  statusError,
+  statusNotice,
+  onDecline,
+  onViewResult,
   onSignAndExecute,
   walletConnected,
 }: Props) {
+  if (statusLoading) {
+    return (
+      <View style={{ flex: 1, backgroundColor: colors.background, justifyContent: 'center', alignItems: 'center', padding: 16 }}>
+        <ActivityIndicator color={colors.primary} />
+        <Text style={{
+          color: colors.text,
+          fontSize: typography.fontSize.lg,
+          fontWeight: typography.fontWeight.semibold,
+          marginTop: 12,
+          textAlign: 'center',
+        }}>
+          Loading signing status
+        </Text>
+        {statusNotice ? (
+          <View style={{
+            marginTop: 16,
+            padding: 12,
+            backgroundColor: '#422006',
+            borderRadius: 8,
+            borderWidth: 1,
+            borderColor: colors.warning,
+            alignSelf: 'stretch',
+          }}>
+            <Text style={{
+              color: colors.warning,
+              fontSize: typography.fontSize.sm,
+              fontWeight: typography.fontWeight.medium,
+            }}>
+              {statusNotice}
+            </Text>
+          </View>
+        ) : null}
+      </View>
+    );
+  }
+
+  if (!lifecycleState && statusError) {
+    return (
+      <View style={{ flex: 1, backgroundColor: colors.background, padding: 16, justifyContent: 'center' }}>
+        <Text style={{ color: colors.text, fontSize: typography.fontSize.xl, fontWeight: typography.fontWeight.bold }}>
+          Signing Status
+        </Text>
+        <Text style={{ color: colors.text, fontSize: typography.fontSize.lg, fontWeight: typography.fontWeight.semibold, marginTop: 16 }}>
+          Could not load signing status
+        </Text>
+        <Text style={{ color: colors.textSecondary, marginTop: 8 }}>
+          {statusError}
+        </Text>
+        {statusNotice ? (
+          <View style={{
+            marginTop: 16,
+            padding: 12,
+            backgroundColor: '#422006',
+            borderRadius: 8,
+            borderWidth: 1,
+            borderColor: colors.warning,
+          }}>
+            <Text style={{
+              color: colors.warning,
+              fontSize: typography.fontSize.sm,
+              fontWeight: typography.fontWeight.medium,
+            }}>
+              {statusNotice}
+            </Text>
+          </View>
+        ) : null}
+      </View>
+    );
+  }
+
   if (!lifecycleState) {
     return (
       <View style={{ flex: 1, backgroundColor: colors.background, padding: 16 }}>
@@ -47,6 +127,24 @@ export function SigningStatusScreen({
         <Text style={{ color: colors.textSecondary, marginTop: 8 }}>
           Loading signing status...
         </Text>
+        {statusNotice ? (
+          <View style={{
+            marginTop: 16,
+            padding: 12,
+            backgroundColor: '#422006',
+            borderRadius: 8,
+            borderWidth: 1,
+            borderColor: colors.warning,
+          }}>
+            <Text style={{
+              color: colors.warning,
+              fontSize: typography.fontSize.sm,
+              fontWeight: typography.fontWeight.medium,
+            }}>
+              {statusNotice}
+            </Text>
+          </View>
+        ) : null}
       </View>
     );
   }
@@ -63,6 +161,15 @@ export function SigningStatusScreen({
   const canRetry =
     walletConnected &&
     lifecycleState.kind === 'awaiting-signature';
+  const canDecline = lifecycleState.kind === 'awaiting-signature' && onDecline != null;
+  const canViewResult =
+    onViewResult != null &&
+    (lifecycleState.kind === 'submitted' ||
+      lifecycleState.kind === 'confirmed' ||
+      lifecycleState.kind === 'failed' ||
+      lifecycleState.kind === 'expired' ||
+      lifecycleState.kind === 'abandoned' ||
+      lifecycleState.kind === 'partial');
   const retryDisabled = !canRetry;
   const progressLabel = showProgress ? getProgressLabel(signingState) : undefined;
 
@@ -77,6 +184,26 @@ export function SigningStatusScreen({
         }}>
           Signing Status
         </Text>
+
+        {statusNotice ? (
+          <View style={{
+            marginBottom: 16,
+            paddingVertical: 8,
+            paddingHorizontal: 12,
+            backgroundColor: '#422006',
+            borderRadius: 8,
+            borderWidth: 1,
+            borderColor: colors.warning,
+          }}>
+            <Text style={{
+              color: colors.warning,
+              fontSize: typography.fontSize.sm,
+              fontWeight: typography.fontWeight.medium,
+            }}>
+              {statusNotice}
+            </Text>
+          </View>
+        ) : null}
 
         {breachDirection ? (
           <View style={{ marginBottom: 16 }}>
@@ -105,6 +232,29 @@ export function SigningStatusScreen({
           </View>
         ) : null}
 
+        {canDecline ? (
+          <TouchableOpacity
+            onPress={onDecline}
+            style={{
+              marginTop: 16,
+              padding: 16,
+              backgroundColor: colors.surface,
+              borderRadius: 8,
+              borderWidth: 1,
+              borderColor: colors.border,
+              alignItems: 'center',
+            }}
+          >
+            <Text style={{
+              color: colors.text,
+              fontSize: typography.fontSize.base,
+              fontWeight: typography.fontWeight.semibold,
+            }}>
+              Decline Signing
+            </Text>
+          </TouchableOpacity>
+        ) : null}
+
         {showProgress ? (
           <View style={{
             marginTop: 16,
@@ -126,6 +276,29 @@ export function SigningStatusScreen({
               {progressLabel}
             </Text>
           </View>
+        ) : null}
+
+        {canViewResult ? (
+          <TouchableOpacity
+            onPress={onViewResult}
+            style={{
+              marginTop: 16,
+              padding: 16,
+              backgroundColor: colors.surface,
+              borderRadius: 8,
+              borderWidth: 1,
+              borderColor: colors.border,
+              alignItems: 'center',
+            }}
+          >
+            <Text style={{
+              color: colors.text,
+              fontSize: typography.fontSize.base,
+              fontWeight: typography.fontWeight.semibold,
+            }}>
+              View Execution Result
+            </Text>
+          </TouchableOpacity>
         ) : null}
 
         {signingState === 'error' ? (

@@ -1,4 +1,4 @@
-import { View, Text, ScrollView, TouchableOpacity } from 'react-native';
+import { ActivityIndicator, View, Text, ScrollView, TouchableOpacity } from 'react-native';
 import type { ExecutionPreviewDto } from '@clmm/application/public';
 import { colors } from '../design-system/index.js';
 import { typography } from '../design-system/index.js';
@@ -8,20 +8,70 @@ import { PreviewStepSequence } from '../components/PreviewStepSequence.js';
 
 type Props = {
   preview?: ExecutionPreviewDto;
+  previewLoading?: boolean;
+  previewError?: string | null;
   onApprove?: () => void;
   onRefresh?: () => void;
 };
 
-export function ExecutionPreviewScreen({ preview, onApprove, onRefresh }: Props) {
-  if (!preview) {
+export function ExecutionPreviewScreen({ preview, previewLoading, previewError, onApprove, onRefresh }: Props) {
+  if (previewLoading) {
     return (
       <ScrollView style={{ flex: 1, backgroundColor: colors.background }}>
-        <View style={{ padding: 16 }}>
+        <View style={{ padding: 16, alignItems: 'center', justifyContent: 'center', minHeight: 240 }}>
           <Text style={{ color: colors.breach, fontSize: typography.fontSize.lg, fontWeight: typography.fontWeight.bold }}>
             Exit Preview
           </Text>
-          <Text style={{ color: colors.textSecondary, marginTop: 8 }}>
-            Loading preview...
+          <ActivityIndicator style={{ marginTop: 16 }} color={colors.primary} />
+          <Text style={{ color: colors.textSecondary, marginTop: 12 }}>
+            Loading exit preview
+          </Text>
+        </View>
+      </ScrollView>
+    );
+  }
+
+  if (!preview && previewError) {
+    return (
+      <ScrollView style={{ flex: 1, backgroundColor: colors.background }}>
+        <View style={{ padding: 16, alignItems: 'center', justifyContent: 'center', minHeight: 240 }}>
+          <Text style={{ color: colors.breach, fontSize: typography.fontSize.lg, fontWeight: typography.fontWeight.bold }}>
+            Exit Preview
+          </Text>
+          <Text style={{
+            color: colors.text,
+            fontSize: typography.fontSize.lg,
+            fontWeight: typography.fontWeight.semibold,
+            marginTop: 16,
+            textAlign: 'center',
+          }}>
+            Could not load exit preview
+          </Text>
+          <Text style={{
+            color: colors.textSecondary,
+            marginTop: 8,
+            textAlign: 'center',
+          }}>
+            {previewError}
+          </Text>
+        </View>
+      </ScrollView>
+    );
+  }
+
+  if (!preview) {
+    return (
+      <ScrollView style={{ flex: 1, backgroundColor: colors.background }}>
+        <View style={{ padding: 16, alignItems: 'center', justifyContent: 'center', minHeight: 240 }}>
+          <Text style={{ color: colors.breach, fontSize: typography.fontSize.lg, fontWeight: typography.fontWeight.bold }}>
+            Exit Preview
+          </Text>
+          <Text style={{
+            color: colors.textSecondary,
+            marginTop: 16,
+            textAlign: 'center',
+          }}>
+            No preview available
           </Text>
         </View>
       </ScrollView>

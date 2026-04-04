@@ -1,4 +1,4 @@
-import { View, Text, FlatList, TouchableOpacity } from 'react-native';
+import { ActivityIndicator, View, Text, FlatList, TouchableOpacity } from 'react-native';
 import type { ActionableAlertDto } from '@clmm/application/public';
 import { colors } from '../design-system/index.js';
 import { typography } from '../design-system/index.js';
@@ -8,11 +8,13 @@ import type { PlatformCapabilities } from '../components/DegradedCapabilityBanne
 
 type Props = {
   alerts?: ActionableAlertDto[];
+  alertsLoading?: boolean;
+  alertsError?: string | null;
   onSelectAlert?: (triggerId: string, positionId: string) => void;
   platformCapabilities?: PlatformCapabilities | null;
 };
 
-export function AlertsListScreen({ alerts, onSelectAlert, platformCapabilities }: Props) {
+export function AlertsListScreen({ alerts, alertsLoading, alertsError, onSelectAlert, platformCapabilities }: Props) {
   const alertItems = alerts ?? [];
   const isEmpty = alertItems.length === 0;
 
@@ -28,7 +30,40 @@ export function AlertsListScreen({ alerts, onSelectAlert, platformCapabilities }
 
       <DegradedCapabilityBanner capabilities={platformCapabilities} />
 
-      {isEmpty ? (
+      {isEmpty && alertsLoading ? (
+        <View style={{ alignItems: 'center', justifyContent: 'center', paddingVertical: 48, paddingHorizontal: 24 }}>
+          <ActivityIndicator color={colors.primary} />
+          <Text style={{
+            color: colors.text,
+            fontSize: typography.fontSize.lg,
+            fontWeight: typography.fontWeight.semibold,
+            textAlign: 'center',
+            marginTop: 12,
+          }}>
+            Loading actionable alerts
+          </Text>
+        </View>
+      ) : isEmpty && alertsError ? (
+        <View style={{ alignItems: 'center', justifyContent: 'center', paddingVertical: 48, paddingHorizontal: 24 }}>
+          <Text style={{
+            color: colors.text,
+            fontSize: typography.fontSize.lg,
+            fontWeight: typography.fontWeight.semibold,
+            textAlign: 'center',
+          }}>
+            Could not load alerts
+          </Text>
+          <Text style={{
+            color: colors.textSecondary,
+            fontSize: typography.fontSize.base,
+            textAlign: 'center',
+            marginTop: 8,
+            lineHeight: typography.fontSize.base * typography.lineHeight.normal,
+          }}>
+            {alertsError}
+          </Text>
+        </View>
+      ) : isEmpty ? (
         <Text style={{ color: colors.textSecondary, marginTop: 8 }}>
           No active alerts.
         </Text>

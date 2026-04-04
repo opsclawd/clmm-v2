@@ -1,4 +1,4 @@
-import { View, Text, ScrollView, TouchableOpacity } from 'react-native';
+import { ActivityIndicator, View, Text, ScrollView, TouchableOpacity } from 'react-native';
 import type { ExecutionLifecycleState, BreachDirection } from '@clmm/application/public';
 import { colors } from '../design-system/index.js';
 import { typography } from '../design-system/index.js';
@@ -11,6 +11,8 @@ type Props = {
   breachDirection?: BreachDirection;
   retryEligible?: boolean;
   transactionSignature?: string;
+  resultLoading?: boolean;
+  resultError?: string | null;
   onRetry?: () => void;
   onViewHistory?: () => void;
 };
@@ -20,17 +22,49 @@ export function ExecutionResultScreen({
   breachDirection,
   retryEligible,
   transactionSignature,
+  resultLoading,
+  resultError,
   onRetry,
   onViewHistory,
 }: Props) {
-  if (!lifecycleState) {
+  if (resultLoading) {
     return (
-      <View style={{ flex: 1, backgroundColor: colors.background, padding: 16 }}>
+      <View style={{ flex: 1, backgroundColor: colors.background, padding: 16, justifyContent: 'center', alignItems: 'center' }}>
         <Text style={{ color: colors.text, fontSize: typography.fontSize.xl, fontWeight: typography.fontWeight.bold }}>
           Execution Result
         </Text>
+        <ActivityIndicator style={{ marginTop: 16 }} color={colors.primary} />
+        <Text style={{ color: colors.textSecondary, marginTop: 12 }}>
+          Loading execution result
+        </Text>
+      </View>
+    );
+  }
+
+  if (!lifecycleState && resultError) {
+    return (
+      <View style={{ flex: 1, backgroundColor: colors.background, padding: 16, justifyContent: 'center' }}>
+        <Text style={{ color: colors.text, fontSize: typography.fontSize.xl, fontWeight: typography.fontWeight.bold }}>
+          Execution Result
+        </Text>
+        <Text style={{ color: colors.text, fontSize: typography.fontSize.lg, fontWeight: typography.fontWeight.semibold, marginTop: 16 }}>
+          Could not load execution result
+        </Text>
         <Text style={{ color: colors.textSecondary, marginTop: 8 }}>
-          Loading result...
+          {resultError}
+        </Text>
+      </View>
+    );
+  }
+
+  if (!lifecycleState) {
+    return (
+      <View style={{ flex: 1, backgroundColor: colors.background, padding: 16, justifyContent: 'center' }}>
+        <Text style={{ color: colors.text, fontSize: typography.fontSize.xl, fontWeight: typography.fontWeight.bold }}>
+          Execution Result
+        </Text>
+        <Text style={{ color: colors.textSecondary, marginTop: 16 }}>
+          No execution result available
         </Text>
       </View>
     );
