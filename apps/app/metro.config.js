@@ -4,18 +4,16 @@ const path = require('path');
 
 const projectRoot = __dirname;
 const workspaceRoot = path.resolve(projectRoot, '../..');
-const repoRoot = path.resolve(projectRoot, '../../../..');
 
 const config = getDefaultConfig(projectRoot);
 
 // Watch all packages in the monorepo
-config.watchFolders = [workspaceRoot, repoRoot];
+config.watchFolders = [workspaceRoot];
 
 // Resolve packages from both the app and the monorepo root
 config.resolver.nodeModulesPaths = [
   path.resolve(projectRoot, 'node_modules'),
   path.resolve(workspaceRoot, 'node_modules'),
-  path.resolve(repoRoot, 'node_modules'),
 ];
 
 config.resolver.sourceExts = ['ts', 'tsx', 'js', 'jsx', 'json', 'cjs', 'mjs'];
