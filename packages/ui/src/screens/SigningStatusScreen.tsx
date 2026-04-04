@@ -19,6 +19,8 @@ type Props = {
   statusError?: string | null;
   statusNotice?: string | null;
   onDecline?: () => void;
+  onRefreshQuote?: () => void;
+  onGoHome?: () => void;
   onViewResult?: () => void;
   onSignAndExecute: () => void;
   walletConnected: boolean;
@@ -46,6 +48,8 @@ export function SigningStatusScreen({
   statusError,
   statusNotice,
   onDecline,
+  onRefreshQuote,
+  onGoHome,
   onViewResult,
   onSignAndExecute,
   walletConnected,
@@ -98,6 +102,48 @@ export function SigningStatusScreen({
         <Text style={{ color: colors.textSecondary, marginTop: 8 }}>
           {statusError}
         </Text>
+        {onRefreshQuote ? (
+          <TouchableOpacity
+            onPress={onRefreshQuote}
+            style={{
+              marginTop: 16,
+              padding: 16,
+              backgroundColor: colors.primary,
+              borderRadius: 8,
+              alignItems: 'center',
+            }}
+          >
+            <Text style={{
+              color: colors.background,
+              fontSize: typography.fontSize.base,
+              fontWeight: typography.fontWeight.bold,
+            }}>
+              Refresh Quote
+            </Text>
+          </TouchableOpacity>
+        ) : null}
+        {onGoHome ? (
+          <TouchableOpacity
+            onPress={onGoHome}
+            style={{
+              marginTop: 12,
+              padding: 16,
+              backgroundColor: colors.surface,
+              borderRadius: 8,
+              borderWidth: 1,
+              borderColor: colors.border,
+              alignItems: 'center',
+            }}
+          >
+            <Text style={{
+              color: colors.text,
+              fontSize: typography.fontSize.base,
+              fontWeight: typography.fontWeight.semibold,
+            }}>
+              Go Home
+            </Text>
+          </TouchableOpacity>
+        ) : null}
         {statusNotice ? (
           <View style={{
             marginTop: 16,

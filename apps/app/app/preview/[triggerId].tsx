@@ -51,12 +51,17 @@ export default function PreviewRoute() {
       {...(preview != null && walletAddress != null
         ? {
             onApprove: () => {
+              const signingParams: { attemptId: string; previewId: string; triggerId?: string } = {
+                attemptId: 'pending',
+                previewId: preview.previewId,
+              };
+              if (triggerId != null) {
+                signingParams.triggerId = triggerId;
+              }
+
               router.push({
                 pathname: '/signing/[attemptId]',
-                params: {
-                  attemptId: 'pending',
-                  previewId: preview.previewId,
-                },
+                params: signingParams,
               });
             },
           }

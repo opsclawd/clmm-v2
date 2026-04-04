@@ -25,6 +25,10 @@ function readPreviewId(value: string | string[] | undefined): string | null {
   return typeof value === 'string' && value.length > 0 ? value : null;
 }
 
+function readTriggerId(value: string | string[] | undefined): string | null {
+  return typeof value === 'string' && value.length > 0 ? value : null;
+}
+
 function isPendingAttemptPlaceholder(value: string | string[] | undefined): boolean {
   return typeof value === 'string' && value === 'pending';
 }
@@ -51,9 +55,14 @@ async function recordSigningOutcome(params: {
 
 export default function SigningRoute() {
   const router = useRouter();
-  const params = useLocalSearchParams<{ attemptId?: string | string[]; previewId?: string | string[] }>();
+  const params = useLocalSearchParams<{
+    attemptId?: string | string[];
+    previewId?: string | string[];
+    triggerId?: string | string[];
+  }>();
   const attemptId = readAttemptId(params.attemptId);
   const previewId = readPreviewId(params.previewId);
+  const triggerId = readTriggerId(params.triggerId);
   const hasPendingAttemptPlaceholder = isPendingAttemptPlaceholder(params.attemptId);
   const walletAddress = useStore(walletSessionStore, (state) => state.walletAddress);
   const connectionKind = useStore(walletSessionStore, (state) => state.connectionKind);
@@ -259,6 +268,20 @@ export default function SigningRoute() {
                   : null
       }
       statusNotice={statusNotice}
+      {...(isPendingApprovalMode
+        ? {
+            ...(triggerId != null
+              ? {
+                  onRefreshQuote: () => {
+                    router.replace(`/preview/${triggerId}`);
+                  },
+                }
+              : {}),
+            onGoHome: () => {
+              router.replace('/(tabs)/positions');
+            },
+          }
+        : {})}
       {...(declineAvailable
         ? {
             ...(declineAvailable
