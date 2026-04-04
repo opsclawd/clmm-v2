@@ -29,6 +29,13 @@
       "when": 1775185297953,
       "tag": "0003_signing_flow_wiring",
       "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "7",
+      "when": 1775332372503,
+      "tag": "0004_breach_episode_linked_lifecycle",
+      "breakpoints": true
     }
   ]
 }
