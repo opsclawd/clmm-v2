@@ -5,6 +5,7 @@ import type {
   ClockPort,
   IdGeneratorPort,
 } from '../../ports/index.js';
+import { makeClockTimestamp } from '@clmm/domain';
 import type { WalletId, BreachDirection } from '@clmm/domain';
 
 const PREPARED_PAYLOAD_VERSION = 'v1';
@@ -84,7 +85,7 @@ export async function requestWalletSignature(params: {
     attemptId,
     unsignedPayload: serializedPayload,
     payloadVersion: PREPARED_PAYLOAD_VERSION,
-    expiresAt: previewRecord.preview.freshness.expiresAt,
+    expiresAt: makeClockTimestamp(previewRecord.preview.freshness.expiresAt),
     createdAt: now,
   });
 
