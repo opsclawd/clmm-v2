@@ -6,10 +6,7 @@
       "dependsOn": ["^build"],
       "outputs": ["dist/**"]
     },
-    "@clmm/testing#build": {
-      "dependsOn": [],
-      "outputs": ["dist/**"]
-    },
+    
     "test": {
       "dependsOn": [],
       "outputs": []
