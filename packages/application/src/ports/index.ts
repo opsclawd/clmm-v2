@@ -135,11 +135,8 @@ export interface DeepLinkEntryPort {
 // --- Storage repositories ---
 
 export interface TriggerRepository {
-  saveTrigger(trigger: ExitTrigger): Promise<void>;
   getTrigger(triggerId: ExitTriggerId): Promise<ExitTrigger | null>;
   listActionableTriggers(walletId: WalletId): Promise<ExitTrigger[]>;
-  getActiveEpisodeTrigger(episodeId: BreachEpisodeId): Promise<ExitTriggerId | null>;
-  saveEpisode(episode: BreachEpisode): Promise<void>;
   deleteTrigger(triggerId: ExitTriggerId): Promise<void>;
 }
 
@@ -147,6 +144,7 @@ export type StoredExecutionAttempt = ExecutionAttempt & {
   attemptId: string;
   positionId: PositionId;
   breachDirection: BreachDirection;
+  episodeId?: BreachEpisodeId;
   previewId?: string;
 };
 
@@ -168,8 +166,15 @@ export interface ExecutionRepository {
     unsignedPayload: Uint8Array;
     expiresAt: ClockTimestamp;
   } | null>;
+  listAwaitingSignatureAttemptsByEpisode(episodeId: BreachEpisodeId): Promise<StoredExecutionAttempt[]>;
   updateAttemptState(attemptId: string, state: ExecutionLifecycleState): Promise<void>;
 }
+
+export type {
+  EpisodeTransition,
+  FinalizationResult,
+  BreachEpisodeRepository,
+} from './BreachEpisodeRepository.js';
 
 export interface ExecutionSessionRepository {
   saveSession(params: {

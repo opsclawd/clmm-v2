@@ -1,5 +1,6 @@
 // Application internal API — used by packages/adapters and packages/testing
 export * from './ports/index.js';
+export * from './ports/BreachEpisodeRepository.js';
 export * from './dto/index.js';
 export * from './use-cases/triggers/ScanPositionsForBreaches.js';
 export * from './use-cases/triggers/QualifyActionableTrigger.js';
