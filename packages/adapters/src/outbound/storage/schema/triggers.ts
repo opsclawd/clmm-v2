@@ -22,6 +22,14 @@ export const breachEpisodes = pgTable('breach_episodes', {
     sql`${table.status} in ('open', 'closed')`,
   ),
   check(
+    'breach_episodes_consecutive_count_min_check',
+    sql`${table.consecutiveCount} >= 1`,
+  ),
+  check(
+    'breach_episodes_close_reason_check',
+    sql`${table.closeReason} is null or ${table.closeReason} in ('position-recovered', 'direction-reversed')`,
+  ),
+  check(
     'breach_episodes_closed_fields_consistency_check',
     sql`(
       (${table.status} = 'open' and ${table.closedAt} is null and ${table.closeReason} is null)

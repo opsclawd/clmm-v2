@@ -285,6 +285,14 @@
           "name": "breach_episodes_status_check",
           "value": "\"breach_episodes\".\"status\" in ('open', 'closed')"
         },
+        "breach_episodes_consecutive_count_min_check": {
+          "name": "breach_episodes_consecutive_count_min_check",
+          "value": "\"breach_episodes\".\"consecutive_count\" >= 1"
+        },
+        "breach_episodes_close_reason_check": {
+          "name": "breach_episodes_close_reason_check",
+          "value": "\"breach_episodes\".\"close_reason\" is null or \"breach_episodes\".\"close_reason\" in ('position-recovered', 'direction-reversed')"
+        },
         "breach_episodes_closed_fields_consistency_check": {
           "name": "breach_episodes_closed_fields_consistency_check",
           "value": "((\"breach_episodes\".\"status\" = 'open' and \"breach_episodes\".\"closed_at\" is null and \"breach_episodes\".\"close_reason\" is null)\n      or\n      (\"breach_episodes\".\"status\" = 'closed' and \"breach_episodes\".\"closed_at\" is not null and \"breach_episodes\".\"close_reason\" is not null))"

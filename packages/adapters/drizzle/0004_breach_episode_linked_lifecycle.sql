@@ -51,6 +51,30 @@ $$;
 DO $$
 BEGIN
   IF NOT EXISTS (
+    SELECT 1 FROM pg_constraint WHERE conname = 'breach_episodes_consecutive_count_min_check'
+  ) THEN
+    ALTER TABLE "breach_episodes"
+      ADD CONSTRAINT "breach_episodes_consecutive_count_min_check"
+      CHECK ("breach_episodes"."consecutive_count" >= 1);
+  END IF;
+END
+$$;
+--> statement-breakpoint
+DO $$
+BEGIN
+  IF NOT EXISTS (
+    SELECT 1 FROM pg_constraint WHERE conname = 'breach_episodes_close_reason_check'
+  ) THEN
+    ALTER TABLE "breach_episodes"
+      ADD CONSTRAINT "breach_episodes_close_reason_check"
+      CHECK ("breach_episodes"."close_reason" is null or "breach_episodes"."close_reason" in ('position-recovered', 'direction-reversed'));
+  END IF;
+END
+$$;
+--> statement-breakpoint
+DO $$
+BEGIN
+  IF NOT EXISTS (
     SELECT 1 FROM pg_constraint WHERE conname = 'breach_episodes_closed_fields_consistency_check'
   ) THEN
     ALTER TABLE "breach_episodes"
