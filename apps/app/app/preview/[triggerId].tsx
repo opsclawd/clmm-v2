@@ -38,7 +38,8 @@ export default function PreviewRoute() {
     }
 
     void createMutation.mutateAsync(triggerId);
-  }, [triggerId, createMutation]);
+    // Intentionally depend only on triggerId to avoid mutation-object re-render loops.
+  }, [triggerId]);
 
   const preview = refreshMutation.data ?? createMutation.data;
 
