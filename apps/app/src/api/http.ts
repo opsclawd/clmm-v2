@@ -25,7 +25,7 @@ export function getBffBaseUrl(): string {
 export async function fetchJson(path: string, init?: RequestInit): Promise<unknown> {
   const headers = new Headers(init?.headers);
 
-  if (init?.body != null && !headers.has('Content-Type')) {
+  if (typeof init?.body === 'string' && !headers.has('Content-Type')) {
     headers.set('Content-Type', 'application/json');
   }
 
@@ -61,8 +61,14 @@ async function extractErrorDetail(response: Response): Promise<string> {
 
     const body: unknown = JSON.parse(bodyText);
 
-    if (isRecord(body) && typeof body['message'] === 'string') {
-      return body['message'];
+    if (isRecord(body)) {
+      if (typeof body['message'] === 'string') {
+        return body['message'];
+      }
+
+      if (Array.isArray(body['message']) && body['message'].every((entry) => typeof entry === 'string')) {
+        return body['message'].join('; ');
+      }
     }
 
     return bodyText;
