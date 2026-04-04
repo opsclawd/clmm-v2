@@ -3,12 +3,12 @@ import { scanPositionsForBreaches } from './ScanPositionsForBreaches.js';
 import {
   FakeSupportedPositionReadPort,
   FakeClockPort,
+  FakeBreachEpisodeRepository,
   FIXTURE_WALLET_ID,
   FIXTURE_POSITION_BELOW_RANGE,
   FIXTURE_POSITION_ABOVE_RANGE,
   FIXTURE_POSITION_IN_RANGE,
 } from '@clmm/testing';
-import { FakeBreachEpisodeRepository } from '../../../../testing/src/fakes/FakeBreachEpisodeRepository.js';
 
 describe('ScanPositionsForBreaches', () => {
   let clock: FakeClockPort;
