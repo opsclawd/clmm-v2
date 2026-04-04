@@ -15,7 +15,7 @@ import {
   FIXTURE_POSITION_ABOVE_RANGE,
   FIXTURE_POSITION_ID,
 } from '@clmm/testing';
-import { LOWER_BOUND_BREACH, UPPER_BOUND_BREACH } from '@clmm/domain';
+import { LOWER_BOUND_BREACH, UPPER_BOUND_BREACH, makePositionId } from '@clmm/domain';
 import type { BreachEpisodeId } from '@clmm/domain';
 import { makeClockTimestamp } from '@clmm/domain';
 import type { MonitoredWalletRepository } from '@clmm/application';
@@ -258,5 +258,32 @@ describe('BreachScanJobHandler', () => {
       (entry) => entry.level === 'info' && entry.message.toLowerCase().includes('abandoned stale attempt'),
     );
     expect(abandonedInfoLogs).toHaveLength(2);
+  });
+
+  it('uses attempt position id when abandoning stale attempts', async () => {
+    await walletRepo.enroll(FIXTURE_WALLET_ID, makeClockTimestamp(1_000));
+    const breachHandler = buildHandler(new FakeSupportedPositionReadPort([FIXTURE_POSITION_BELOW_RANGE]));
+
+    await breachHandler.handle();
+
+    const queued = enqueuedJobs[0]!.data as Record<string, unknown>;
+    const episodeId = queued['episodeId'] as BreachEpisodeId;
+
+    const mismatchedPositionId = makePositionId('mismatched-position');
+    await executionRepo.saveAttempt({
+      attemptId: 'attempt-mismatched-position',
+      positionId: mismatchedPositionId,
+      breachDirection: LOWER_BOUND_BREACH,
+      episodeId,
+      lifecycleState: { kind: 'awaiting-signature' },
+      completedSteps: [],
+      transactionReferences: [],
+    });
+
+    const recoveryHandler = buildHandler(new FakeSupportedPositionReadPort([FIXTURE_POSITION_IN_RANGE]));
+    await recoveryHandler.handle();
+
+    const updated = await executionRepo.getAttempt('attempt-mismatched-position');
+    expect(updated?.lifecycleState.kind).toBe('abandoned');
   });
 });
