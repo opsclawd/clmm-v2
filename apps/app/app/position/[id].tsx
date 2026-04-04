@@ -7,10 +7,11 @@ import { fetchPositionDetail } from '../../src/api/positions';
 import { walletSessionStore } from '../../src/state/walletSessionStore';
 
 export default function PositionDetailRoute() {
-  const { id } = useLocalSearchParams<{ id: string }>();
+  const { id, triggerId } = useLocalSearchParams<{ id: string; triggerId?: string }>();
   const router = useRouter();
   const walletAddress = useStore(walletSessionStore, (state) => state.walletAddress);
   const positionId = typeof id === 'string' ? id : undefined;
+  const alertTriggerId = typeof triggerId === 'string' && triggerId.length > 0 ? triggerId : undefined;
   const hasValidPositionId = positionId != null && positionId.length > 0;
   const hasWalletAddress = walletAddress != null && walletAddress.length > 0;
 
@@ -36,10 +37,19 @@ export default function PositionDetailRoute() {
     );
   }
 
+  const position = positionQuery.data
+    ? {
+        ...positionQuery.data,
+        triggerId: positionQuery.data.triggerId ?? alertTriggerId,
+      }
+    : undefined;
+
   return (
     <PositionDetailScreen
-      {...(positionQuery.data ? { position: positionQuery.data } : {})}
-      onViewPreview={(triggerId) => router.push(`/preview/${triggerId}`)}
+      {...(position ? { position } : {})}
+      onViewPreview={(resolvedTriggerId) =>
+        router.push(`/preview/${resolvedTriggerId}`)
+      }
     />
   );
 }
