@@ -4,17 +4,23 @@
  * Runs on a schedule (e.g., every 60 seconds) via WorkerModule
  */
 import { Inject, Injectable } from '@nestjs/common';
-import { scanPositionsForBreaches } from '@clmm/application';
+import { scanPositionsForBreaches, recordExecutionAbandonment } from '@clmm/application';
 import type {
+  BreachEpisodeRepository,
   MonitoredWalletRepository,
   SupportedPositionReadPort,
+  ExecutionRepository,
+  ExecutionHistoryRepository,
   ClockPort,
   IdGeneratorPort,
   ObservabilityPort,
 } from '@clmm/application';
 import {
+  BREACH_EPISODE_REPOSITORY,
   MONITORED_WALLET_REPOSITORY,
   SUPPORTED_POSITION_READ_PORT,
+  EXECUTION_REPOSITORY,
+  EXECUTION_HISTORY_REPOSITORY,
   CLOCK_PORT,
   ID_GENERATOR_PORT,
   OBSERVABILITY_PORT,
@@ -38,6 +44,12 @@ export class BreachScanJobHandler {
     private readonly ids: IdGeneratorPort,
     @Inject(OBSERVABILITY_PORT)
     private readonly observability: ObservabilityPort,
+    @Inject(BREACH_EPISODE_REPOSITORY)
+    private readonly episodeRepo: BreachEpisodeRepository,
+    @Inject(EXECUTION_REPOSITORY)
+    private readonly executionRepo: ExecutionRepository,
+    @Inject(EXECUTION_HISTORY_REPOSITORY)
+    private readonly historyRepo: ExecutionHistoryRepository,
     @Inject(PG_BOSS)
     private readonly enqueue: EnqueueFn,
   ) {}
@@ -61,16 +73,17 @@ export class BreachScanJobHandler {
           walletId: wallet.walletId,
           positionReadPort: this.positionReadPort,
           clock: this.clock,
-          ids: this.ids,
+          episodeRepo: this.episodeRepo,
         });
 
-        for (const obs of observations) {
+        for (const obs of observations.observations) {
           await this.enqueue('qualify-trigger', {
             positionId: obs.positionId,
             walletId: wallet.walletId,
             directionKind: obs.direction.kind,
             observedAt: obs.observedAt,
             episodeId: obs.episodeId,
+            consecutiveCount: obs.consecutiveCount,
           });
 
           this.observability.recordDetectionTiming({
@@ -79,6 +92,38 @@ export class BreachScanJobHandler {
             observedAt: obs.observedAt,
             durationMs: this.clock.now() - obs.observedAt,
           });
+        }
+
+        for (const abandonment of observations.abandonments) {
+          const staleAttempts = await this.executionRepo.listAwaitingSignatureAttemptsByEpisode(abandonment.episodeId);
+
+          if (staleAttempts.length > 1) {
+            this.observability.log('warn', `Execution integrity violation for episode ${abandonment.episodeId}`, {
+              episodeId: abandonment.episodeId,
+              positionId: abandonment.positionId,
+              reason: abandonment.reason,
+              awaitingSignatureAttempts: staleAttempts.length,
+            });
+          }
+
+          for (const attempt of staleAttempts) {
+            await recordExecutionAbandonment({
+              attemptId: attempt.attemptId,
+              positionId: abandonment.positionId,
+              breachDirection: attempt.breachDirection,
+              executionRepo: this.executionRepo,
+              historyRepo: this.historyRepo,
+              clock: this.clock,
+              ids: this.ids,
+            });
+
+            this.observability.log('info', `Abandoned stale attempt ${attempt.attemptId} for closed episode`, {
+              attemptId: attempt.attemptId,
+              episodeId: abandonment.episodeId,
+              positionId: abandonment.positionId,
+              reason: abandonment.reason,
+            });
+          }
         }
 
         await this.monitoredWalletRepo.markScanned(wallet.walletId, this.clock.now());
