@@ -127,17 +127,219 @@ describe('ExecutionController', () => {
     );
   });
 
-  it('stores previewId on the attempt created by approve', async () => {
+  it('returns approval data and stores previewId on the attempt created by approve', async () => {
     const { previewId } = await savePreview(LOWER_BOUND_BREACH);
 
     const result = await controller.approveExecution({
       previewId,
-      triggerId: 'trigger-1',
-      breachDirection: LOWER_BOUND_BREACH.kind,
+      walletId: FIXTURE_WALLET_ID,
     });
 
-    const storedAttempt = await executionRepo.getAttempt(result.attemptId);
+    expect(result.approval).toEqual({
+      attemptId: result.approval.attemptId,
+      lifecycleState: { kind: 'awaiting-signature' },
+      breachDirection: LOWER_BOUND_BREACH,
+    });
+    const storedAttempt = await executionRepo.getAttempt(result.approval.attemptId);
     expect(storedAttempt?.previewId).toBe(previewId);
+  });
+
+  it('maps missing preview approval attempts to 404', async () => {
+    await expect(
+      controller.approveExecution({
+        previewId: 'missing-preview',
+        walletId: FIXTURE_WALLET_ID,
+      }),
+    ).rejects.toBeInstanceOf(NotFoundException);
+  });
+
+  it('maps stale preview approval attempts to 400', async () => {
+    const { previewId } = await savePreview(LOWER_BOUND_BREACH);
+    const storedPreview = executionRepo.previews.get(previewId);
+    if (!storedPreview) {
+      throw new Error('Expected preview fixture to exist');
+    }
+
+    executionRepo.previews.set(previewId, {
+      ...storedPreview,
+      preview: {
+        ...storedPreview.preview,
+        freshness: { kind: 'stale' },
+      },
+    });
+
+    await expect(
+      controller.approveExecution({
+        previewId,
+        walletId: FIXTURE_WALLET_ID,
+      }),
+    ).rejects.toBeInstanceOf(BadRequestException);
+  });
+
+  it('returns the signing payload for awaiting-signature attempts', async () => {
+    await saveAttempt({
+      attemptId: 'attempt-signing-payload',
+      positionId: FIXTURE_POSITION_ID,
+      breachDirection: LOWER_BOUND_BREACH,
+      lifecycleState: { kind: 'awaiting-signature' },
+      completedSteps: [],
+      transactionReferences: [],
+    });
+    await executionRepo.savePreparedPayload({
+      payloadId: 'payload-signing-payload',
+      attemptId: 'attempt-signing-payload',
+      unsignedPayload: new Uint8Array([9, 8, 7]),
+      payloadVersion: 'v1',
+      expiresAt: makeClockTimestamp(1_060_000),
+      createdAt: makeClockTimestamp(1_000_000),
+    });
+
+    const result = await controller.getSigningPayload('attempt-signing-payload');
+
+    expect(result).toEqual({
+      signingPayload: {
+        attemptId: 'attempt-signing-payload',
+        serializedPayload: Buffer.from([9, 8, 7]).toString('base64'),
+        lifecycleState: { kind: 'awaiting-signature' },
+        signingExpiresAt: makeClockTimestamp(1_060_000),
+      },
+    });
+  });
+
+  it('maps signing payload retrieval failures to controller exceptions', async () => {
+    await saveAttempt({
+      attemptId: 'attempt-not-signable',
+      positionId: FIXTURE_POSITION_ID,
+      breachDirection: LOWER_BOUND_BREACH,
+      lifecycleState: { kind: 'submitted' },
+      completedSteps: [],
+      transactionReferences: [],
+    });
+    await saveAttempt({
+      attemptId: 'attempt-missing-payload',
+      positionId: FIXTURE_POSITION_ID,
+      breachDirection: LOWER_BOUND_BREACH,
+      lifecycleState: { kind: 'awaiting-signature' },
+      completedSteps: [],
+      transactionReferences: [],
+    });
+    await saveAttempt({
+      attemptId: 'attempt-expired-payload',
+      positionId: FIXTURE_POSITION_ID,
+      breachDirection: LOWER_BOUND_BREACH,
+      lifecycleState: { kind: 'awaiting-signature' },
+      completedSteps: [],
+      transactionReferences: [],
+    });
+    await executionRepo.savePreparedPayload({
+      payloadId: 'payload-expired',
+      attemptId: 'attempt-expired-payload',
+      unsignedPayload: new Uint8Array([1, 2, 3]),
+      payloadVersion: 'v1',
+      expiresAt: makeClockTimestamp(1_000_000),
+      createdAt: makeClockTimestamp(900_000),
+    });
+    clock.set(1_000_001);
+
+    await expect(controller.getSigningPayload('missing-attempt')).rejects.toBeInstanceOf(NotFoundException);
+    await expect(controller.getSigningPayload('attempt-not-signable')).rejects.toBeInstanceOf(ConflictException);
+    await expect(controller.getSigningPayload('attempt-missing-payload')).rejects.toBeInstanceOf(ConflictException);
+    await expect(controller.getSigningPayload('attempt-expired-payload')).rejects.toBeInstanceOf(ConflictException);
+  });
+
+  it('returns wallet-scoped execution history', async () => {
+    historyRepo.assignWalletToPosition(FIXTURE_WALLET_ID, FIXTURE_POSITION_ID);
+    await historyRepo.appendEvent({
+      eventId: 'evt-wallet-history',
+      positionId: FIXTURE_POSITION_ID,
+      eventType: 'submitted',
+      breachDirection: LOWER_BOUND_BREACH,
+      occurredAt: makeClockTimestamp(1_000_000),
+      lifecycleState: { kind: 'submitted' },
+      transactionReference: { signature: 'sig-wallet-history', stepKind: 'swap-assets' },
+    });
+
+    const result = await controller.getWalletHistory(FIXTURE_WALLET_ID);
+
+    expect(result).toEqual({
+      history: [
+        {
+          eventId: 'evt-wallet-history',
+          positionId: FIXTURE_POSITION_ID,
+          eventType: 'submitted',
+          breachDirection: LOWER_BOUND_BREACH,
+          occurredAt: makeClockTimestamp(1_000_000),
+          transactionReference: { signature: 'sig-wallet-history', stepKind: 'swap-assets' },
+          note: 'off-chain operational history — not an on-chain receipt or attestation',
+        },
+      ],
+    });
+  });
+
+  it('records signature decline and reports the new state', async () => {
+    await saveAttempt({
+      attemptId: 'attempt-decline',
+      positionId: FIXTURE_POSITION_ID,
+      breachDirection: LOWER_BOUND_BREACH,
+      lifecycleState: { kind: 'awaiting-signature' },
+      completedSteps: [],
+      transactionReferences: [],
+    });
+
+    const result = await controller.declineSignature('attempt-decline');
+
+    expect(result).toEqual({ declined: true, state: 'declined' });
+    expect((await executionRepo.getAttempt('attempt-decline'))?.lifecycleState).toEqual({
+      kind: 'abandoned',
+    });
+    expect(historyRepo.events.at(-1)?.eventType).toBe('signature-declined');
+  });
+
+  it('maps decline-signature failures to controller exceptions', async () => {
+    await saveAttempt({
+      attemptId: 'attempt-decline-terminal',
+      positionId: FIXTURE_POSITION_ID,
+      breachDirection: LOWER_BOUND_BREACH,
+      lifecycleState: { kind: 'submitted' },
+      completedSteps: [],
+      transactionReferences: [],
+    });
+
+    await expect(controller.declineSignature('attempt-decline-missing')).rejects.toBeInstanceOf(NotFoundException);
+    await expect(controller.declineSignature('attempt-decline-terminal')).rejects.toBeInstanceOf(ConflictException);
+  });
+
+  it('records signature interruption and reports the new state', async () => {
+    await saveAttempt({
+      attemptId: 'attempt-interrupt',
+      positionId: FIXTURE_POSITION_ID,
+      breachDirection: LOWER_BOUND_BREACH,
+      lifecycleState: { kind: 'awaiting-signature' },
+      completedSteps: [],
+      transactionReferences: [],
+    });
+
+    const result = await controller.interruptSignature('attempt-interrupt');
+
+    expect(result).toEqual({ interrupted: true, state: 'interrupted' });
+    expect((await executionRepo.getAttempt('attempt-interrupt'))?.lifecycleState).toEqual({
+      kind: 'awaiting-signature',
+    });
+    expect(historyRepo.events.at(-1)?.eventType).toBe('signature-interrupted');
+  });
+
+  it('maps interrupt-signature failures to controller exceptions', async () => {
+    await saveAttempt({
+      attemptId: 'attempt-interrupt-terminal',
+      positionId: FIXTURE_POSITION_ID,
+      breachDirection: LOWER_BOUND_BREACH,
+      lifecycleState: { kind: 'submitted' },
+      completedSteps: [],
+      transactionReferences: [],
+    });
+
+    await expect(controller.interruptSignature('attempt-interrupt-missing')).rejects.toBeInstanceOf(NotFoundException);
+    await expect(controller.interruptSignature('attempt-interrupt-terminal')).rejects.toBeInstanceOf(ConflictException);
   });
 
   it('uses the attempt-persisted direction for GET /executions/:attemptId even when history disagrees', async () => {

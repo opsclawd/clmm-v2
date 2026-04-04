@@ -18,12 +18,21 @@ import type {
   ClockPort,
   IdGeneratorPort,
   ExecutionAttemptDto,
+  ExecutionApprovalDto,
+  ExecutionSigningPayloadDto,
   HistoryEventDto,
   StoredExecutionAttempt,
 } from '@clmm/application';
 import {
+  getAwaitingSignaturePayload,
   getExecutionHistory,
+  getWalletExecutionHistory,
   recordExecutionAbandonment,
+  recordSignatureDecline,
+  recordSignatureInterruption,
+  requestWalletSignature,
+  PreviewApprovalNotAllowedError,
+  PreviewNotFoundError,
 } from '@clmm/application';
 import type {
   PositionId,
@@ -67,6 +76,18 @@ function toAttemptDto(
     transactionReferences: [...attempt.transactionReferences],
     retryEligible: retry.kind === 'eligible',
     ...(retry.kind === 'eligible' ? {} : { retryReason: retry.reason }),
+  };
+}
+
+function toHistoryEventDto(event: HistoryEvent): HistoryEventDto {
+  return {
+    eventId: event.eventId,
+    positionId: event.positionId,
+    eventType: event.eventType,
+    breachDirection: event.breachDirection,
+    occurredAt: event.occurredAt,
+    ...(event.transactionReference ? { transactionReference: event.transactionReference } : {}),
+    note: 'off-chain operational history — not an on-chain receipt or attestation',
   };
 }
 
@@ -146,45 +167,30 @@ export class ExecutionController {
   async approveExecution(
     @Body() body: {
       previewId: string;
-      triggerId: string;
-      breachDirection?: 'lower-bound-breach' | 'upper-bound-breach';
+      walletId: string;
     },
-  ) {
-    const previewResult = await this.executionRepo.getPreview(body.previewId);
-    if (!previewResult) {
-      throw new NotFoundException(`Preview not found: ${body.previewId}`);
+  ): Promise<{ approval: ExecutionApprovalDto }> {
+    try {
+      const approval = await requestWalletSignature({
+        previewId: body.previewId,
+        walletId: body.walletId as WalletId,
+        executionRepo: this.executionRepo,
+        prepPort: this.preparationPort,
+        historyRepo: this.historyRepo,
+        clock: this.clock,
+        ids: this.ids,
+      });
+
+      return { approval };
+    } catch (error) {
+      if (error instanceof PreviewNotFoundError) {
+        throw new NotFoundException(error.message);
+      }
+      if (error instanceof PreviewApprovalNotAllowedError) {
+        throw new BadRequestException(error.message);
+      }
+      throw error;
     }
-
-    const { positionId, breachDirection } = previewResult;
-    const attemptId = this.ids.generateId();
-
-    const attempt: StoredExecutionAttempt = {
-      attemptId,
-      positionId,
-      breachDirection,
-      previewId: body.previewId,
-      lifecycleState: { kind: 'awaiting-signature' },
-      completedSteps: [],
-      transactionReferences: [],
-    };
-
-    await this.executionRepo.saveAttempt(attempt);
-
-    await this.historyRepo.appendEvent({
-      eventId: this.ids.generateId(),
-      positionId,
-      eventType: 'signature-requested',
-      breachDirection,
-      occurredAt: this.clock.now(),
-      lifecycleState: { kind: 'awaiting-signature' },
-    });
-
-    return {
-      attemptId,
-      positionId,
-      breachDirection,
-      lifecycleState: { kind: 'awaiting-signature' },
-    };
   }
 
   @Post(':attemptId/prepare')
@@ -235,6 +241,91 @@ export class ExecutionController {
     };
   }
 
+  @Get(':attemptId/signing-payload')
+  async getSigningPayload(
+    @Param('attemptId') attemptId: string,
+  ): Promise<{ signingPayload: ExecutionSigningPayloadDto }> {
+    const result = await getAwaitingSignaturePayload({
+      attemptId,
+      executionRepo: this.executionRepo,
+      historyRepo: this.historyRepo,
+      clock: this.clock,
+      ids: this.ids,
+    });
+
+    if (result.kind === 'not-found') {
+      throw new NotFoundException(`Attempt not found: ${attemptId}`);
+    }
+    if (result.kind === 'not-signable') {
+      throw new ConflictException(
+        `Attempt ${attemptId} cannot provide a signing payload from state ${result.currentState}`,
+      );
+    }
+    if (result.kind === 'missing-payload') {
+      throw new ConflictException(`Attempt ${attemptId} is missing a prepared signing payload`);
+    }
+    if (result.kind === 'expired') {
+      throw new ConflictException(`Signing payload expired for attempt ${attemptId}`);
+    }
+
+    return {
+      signingPayload: {
+        attemptId: result.attemptId,
+        serializedPayload: Buffer.from(result.serializedPayload).toString('base64'),
+        lifecycleState: result.lifecycleState,
+        ...(result.signingExpiresAt ? { signingExpiresAt: result.signingExpiresAt } : {}),
+      },
+    };
+  }
+
+  @Post(':attemptId/decline-signature')
+  async declineSignature(
+    @Param('attemptId') attemptId: string,
+  ): Promise<{ declined: true; state: string }> {
+    const result = await recordSignatureDecline({
+      attemptId,
+      executionRepo: this.executionRepo,
+      historyRepo: this.historyRepo,
+      clock: this.clock,
+      ids: this.ids,
+    });
+
+    if (result.kind === 'not-found') {
+      throw new NotFoundException(`Attempt not found: ${attemptId}`);
+    }
+    if (result.kind === 'already-terminal') {
+      throw new ConflictException(
+        `Attempt ${attemptId} cannot record a signature decline from state ${result.state}`,
+      );
+    }
+
+    return { declined: true, state: result.kind };
+  }
+
+  @Post(':attemptId/interrupt-signature')
+  async interruptSignature(
+    @Param('attemptId') attemptId: string,
+  ): Promise<{ interrupted: true; state: string }> {
+    const result = await recordSignatureInterruption({
+      attemptId,
+      executionRepo: this.executionRepo,
+      historyRepo: this.historyRepo,
+      clock: this.clock,
+      ids: this.ids,
+    });
+
+    if (result.kind === 'not-found') {
+      throw new NotFoundException(`Attempt not found: ${attemptId}`);
+    }
+    if (result.kind === 'already-terminal') {
+      throw new ConflictException(
+        `Attempt ${attemptId} cannot record a signature interruption from state ${result.state}`,
+      );
+    }
+
+    return { interrupted: true, state: result.kind };
+  }
+
   @Get(':attemptId')
   async getExecution(@Param('attemptId') attemptId: string) {
     const attempt = await this.executionRepo.getAttempt(attemptId);
@@ -251,21 +342,22 @@ export class ExecutionController {
     };
   }
 
+  @Get('history/wallet/:walletId')
+  async getWalletHistory(@Param('walletId') walletId: string) {
+    const { history } = await getWalletExecutionHistory({
+      walletId: walletId as WalletId,
+      historyRepo: this.historyRepo,
+    });
+    return { history: history.map((event) => toHistoryEventDto(event)) };
+  }
+
   @Get('history/:positionId')
   async getExecutionHistory(@Param('positionId') positionId: string) {
     const { timeline } = await getExecutionHistory({
       positionId: positionId as PositionId,
       historyRepo: this.historyRepo,
     });
-    const events: HistoryEventDto[] = timeline.events.map((e: HistoryEvent) => ({
-      eventId: e.eventId,
-      positionId: e.positionId,
-      eventType: e.eventType,
-      breachDirection: e.breachDirection,
-      occurredAt: e.occurredAt,
-      ...(e.transactionReference ? { transactionReference: e.transactionReference } : {}),
-      note: 'off-chain operational history — not an on-chain receipt or attestation',
-    }));
+    const events: HistoryEventDto[] = timeline.events.map((e: HistoryEvent) => toHistoryEventDto(e));
     return { history: events };
   }
 
