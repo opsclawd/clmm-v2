@@ -6,10 +6,12 @@ export * from './positions/index.js';
 
 // Triggers
 export * from './triggers/index.js';
-export { qualifyTrigger } from './triggers/TriggerQualificationService.js';
+export {
+  evaluateConfirmationThreshold,
+  buildExitTrigger,
+} from './triggers/TriggerQualificationService.js';
 export type {
-  BreachObservation,
-  TriggerQualificationResult,
+  ThresholdEvaluation,
 } from './triggers/TriggerQualificationService.js';
 
 // Exit policy — THE CORE INVARIANT

@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import {
-  qualifyTrigger,
-  type BreachObservation,
+  evaluateConfirmationThreshold,
+  buildExitTrigger,
 } from './TriggerQualificationService.js';
 import {
   makePositionId,
@@ -9,89 +9,63 @@ import {
   LOWER_BOUND_BREACH,
   UPPER_BOUND_BREACH,
 } from '../shared/index.js';
+import type { BreachEpisodeId, ExitTriggerId } from './index.js';
 
 const posId = makePositionId('pos-1');
 const now = makeClockTimestamp(1_000_000);
 
-const baseObservation: BreachObservation = {
-  positionId: posId,
-  direction: LOWER_BOUND_BREACH,
-  observedAt: now,
-  episodeId: 'episode-1',
-  consecutiveOutOfRangeCount: 3,
-};
-
 describe('TriggerQualificationService', () => {
-  describe('MVP confirmation rule: requires 3 consecutive out-of-range observations', () => {
-    it('qualifies a lower-bound breach when count meets threshold', () => {
-      const result = qualifyTrigger(baseObservation);
-      expect(result.kind).toBe('qualified');
-    });
-
-    it('does not qualify when below threshold', () => {
-      const result = qualifyTrigger({
-        ...baseObservation,
-        consecutiveOutOfRangeCount: 2,
-      });
-      expect(result.kind).toBe('not-qualified');
-      if (result.kind === 'not-qualified') {
+  describe('evaluateConfirmationThreshold', () => {
+    it('returns not-met for count below threshold', () => {
+      const result = evaluateConfirmationThreshold(2);
+      expect(result.kind).toBe('not-met');
+      if (result.kind === 'not-met') {
         expect(result.reason).toContain('confirmation');
       }
     });
 
-    it('qualifies an upper-bound breach when count meets threshold', () => {
-      const result = qualifyTrigger({
-        ...baseObservation,
+    it('returns met for count at threshold', () => {
+      const result = evaluateConfirmationThreshold(3);
+      expect(result).toEqual({ kind: 'met' });
+    });
+
+    it('returns met for count above threshold', () => {
+      const result = evaluateConfirmationThreshold(4);
+      expect(result).toEqual({ kind: 'met' });
+    });
+  });
+
+  describe('buildExitTrigger', () => {
+    it('builds trigger with required shape for lower breach', () => {
+      const trigger = buildExitTrigger({
+        triggerId: 'trigger-1' as ExitTriggerId,
+        positionId: posId,
+        direction: LOWER_BOUND_BREACH,
+        observedAt: now,
+        episodeId: 'episode-1' as BreachEpisodeId,
+      });
+
+      expect(trigger).toEqual({
+        triggerId: 'trigger-1',
+        positionId: posId,
+        breachDirection: LOWER_BOUND_BREACH,
+        triggeredAt: now,
+        confirmationEvaluatedAt: now,
+        confirmationPassed: true,
+        episodeId: 'episode-1',
+      });
+    });
+
+    it('preserves upper breach direction', () => {
+      const trigger = buildExitTrigger({
+        triggerId: 'trigger-2' as ExitTriggerId,
+        positionId: posId,
         direction: UPPER_BOUND_BREACH,
+        observedAt: now,
+        episodeId: 'episode-2' as BreachEpisodeId,
       });
-      expect(result.kind).toBe('qualified');
-    });
 
-    it('preserves breach direction in qualified trigger', () => {
-      const lower = qualifyTrigger({ ...baseObservation, direction: LOWER_BOUND_BREACH });
-      const upper = qualifyTrigger({ ...baseObservation, direction: UPPER_BOUND_BREACH });
-      expect(lower.kind).toBe('qualified');
-      expect(upper.kind).toBe('qualified');
-      if (lower.kind === 'qualified') {
-        expect(lower.trigger.breachDirection.kind).toBe('lower-bound-breach');
-      }
-      if (upper.kind === 'qualified') {
-        expect(upper.trigger.breachDirection.kind).toBe('upper-bound-breach');
-      }
-    });
-  });
-
-  describe('episode idempotency', () => {
-    it('suppresses duplicate trigger for the same episode', () => {
-      const existingTriggerId = 'trigger-existing';
-      const result = qualifyTrigger({
-        ...baseObservation,
-        existingTriggerIdForEpisode: existingTriggerId,
-      });
-      expect(result.kind).toBe('duplicate-suppressed');
-      if (result.kind === 'duplicate-suppressed') {
-        expect(result.existingTriggerId).toBe(existingTriggerId);
-      }
-    });
-
-    it('does not suppress when no existing trigger for episode', () => {
-      const result = qualifyTrigger(baseObservation);
-      expect(result.kind).toBe('qualified');
-    });
-  });
-
-  describe('qualified trigger has required fields', () => {
-    it('trigger includes positionId, breachDirection, triggeredAt, confirmationEvaluatedAt', () => {
-      const result = qualifyTrigger(baseObservation);
-      expect(result.kind).toBe('qualified');
-      if (result.kind === 'qualified') {
-        const { trigger } = result;
-        expect(trigger.positionId).toBe(posId);
-        expect(trigger.breachDirection).toBe(LOWER_BOUND_BREACH);
-        expect(typeof trigger.triggeredAt).toBe('number');
-        expect(typeof trigger.confirmationEvaluatedAt).toBe('number');
-        expect(trigger.confirmationPassed).toBe(true);
-      }
+      expect(trigger.breachDirection.kind).toBe('upper-bound-breach');
     });
   });
 });

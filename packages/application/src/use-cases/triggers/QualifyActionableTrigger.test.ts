@@ -1,12 +1,16 @@
 import { describe, it, expect, beforeEach } from 'vitest';
 import { qualifyActionableTrigger } from './QualifyActionableTrigger.js';
 import {
-  FakeClockPort,
+  FakeBreachEpisodeRepository,
   FakeIdGeneratorPort,
-  FakeTriggerRepository,
   FIXTURE_POSITION_ID,
 } from '@clmm/testing';
-import { LOWER_BOUND_BREACH, UPPER_BOUND_BREACH, makeClockTimestamp } from '@clmm/domain';
+import {
+  LOWER_BOUND_BREACH,
+  UPPER_BOUND_BREACH,
+  makeClockTimestamp,
+  type BreachEpisodeId,
+} from '@clmm/domain';
 import type { BreachObservationResult } from './ScanPositionsForBreaches.js';
 
 function makeObs(
@@ -16,86 +20,84 @@ function makeObs(
     positionId: FIXTURE_POSITION_ID,
     direction,
     observedAt: makeClockTimestamp(1_000_000),
-    episodeId: 'ep-1',
+    episodeId: 'ep-1' as BreachEpisodeId,
+    consecutiveCount: 3,
   };
 }
 
 describe('QualifyActionableTrigger', () => {
-  let clock: FakeClockPort;
   let ids: FakeIdGeneratorPort;
-  let repo: FakeTriggerRepository;
+  let episodeRepo: FakeBreachEpisodeRepository;
 
   beforeEach(() => {
-    clock = new FakeClockPort();
     ids = new FakeIdGeneratorPort('trigger');
-    repo = new FakeTriggerRepository();
+    episodeRepo = new FakeBreachEpisodeRepository();
+    episodeRepo.episodes.set('ep-1', {
+      episodeId: 'ep-1' as BreachEpisodeId,
+      positionId: FIXTURE_POSITION_ID,
+      direction: LOWER_BOUND_BREACH,
+      status: 'open',
+      startedAt: makeClockTimestamp(900_000),
+      lastObservedAt: makeClockTimestamp(1_000_000),
+      consecutiveCount: 3,
+      triggerId: null,
+      closedAt: null,
+      closeReason: null,
+    });
   });
 
-  it('creates a trigger for a lower-bound breach with correct direction', async () => {
+  it('returns not-qualified below threshold', async () => {
     const result = await qualifyActionableTrigger({
-      observation: makeObs(LOWER_BOUND_BREACH),
-      consecutiveCount: 3,
-      triggerRepo: repo,
-      clock,
-      ids,
-    });
-    expect(result.kind).toBe('trigger-created');
-    if (result.kind === 'trigger-created') {
-      expect(result.trigger.breachDirection.kind).toBe('lower-bound-breach');
-    }
-  });
-
-  it('creates a trigger for an upper-bound breach with correct direction', async () => {
-    const result = await qualifyActionableTrigger({
-      observation: makeObs(UPPER_BOUND_BREACH),
-      consecutiveCount: 3,
-      triggerRepo: repo,
-      clock,
-      ids,
-    });
-    expect(result.kind).toBe('trigger-created');
-    if (result.kind === 'trigger-created') {
-      expect(result.trigger.breachDirection.kind).toBe('upper-bound-breach');
-    }
-  });
-
-  it('suppresses duplicate when episode already has a trigger', async () => {
-    await qualifyActionableTrigger({
-      observation: makeObs(),
-      consecutiveCount: 3,
-      triggerRepo: repo,
-      clock,
-      ids,
-    });
-    const result = await qualifyActionableTrigger({
-      observation: makeObs(),
-      consecutiveCount: 3,
-      triggerRepo: repo,
-      clock,
-      ids,
-    });
-    expect(result.kind).toBe('duplicate-suppressed');
-  });
-
-  it('does not qualify when below confirmation threshold', async () => {
-    const result = await qualifyActionableTrigger({
-      observation: makeObs(),
-      consecutiveCount: 2,
-      triggerRepo: repo,
-      clock,
+      observation: {
+        ...makeObs(LOWER_BOUND_BREACH),
+        consecutiveCount: 2,
+      },
+      episodeRepo,
       ids,
     });
     expect(result.kind).toBe('not-qualified');
   });
 
-  it('persists the trigger and episode to the repository', async () => {
-    await qualifyActionableTrigger({
-      observation: makeObs(),
-      consecutiveCount: 3,
-      triggerRepo: repo,
-      clock,
+  it('creates trigger when threshold met and episode exists', async () => {
+    const result = await qualifyActionableTrigger({
+      observation: makeObs(UPPER_BOUND_BREACH),
+      episodeRepo,
       ids,
     });
-    expect(repo.triggers.size).toBe(1);
+
+    expect(result.kind).toBe('trigger-created');
+    if (result.kind === 'trigger-created') {
+      expect(result.trigger.breachDirection.kind).toBe('upper-bound-breach');
+      expect(result.trigger.triggeredAt).toBe(makeClockTimestamp(1_000_000));
+    }
+  });
+
+  it('returns duplicate-suppressed when episode already has trigger', async () => {
+    await qualifyActionableTrigger({
+      observation: makeObs(),
+      episodeRepo,
+      ids,
+    });
+
+    const result = await qualifyActionableTrigger({
+      observation: makeObs(),
+      episodeRepo,
+      ids,
+    });
+
+    expect(result.kind).toBe('duplicate-suppressed');
+  });
+
+  it('uses IdGeneratorPort for trigger id', async () => {
+    const result = await qualifyActionableTrigger({
+      observation: makeObs(),
+      episodeRepo,
+      ids,
+    });
+
+    expect(result.kind).toBe('trigger-created');
+    if (result.kind === 'trigger-created') {
+      expect(result.trigger.triggerId).toBe('trigger-1');
+    }
   });
 });

@@ -1,6 +1,10 @@
-import type { TriggerRepository, ClockPort, IdGeneratorPort } from '../../ports/index.js';
-import { qualifyTrigger } from '@clmm/domain';
-import type { ExitTrigger, BreachEpisode, BreachEpisodeId, ExitTriggerId } from '@clmm/domain';
+import type { BreachEpisodeRepository, IdGeneratorPort } from '../../ports/index.js';
+import {
+  evaluateConfirmationThreshold,
+  buildExitTrigger,
+  type ExitTrigger,
+  type ExitTriggerId,
+} from '@clmm/domain';
 import type { BreachObservationResult } from './ScanPositionsForBreaches.js';
 
 export type QualifyResult =
@@ -10,48 +14,31 @@ export type QualifyResult =
 
 export async function qualifyActionableTrigger(params: {
   observation: BreachObservationResult;
-  consecutiveCount: number;
-  triggerRepo: TriggerRepository;
-  clock: ClockPort;
+  episodeRepo: BreachEpisodeRepository;
   ids: IdGeneratorPort;
 }): Promise<QualifyResult> {
-  const { observation, consecutiveCount, triggerRepo, clock } = params;
+  const { observation, episodeRepo, ids } = params;
 
-  const existingId = await triggerRepo.getActiveEpisodeTrigger(
-    observation.episodeId as BreachEpisodeId,
-  );
-
-  const domainResult = qualifyTrigger({
-    positionId: observation.positionId,
-    direction: observation.direction,
-    observedAt: clock.now(),
-    episodeId: observation.episodeId,
-    consecutiveOutOfRangeCount: consecutiveCount,
-    ...(existingId != null && { existingTriggerIdForEpisode: existingId }),
-  });
-
-  if (domainResult.kind === 'not-qualified') {
-    return { kind: 'not-qualified', reason: domainResult.reason };
+  const thresholdResult = evaluateConfirmationThreshold(observation.consecutiveCount);
+  if (thresholdResult.kind === 'not-met') {
+    return { kind: 'not-qualified', reason: thresholdResult.reason };
   }
 
-  if (domainResult.kind === 'duplicate-suppressed') {
+  const trigger = buildExitTrigger({
+    triggerId: ids.generateId() as ExitTriggerId,
+    positionId: observation.positionId,
+    direction: observation.direction,
+    observedAt: observation.observedAt,
+    episodeId: observation.episodeId,
+  });
+
+  const finalization = await episodeRepo.finalizeQualification(observation.episodeId, trigger);
+  if (finalization.kind === 'duplicate-suppressed') {
     return {
       kind: 'duplicate-suppressed',
-      existingTriggerId: domainResult.existingTriggerId as ExitTriggerId,
+      existingTriggerId: finalization.existingTriggerId,
     };
   }
 
-  await triggerRepo.saveTrigger(domainResult.trigger);
-
-  const episode: BreachEpisode = {
-    episodeId: observation.episodeId as BreachEpisodeId,
-    positionId: observation.positionId,
-    direction: observation.direction,
-    startedAt: observation.observedAt,
-    lastObservedAt: clock.now(),
-    activeTriggerId: domainResult.trigger.triggerId,
-  };
-  await triggerRepo.saveEpisode(episode);
-
-  return { kind: 'trigger-created', trigger: domainResult.trigger };
+  return { kind: 'trigger-created', trigger };
 }
