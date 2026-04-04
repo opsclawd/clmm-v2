@@ -68,6 +68,10 @@ export class SolanaExecutionPreparationAdapter implements ExecutionPreparationPo
     const rpc = this.getRpc();
     const payer = address(walletId);
 
+    // Orca SDK defaults to native SOL wrapping via ephemeral keypair, which introduces an
+    // additional signer not available in this wallet-only signing flow.
+    setNativeMintWrappingStrategy('ata');
+
     const { value: latestBlockhash } = await rpc.getLatestBlockhash().send();
 
     const positionData = await this.fetchPositionData(rpc, positionId);
@@ -294,10 +298,6 @@ export class SolanaExecutionPreparationAdapter implements ExecutionPreparationPo
     inputMint: string,
     inputAmount: bigint,
   ): Promise<Instruction[]> {
-    // Ensure fallback swap does not depend on an ephemeral keypair signer for SOL wrapping.
-    // In this architecture only the end-user wallet can sign the prepared transaction.
-    setNativeMintWrappingStrategy('ata');
-
     const authority = createNoopSigner(address(walletId));
     const result = await swapInstructions(
       rpc,
