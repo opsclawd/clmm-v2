@@ -14,6 +14,7 @@ type Props = {
   retryEligible?: boolean;
   signingState: SigningState;
   signingError?: string;
+  declineLoading?: boolean;
   statusLoading?: boolean;
   statusError?: string | null;
   statusNotice?: string | null;
@@ -40,6 +41,7 @@ export function SigningStatusScreen({
   retryEligible,
   signingState,
   signingError,
+  declineLoading,
   statusLoading,
   statusError,
   statusNotice,
@@ -172,6 +174,7 @@ export function SigningStatusScreen({
       lifecycleState.kind === 'partial');
   const retryDisabled = !canRetry;
   const progressLabel = showProgress ? getProgressLabel(signingState) : undefined;
+  const declineDisabled = declineLoading === true;
 
   return (
     <ScrollView style={{ flex: 1, backgroundColor: colors.background }}>
@@ -234,7 +237,8 @@ export function SigningStatusScreen({
 
         {canDecline ? (
           <TouchableOpacity
-            onPress={onDecline}
+            disabled={declineDisabled}
+            onPress={declineDisabled ? undefined : onDecline}
             style={{
               marginTop: 16,
               padding: 16,
@@ -243,14 +247,19 @@ export function SigningStatusScreen({
               borderWidth: 1,
               borderColor: colors.border,
               alignItems: 'center',
+              flexDirection: 'row',
+              justifyContent: 'center',
+              gap: 8,
+              opacity: declineDisabled ? 0.7 : 1,
             }}
           >
+            {declineDisabled ? <ActivityIndicator size="small" color={colors.text} /> : null}
             <Text style={{
               color: colors.text,
               fontSize: typography.fontSize.base,
               fontWeight: typography.fontWeight.semibold,
             }}>
-              Decline Signing
+              {declineDisabled ? 'Declining...' : 'Decline Signing'}
             </Text>
           </TouchableOpacity>
         ) : null}

@@ -58,7 +58,6 @@ export default function SigningRoute() {
   const walletAddress = useStore(walletSessionStore, (state) => state.walletAddress);
   const connectionKind = useStore(walletSessionStore, (state) => state.connectionKind);
   const [statusNotice, setStatusNotice] = useState<string | null>(null);
-  const [isDecliningTransition, setIsDecliningTransition] = useState(false);
   const [hasStartedPendingApproval, setHasStartedPendingApproval] = useState(false);
 
   const approveMutation = useMutation({
@@ -128,9 +127,6 @@ export default function SigningRoute() {
     signingPayloadQuery.error instanceof Error
       ? (staleExecutionQuery.data ?? executionQuery.data)
       : executionQuery.data;
-  const displayLifecycleState = isDecliningTransition ? undefined : displayedExecution?.lifecycleState;
-  const displayBreachDirection = isDecliningTransition ? undefined : displayedExecution?.breachDirection;
-  const displayRetryEligible = isDecliningTransition ? undefined : displayedExecution?.retryEligible;
 
   const declineAvailable = canDeclineSigning({ displayedExecution });
 
@@ -222,13 +218,14 @@ export default function SigningRoute() {
 
   return (
     <SigningStatusScreen
-      {...(displayLifecycleState != null
+      {...(displayedExecution != null
         ? {
-            lifecycleState: displayLifecycleState,
-            ...(displayBreachDirection != null ? { breachDirection: displayBreachDirection } : {}),
-            ...(displayRetryEligible != null ? { retryEligible: displayRetryEligible } : {}),
+            lifecycleState: displayedExecution.lifecycleState,
+            ...(displayedExecution.breachDirection != null ? { breachDirection: displayedExecution.breachDirection } : {}),
+            ...(displayedExecution.retryEligible != null ? { retryEligible: displayedExecution.retryEligible } : {}),
           }
         : {})}
+      declineLoading={declineMutation.isPending}
       statusLoading={
         (isPendingApprovalMode &&
           !hasStartedPendingApproval &&
@@ -240,8 +237,7 @@ export default function SigningRoute() {
         staleExecutionQuery.isLoading ||
         signingPayloadQuery.isLoading ||
         signMutation.isPending ||
-        declineMutation.isPending ||
-        isDecliningTransition
+        declineMutation.isPending
       }
       statusError={
         isPendingApprovalMode && previewId == null
@@ -268,16 +264,11 @@ export default function SigningRoute() {
             ...(declineAvailable
               ? {
                   onDecline: () => {
-                    if (isDecliningTransition || declineMutation.isPending) {
+                    if (declineMutation.isPending) {
                       return;
                     }
 
-                    setIsDecliningTransition(true);
-                    declineMutation.mutate(undefined, {
-                      onSettled: () => {
-                        setIsDecliningTransition(false);
-                      },
-                    });
+                    declineMutation.mutate();
                   },
                 }
               : {}),
