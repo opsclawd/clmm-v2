@@ -9,36 +9,36 @@ import type {
 } from '@clmm/domain';
 
 export type EpisodeTransition =
-  | { kind: 'no-op' }
+  | { readonly kind: 'no-op' }
   | {
-      kind: 'episode-closed-recovered';
-      closedEpisodeId: BreachEpisodeId;
-      direction: BreachDirection;
+      readonly kind: 'episode-closed-recovered';
+      readonly closedEpisodeId: BreachEpisodeId;
+      readonly direction: BreachDirection;
     }
   | {
-      kind: 'episode-started';
-      episodeId: BreachEpisodeId;
-      direction: BreachDirection;
-      consecutiveCount: number;
+      readonly kind: 'episode-started';
+      readonly episodeId: BreachEpisodeId;
+      readonly direction: BreachDirection;
+      readonly consecutiveCount: number;
     }
   | {
-      kind: 'episode-continued';
-      episodeId: BreachEpisodeId;
-      direction: BreachDirection;
-      consecutiveCount: number;
+      readonly kind: 'episode-continued';
+      readonly episodeId: BreachEpisodeId;
+      readonly direction: BreachDirection;
+      readonly consecutiveCount: number;
     }
   | {
-      kind: 'episode-reversed';
-      closedEpisodeId: BreachEpisodeId;
-      oldDirection: BreachDirection;
-      newEpisodeId: BreachEpisodeId;
-      newDirection: BreachDirection;
-      consecutiveCount: number;
+      readonly kind: 'episode-reversed';
+      readonly closedEpisodeId: BreachEpisodeId;
+      readonly oldDirection: BreachDirection;
+      readonly newEpisodeId: BreachEpisodeId;
+      readonly newDirection: BreachDirection;
+      readonly consecutiveCount: number;
     };
 
 export type FinalizationResult =
-  | { kind: 'qualified'; triggerId: ExitTriggerId }
-  | { kind: 'duplicate-suppressed'; existingTriggerId: ExitTriggerId };
+  | { readonly kind: 'qualified'; readonly triggerId: ExitTriggerId }
+  | { readonly kind: 'duplicate-suppressed'; readonly existingTriggerId: ExitTriggerId };
 
 export interface BreachEpisodeRepository {
   recordInRange(positionId: PositionId, observedAt: ClockTimestamp): Promise<EpisodeTransition>;
