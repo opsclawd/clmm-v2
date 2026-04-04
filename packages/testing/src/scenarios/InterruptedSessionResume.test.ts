@@ -8,11 +8,12 @@ import {
   createExecutionPreview,
   resumeExecutionAttempt,
 } from '@clmm/application';
+import type { BreachObservationResult } from '@clmm/application';
 import {
   FakeSupportedPositionReadPort,
   FakeClockPort,
   FakeIdGeneratorPort,
-  FakeTriggerRepository,
+  FakeBreachEpisodeRepository,
   FakeSwapQuotePort,
   FakeExecutionRepository,
   FakeExecutionPreparationPort,
@@ -39,7 +40,7 @@ describe('Interrupted-Session Resume Smoke Scenario', () => {
     const clock = new FakeClockPort();
     const ids = new FakeIdGeneratorPort('interrupted');
     const positionRead = new FakeSupportedPositionReadPort([FIXTURE_POSITION_BELOW_RANGE]);
-    const triggerRepo = new FakeTriggerRepository();
+    const episodeRepo = new FakeBreachEpisodeRepository();
     const swapQuote = new FakeSwapQuotePort();
     const executionRepo = new FakeExecutionRepository();
     const prepPort = new FakeExecutionPreparationPort();
@@ -48,7 +49,7 @@ describe('Interrupted-Session Resume Smoke Scenario', () => {
     const historyRepo = new FakeExecutionHistoryRepository();
 
     return {
-      walletId, clock, ids, positionRead, triggerRepo, swapQuote,
+      walletId, clock, ids, positionRead, episodeRepo, swapQuote,
       executionRepo, prepPort, signingPort, submissionPort, historyRepo,
     };
   }
@@ -56,27 +57,30 @@ describe('Interrupted-Session Resume Smoke Scenario', () => {
   it('interrupted signing session is resumable and can complete after re-approval', async () => {
     const fakes = buildFakes();
     const {
-      walletId, clock, ids, positionRead, triggerRepo, swapQuote,
+      walletId, clock, ids, positionRead, episodeRepo, swapQuote,
       executionRepo, prepPort, signingPort, submissionPort, historyRepo,
     } = fakes;
 
     // 1. Scan — detect below-range position
-    const observations = await scanPositionsForBreaches({
-      walletId,
-      positionReadPort: positionRead,
-      clock,
-      ids,
-    });
-    expect(observations.length).toBeGreaterThan(0);
-    const obs = observations[0]!;
+    let obs: BreachObservationResult | null = null;
+    for (let i = 0; i < 3; i += 1) {
+      const { observations } = await scanPositionsForBreaches({
+        walletId,
+        positionReadPort: positionRead,
+        clock,
+        episodeRepo,
+      });
+      expect(observations.length).toBeGreaterThan(0);
+      obs = observations[0]!;
+      clock.advance(60_000);
+    }
+    if (!obs) throw new Error('Expected breach observation');
     expect(obs.direction.kind).toBe('lower-bound-breach');
 
     // 2. Qualify — create actionable trigger
     const qualifyResult = await qualifyActionableTrigger({
       observation: obs,
-      consecutiveCount: 3,
-      triggerRepo,
-      clock,
+      episodeRepo,
       ids,
     });
     expect(qualifyResult.kind).toBe('trigger-created');
@@ -158,26 +162,29 @@ describe('Interrupted-Session Resume Smoke Scenario', () => {
   it('interrupted attempt is distinct from declined (abandoned) attempt', async () => {
     const fakes = buildFakes();
     const {
-      walletId, clock, ids, positionRead, triggerRepo, swapQuote,
+      walletId, clock, ids, positionRead, episodeRepo, swapQuote,
       executionRepo, prepPort, signingPort, submissionPort, historyRepo,
     } = fakes;
 
     // 1. Scan — detect below-range position
-    const observations = await scanPositionsForBreaches({
-      walletId,
-      positionReadPort: positionRead,
-      clock,
-      ids,
-    });
-    expect(observations.length).toBeGreaterThan(0);
-    const obs = observations[0]!;
+    let obs: BreachObservationResult | null = null;
+    for (let i = 0; i < 3; i += 1) {
+      const { observations } = await scanPositionsForBreaches({
+        walletId,
+        positionReadPort: positionRead,
+        clock,
+        episodeRepo,
+      });
+      expect(observations.length).toBeGreaterThan(0);
+      obs = observations[0]!;
+      clock.advance(60_000);
+    }
+    if (!obs) throw new Error('Expected breach observation');
 
     // 2. Qualify — create actionable trigger
     const qualifyResult = await qualifyActionableTrigger({
       observation: obs,
-      consecutiveCount: 3,
-      triggerRepo,
-      clock,
+      episodeRepo,
       ids,
     });
     expect(qualifyResult.kind).toBe('trigger-created');

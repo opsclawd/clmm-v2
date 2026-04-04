@@ -5,11 +5,12 @@ import {
 import { scanPositionsForBreaches } from '@clmm/application';
 import { qualifyActionableTrigger } from '@clmm/application';
 import { createExecutionPreview } from '@clmm/application';
+import type { BreachObservationResult } from '@clmm/application';
 import {
   FakeSupportedPositionReadPort,
   FakeClockPort,
   FakeIdGeneratorPort,
-  FakeTriggerRepository,
+  FakeBreachEpisodeRepository,
   FakeSwapQuotePort,
   FakeExecutionRepository,
   FakeExecutionPreparationPort,
@@ -40,7 +41,7 @@ export async function runBreachToExitScenario(params: {
       : FIXTURE_POSITION_ABOVE_RANGE;
 
   const positionRead = new FakeSupportedPositionReadPort([fixturePosition]);
-  const triggerRepo = new FakeTriggerRepository();
+  const episodeRepo = new FakeBreachEpisodeRepository();
   const swapQuote = new FakeSwapQuotePort();
   const executionRepo = new FakeExecutionRepository();
   const prepPort = new FakeExecutionPreparationPort();
@@ -48,20 +49,24 @@ export async function runBreachToExitScenario(params: {
   const submissionPort = new FakeExecutionSubmissionPort();
   const historyRepo = new FakeExecutionHistoryRepository();
 
-  const observations = await scanPositionsForBreaches({
-    walletId,
-    positionReadPort: positionRead,
-    clock,
-    ids,
-  });
-  if (observations.length === 0) throw new Error('No observations from scan');
-  const obs = observations[0]!;
+  let obs: BreachObservationResult | null = null;
+  for (let i = 0; i < 3; i += 1) {
+    const { observations } = await scanPositionsForBreaches({
+      walletId,
+      positionReadPort: positionRead,
+      clock,
+      episodeRepo,
+    });
+    if (observations.length === 0) throw new Error('No observations from scan');
+    obs = observations[0]!;
+    clock.advance(60_000);
+  }
+
+  if (!obs) throw new Error('No observation available for qualification');
 
   const qualifyResult = await qualifyActionableTrigger({
     observation: obs,
-    consecutiveCount: 3,
-    triggerRepo,
-    clock,
+    episodeRepo,
     ids,
   });
   if (qualifyResult.kind !== 'trigger-created') {

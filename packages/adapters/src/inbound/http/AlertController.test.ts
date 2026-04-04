@@ -22,7 +22,7 @@ describe('AlertController', () => {
 
     const controller = new AlertController(triggerRepo);
 
-    await triggerRepo.saveTrigger({
+    triggerRepo.triggers.set('trigger-owned', {
       triggerId: 'trigger-owned' as ExitTriggerId,
       positionId: FIXTURE_POSITION_IN_RANGE.positionId,
       episodeId: 'episode-owned' as BreachEpisodeId,
@@ -31,7 +31,7 @@ describe('AlertController', () => {
       confirmationEvaluatedAt: makeClockTimestamp(1_000_001),
       confirmationPassed: true,
     });
-    await triggerRepo.saveTrigger({
+    triggerRepo.triggers.set('trigger-leaked', {
       triggerId: 'trigger-leaked' as ExitTriggerId,
       positionId: otherPositionId,
       episodeId: 'episode-leaked' as BreachEpisodeId,

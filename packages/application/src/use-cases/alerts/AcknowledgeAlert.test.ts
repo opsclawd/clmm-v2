@@ -21,7 +21,8 @@ describe('AcknowledgeAlert', () => {
 
   beforeEach(async () => {
     triggerRepo = new FakeTriggerRepository();
-    await triggerRepo.saveTrigger(makeFixtureTrigger('trigger-ack-1'));
+    const trigger = makeFixtureTrigger('trigger-ack-1');
+    triggerRepo.triggers.set(trigger.triggerId, trigger);
   });
 
   it('acknowledges an existing trigger and removes it', async () => {

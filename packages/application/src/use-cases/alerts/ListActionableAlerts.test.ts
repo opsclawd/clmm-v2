@@ -34,14 +34,16 @@ describe('ListActionableAlerts', () => {
   });
 
   it('returns triggers that have been saved', async () => {
-    await triggerRepo.saveTrigger(makeFixtureTrigger());
+    const trigger = makeFixtureTrigger();
+    triggerRepo.triggers.set(trigger.triggerId, trigger);
     const result = await listActionableAlerts({ walletId: FIXTURE_WALLET_ID, triggerRepo });
     expect(result.triggers).toHaveLength(1);
     expect(result.triggers[0]?.breachDirection.kind).toBe('lower-bound-breach');
   });
 
   it('includes triggerId and positionId in results', async () => {
-    await triggerRepo.saveTrigger(makeFixtureTrigger());
+    const trigger = makeFixtureTrigger();
+    triggerRepo.triggers.set(trigger.triggerId, trigger);
     const result = await listActionableAlerts({ walletId: FIXTURE_WALLET_ID, triggerRepo });
     expect(result.triggers[0]?.triggerId).toBeDefined();
     expect(result.triggers[0]?.positionId).toBe(FIXTURE_POSITION_ID);

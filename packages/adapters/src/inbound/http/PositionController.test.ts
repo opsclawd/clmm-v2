@@ -13,7 +13,7 @@ describe('PositionController', () => {
   it('returns populated position detail with actionable trigger fields when a trigger exists', async () => {
     const positionReadPort = new FakeSupportedPositionReadPort([FIXTURE_POSITION_IN_RANGE]);
     const triggerRepo = new FakeTriggerRepository();
-    await triggerRepo.saveTrigger({
+    triggerRepo.triggers.set('trigger-position-1', {
       triggerId: 'trigger-position-1' as ExitTriggerId,
       positionId: FIXTURE_POSITION_IN_RANGE.positionId,
       episodeId: 'episode-position-1' as BreachEpisodeId,
@@ -172,7 +172,7 @@ describe('PositionController', () => {
   it('enriches position summaries with hasActionableTrigger from trigger repository', async () => {
     const positionReadPort = new FakeSupportedPositionReadPort([FIXTURE_POSITION_IN_RANGE]);
     const triggerRepo = new FakeTriggerRepository();
-    await triggerRepo.saveTrigger({
+    triggerRepo.triggers.set('trigger-list-1', {
       triggerId: 'trigger-list-1' as ExitTriggerId,
       positionId: FIXTURE_POSITION_IN_RANGE.positionId,
       episodeId: 'episode-list-1' as BreachEpisodeId,
