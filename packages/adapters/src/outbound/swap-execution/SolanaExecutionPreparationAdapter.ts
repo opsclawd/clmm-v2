@@ -37,7 +37,8 @@ import type { ExecutionPreparationPort } from '@clmm/application';
 import type { ExecutionPlan, WalletId, PositionId, PoolId, ClockTimestamp, LiquidityPosition } from '@clmm/domain';
 import { makeClockTimestamp } from '@clmm/domain';
 
-const JUPITER_API_BASE = 'https://api.jup.ag/swap/v1';
+const JUPITER_QUOTE_API_BASE = 'https://quote-api.jup.ag/v6';
+const JUPITER_SWAP_API_BASE = 'https://api.jup.ag/swap/v1';
 
 const SOL_MINT = 'So11111111111111111111111111111111111111112';
 const TOKEN_MINTS: Record<'SOL' | 'USDC', string> = {
@@ -73,7 +74,8 @@ export class SolanaExecutionPreparationAdapter implements ExecutionPreparationPo
 
     const orcaPreparation = await this.buildOrcaInstructions(rpc, positionData, walletId);
     const { instructions: orcaInstructions } = orcaPreparation;
-    const swapInstructions = await this.buildSwapInstructions(plan, walletId, orcaPreparation);
+    const swapPreparation = await this.buildSwapInstructions(plan, walletId, orcaPreparation);
+    const swapInstructions = swapPreparation.instructions;
 
     const allInstructions: Instruction[] = [...orcaInstructions];
     if (swapInstructions.length > 0) {
@@ -82,7 +84,11 @@ export class SolanaExecutionPreparationAdapter implements ExecutionPreparationPo
 
     const requiresSwapStep = plan.steps.some((step) => step.kind === 'swap-assets');
     if (requiresSwapStep && swapInstructions.length === 0) {
-      throw new Error('Swap step is required by the execution plan but no swap instructions were prepared');
+      throw new Error(
+        `Swap step is required by the execution plan but no swap instructions were prepared${
+          swapPreparation.failureReason ? `: ${swapPreparation.failureReason}` : ''
+        }`,
+      );
     }
 
     const message = pipe(
@@ -183,10 +189,10 @@ export class SolanaExecutionPreparationAdapter implements ExecutionPreparationPo
       tokenMintA: string;
       tokenMintB: string;
     },
-  ): Promise<Instruction[]> {
+  ): Promise<{ instructions: Instruction[]; failureReason?: string }> {
     const swapStep = plan.steps.find((s) => s.kind === 'swap-assets');
     if (!swapStep || swapStep.kind !== 'swap-assets') {
-      return [];
+      return { instructions: [], failureReason: 'execution plan has no swap step' };
     }
 
     try {
@@ -208,17 +214,26 @@ export class SolanaExecutionPreparationAdapter implements ExecutionPreparationPo
         throw new Error(`Swap source mint ${sourceMint} not found in whirlpool token mints`);
       }
       if (swapAmount === 0n) {
-        return [];
+        return {
+          instructions: [],
+          failureReason: `close-position quote produced zero ${fromAsset} balance`,
+        };
       }
 
       const quoteResponse = await this.getJupiterQuote(inputMint, outputMint, swapAmount.toString());
       if (!quoteResponse) {
-        return [];
+        return {
+          instructions: [],
+          failureReason: `Jupiter quote unavailable for ${inputMint}->${outputMint} amount ${swapAmount.toString()}`,
+        };
       }
 
       const swapTransaction = await this.getJupiterSwapTransaction(quoteResponse, walletId);
       if (!swapTransaction) {
-        return [];
+        return {
+          instructions: [],
+          failureReason: 'Jupiter swap transaction unavailable',
+        };
       }
 
       const encoder = getBase64Encoder();
@@ -233,17 +248,28 @@ export class SolanaExecutionPreparationAdapter implements ExecutionPreparationPo
         this.getRpc(),
       );
 
-      return [...transactionMessage.instructions];
+      const instructions = [...transactionMessage.instructions];
+      if (instructions.length === 0) {
+        return {
+          instructions: [],
+          failureReason: 'Decoded Jupiter swap transaction contained no instructions',
+        };
+      }
+
+      return { instructions };
     } catch (error) {
       console.error('Failed to build swap instruction:', error);
-      return [];
+      return {
+        instructions: [],
+        failureReason: error instanceof Error ? error.message : 'unknown swap preparation error',
+      };
     }
   }
 
   // boundary: Jupiter v6 REST /quote response is untyped — no official SDK types available
   private async getJupiterQuote(inputMint: string, outputMint: string, amount: string): Promise<unknown> {
     try {
-      const url = `${JUPITER_API_BASE}/quote?inputMint=${inputMint}&outputMint=${outputMint}&amount=${amount}&slippageBps=50`;
+      const url = `${JUPITER_QUOTE_API_BASE}/quote?inputMint=${inputMint}&outputMint=${outputMint}&amount=${amount}&slippageBps=50`;
       const response = await fetch(url);
       if (!response.ok) {
         return null;
@@ -258,7 +284,7 @@ export class SolanaExecutionPreparationAdapter implements ExecutionPreparationPo
   // boundary: Jupiter v6 REST /swap expects the raw /quote response object — no official SDK types
   private async getJupiterSwapTransaction(quoteResponse: unknown, userPublicKey: string): Promise<string | null> {
     try {
-      const response = await fetch(`${JUPITER_API_BASE}/swap`, {
+      const response = await fetch(`${JUPITER_SWAP_API_BASE}/swap`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
