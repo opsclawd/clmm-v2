@@ -7,13 +7,20 @@ import type {
 export type BreachEpisodeId = string & { readonly _brand: 'BreachEpisodeId' };
 export type ExitTriggerId = string & { readonly _brand: 'ExitTriggerId' };
 
+export type BreachEpisodeStatus = 'open' | 'closed';
+export type EpisodeCloseReason = 'position-recovered' | 'direction-reversed';
+
 export type BreachEpisode = {
   readonly episodeId: BreachEpisodeId;
   readonly positionId: PositionId;
   readonly direction: BreachDirection;
+  readonly status: BreachEpisodeStatus;
   readonly startedAt: ClockTimestamp;
   readonly lastObservedAt: ClockTimestamp;
-  readonly activeTriggerId: ExitTriggerId | null;
+  readonly consecutiveCount: number;
+  readonly triggerId: ExitTriggerId | null;
+  readonly closedAt: ClockTimestamp | null;
+  readonly closeReason: EpisodeCloseReason | null;
 };
 
 export type ExitTrigger = {

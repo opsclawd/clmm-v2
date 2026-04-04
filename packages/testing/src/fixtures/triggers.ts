@@ -9,9 +9,13 @@ export const FIXTURE_LOWER_BREACH_EPISODE: BreachEpisode = {
   episodeId: FIXTURE_BREACH_EPISODE_ID,
   positionId: FIXTURE_POSITION_ID,
   direction: LOWER_BOUND_BREACH,
+  status: 'open',
   startedAt: makeClockTimestamp(900_000),
   lastObservedAt: makeClockTimestamp(1_000_000),
-  activeTriggerId: FIXTURE_EXIT_TRIGGER_ID,
+  consecutiveCount: 3,
+  triggerId: FIXTURE_EXIT_TRIGGER_ID,
+  closedAt: null,
+  closeReason: null,
 };
 
 export const FIXTURE_LOWER_EXIT_TRIGGER: ExitTrigger = {
