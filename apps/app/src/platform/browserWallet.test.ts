@@ -156,6 +156,34 @@ describe('browserWallet helpers', () => {
     ).rejects.toThrow('Wallet returned an unsupported signed transaction payload');
   });
 
+  it('retries with a serializable payload when provider rejects raw bytes', async () => {
+    let callCount = 0;
+    const provider = {
+      connect: () => Promise.resolve({ publicKey: null }),
+      signTransaction: (payload: unknown) => {
+        callCount += 1;
+
+        if (callCount === 1) {
+          expect(payload).toBeInstanceOf(Uint8Array);
+          return Promise.reject(new Error('r.serialize is not a function'));
+        }
+
+        expect(payload).toMatchObject({
+          serialize: expect.any(Function),
+        });
+        return Promise.resolve(new Uint8Array([7, 8, 9]));
+      },
+    };
+
+    const result = await signBrowserTransaction({
+      browserWindow: { solana: provider },
+      serializedPayload: VALID_SERIALIZED_PAYLOAD,
+    });
+
+    expect(callCount).toBe(2);
+    expect(result).toBe(Buffer.from([7, 8, 9]).toString('base64'));
+  });
+
   it('signBrowserTransaction throws when no browser wallet provider is injected', async () => {
     await expect(
       signBrowserTransaction({

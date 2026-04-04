@@ -7,7 +7,7 @@ export type BrowserWalletProvider = {
   publicKey?: BrowserWalletPublicKey | null;
   connect(): Promise<{ publicKey?: BrowserWalletPublicKey | null } | null | undefined>;
   disconnect?(): Promise<void>;
-  signTransaction?(payload: Uint8Array): Promise<unknown>;
+  signTransaction?(payload: unknown): Promise<unknown>;
 };
 
 export type BrowserWalletWindow = {
@@ -104,6 +104,18 @@ function normalizeSignedResult(payload: unknown): Uint8Array {
   throw new Error('Wallet returned an unsupported signed transaction payload');
 }
 
+function shouldRetryWithSerializablePayload(error: unknown): boolean {
+  return error instanceof Error && error.message.toLowerCase().includes('serialize is not a function');
+}
+
+function buildSerializablePayload(payloadBytes: Uint8Array): { serialize(): Uint8Array } {
+  return {
+    serialize() {
+      return payloadBytes;
+    },
+  };
+}
+
 export async function signBrowserTransaction(params: {
   browserWindow: BrowserWalletWindow | undefined;
   serializedPayload: string;
@@ -119,6 +131,17 @@ export async function signBrowserTransaction(params: {
   }
 
   const payloadBytes = decodeBase64Payload(params.serializedPayload);
-  const signedPayload = await provider.signTransaction(payloadBytes);
+  let signedPayload: unknown;
+
+  try {
+    signedPayload = await provider.signTransaction(payloadBytes);
+  } catch (error: unknown) {
+    if (!shouldRetryWithSerializablePayload(error)) {
+      throw error;
+    }
+
+    signedPayload = await provider.signTransaction(buildSerializablePayload(payloadBytes));
+  }
+
   return encodeBase64Payload(normalizeSignedResult(signedPayload));
 }
