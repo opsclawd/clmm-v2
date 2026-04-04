@@ -1,9 +1,8 @@
-import { useEffect, useState } from 'react';
+import { useEffect } from 'react';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useMutation } from '@tanstack/react-query';
 import { ExecutionPreviewScreen } from '@clmm/ui';
 import { useStore } from 'zustand';
-import { approveExecutionPreview } from '../../src/api/executions';
 import { createPreview, refreshPreview } from '../../src/api/previews';
 import { walletSessionStore } from '../../src/state/walletSessionStore';
 
@@ -16,7 +15,6 @@ export default function PreviewRoute() {
   const params = useLocalSearchParams<{ triggerId?: string | string[] }>();
   const triggerId = readTriggerId(params.triggerId);
   const walletAddress = useStore(walletSessionStore, (state) => state.walletAddress);
-  const [isApprovingTransition, setIsApprovingTransition] = useState(false);
 
   const createMutation = useMutation({
     mutationFn: createPreview,
@@ -25,11 +23,6 @@ export default function PreviewRoute() {
 
   const refreshMutation = useMutation({
     mutationFn: refreshPreview,
-    retry: 0,
-  });
-
-  const approvalMutation = useMutation({
-    mutationFn: approveExecutionPreview,
     retry: 0,
   });
 
@@ -43,50 +36,28 @@ export default function PreviewRoute() {
   }, [triggerId]);
 
   const preview = refreshMutation.data ?? createMutation.data;
-  const displayPreview = isApprovingTransition ? undefined : preview;
 
   return (
     <ExecutionPreviewScreen
-      {...(displayPreview != null ? { preview: displayPreview } : {})}
-      previewLoading={
-        isApprovingTransition || createMutation.isPending || refreshMutation.isPending || approvalMutation.isPending
-      }
+      {...(preview != null ? { preview } : {})}
+      previewLoading={createMutation.isPending || refreshMutation.isPending}
       previewError={
-        isApprovingTransition
-          ? null
-          : createMutation.error instanceof Error
-            ? createMutation.error.message
-            : refreshMutation.error instanceof Error
-              ? refreshMutation.error.message
-              : approvalMutation.error instanceof Error
-                ? approvalMutation.error.message
-                : null
+        createMutation.error instanceof Error
+          ? createMutation.error.message
+          : refreshMutation.error instanceof Error
+            ? refreshMutation.error.message
+            : null
       }
       {...(preview != null && walletAddress != null
         ? {
             onApprove: () => {
-              if (isApprovingTransition || approvalMutation.isPending) {
-                return;
-              }
-
-              setIsApprovingTransition(true);
-              approvalMutation.mutate(
-                {
+              router.push({
+                pathname: '/signing/[attemptId]',
+                params: {
+                  attemptId: 'pending',
                   previewId: preview.previewId,
-                  walletId: walletAddress,
                 },
-                {
-                  onSuccess: (approval) => {
-                    router.push({
-                      pathname: '/signing/[attemptId]',
-                      params: { attemptId: approval.attemptId },
-                    });
-                  },
-                  onError: () => {
-                    setIsApprovingTransition(false);
-                  },
-                },
-              );
+              });
             },
           }
         : {})}

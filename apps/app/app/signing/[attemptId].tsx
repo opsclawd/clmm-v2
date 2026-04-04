@@ -1,9 +1,10 @@
 import { useRouter, useLocalSearchParams } from 'expo-router';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useQuery, useMutation } from '@tanstack/react-query';
 import { SigningStatusScreen } from '@clmm/ui';
 import { useStore } from 'zustand';
 import {
+  approveExecutionPreview,
   fetchExecution,
   fetchExecutionSigningPayload,
   recordSignatureDecline,
@@ -17,7 +18,15 @@ import { walletSessionStore } from '../../src/state/walletSessionStore';
 import type { ExecutionAttemptDto } from '@clmm/application/public';
 
 function readAttemptId(value: string | string[] | undefined): string | null {
+  return typeof value === 'string' && value.length > 0 && value !== 'pending' ? value : null;
+}
+
+function readPreviewId(value: string | string[] | undefined): string | null {
   return typeof value === 'string' && value.length > 0 ? value : null;
+}
+
+function isPendingAttemptPlaceholder(value: string | string[] | undefined): boolean {
+  return typeof value === 'string' && value === 'pending';
 }
 
 function canDeclineSigning(params: { displayedExecution: ExecutionAttemptDto | undefined }): boolean {
@@ -42,11 +51,57 @@ async function recordSigningOutcome(params: {
 
 export default function SigningRoute() {
   const router = useRouter();
-  const params = useLocalSearchParams<{ attemptId?: string | string[] }>();
+  const params = useLocalSearchParams<{ attemptId?: string | string[]; previewId?: string | string[] }>();
   const attemptId = readAttemptId(params.attemptId);
+  const previewId = readPreviewId(params.previewId);
+  const hasPendingAttemptPlaceholder = isPendingAttemptPlaceholder(params.attemptId);
   const walletAddress = useStore(walletSessionStore, (state) => state.walletAddress);
   const connectionKind = useStore(walletSessionStore, (state) => state.connectionKind);
   const [statusNotice, setStatusNotice] = useState<string | null>(null);
+  const [isDecliningTransition, setIsDecliningTransition] = useState(false);
+  const [hasStartedPendingApproval, setHasStartedPendingApproval] = useState(false);
+
+  const approveMutation = useMutation({
+    mutationFn: approveExecutionPreview,
+    retry: 0,
+  });
+
+  const isPendingApprovalMode = hasPendingAttemptPlaceholder && attemptId == null;
+  const canStartPendingApproval = isPendingApprovalMode && previewId != null && walletAddress != null;
+
+  useEffect(() => {
+    if (
+      !canStartPendingApproval ||
+      hasStartedPendingApproval ||
+      approveMutation.isPending ||
+      approveMutation.isSuccess
+    ) {
+      return;
+    }
+
+    setHasStartedPendingApproval(true);
+    approveMutation.mutate(
+      {
+        previewId,
+        walletId: walletAddress,
+      },
+      {
+        onSuccess: (approval) => {
+          router.replace({
+            pathname: '/signing/[attemptId]',
+            params: { attemptId: approval.attemptId },
+          });
+        },
+      },
+    );
+  }, [
+    approveMutation,
+    canStartPendingApproval,
+    hasStartedPendingApproval,
+    previewId,
+    router,
+    walletAddress,
+  ]);
 
   const executionQuery = useQuery({
     queryKey: ['execution-attempt', attemptId],
@@ -73,6 +128,9 @@ export default function SigningRoute() {
     signingPayloadQuery.error instanceof Error
       ? (staleExecutionQuery.data ?? executionQuery.data)
       : executionQuery.data;
+  const displayLifecycleState = isDecliningTransition ? undefined : displayedExecution?.lifecycleState;
+  const displayBreachDirection = isDecliningTransition ? undefined : displayedExecution?.breachDirection;
+  const displayRetryEligible = isDecliningTransition ? undefined : displayedExecution?.retryEligible;
 
   const declineAvailable = canDeclineSigning({ displayedExecution });
 
@@ -164,22 +222,35 @@ export default function SigningRoute() {
 
   return (
     <SigningStatusScreen
-      {...(displayedExecution != null
+      {...(displayLifecycleState != null
         ? {
-            lifecycleState: displayedExecution.lifecycleState,
-            breachDirection: displayedExecution.breachDirection,
-            retryEligible: displayedExecution.retryEligible,
+            lifecycleState: displayLifecycleState,
+            ...(displayBreachDirection != null ? { breachDirection: displayBreachDirection } : {}),
+            ...(displayRetryEligible != null ? { retryEligible: displayRetryEligible } : {}),
           }
         : {})}
       statusLoading={
+        (isPendingApprovalMode &&
+          !hasStartedPendingApproval &&
+          approveMutation.error == null &&
+          previewId != null &&
+          walletAddress != null) ||
+        approveMutation.isPending ||
         executionQuery.isLoading ||
         staleExecutionQuery.isLoading ||
         signingPayloadQuery.isLoading ||
         signMutation.isPending ||
-        declineMutation.isPending
+        declineMutation.isPending ||
+        isDecliningTransition
       }
       statusError={
-        executionQuery.error instanceof Error
+        isPendingApprovalMode && previewId == null
+          ? 'Could not start signing flow: missing preview reference.'
+          : isPendingApprovalMode && walletAddress == null
+            ? 'Connect your wallet to continue signing.'
+            : approveMutation.error instanceof Error
+          ? approveMutation.error.message
+          : executionQuery.error instanceof Error
           ? executionQuery.error.message
           : staleExecutionQuery.error instanceof Error
             ? staleExecutionQuery.error.message
@@ -197,7 +268,16 @@ export default function SigningRoute() {
             ...(declineAvailable
               ? {
                   onDecline: () => {
-                    declineMutation.mutate();
+                    if (isDecliningTransition || declineMutation.isPending) {
+                      return;
+                    }
+
+                    setIsDecliningTransition(true);
+                    declineMutation.mutate(undefined, {
+                      onSettled: () => {
+                        setIsDecliningTransition(false);
+                      },
+                    });
                   },
                 }
               : {}),
