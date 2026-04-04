@@ -6,7 +6,6 @@ import {
   scanPositionsForBreaches,
   qualifyActionableTrigger,
   createExecutionPreview,
-  approveExecution,
   resumeExecutionAttempt,
 } from '@clmm/application';
 import {
@@ -22,6 +21,7 @@ import {
   FakeExecutionHistoryRepository,
 } from '../fakes/index.js';
 import { FIXTURE_POSITION_BELOW_RANGE } from '../fixtures/index.js';
+import { runApprovalFlow } from './approvalFlow.js';
 
 /**
  * Interrupted-session resume smoke scenario.
@@ -94,11 +94,9 @@ describe('Interrupted-Session Resume Smoke Scenario', () => {
 
     // 4. Interrupt signing — simulate MWA/wallet interruption
     signingPort.willInterrupt();
-    const interruptedOutcome = await approveExecution({
+    const interruptedOutcome = await runApprovalFlow({
       previewId: previewResult.previewId,
       walletId,
-      positionId: obs.positionId,
-      breachDirection: obs.direction,
       executionRepo,
       prepPort,
       signingPort,
@@ -133,11 +131,9 @@ describe('Interrupted-Session Resume Smoke Scenario', () => {
       ids,
     });
 
-    const reApprovalOutcome = await approveExecution({
+    const reApprovalOutcome = await runApprovalFlow({
       previewId: freshPreview.previewId,
       walletId,
-      positionId: obs.positionId,
-      breachDirection: obs.direction,
       executionRepo,
       prepPort,
       signingPort,
@@ -198,11 +194,9 @@ describe('Interrupted-Session Resume Smoke Scenario', () => {
 
     // 4. Decline signing — simulate user declining wallet signature
     signingPort.willDecline();
-    const declinedOutcome = await approveExecution({
+    const declinedOutcome = await runApprovalFlow({
       previewId: previewResult.previewId,
       walletId,
-      positionId: obs.positionId,
-      breachDirection: obs.direction,
       executionRepo,
       prepPort,
       signingPort,

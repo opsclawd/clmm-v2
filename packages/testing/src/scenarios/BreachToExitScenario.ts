@@ -5,8 +5,6 @@ import {
 import { scanPositionsForBreaches } from '@clmm/application';
 import { qualifyActionableTrigger } from '@clmm/application';
 import { createExecutionPreview } from '@clmm/application';
-import { approveExecution } from '@clmm/application';
-import type { ApproveExecutionResult } from '@clmm/application';
 import {
   FakeSupportedPositionReadPort,
   FakeClockPort,
@@ -20,11 +18,13 @@ import {
   FakeExecutionHistoryRepository,
 } from '../fakes/index.js';
 import { FIXTURE_POSITION_BELOW_RANGE, FIXTURE_POSITION_ABOVE_RANGE } from '../fixtures/index.js';
+import { runApprovalFlow } from './approvalFlow.js';
+import type { ScenarioApprovalOutcome } from './approvalFlow.js';
 
 export type ScenarioResult = {
   previewPosture: PostExitAssetPosture;
   swapInstruction: SwapInstruction;
-  approvalOutcome: ApproveExecutionResult;
+  approvalOutcome: ScenarioApprovalOutcome;
 };
 
 export async function runBreachToExitScenario(params: {
@@ -77,11 +77,9 @@ export async function runBreachToExitScenario(params: {
     ids,
   });
 
-  const approvalOutcome = await approveExecution({
+  const approvalOutcome = await runApprovalFlow({
     previewId: previewResult.previewId,
     walletId,
-    positionId: obs.positionId,
-    breachDirection: obs.direction,
     executionRepo,
     prepPort,
     signingPort,

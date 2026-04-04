@@ -6,7 +6,6 @@ import {
   scanPositionsForBreaches,
   qualifyActionableTrigger,
   createExecutionPreview,
-  approveExecution,
   reconcileExecutionAttempt,
   resumeExecutionAttempt,
 } from '@clmm/application';
@@ -23,6 +22,7 @@ import {
   FakeExecutionHistoryRepository,
 } from '../fakes/index.js';
 import { FIXTURE_POSITION_BELOW_RANGE } from '../fixtures/index.js';
+import { runApprovalFlow } from './approvalFlow.js';
 
 /**
  * Partial-completion resume smoke scenario.
@@ -92,11 +92,9 @@ describe('Partial-Completion Resume Smoke Scenario', () => {
     expect(previewResult.plan.postExitPosture.kind).toBe('exit-to-usdc');
 
     // 4. Approve — sign and submit
-    const approvalOutcome = await approveExecution({
+    const approvalOutcome = await runApprovalFlow({
       previewId: previewResult.previewId,
       walletId,
-      positionId: obs.positionId,
-      breachDirection: obs.direction,
       executionRepo,
       prepPort,
       signingPort,
