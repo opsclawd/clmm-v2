@@ -22,15 +22,43 @@ export function getBffBaseUrl(): string {
   );
 }
 
-export async function fetchJson(path: string): Promise<unknown> {
-  const response = await fetch(`${getBffBaseUrl()}${path}`, { method: 'GET' });
+export async function fetchJson(path: string, init?: RequestInit): Promise<unknown> {
+  const response = await fetch(`${getBffBaseUrl()}${path}`, {
+    ...init,
+    headers: {
+      'Content-Type': 'application/json',
+      ...init?.headers,
+    },
+  });
 
   if (!response.ok) {
-    const responseText = await response.text().catch(() => '');
-    const statusDetail = responseText.length > 0 ? `: ${responseText}` : '';
-
-    throw new Error(`HTTP ${response.status}${statusDetail}`);
+    const detail = await extractErrorDetail(response);
+    throw new Error(detail);
   }
 
-  return response.json();
+  try {
+    return await response.json();
+  } catch {
+    throw new Error('Response body was not valid JSON');
+  }
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null && !Array.isArray(value);
+}
+
+async function extractErrorDetail(response: Response): Promise<string> {
+  const fallback = `HTTP ${response.status}: ${response.statusText}`;
+
+  try {
+    const body: unknown = await response.json();
+
+    if (isRecord(body) && typeof body['message'] === 'string') {
+      return body['message'];
+    }
+
+    return fallback;
+  } catch {
+    return fallback;
+  }
 }
