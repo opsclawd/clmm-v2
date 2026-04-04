@@ -1,4 +1,4 @@
-// This is the ONLY import surface for packages/ui.
+// This is the ONLY import surface for packages/ui and packages/testing.
 // Do not add implementation details here.
 
 // DTOs
@@ -35,3 +35,13 @@ export {
   makeClockTimestamp,
   makePositionId,
 } from '@clmm/domain';
+
+// Use cases (needed by testing scenarios)
+export { scanPositionsForBreaches } from '../use-cases/triggers/ScanPositionsForBreaches.js';
+export { qualifyActionableTrigger } from '../use-cases/triggers/QualifyActionableTrigger.js';
+export { createExecutionPreview } from '../use-cases/previews/CreateExecutionPreview.js';
+export { refreshExecutionPreview } from '../use-cases/previews/RefreshExecutionPreview.js';
+export { approveExecution } from '../use-cases/execution/ApproveExecution.js';
+export type { ApproveExecutionResult } from '../use-cases/execution/ApproveExecution.js';
+export { resumeExecutionAttempt } from '../use-cases/execution/ResumeExecutionAttempt.js';
+export { reconcileExecutionAttempt } from '../use-cases/execution/ReconcileExecutionAttempt.js';
