@@ -60,7 +60,12 @@ export class FakeBreachEpisodeRepository implements BreachEpisodeRepository {
 
     if (openEpisode.direction.kind === direction.kind) {
       if (Number(observedAt) <= Number(openEpisode.lastObservedAt)) {
-        return { kind: 'no-op' };
+        return {
+          kind: 'episode-continued',
+          episodeId: openEpisode.episodeId,
+          direction,
+          consecutiveCount: openEpisode.consecutiveCount,
+        };
       }
 
       const continuedEpisode: BreachEpisode = {
@@ -184,6 +189,6 @@ export class FakeBreachEpisodeRepository implements BreachEpisodeRepository {
 
   private nextEpisodeId(): BreachEpisodeId {
     FakeBreachEpisodeRepository.episodeCounter += 1;
-    return `episode-${FakeBreachEpisodeRepository.episodeCounter}` as BreachEpisodeId;
+    return `fake-episode-${FakeBreachEpisodeRepository.episodeCounter}` as BreachEpisodeId;
   }
 }
