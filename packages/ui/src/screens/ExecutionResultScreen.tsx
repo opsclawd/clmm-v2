@@ -27,7 +27,7 @@ export function ExecutionResultScreen({
   onRetry,
   onViewHistory,
 }: Props) {
-  if (resultLoading) {
+  if (resultLoading !== false && !lifecycleState) {
     return (
       <View style={{ flex: 1, backgroundColor: colors.background, padding: 16, justifyContent: 'center', alignItems: 'center' }}>
         <Text style={{ color: colors.text, fontSize: typography.fontSize.xl, fontWeight: typography.fontWeight.bold }}>

@@ -15,7 +15,7 @@ type Props = {
 };
 
 export function ExecutionPreviewScreen({ preview, previewLoading, previewError, onApprove, onRefresh }: Props) {
-  if (previewLoading) {
+  if (previewLoading !== false && !preview) {
     return (
       <ScrollView style={{ flex: 1, backgroundColor: colors.background }}>
         <View style={{ padding: 16, alignItems: 'center', justifyContent: 'center', minHeight: 240 }}>

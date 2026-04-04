@@ -48,7 +48,7 @@ export function SigningStatusScreen({
   onSignAndExecute,
   walletConnected,
 }: Props) {
-  if (statusLoading) {
+  if (statusLoading && !lifecycleState) {
     return (
       <View style={{ flex: 1, backgroundColor: colors.background, justifyContent: 'center', alignItems: 'center', padding: 16 }}>
         <ActivityIndicator color={colors.primary} />
