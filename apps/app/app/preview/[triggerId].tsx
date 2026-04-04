@@ -26,6 +26,8 @@ export default function PreviewRoute() {
     void createPreviewMutation.mutateAsync(triggerId);
   }, [createPreviewMutation, triggerId]);
 
+  const activePreview = refreshMutation.data ?? createPreviewMutation.data;
+
   const approveMutation = useMutation({
     mutationFn: async () => {
       // Create an execution attempt from the preview
@@ -33,7 +35,7 @@ export default function PreviewRoute() {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          previewId: createPreviewMutation.data?.previewId,
+          previewId: activePreview?.previewId,
           triggerId,
         }),
       });
@@ -47,7 +49,7 @@ export default function PreviewRoute() {
 
   return (
     <ExecutionPreviewScreen
-      {...(createPreviewMutation.data ? { preview: createPreviewMutation.data } : {})}
+      {...(activePreview ? { preview: activePreview } : {})}
       onApprove={() => approveMutation.mutate()}
       onRefresh={() => refreshMutation.mutate()}
     />
