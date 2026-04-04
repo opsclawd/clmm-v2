@@ -33,12 +33,6 @@ function readEpisodeId(value: string | string[] | undefined): string | null {
   return typeof value === 'string' && value.length > 0 ? value : null;
 }
 
-function readTriggerDerivedApprovalFlag(
-  value: string | string[] | undefined,
-): boolean {
-  return typeof value === 'string' && value === 'true';
-}
-
 function isPendingAttemptPlaceholder(value: string | string[] | undefined): boolean {
   return typeof value === 'string' && value === 'pending';
 }
@@ -70,14 +64,11 @@ export default function SigningRoute() {
     previewId?: string | string[];
     triggerId?: string | string[];
     episodeId?: string | string[];
-    isTriggerDerivedApproval?: string | string[];
   }>();
   const attemptId = readAttemptId(params.attemptId);
   const previewId = readPreviewId(params.previewId);
   const triggerId = readTriggerId(params.triggerId);
   const episodeId = readEpisodeId(params.episodeId);
-  const isTriggerDerivedApproval =
-    triggerId != null || readTriggerDerivedApprovalFlag(params.isTriggerDerivedApproval);
   const hasPendingAttemptPlaceholder = isPendingAttemptPlaceholder(params.attemptId);
   const walletAddress = useStore(walletSessionStore, (state) => state.walletAddress);
   const connectionKind = useStore(walletSessionStore, (state) => state.connectionKind);
@@ -108,7 +99,6 @@ export default function SigningRoute() {
         previewId,
         walletId: walletAddress,
         ...(episodeId ? { episodeId } : {}),
-        ...(isTriggerDerivedApproval ? { isTriggerDerivedApproval: true } : {}),
       },
       {
         onSuccess: (approval) => {

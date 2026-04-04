@@ -56,11 +56,9 @@ export default function PreviewRoute() {
                 previewId: string;
                 triggerId?: string;
                 episodeId?: string;
-                isTriggerDerivedApproval?: 'true';
               } = {
                 attemptId: 'pending',
                 previewId: preview.previewId,
-                isTriggerDerivedApproval: 'true',
               };
               if (triggerId != null) {
                 signingParams.triggerId = triggerId;

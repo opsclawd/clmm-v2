@@ -133,7 +133,6 @@ describe('ExecutionController', () => {
     const result = await controller.approveExecution({
       previewId,
       episodeId: 'episode-approve-1',
-      isTriggerDerivedApproval: true,
       walletId: FIXTURE_WALLET_ID,
     });
 
@@ -154,7 +153,6 @@ describe('ExecutionController', () => {
       controller.approveExecution({
         previewId,
         walletId: FIXTURE_WALLET_ID,
-        isTriggerDerivedApproval: true,
       }),
     ).rejects.toBeInstanceOf(BadRequestException);
   });
@@ -163,6 +161,7 @@ describe('ExecutionController', () => {
     await expect(
       controller.approveExecution({
         previewId: 'missing-preview',
+        episodeId: 'episode-missing-preview',
         walletId: FIXTURE_WALLET_ID,
       }),
     ).rejects.toBeInstanceOf(NotFoundException);
@@ -186,6 +185,7 @@ describe('ExecutionController', () => {
     await expect(
       controller.approveExecution({
         previewId,
+        episodeId: 'episode-stale-preview',
         walletId: FIXTURE_WALLET_ID,
       }),
     ).rejects.toBeInstanceOf(BadRequestException);

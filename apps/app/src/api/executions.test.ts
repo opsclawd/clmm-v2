@@ -27,7 +27,7 @@ describe('approveExecutionPreview', () => {
     vi.restoreAllMocks();
   });
 
-  it('sends episodeId and trigger-derived marker when provided', async () => {
+  it('sends episodeId without client trigger-derived marker', async () => {
     env.EXPO_PUBLIC_BFF_BASE_URL = 'https://bff.example.test';
 
     const fetchMock = vi.fn().mockResolvedValue({
@@ -47,7 +47,6 @@ describe('approveExecutionPreview', () => {
       previewId: 'preview-1',
       walletId: 'wallet-1',
       episodeId: 'episode-1',
-      isTriggerDerivedApproval: true,
     });
 
     expect(fetchMock).toHaveBeenCalledWith(
@@ -58,7 +57,6 @@ describe('approveExecutionPreview', () => {
           previewId: 'preview-1',
           walletId: 'wallet-1',
           episodeId: 'episode-1',
-          isTriggerDerivedApproval: true,
         }),
         headers: expect.any(Headers),
       }),
