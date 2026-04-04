@@ -31,7 +31,7 @@ import {
   prependTransactionMessageInstructions,
 } from '@solana/kit';
 import { fetchPosition, fetchWhirlpool, getPositionAddress } from '@orca-so/whirlpools-client';
-import { closePositionInstructions } from '@orca-so/whirlpools';
+import { closePositionInstructions, swapInstructions } from '@orca-so/whirlpools';
 import type { Instruction } from '@solana/kit';
 import type { ExecutionPreparationPort } from '@clmm/application';
 import type { ExecutionPlan, WalletId, PositionId, PoolId, ClockTimestamp, LiquidityPosition } from '@clmm/domain';
@@ -77,7 +77,13 @@ export class SolanaExecutionPreparationAdapter implements ExecutionPreparationPo
 
     const orcaPreparation = await this.buildOrcaInstructions(rpc, positionData, walletId);
     const { instructions: orcaInstructions } = orcaPreparation;
-    const swapPreparation = await this.buildSwapInstructions(plan, walletId, orcaPreparation);
+    const swapPreparation = await this.buildSwapInstructions(
+      rpc,
+      plan,
+      walletId,
+      positionData.poolId,
+      orcaPreparation,
+    );
     const swapInstructions = swapPreparation.instructions;
 
     const allInstructions: Instruction[] = [...orcaInstructions];
@@ -185,8 +191,10 @@ export class SolanaExecutionPreparationAdapter implements ExecutionPreparationPo
   }
 
   private async buildSwapInstructions(
+    rpc: ReturnType<typeof createSolanaRpc>,
     plan: ExecutionPlan,
     walletId: WalletId,
+    poolId: PoolId,
     tokenContext: {
       tokenAmounts: { tokenA: bigint; tokenB: bigint };
       tokenMintA: string;
@@ -198,31 +206,37 @@ export class SolanaExecutionPreparationAdapter implements ExecutionPreparationPo
       return { instructions: [], failureReason: 'execution plan has no swap step' };
     }
 
+    const fromAsset = swapStep.instruction.fromAsset;
+    const toAsset = swapStep.instruction.toAsset;
+    const inputMint = TOKEN_MINTS[fromAsset];
+    const outputMint = TOKEN_MINTS[toAsset];
+    if (!inputMint || !outputMint) {
+      return {
+        instructions: [],
+        failureReason: `Unsupported swap pair ${fromAsset}->${toAsset}`,
+      };
+    }
+
+    const sourceMint = TOKEN_MINTS[fromAsset];
+    let swapAmount = 0n;
+    if (tokenContext.tokenMintA === sourceMint) {
+      swapAmount = tokenContext.tokenAmounts.tokenA;
+    } else if (tokenContext.tokenMintB === sourceMint) {
+      swapAmount = tokenContext.tokenAmounts.tokenB;
+    } else {
+      return {
+        instructions: [],
+        failureReason: `Swap source mint ${sourceMint} not found in whirlpool token mints`,
+      };
+    }
+    if (swapAmount === 0n) {
+      return {
+        instructions: [],
+        failureReason: `close-position quote produced zero ${fromAsset} balance`,
+      };
+    }
+
     try {
-      const fromAsset = swapStep.instruction.fromAsset;
-      const toAsset = swapStep.instruction.toAsset;
-      const inputMint = TOKEN_MINTS[fromAsset];
-      const outputMint = TOKEN_MINTS[toAsset];
-      if (!inputMint || !outputMint) {
-        throw new Error(`Unsupported swap pair ${fromAsset}->${toAsset} for Jupiter quote`);
-      }
-
-      const sourceMint = TOKEN_MINTS[fromAsset];
-      let swapAmount = 0n;
-      if (tokenContext.tokenMintA === sourceMint) {
-        swapAmount = tokenContext.tokenAmounts.tokenA;
-      } else if (tokenContext.tokenMintB === sourceMint) {
-        swapAmount = tokenContext.tokenAmounts.tokenB;
-      } else {
-        throw new Error(`Swap source mint ${sourceMint} not found in whirlpool token mints`);
-      }
-      if (swapAmount === 0n) {
-        return {
-          instructions: [],
-          failureReason: `close-position quote produced zero ${fromAsset} balance`,
-        };
-      }
-
       const quoteResponse = await this.getJupiterQuote(inputMint, outputMint, swapAmount.toString());
       const swapTransaction = await this.getJupiterSwapTransaction(quoteResponse, walletId);
 
@@ -247,13 +261,52 @@ export class SolanaExecutionPreparationAdapter implements ExecutionPreparationPo
       }
 
       return { instructions };
-    } catch (error) {
-      console.error('Failed to build swap instruction:', error);
-      return {
-        instructions: [],
-        failureReason: error instanceof Error ? error.message : 'unknown swap preparation error',
-      };
+    } catch (jupiterError) {
+      const jupiterMessage =
+        jupiterError instanceof Error ? jupiterError.message : 'unknown Jupiter swap preparation error';
+      console.error('Jupiter swap preparation failed, attempting Orca fallback:', jupiterError);
+
+      try {
+        const instructions = await this.buildOrcaSwapInstructions(rpc, poolId, walletId, inputMint, swapAmount);
+        if (instructions.length === 0) {
+          return {
+            instructions: [],
+            failureReason: `Jupiter failed (${jupiterMessage}); Orca fallback produced no instructions`,
+          };
+        }
+
+        return { instructions };
+      } catch (orcaError) {
+        const orcaMessage = orcaError instanceof Error ? orcaError.message : 'unknown Orca fallback error';
+        console.error('Orca fallback swap preparation failed:', orcaError);
+        return {
+          instructions: [],
+          failureReason: `Jupiter failed (${jupiterMessage}); Orca fallback failed (${orcaMessage})`,
+        };
+      }
     }
+  }
+
+  private async buildOrcaSwapInstructions(
+    rpc: ReturnType<typeof createSolanaRpc>,
+    poolId: PoolId,
+    walletId: WalletId,
+    inputMint: string,
+    inputAmount: bigint,
+  ): Promise<Instruction[]> {
+    const authority = createNoopSigner(address(walletId));
+    const result = await swapInstructions(
+      rpc,
+      {
+        mint: address(inputMint),
+        inputAmount,
+      },
+      address(poolId),
+      50,
+      authority,
+    );
+
+    return result.instructions;
   }
 
   // boundary: Jupiter v6 REST /quote response is untyped — no official SDK types available
