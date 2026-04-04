@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-// @ts-ignore - dependency-cruiser config is a runtime CJS file without shipped typings
+// @ts-expect-error - dependency-cruiser config is a runtime CJS file without shipped typings
 import depCruiseConfig from '../boundaries/dependency-cruiser.cjs';
 
 type ForbiddenRule = {

@@ -91,7 +91,7 @@ export default function ConnectRoute() {
       platformCapabilities={platformCapabilities}
       connectionOutcome={connectionOutcome}
       isConnecting={isConnecting}
-      onSelectWallet={(kind) => {
+      onSelectWallet={(kind: 'native' | 'browser') => {
         void handleSelectWallet(kind);
       }}
       onGoBack={() => {

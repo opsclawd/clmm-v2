@@ -4,6 +4,7 @@ import { PositionsListScreen } from '@clmm/ui';
 import { useStore } from 'zustand';
 import { fetchSupportedPositions } from '../../src/api/positions';
 import { walletSessionStore } from '../../src/state/walletSessionStore';
+import type { PositionListItemViewModel } from '@clmm/ui';
 
 export default function PositionsRoute() {
   const router = useRouter();
@@ -24,7 +25,7 @@ export default function PositionsRoute() {
       positionsError={positionsQuery.isError && !hasLoadedPositions ? 'Could not load supported positions for this wallet.' : null}
       platformCapabilities={platformCapabilities}
       onConnectWallet={() => router.push('/connect')}
-      onSelectPosition={(positionId) => router.push(`/position/${positionId}`)}
+      onSelectPosition={(positionId: PositionListItemViewModel['positionId']) => router.push(`/position/${positionId}`)}
     />
   );
 }
