@@ -1,3 +1,5 @@
+import { VersionedTransaction } from '@solana/web3.js';
+
 export type BrowserWalletPublicKey = {
   toBase58(): string;
 };
@@ -7,7 +9,7 @@ export type BrowserWalletProvider = {
   publicKey?: BrowserWalletPublicKey | null;
   connect(): Promise<{ publicKey?: BrowserWalletPublicKey | null } | null | undefined>;
   disconnect?(): Promise<void>;
-  signTransaction?(transaction: Uint8Array): Promise<unknown>;
+  signTransaction?(transaction: VersionedTransaction): Promise<unknown>;
 };
 
 export type BrowserWalletWindow = {
@@ -69,6 +71,10 @@ function normalizeSignedTransactionPayload(payload: unknown): Uint8Array {
     return new Uint8Array(payload);
   }
 
+  if (payload instanceof VersionedTransaction) {
+    return payload.serialize();
+  }
+
   if (isSerializedTransaction(payload)) {
     return normalizeSignedTransactionPayload(payload.serialize());
   }
@@ -90,6 +96,7 @@ export async function signTransactionWithBrowserWallet(
     throw new Error('Wallet does not support transaction signing');
   }
 
-  const signedPayload = await provider.signTransaction(serializedTransaction);
+  const transaction = VersionedTransaction.deserialize(serializedTransaction);
+  const signedPayload = await provider.signTransaction(transaction);
   return normalizeSignedTransactionPayload(signedPayload);
 }
