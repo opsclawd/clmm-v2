@@ -9,7 +9,10 @@
     "build": "tsc -p tsconfig.json",
     "lint": "eslint src --ext .ts",
     "dev:api": "tsx src/inbound/http/main.ts",
-    "dev:worker": "tsx src/inbound/jobs/main.ts"
+    "dev:worker": "tsx src/inbound/jobs/main.ts",
+    "db:migrate": "drizzle-kit migrate",
+    "db:generate": "drizzle-kit generate",
+    "db:studio": "drizzle-kit studio"
   },
   "dependencies": {
     "@clmm/application": "workspace:*",
@@ -32,6 +35,7 @@
     "@clmm/testing": "workspace:*",
     "@types/node": "^25.5.0",
     "@types/pg": "^8.20.0",
+    "dotenv": "^17.4.0",
     "drizzle-kit": "^0.31.10",
     "tsx": "^4.21.0",
     "typescript": "^5.4.0",
