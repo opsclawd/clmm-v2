@@ -325,9 +325,20 @@ export class OperationalStorageAdapter
     }
 
     const rows = await this.db
-      .select()
+      .select({
+        triggerId: exitTriggers.triggerId,
+        positionId: exitTriggers.positionId,
+        episodeId: exitTriggers.episodeId,
+        directionKind: exitTriggers.directionKind,
+        triggeredAt: exitTriggers.triggeredAt,
+        confirmationEvaluatedAt: exitTriggers.confirmationEvaluatedAt,
+      })
       .from(exitTriggers)
-      .where(inArray(exitTriggers.positionId, positionIds));
+      .innerJoin(breachEpisodes, eq(exitTriggers.episodeId, breachEpisodes.episodeId))
+      .where(and(
+        inArray(exitTriggers.positionId, positionIds),
+        eq(breachEpisodes.status, 'open'),
+      ));
 
     const ownedPositionIds = new Set(positionIds);
     return rows.map((row) => ({

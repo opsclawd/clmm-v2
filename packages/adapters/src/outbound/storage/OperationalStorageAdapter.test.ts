@@ -30,13 +30,55 @@ function makeDbWithTriggerRows(rows: Array<{
   directionKind: string;
   triggeredAt: number;
   confirmationEvaluatedAt: number;
+  episodeStatus?: string;
 }>): Db {
+  function predicateReferencesOpenEpisodeFilter(value: unknown): boolean {
+    const visited = new WeakSet<object>();
+    function walk(node: unknown): boolean {
+      if (node == null) return false;
+      if (typeof node === 'string') {
+        return node === 'open';
+      }
+      if (typeof node !== 'object') return false;
+      if (visited.has(node)) return false;
+      visited.add(node);
+
+      const record = node as Record<string, unknown>;
+      const table = record['table'];
+      const name = record['name'];
+      if (
+        typeof name === 'string' &&
+        name === 'status' &&
+        typeof table === 'object' &&
+        table != null &&
+        (table as { name?: unknown }).name === 'breach_episodes'
+      ) {
+        return true;
+      }
+
+      const queryChunks = record['queryChunks'];
+      if (Array.isArray(queryChunks) && queryChunks.some((chunk) => walk(chunk))) {
+        return true;
+      }
+
+      return Object.values(record).some((entry) => walk(entry));
+    }
+
+    return walk(value);
+  }
+
   return {
     select() {
       return {
         from() {
           return {
-            where: async () => rows,
+            innerJoin: () => ({
+              where: async (predicate: unknown) => (
+                predicateReferencesOpenEpisodeFilter(predicate)
+                  ? rows.filter((row) => row.episodeStatus === 'open')
+                  : rows
+              ),
+            }),
           };
         },
       };
@@ -124,6 +166,7 @@ describe('OperationalStorageAdapter', () => {
           directionKind: 'lower-bound-breach',
           triggeredAt: makeClockTimestamp(1_000_000),
           confirmationEvaluatedAt: makeClockTimestamp(1_000_001),
+          episodeStatus: 'open',
         },
         {
           triggerId: 'trigger-leaked',
@@ -132,6 +175,7 @@ describe('OperationalStorageAdapter', () => {
           directionKind: 'upper-bound-breach',
           triggeredAt: makeClockTimestamp(1_000_002),
           confirmationEvaluatedAt: makeClockTimestamp(1_000_003),
+          episodeStatus: 'open',
         },
       ]),
       new FakeIdGeneratorPort('storage'),
@@ -144,6 +188,30 @@ describe('OperationalStorageAdapter', () => {
     expect(triggers).toHaveLength(1);
     expect(triggers[0]?.triggerId).toBe('trigger-owned');
     expect(triggers[0]?.positionId).toBe(FIXTURE_POSITION_IN_RANGE.positionId);
+  });
+
+  it('does not return triggers whose breach episode is already closed', async () => {
+    const positionReadPort = new WalletScopedPositionReadPort([FIXTURE_POSITION_IN_RANGE]);
+    const adapter = new OperationalStorageAdapter(
+      makeDbWithTriggerRows([
+        {
+          triggerId: 'trigger-closed',
+          positionId: FIXTURE_POSITION_IN_RANGE.positionId,
+          episodeId: 'episode-closed',
+          directionKind: 'lower-bound-breach',
+          triggeredAt: makeClockTimestamp(1_000_000),
+          confirmationEvaluatedAt: makeClockTimestamp(1_000_001),
+          episodeStatus: 'closed',
+        },
+      ]),
+      new FakeIdGeneratorPort('storage'),
+      positionReadPort,
+    );
+
+    const triggers = await adapter.listActionableTriggers(FIXTURE_WALLET_ID);
+
+    expect(positionReadPort.receivedWalletId).toBe(FIXTURE_WALLET_ID);
+    expect(triggers).toHaveLength(0);
   });
 
   it('returns duplicate-suppressed for closed episodes with an existing trigger and does not insert', async () => {
