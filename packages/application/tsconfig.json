@@ -4,7 +4,8 @@
     "rootDir": "src",
     "outDir": "dist",
     "paths": {
-      "@clmm/domain": ["../domain/src/index.ts"]
+      "@clmm/domain": ["../domain/src/index.ts"],
+      "@clmm/testing": ["../testing/src/index.ts"]
     }
   },
   "include": ["src/**/*"],

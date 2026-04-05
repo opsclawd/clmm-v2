@@ -42,6 +42,7 @@ export type {
 export { buildPreviewViewModel } from './view-models/PreviewViewModel.js';
 export { buildExecutionStateViewModel } from './view-models/ExecutionStateViewModel.js';
 export { buildPositionListViewModel } from './view-models/PositionListViewModel.js';
+export type { PositionListItemViewModel } from './view-models/PositionListViewModel.js';
 export { buildPositionDetailViewModel } from './view-models/PositionDetailViewModel.js';
 export { buildHistoryViewModel } from './view-models/HistoryViewModel.js';
 export { buildWalletConnectViewModel } from './view-models/WalletConnectionViewModel.js';
