@@ -144,6 +144,9 @@ importers:
       '@orca-so/whirlpools':
         specifier: ^7.0.2
         version: 7.0.2(@solana/kit@6.5.0(bufferutil@4.1.0)(fastestsmallesttextencoderdecoder@1.0.22)(typescript@5.9.3)(utf-8-validate@6.0.6))(@solana/rpc@6.5.0(fastestsmallesttextencoderdecoder@1.0.22)(typescript@5.9.3))(fastestsmallesttextencoderdecoder@1.0.22)(typescript@5.9.3)
+      '@orca-so/whirlpools-client':
+        specifier: ^6.2.1
+        version: 6.2.1(@solana/kit@6.5.0(bufferutil@4.1.0)(fastestsmallesttextencoderdecoder@1.0.22)(typescript@5.9.3)(utf-8-validate@6.0.6))
       '@solana-mobile/mobile-wallet-adapter-protocol':
         specifier: ^2.2.6
         version: 2.2.6(fastestsmallesttextencoderdecoder@1.0.22)(react-native@0.76.9(@babel/core@7.29.0)(@babel/preset-env@7.29.2(@babel/core@7.29.0))(@react-native-community/cli@13.6.4(bufferutil@4.1.0)(utf-8-validate@6.0.6))(@types/react@18.3.28)(bufferutil@4.1.0)(react@18.3.1)(utf-8-validate@6.0.6))(typescript@5.9.3)
