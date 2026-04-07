@@ -15,6 +15,11 @@ export default function PositionDetailRoute() {
   const hasValidPositionId = positionId != null && positionId.length > 0;
   const hasWalletAddress = walletAddress != null && walletAddress.length > 0;
 
+  if (hasValidPositionId && !hasWalletAddress) {
+    router.push('/connect');
+    return null;
+  }
+
   const positionQuery = useQuery({
     queryKey: ['position-detail', walletAddress, positionId],
     queryFn: () => fetchPositionDetail(walletAddress!, positionId!),

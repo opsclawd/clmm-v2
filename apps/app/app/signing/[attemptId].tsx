@@ -72,6 +72,12 @@ export default function SigningRoute() {
   const hasPendingAttemptPlaceholder = isPendingAttemptPlaceholder(params.attemptId);
   const walletAddress = useStore(walletSessionStore, (state) => state.walletAddress);
   const connectionKind = useStore(walletSessionStore, (state) => state.connectionKind);
+
+  if (attemptId == null && walletAddress == null) {
+    router.push('/connect');
+    return null;
+  }
+
   const [statusNotice, setStatusNotice] = useState<string | null>(null);
   const [hasStartedPendingApproval, setHasStartedPendingApproval] = useState(false);
 

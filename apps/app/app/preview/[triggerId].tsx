@@ -16,6 +16,11 @@ export default function PreviewRoute() {
   const triggerId = readTriggerId(params.triggerId);
   const walletAddress = useStore(walletSessionStore, (state) => state.walletAddress);
 
+  if (triggerId != null && walletAddress == null) {
+    router.push('/connect');
+    return null;
+  }
+
   const createMutation = useMutation({
     mutationFn: createPreview,
     retry: 0,
