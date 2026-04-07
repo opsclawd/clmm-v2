@@ -138,6 +138,22 @@ describe('ReconcileExecutionAttempt', () => {
     expect(reconcileSpy).not.toHaveBeenCalled();
   });
 
+  it('returns failed when submission port reports all-failed', async () => {
+    submissionPort.setConfirmedSteps([]);
+    submissionPort.setAllFailed(true);
+    const result = await reconcileExecutionAttempt({
+      attemptId: 'attempt-1',
+      positionId: FIXTURE_POSITION_ID,
+      breachDirection: LOWER_BOUND_BREACH,
+      executionRepo,
+      submissionPort,
+      historyRepo,
+      clock,
+      ids,
+    });
+    expect(result.kind).toBe('failed');
+  });
+
   it('short-circuits a second reconcile after persisting partial completed steps', async () => {
     const reconcileSpy = vi.spyOn(submissionPort, 'reconcileExecution');
     submissionPort.setConfirmedSteps(['remove-liquidity']);

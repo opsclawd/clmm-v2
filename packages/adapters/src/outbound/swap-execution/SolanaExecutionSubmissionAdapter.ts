@@ -52,28 +52,36 @@ export class SolanaExecutionSubmissionAdapter implements ExecutionSubmissionPort
     const rpc = this.getRpc();
 
     const confirmedSteps: Array<'remove-liquidity' | 'collect-fees' | 'swap-assets'> = [];
+    let failedCount = 0;
 
     for (const ref of references) {
       try {
-        // boundary: @solana/kit getSignatureStatuses expects Signature branded type; ref.signature is a string
         const status = await rpc.getSignatureStatuses([ref.signature as unknown as Signature], { searchTransactionHistory: true }).send();
         const sigStatus = status.value[0];
 
         if (sigStatus?.confirmationStatus === 'confirmed' || sigStatus?.confirmationStatus === 'finalized') {
           confirmedSteps.push(ref.stepKind);
+        } else if (sigStatus?.err) {
+          failedCount++;
         }
       } catch {
-        // Transaction not found or error - skip
+        failedCount++;
       }
     }
 
-    const finalState: ExecutionLifecycleState | null = confirmedSteps.length > 0
-      ? { kind: 'confirmed' }
-      : { kind: 'failed' };
+    const unresolvedCount = references.length - confirmedSteps.length - failedCount;
 
-    return {
-      confirmedSteps,
-      finalState,
-    };
+    let finalState: ExecutionLifecycleState | null;
+    if (confirmedSteps.length === references.length) {
+      finalState = { kind: 'confirmed' };
+    } else if (confirmedSteps.length > 0) {
+      finalState = { kind: 'partial' };
+    } else if (unresolvedCount > 0) {
+      finalState = null;
+    } else {
+      finalState = { kind: 'failed' };
+    }
+
+    return { confirmedSteps, finalState };
   }
 }

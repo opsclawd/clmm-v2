@@ -4,9 +4,14 @@ import { makeClockTimestamp } from '@clmm/domain';
 
 export class FakeExecutionSubmissionPort implements ExecutionSubmissionPort {
   private _confirmedSteps: ExecutionStep['kind'][] = [];
+  private _allFailed = false;
 
   setConfirmedSteps(steps: ExecutionStep['kind'][]): void {
     this._confirmedSteps = steps;
+  }
+
+  setAllFailed(value: boolean): void {
+    this._allFailed = value;
   }
 
   async submitExecution(
@@ -29,6 +34,9 @@ export class FakeExecutionSubmissionPort implements ExecutionSubmissionPort {
     }
     if (this._confirmedSteps.length > 0) {
       return { confirmedSteps: this._confirmedSteps, finalState: { kind: 'partial' } };
+    }
+    if (this._allFailed) {
+      return { confirmedSteps: [], finalState: { kind: 'failed' } };
     }
     return { confirmedSteps: [], finalState: null };
   }
