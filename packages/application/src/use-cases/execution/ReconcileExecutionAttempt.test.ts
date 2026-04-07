@@ -154,6 +154,22 @@ describe('ReconcileExecutionAttempt', () => {
     expect(result.kind).toBe('failed');
   });
 
+  it('returns null when no references confirmed and result is still unresolved', async () => {
+    submissionPort.setConfirmedSteps([]);
+    submissionPort.setAllFailed(false);
+    const result = await reconcileExecutionAttempt({
+      attemptId: 'attempt-1',
+      positionId: FIXTURE_POSITION_ID,
+      breachDirection: LOWER_BOUND_BREACH,
+      executionRepo,
+      submissionPort,
+      historyRepo,
+      clock,
+      ids,
+    });
+    expect(result).toBeNull();
+  });
+
   it('short-circuits a second reconcile after persisting partial completed steps', async () => {
     const reconcileSpy = vi.spyOn(submissionPort, 'reconcileExecution');
     submissionPort.setConfirmedSteps(['remove-liquidity']);
