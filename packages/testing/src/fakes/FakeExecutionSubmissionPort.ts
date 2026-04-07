@@ -5,6 +5,7 @@ import { makeClockTimestamp } from '@clmm/domain';
 export class FakeExecutionSubmissionPort implements ExecutionSubmissionPort {
   private _confirmedSteps: ExecutionStep['kind'][] = [];
   private _allFailed = false;
+  private _totalReferences = 3;
 
   setConfirmedSteps(steps: ExecutionStep['kind'][]): void {
     this._confirmedSteps = steps;
@@ -12,6 +13,10 @@ export class FakeExecutionSubmissionPort implements ExecutionSubmissionPort {
 
   setAllFailed(value: boolean): void {
     this._allFailed = value;
+  }
+
+  setTotalReferenceCount(count: number): void {
+    this._totalReferences = count;
   }
 
   async submitExecution(
@@ -29,7 +34,7 @@ export class FakeExecutionSubmissionPort implements ExecutionSubmissionPort {
     confirmedSteps: Array<ExecutionStep['kind']>;
     finalState: ExecutionLifecycleState | null;
   }> {
-    if (this._confirmedSteps.length === 3) {
+    if (this._confirmedSteps.length === this._totalReferences) {
       return { confirmedSteps: this._confirmedSteps, finalState: { kind: 'confirmed' } };
     }
     if (this._confirmedSteps.length > 0) {

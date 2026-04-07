@@ -97,6 +97,24 @@ describe('RequestWalletSignature', () => {
     ]);
   });
 
+  it('records wallet-position ownership when approving a preview', async () => {
+    await requestWalletSignature({
+      previewId,
+      episodeId: FIXTURE_BREACH_EPISODE_ID,
+      isTriggerDerivedApproval: true,
+      walletId: FIXTURE_WALLET_ID,
+      executionRepo,
+      prepPort,
+      historyRepo,
+      clock,
+      ids,
+    });
+
+    const history = await historyRepo.getWalletHistory(FIXTURE_WALLET_ID);
+    expect(history.length).toBeGreaterThanOrEqual(1);
+    expect(history.some((e) => e.positionId === FIXTURE_POSITION_ID)).toBe(true);
+  });
+
   it('throws PreviewNotFoundError when the preview record does not exist', async () => {
     await expect(requestWalletSignature({
       previewId: 'missing-preview',

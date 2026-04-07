@@ -65,6 +65,37 @@ describe('ReconcileExecutionAttempt', () => {
     expect((await executionRepo.getAttempt('attempt-1'))?.completedSteps).toEqual(['remove-liquidity']);
   });
 
+  it('marks as partial when one step confirms and another fails', async () => {
+    await executionRepo.saveAttempt({
+      attemptId: 'attempt-mixed',
+      positionId: FIXTURE_POSITION_ID,
+      breachDirection: LOWER_BOUND_BREACH,
+      lifecycleState: { kind: 'submitted' },
+      completedSteps: [],
+      transactionReferences: [
+        { signature: 'sig-ok', stepKind: 'remove-liquidity' },
+        { signature: 'sig-fail', stepKind: 'swap-assets' },
+      ],
+    });
+
+    submissionPort.setTotalReferenceCount(2);
+    submissionPort.setConfirmedSteps(['remove-liquidity']);
+
+    const result = await reconcileExecutionAttempt({
+      attemptId: 'attempt-mixed',
+      positionId: FIXTURE_POSITION_ID,
+      breachDirection: LOWER_BOUND_BREACH,
+      executionRepo,
+      submissionPort,
+      historyRepo,
+      clock,
+      ids,
+    });
+
+    expect(result.kind).toBe('partial');
+    expect((await executionRepo.getAttempt('attempt-mixed'))?.completedSteps).toEqual(['remove-liquidity']);
+  });
+
   it('preserves directional context in history events', async () => {
     submissionPort.setConfirmedSteps(['remove-liquidity', 'collect-fees', 'swap-assets']);
     await reconcileExecutionAttempt({

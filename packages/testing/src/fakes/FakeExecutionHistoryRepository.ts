@@ -21,6 +21,14 @@ export class FakeExecutionHistoryRepository implements ExecutionHistoryRepositor
     this.walletPositions.set(walletId, positions);
   }
 
+  async recordWalletPositionOwnership(
+    walletId: WalletId,
+    positionId: PositionId,
+    _observedAt: number,
+  ): Promise<void> {
+    this.assignWalletToPosition(walletId, positionId);
+  }
+
   async getWalletHistory(walletId: WalletId): Promise<readonly HistoryEvent[]> {
     const positions = this.walletPositions.get(walletId);
     if (!positions) {
