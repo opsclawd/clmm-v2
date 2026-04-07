@@ -53,7 +53,7 @@ export function SigningStatusScreen({
   onViewResult,
   onSignAndExecute,
   walletConnected,
-}: Props) {
+}: Props): JSX.Element {
   if (statusLoading && !lifecycleState) {
     return (
       <View style={{ flex: 1, backgroundColor: colors.background, justifyContent: 'center', alignItems: 'center', padding: 16 }}>

@@ -21,7 +21,7 @@ export function WalletSettingsScreen({
   onReconnect,
   onSwitchWallet,
   onDisconnect,
-}: Props) {
+}: Props): JSX.Element {
   const caps = platformCapabilities ?? {
     nativePushAvailable: false,
     browserNotificationAvailable: false,

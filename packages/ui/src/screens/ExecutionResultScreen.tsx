@@ -26,7 +26,7 @@ export function ExecutionResultScreen({
   resultError,
   onRetry,
   onViewHistory,
-}: Props) {
+}: Props): JSX.Element {
   if (resultLoading !== false && !lifecycleState) {
     return (
       <View style={{ flex: 1, backgroundColor: colors.background, padding: 16, justifyContent: 'center', alignItems: 'center' }}>

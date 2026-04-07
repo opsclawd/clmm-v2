@@ -11,7 +11,7 @@ type Props = {
   onViewPreview?: (triggerId: string) => void;
 };
 
-export function PositionDetailScreen({ position, onViewPreview }: Props) {
+export function PositionDetailScreen({ position, onViewPreview }: Props): JSX.Element {
   if (!position) {
     return (
       <View style={{ flex: 1, backgroundColor: colors.background, padding: 16 }}>

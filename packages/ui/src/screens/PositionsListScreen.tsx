@@ -26,7 +26,7 @@ export function PositionsListScreen({
   onSelectPosition,
   onConnectWallet,
   platformCapabilities,
-}: Props) {
+}: Props): JSX.Element {
   const isConnected = walletAddress != null && walletAddress.length > 0;
   const hasPositions = (positions?.length ?? 0) > 0;
 
@@ -99,7 +99,7 @@ function ConnectedPositionsList({
 }: {
   positions: PositionSummaryDto[];
   onSelectPosition?: (positionId: string) => void;
-}) {
+}): JSX.Element {
   const viewModel = buildPositionListViewModel(positions);
 
   if (viewModel.isEmpty) {

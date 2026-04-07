@@ -6,7 +6,7 @@ type Props = {
   note: string;
 };
 
-export function OffChainHistoryLabel({ note }: Props) {
+export function OffChainHistoryLabel({ note }: Props): JSX.Element {
   return (
     <View style={{
       marginTop: 8,

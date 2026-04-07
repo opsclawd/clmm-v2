@@ -5,7 +5,7 @@ type Props = {
   onConnectWallet?: () => void;
 };
 
-export function ConnectWalletEntry({ onConnectWallet }: Props) {
+export function ConnectWalletEntry({ onConnectWallet }: Props): JSX.Element {
   return (
     <View style={{ alignItems: 'center', paddingVertical: 48, paddingHorizontal: 24 }}>
       <Text style={{

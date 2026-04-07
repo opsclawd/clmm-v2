@@ -7,7 +7,7 @@ type Props = {
   direction: BreachDirection;
 };
 
-export function DirectionalPolicyCard({ direction }: Props) {
+export function DirectionalPolicyCard({ direction }: Props): JSX.Element {
   const policy = renderDirectionalPolicyText(direction);
   return (
     <View style={{ padding: 16, borderRadius: 8, backgroundColor: colors.surface }}>

@@ -14,7 +14,7 @@ type Props = {
  * matching the mobile-first IA. NOT a dashboard shell — just a responsive container.
  * On native, renders children directly without wrapping.
  */
-export function DesktopShell({ children, title }: Props) {
+export function DesktopShell({ children, title }: Props): JSX.Element {
   if (Platform.OS !== 'web') {
     return <>{children}</>;
   }

@@ -7,7 +7,7 @@ type Props = {
   viewModel: ExecutionStateViewModel;
 };
 
-export function ExecutionStateCard({ viewModel }: Props) {
+export function ExecutionStateCard({ viewModel }: Props): JSX.Element {
   return (
     <View style={{
       padding: 16,

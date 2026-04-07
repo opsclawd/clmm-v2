@@ -32,7 +32,7 @@ type Props = {
   event: HistoryEventDto;
 };
 
-export function HistoryEventRow({ event }: Props) {
+export function HistoryEventRow({ event }: Props): JSX.Element {
   const eventColor = getEventColor(event.eventType);
 
   return (

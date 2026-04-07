@@ -11,7 +11,7 @@ type Props = {
   capabilities?: PlatformCapabilities | null | undefined;
 };
 
-export function DegradedCapabilityBanner({ capabilities }: Props) {
+export function DegradedCapabilityBanner({ capabilities }: Props): JSX.Element | null {
   if (!capabilities) return null;
 
   const message = buildDegradedBannerMessage(capabilities);

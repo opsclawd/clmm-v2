@@ -10,7 +10,7 @@ type Props = {
   onSelectEvent?: (eventId: string) => void;
 };
 
-export function HistoryListScreen({ events, onSelectEvent }: Props) {
+export function HistoryListScreen({ events, onSelectEvent }: Props): JSX.Element {
   const viewModel = buildHistoryViewModel(events ?? []);
 
   return (

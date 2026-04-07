@@ -14,7 +14,7 @@ type Props = {
   onRefresh?: () => void;
 };
 
-export function ExecutionPreviewScreen({ preview, previewLoading, previewError, onApprove, onRefresh }: Props) {
+export function ExecutionPreviewScreen({ preview, previewLoading, previewError, onApprove, onRefresh }: Props): JSX.Element {
   if (previewLoading !== false && !preview) {
     return (
       <ScrollView style={{ flex: 1, backgroundColor: colors.background }}>

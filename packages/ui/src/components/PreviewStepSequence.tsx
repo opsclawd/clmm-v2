@@ -5,7 +5,7 @@ import { colors } from '../design-system/index.js';
 
 type Props = { direction: BreachDirection; estimatedAmounts?: Record<number, string> };
 
-export function PreviewStepSequence({ direction, estimatedAmounts }: Props) {
+export function PreviewStepSequence({ direction, estimatedAmounts }: Props): JSX.Element {
   const steps = buildPreviewStepLabels(direction);
   return (
     <View>

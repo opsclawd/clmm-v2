@@ -5,7 +5,7 @@ import { getRangeStatusBadgeProps, type RangeStateKind } from './RangeStatusBadg
 
 export { getRangeStatusBadgeProps } from './RangeStatusBadgeUtils.js';
 
-export function RangeStatusBadge({ rangeStateKind }: { rangeStateKind: RangeStateKind }) {
+export function RangeStatusBadge({ rangeStateKind }: { rangeStateKind: RangeStateKind }): JSX.Element {
   const { label, colorKey } = getRangeStatusBadgeProps(rangeStateKind);
   const badgeColor = colors[colorKey];
 

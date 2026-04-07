@@ -16,7 +16,7 @@ function breachDirectionLabel(direction: { kind: string }): string {
     : 'Upper Bound Breach — Exit to SOL';
 }
 
-export function HistoryDetailScreen({ positionId, events }: Props) {
+export function HistoryDetailScreen({ positionId, events }: Props): JSX.Element {
   const eventItems = events ?? [];
   const isEmpty = eventItems.length === 0;
 

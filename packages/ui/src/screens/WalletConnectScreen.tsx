@@ -25,7 +25,7 @@ export function WalletConnectScreen({
   isConnecting,
   onSelectWallet,
   onGoBack,
-}: Props) {
+}: Props): JSX.Element {
   if (!platformCapabilities) {
     return (
       <View style={{ flex: 1, backgroundColor: colors.background, justifyContent: 'center', alignItems: 'center' }}>

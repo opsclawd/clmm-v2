@@ -14,7 +14,7 @@ type Props = {
   platformCapabilities?: PlatformCapabilities | null;
 };
 
-export function AlertsListScreen({ alerts, alertsLoading, alertsError, onSelectAlert, platformCapabilities }: Props) {
+export function AlertsListScreen({ alerts, alertsLoading, alertsError, onSelectAlert, platformCapabilities }: Props): JSX.Element {
   const isLoading = alertsLoading ?? (alerts == null && alertsError == null);
   const alertItems = alerts ?? [];
   const isEmpty = alertItems.length === 0;
