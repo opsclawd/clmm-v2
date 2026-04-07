@@ -331,10 +331,12 @@ export class ExecutionController {
 
     const breachDirection = this.resolveAttemptDirection(attempt, body.breachDirection);
     const signedPayload = decodeSignedPayload(body.signedPayload);
-    if (body.payloadVersion) {
-      const preparedPayload = await this.executionRepo.getPreparedPayload(attemptId);
-      if (!preparedPayload) {
-        throw new ConflictException(`Attempt ${attemptId} has no prepared payload`);
+    const preparedPayload = await this.executionRepo.getPreparedPayload(attemptId);
+    if (preparedPayload) {
+      if (!body.payloadVersion) {
+        throw new ConflictException(
+          `Attempt ${attemptId} has a prepared payload; payloadVersion is required`,
+        );
       }
       if (preparedPayload.payloadVersion !== body.payloadVersion) {
         throw new ConflictException(`Attempt ${attemptId} payloadVersion does not match`);
@@ -342,6 +344,8 @@ export class ExecutionController {
       if (preparedPayload.expiresAt <= this.clock.now()) {
         throw new GoneException(`Prepared payload expired for attempt ${attemptId}`);
       }
+    } else if (body.payloadVersion) {
+      throw new ConflictException(`Attempt ${attemptId} has no prepared payload`);
     }
 
     const { references } = await this.submissionPort.submitExecution(signedPayload);

@@ -523,7 +523,33 @@ describe('ExecutionController', () => {
     expect(submissionPort.submittedPayloads).toHaveLength(0);
   });
 
-  it('submits without payloadVersion for the legacy awaiting-signature path', async () => {
+  it('rejects submit when payloadVersion is omitted but a prepared payload exists', async () => {
+    await saveAttempt({
+      attemptId: 'attempt-missing-version',
+      positionId: FIXTURE_POSITION_ID,
+      breachDirection: LOWER_BOUND_BREACH,
+      lifecycleState: { kind: 'awaiting-signature' },
+      completedSteps: [],
+      transactionReferences: [],
+    });
+    await executionRepo.savePreparedPayload({
+      payloadId: 'payload-missing-version',
+      attemptId: 'attempt-missing-version',
+      unsignedPayload: new Uint8Array([1, 2]),
+      payloadVersion: 'stored-version',
+      expiresAt: makeClockTimestamp(1_100_000),
+      createdAt: makeClockTimestamp(1_000_000),
+    });
+
+    await expect(
+      controller.submitExecution('attempt-missing-version', {
+        signedPayload: Buffer.from([1, 2]).toString('base64'),
+      }),
+    ).rejects.toBeInstanceOf(ConflictException);
+    expect(submissionPort.submittedPayloads).toHaveLength(0);
+  });
+
+  it('submits without payloadVersion when no prepared payload exists (legacy path)', async () => {
     await saveAttempt({
       attemptId: 'attempt-legacy-submit',
       positionId: FIXTURE_POSITION_ID,
@@ -532,6 +558,7 @@ describe('ExecutionController', () => {
       completedSteps: [],
       transactionReferences: [],
     });
+    // No prepared payload saved — legacy path still works
 
     const result = await controller.submitExecution('attempt-legacy-submit', {
       signedPayload: Buffer.from([3, 2, 1]).toString('base64'),
