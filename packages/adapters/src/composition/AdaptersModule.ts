@@ -6,7 +6,6 @@ import { OperationalStorageAdapter } from '../outbound/storage/OperationalStorag
 import { OffChainHistoryStorageAdapter } from '../outbound/storage/OffChainHistoryStorageAdapter.js';
 import { MonitoredWalletStorageAdapter } from '../outbound/storage/MonitoredWalletStorageAdapter.js';
 import { NotificationDedupStorageAdapter } from '../outbound/storage/NotificationDedupStorageAdapter.js';
-import { JupiterQuoteAdapter } from '../outbound/swap-execution/JupiterQuoteAdapter.js';
 import { SolanaExecutionPreparationAdapter } from '../outbound/swap-execution/SolanaExecutionPreparationAdapter.js';
 import { SolanaExecutionSubmissionAdapter } from '../outbound/swap-execution/SolanaExecutionSubmissionAdapter.js';
 import { InAppAlertAdapter } from '../outbound/notifications/InAppAlertAdapter.js';
@@ -53,7 +52,6 @@ const operationalStorage = new OperationalStorageAdapter(db, systemIds, orcaPosi
 const historyStorage = new OffChainHistoryStorageAdapter(db, orcaPositionRead);
 const monitoredWalletStorage = new MonitoredWalletStorageAdapter(db);
 const notificationDedupStorage = new NotificationDedupStorageAdapter(db);
-const jupiterQuote = new JupiterQuoteAdapter();
 const solanaPreparation = new SolanaExecutionPreparationAdapter(rpcUrl);
 const solanaSubmission = new SolanaExecutionSubmissionAdapter(rpcUrl);
 const inAppAlert = new InAppAlertAdapter();

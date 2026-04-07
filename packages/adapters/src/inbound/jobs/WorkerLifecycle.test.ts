@@ -36,8 +36,9 @@ describe('WorkerLifecycle', () => {
       schedule: vi.fn().mockResolvedValue(undefined),
     } as unknown as PgBoss;
 
+    const breachScanHandle = vi.fn().mockResolvedValue(undefined);
     const breachScanHandler = {
-      handle: vi.fn().mockResolvedValue(undefined),
+      handle: breachScanHandle,
     } as unknown as BreachScanJobHandler;
     const triggerQualificationHandler = {
       handle: vi.fn().mockResolvedValue(undefined),
@@ -67,6 +68,6 @@ describe('WorkerLifecycle', () => {
       { id: 'job-1', data: {} } as Job<object>,
     ]);
 
-    expect(breachScanHandler.handle).toHaveBeenCalledTimes(1);
+    expect(breachScanHandle).toHaveBeenCalledTimes(1);
   });
 });

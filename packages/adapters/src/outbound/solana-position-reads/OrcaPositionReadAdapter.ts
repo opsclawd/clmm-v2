@@ -17,7 +17,6 @@ import type { LiquidityPosition, WalletId, PositionId } from '@clmm/domain';
 import {
   makePositionId,
   makePoolId,
-  makeWalletId,
   makeClockTimestamp,
   evaluateRangeState,
 } from '@clmm/domain';

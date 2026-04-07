@@ -17,5 +17,11 @@ module.exports = {
         project: ['./packages/application/tsconfig.typecheck.json'],
       },
     },
+    {
+      files: ['packages/adapters/src/**/*.test.ts'],
+      parserOptions: {
+        project: ['./packages/adapters/tsconfig.typecheck.json'],
+      },
+    },
   ],
 };

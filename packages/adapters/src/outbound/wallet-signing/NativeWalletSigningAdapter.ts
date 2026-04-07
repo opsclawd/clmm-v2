@@ -9,7 +9,6 @@
  */
 import { transact } from '@solana-mobile/mobile-wallet-adapter-protocol-kit';
 import type { KitMobileWallet } from '@solana-mobile/mobile-wallet-adapter-protocol-kit';
-import type { Chain } from '@solana-mobile/mobile-wallet-adapter-protocol';
 import {
   getTransactionDecoder,
   getBase64EncodedWireTransaction,
@@ -39,8 +38,7 @@ export class NativeWalletSigningAdapter implements WalletSigningPort {
         async (wallet: KitMobileWallet) => {
           const authResult = await wallet.authorize({
             identity: APP_IDENTITY,
-            // boundary: MWA authorize() expects a branded Chain type; cluster string is runtime-configured
-            chain: this.cluster as Chain,
+            chain: this.cluster,
           });
 
           const account = authResult.accounts[0];

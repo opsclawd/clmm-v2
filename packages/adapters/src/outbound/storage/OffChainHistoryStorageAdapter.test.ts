@@ -5,7 +5,7 @@ import {
   FIXTURE_POSITION_ID,
   FIXTURE_WALLET_ID,
 } from '@clmm/testing';
-import { LOWER_BOUND_BREACH, UPPER_BOUND_BREACH, makeWalletId, makePositionId } from '@clmm/domain';
+import { LOWER_BOUND_BREACH, UPPER_BOUND_BREACH, makePositionId } from '@clmm/domain';
 import type { Db } from './db.js';
 import type { SupportedPositionReadPort } from '@clmm/application';
 
@@ -37,7 +37,8 @@ describe('OffChainHistoryStorageAdapter', () => {
         }),
       }),
     });
-    const listSupportedPositions = vi.fn<SupportedPositionReadPort['listSupportedPositions']>()
+    const listSupportedPositions: SupportedPositionReadPort['listSupportedPositions'] = vi
+      .fn()
       .mockResolvedValue([
         FIXTURE_POSITION_IN_RANGE,
         {
@@ -47,10 +48,11 @@ describe('OffChainHistoryStorageAdapter', () => {
       ]);
 
     const db = { select } as unknown as Db;
-    const positionReadPort = { listSupportedPositions } as SupportedPositionReadPort;
-    const adapter = new OffChainHistoryStorageAdapter(db, positionReadPort) as unknown as {
-      getWalletHistory: (walletId: ReturnType<typeof makeWalletId>) => Promise<readonly unknown[]>;
+    const positionReadPort: SupportedPositionReadPort = {
+      listSupportedPositions,
+      getPosition: vi.fn().mockResolvedValue(null),
     };
+    const adapter = new OffChainHistoryStorageAdapter(db, positionReadPort);
 
     const history = await adapter.getWalletHistory(FIXTURE_WALLET_ID);
 

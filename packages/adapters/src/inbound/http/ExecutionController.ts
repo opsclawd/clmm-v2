@@ -40,7 +40,6 @@ import type {
   ExecutionAttempt,
   HistoryEvent,
   ExecutionLifecycleState,
-  ClockTimestamp,
   TransactionReference,
   WalletId,
   BreachEpisodeId,
