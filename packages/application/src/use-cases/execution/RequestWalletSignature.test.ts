@@ -110,18 +110,7 @@ describe('RequestWalletSignature', () => {
   });
 
   it('throws PreviewApprovalNotAllowedError when the preview is not fresh', async () => {
-    const storedPreview = executionRepo.previews.get(previewId);
-    if (!storedPreview) {
-      throw new Error('Expected preview fixture to exist');
-    }
-
-    executionRepo.previews.set(previewId, {
-      ...storedPreview,
-      preview: {
-        ...storedPreview.preview,
-        freshness: { kind: 'stale' },
-      },
-    });
+    clock.advance(35_000);
 
     await expect(requestWalletSignature({
       previewId,
@@ -139,6 +128,23 @@ describe('RequestWalletSignature', () => {
 
   it('throws PreviewApprovalNotAllowedError when a fresh preview is past expiresAt by clock time', async () => {
     clock.advance(60_001);
+
+    await expect(requestWalletSignature({
+      previewId,
+      walletId: FIXTURE_WALLET_ID,
+      executionRepo,
+      prepPort,
+      historyRepo,
+      clock,
+      ids,
+    })).rejects.toThrow(PreviewApprovalNotAllowedError);
+    expect(executionRepo.attempts.size).toBe(0);
+    expect(executionRepo.preparedPayloads.size).toBe(0);
+    expect(historyRepo.events).toEqual([]);
+  });
+
+  it('throws PreviewApprovalNotAllowedError when clock time puts preview in the stale window even though stored freshness is fresh', async () => {
+    clock.advance(35_000);
 
     await expect(requestWalletSignature({
       previewId,

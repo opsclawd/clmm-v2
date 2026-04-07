@@ -5,7 +5,7 @@ import type {
   ClockPort,
   IdGeneratorPort,
 } from '../../ports/index.js';
-import { makeClockTimestamp } from '@clmm/domain';
+import { makeClockTimestamp, evaluatePreviewFreshness } from '@clmm/domain';
 import type { WalletId, BreachDirection, BreachEpisodeId } from '@clmm/domain';
 
 const PREPARED_PAYLOAD_VERSION = 'v1';
@@ -69,13 +69,10 @@ export async function requestWalletSignature(params: {
     throw new PreviewNotFoundError(previewId);
   }
 
-  if (previewRecord.preview.freshness.kind !== 'fresh') {
-    throw new PreviewApprovalNotAllowedError(`preview ${previewId} is ${previewRecord.preview.freshness.kind}`);
-  }
-
   const now = clock.now();
-  if (now > previewRecord.preview.freshness.expiresAt) {
-    throw new PreviewApprovalNotAllowedError(`preview ${previewId} expired at ${previewRecord.preview.freshness.expiresAt}`);
+  const liveFreshness = evaluatePreviewFreshness(previewRecord.preview.estimatedAt, now);
+  if (liveFreshness.kind !== 'fresh') {
+    throw new PreviewApprovalNotAllowedError(`preview ${previewId} is ${liveFreshness.kind}`);
   }
 
   const attemptId = ids.generateId();
@@ -101,7 +98,7 @@ export async function requestWalletSignature(params: {
     attemptId,
     unsignedPayload: serializedPayload,
     payloadVersion: PREPARED_PAYLOAD_VERSION,
-    expiresAt: makeClockTimestamp(previewRecord.preview.freshness.expiresAt),
+    expiresAt: makeClockTimestamp(liveFreshness.expiresAt),
     createdAt: now,
   });
 
