@@ -16,6 +16,7 @@
     "@clmm/application": "workspace:*",
     "@clmm/ui": "workspace:*",
     "@expo/metro-runtime": "~4.0.1",
+    "expo-modules-core": "~2.2.3",
     "@solana-mobile/mobile-wallet-adapter-protocol": "^2.2.6",
     "@solana-mobile/mobile-wallet-adapter-protocol-kit": "^0.2.3",
     "@solana/web3.js": "^1.98.4",
