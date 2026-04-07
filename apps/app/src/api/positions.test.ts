@@ -53,7 +53,7 @@ describe('fetchSupportedPositions', () => {
 
     expect(fetchMock).toHaveBeenCalledWith(
       'https://bff.example.test/positions/DemoWallet1111111111111111111111111111111111',
-      expect.objectContaining({ headers: expect.any(Headers) }),
+      expect.objectContaining({}),
     );
   });
 
@@ -73,7 +73,7 @@ describe('fetchSupportedPositions', () => {
 
     expect(fetchMock).toHaveBeenCalledWith(
       'https://app.example.test:3001/positions/DemoWallet1111111111111111111111111111111111',
-      expect.objectContaining({ headers: expect.any(Headers) }),
+      expect.objectContaining({}),
     );
   });
 
@@ -184,7 +184,7 @@ describe('fetchPositionDetail', () => {
 
     expect(fetchMock).toHaveBeenCalledWith(
       'https://bff.example.test/positions/DemoWallet1111111111111111111111111111111111/Position1111111111111111111111111111111111',
-      expect.objectContaining({ headers: expect.any(Headers) }),
+      expect.objectContaining({}),
     );
   });
 

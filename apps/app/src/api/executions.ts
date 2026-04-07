@@ -265,9 +265,9 @@ export async function recordSignatureDecline(
   attemptId: string,
 ): Promise<{ declined: true; state: string }> {
   try {
-    const payload = (await fetchJson(`/executions/${attemptId}/decline-signature`, {
+    const payload: unknown = await fetchJson(`/executions/${attemptId}/decline-signature`, {
       method: 'POST',
-    })) as unknown;
+    });
 
     if (!isSignatureDeclineResponse(payload)) {
       throw new Error('Malformed signature decline response');
@@ -283,9 +283,9 @@ export async function recordSignatureInterruption(
   attemptId: string,
 ): Promise<{ interrupted: true; state: string }> {
   try {
-    const payload = (await fetchJson(`/executions/${attemptId}/interrupt-signature`, {
+    const payload: unknown = await fetchJson(`/executions/${attemptId}/interrupt-signature`, {
       method: 'POST',
-    })) as unknown;
+    });
 
     if (!isSignatureInterruptionResponse(payload)) {
       throw new Error('Malformed signature interruption response');

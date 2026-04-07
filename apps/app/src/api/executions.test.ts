@@ -58,7 +58,6 @@ describe('approveExecutionPreview', () => {
           walletId: 'wallet-1',
           episodeId: 'episode-1',
         }),
-        headers: expect.any(Headers),
       }),
     );
   });

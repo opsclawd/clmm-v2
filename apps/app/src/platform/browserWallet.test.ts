@@ -168,9 +168,7 @@ describe('browserWallet helpers', () => {
           return Promise.reject(new Error('r.serialize is not a function'));
         }
 
-        expect(payload).toMatchObject({
-          serialize: expect.any(Function),
-        });
+        expect(typeof (payload as { serialize?: unknown }).serialize).toBe('function');
         return Promise.resolve(new Uint8Array([7, 8, 9]));
       },
     };

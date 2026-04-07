@@ -40,7 +40,8 @@ export async function fetchJson(path: string, init?: RequestInit): Promise<unkno
   }
 
   try {
-    return await response.json();
+    const body: unknown = await response.json();
+    return body;
   } catch {
     throw new Error('Response body was not valid JSON');
   }
