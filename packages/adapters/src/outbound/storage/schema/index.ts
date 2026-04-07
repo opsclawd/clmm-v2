@@ -5,3 +5,4 @@ export * from './prepared-payloads.js';
 export * from './history.js';
 export * from './monitored-wallets.js';
 export * from './notification-dedup.js';
+export * from './wallet-position-ownership.js';

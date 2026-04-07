@@ -1,7 +1,6 @@
 import { describe, it, expect, vi } from 'vitest';
 import { OffChainHistoryStorageAdapter } from './OffChainHistoryStorageAdapter.js';
 import {
-  FIXTURE_POSITION_IN_RANGE,
   FIXTURE_POSITION_ID,
   FIXTURE_WALLET_ID,
 } from '@clmm/testing';
@@ -11,7 +10,16 @@ import type { SupportedPositionReadPort } from '@clmm/application';
 
 describe('OffChainHistoryStorageAdapter', () => {
   it('derives wallet history from wallet-owned positions and maps stored rows into history events', async () => {
-    const select = vi.fn().mockReturnValue({
+    const secondPositionId = makePositionId('second-owned-position');
+    const ownershipSelect = vi.fn().mockReturnValue({
+      from: vi.fn().mockReturnValue({
+        where: vi.fn().mockResolvedValue([
+          { walletId: FIXTURE_WALLET_ID, positionId: FIXTURE_POSITION_ID, firstSeenAt: 900, lastSeenAt: 1000 },
+          { walletId: FIXTURE_WALLET_ID, positionId: secondPositionId, firstSeenAt: 900, lastSeenAt: 1000 },
+        ]),
+      }),
+    });
+    const historySelect = vi.fn().mockReturnValue({
       from: vi.fn().mockReturnValue({
         where: vi.fn().mockReturnValue({
           orderBy: vi.fn().mockResolvedValue([
@@ -26,7 +34,7 @@ describe('OffChainHistoryStorageAdapter', () => {
             },
             {
               eventId: 'evt-2',
-              positionId: makePositionId('second-owned-position'),
+              positionId: secondPositionId,
               eventType: 'failed',
               directionKind: 'upper-bound-breach',
               occurredAt: 2000,
@@ -37,19 +45,14 @@ describe('OffChainHistoryStorageAdapter', () => {
         }),
       }),
     });
-    const listSupportedPositions: SupportedPositionReadPort['listSupportedPositions'] = vi
-      .fn()
-      .mockResolvedValue([
-        FIXTURE_POSITION_IN_RANGE,
-        {
-          ...FIXTURE_POSITION_IN_RANGE,
-          positionId: makePositionId('second-owned-position'),
-        },
-      ]);
 
-    const db = { select } as unknown as Db;
+    const selectMock = vi.fn()
+      .mockReturnValueOnce(ownershipSelect())
+      .mockReturnValueOnce(historySelect());
+
+    const db = { select: selectMock } as unknown as Db;
     const positionReadPort: SupportedPositionReadPort = {
-      listSupportedPositions,
+      listSupportedPositions: vi.fn().mockResolvedValue([]),
       getPosition: vi.fn().mockResolvedValue(null),
     };
     const adapter = new OffChainHistoryStorageAdapter(db, positionReadPort);
@@ -68,14 +71,58 @@ describe('OffChainHistoryStorageAdapter', () => {
       },
       {
         eventId: 'evt-2',
-        positionId: makePositionId('second-owned-position'),
+        positionId: secondPositionId,
         eventType: 'failed',
         breachDirection: UPPER_BOUND_BREACH,
         occurredAt: 2000,
       },
     ]);
-    expect(listSupportedPositions).toHaveBeenCalledWith(FIXTURE_WALLET_ID);
-    expect(select).toHaveBeenCalledTimes(1);
+    expect(positionReadPort.listSupportedPositions).not.toHaveBeenCalled();
+    expect(selectMock).toHaveBeenCalledTimes(2);
+  });
+
+  it('returns wallet history from durable ownership projection even when no live positions exist', async () => {
+    const ownershipSelect = vi.fn().mockReturnValue({
+      from: vi.fn().mockReturnValue({
+        where: vi.fn().mockResolvedValue([
+          { walletId: FIXTURE_WALLET_ID, positionId: FIXTURE_POSITION_ID, firstSeenAt: 900, lastSeenAt: 1000 },
+        ]),
+      }),
+    });
+    const historySelect = vi.fn().mockReturnValue({
+      from: vi.fn().mockReturnValue({
+        where: vi.fn().mockReturnValue({
+          orderBy: vi.fn().mockResolvedValue([
+            {
+              eventId: 'evt-durable-1',
+              positionId: FIXTURE_POSITION_ID,
+              eventType: 'confirmed',
+              directionKind: 'lower-bound-breach',
+              occurredAt: 1000,
+              lifecycleStateKind: 'confirmed',
+              transactionRefJson: null,
+            },
+          ]),
+        }),
+      }),
+    });
+
+    const selectMock = vi.fn()
+      .mockReturnValueOnce(ownershipSelect())
+      .mockReturnValueOnce(historySelect());
+
+    const db = { select: selectMock } as unknown as Db;
+    const positionReadPort: SupportedPositionReadPort = {
+      listSupportedPositions: vi.fn().mockResolvedValue([]),
+      getPosition: vi.fn().mockResolvedValue(null),
+    };
+    const adapter = new OffChainHistoryStorageAdapter(db, positionReadPort);
+
+    const history = await adapter.getWalletHistory(FIXTURE_WALLET_ID);
+
+    expect(history).toHaveLength(1);
+    expect(history[0]?.eventId).toBe('evt-durable-1');
+    expect(positionReadPort.listSupportedPositions).not.toHaveBeenCalled();
   });
 
   it('getOutcomeSummary method exists and is not a null-stub', () => {

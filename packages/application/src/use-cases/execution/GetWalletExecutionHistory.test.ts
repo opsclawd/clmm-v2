@@ -44,6 +44,28 @@ describe('GetWalletExecutionHistory', () => {
     expect(result.history).toEqual([]);
   });
 
+  it('returns history for a wallet whose positions were previously assigned even if no new events exist', async () => {
+    const closedPositionId = makePositionId('closed-position');
+    historyRepo.assignWalletToPosition(FIXTURE_WALLET_ID, closedPositionId);
+    await historyRepo.appendEvent({
+      eventId: 'evt-closed-pos',
+      positionId: closedPositionId,
+      eventType: 'confirmed',
+      breachDirection: LOWER_BOUND_BREACH,
+      occurredAt: clock.now(),
+      lifecycleState: { kind: 'confirmed' },
+    });
+
+    const result = await getWalletExecutionHistory({
+      walletId: FIXTURE_WALLET_ID,
+      historyRepo,
+    });
+
+    expect(result.history).toHaveLength(2);
+    const closedPosEvent = result.history.find((e) => e.positionId === closedPositionId);
+    expect(closedPosEvent?.eventType).toBe('confirmed');
+  });
+
   it('does not include events from positions assigned to a different wallet', async () => {
     const otherWalletId = makeWalletId('wallet-other');
     const otherPositionId = makePositionId('other-wallet-position');

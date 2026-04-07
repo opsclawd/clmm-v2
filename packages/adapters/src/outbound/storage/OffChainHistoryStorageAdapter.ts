@@ -1,6 +1,6 @@
 import { eq, inArray } from 'drizzle-orm';
 import type { Db } from './db.js';
-import { historyEvents } from './schema/index.js';
+import { historyEvents, walletPositionOwnership } from './schema/index.js';
 import type { ExecutionHistoryRepository, SupportedPositionReadPort } from '@clmm/application';
 import type {
   HistoryEvent,
@@ -63,9 +63,32 @@ export class OffChainHistoryStorageAdapter implements ExecutionHistoryRepository
     }).onConflictDoNothing();
   }
 
+  async recordWalletPositionOwnership(
+    walletId: WalletId,
+    positionId: PositionId,
+    observedAt: number,
+  ): Promise<void> {
+    await this.db
+      .insert(walletPositionOwnership)
+      .values({
+        walletId,
+        positionId,
+        firstSeenAt: observedAt,
+        lastSeenAt: observedAt,
+      })
+      .onConflictDoUpdate({
+        target: [walletPositionOwnership.walletId, walletPositionOwnership.positionId],
+        set: { lastSeenAt: observedAt },
+      });
+  }
+
   async getWalletHistory(walletId: WalletId): Promise<readonly HistoryEvent[]> {
-    const positions = await this.positionReadPort.listSupportedPositions(walletId);
-    const positionIds = [...new Set(positions.map((position) => position.positionId))];
+    const ownershipRows = await this.db
+      .select()
+      .from(walletPositionOwnership)
+      .where(eq(walletPositionOwnership.walletId, walletId));
+
+    const positionIds = ownershipRows.map((row) => row.positionId);
     if (positionIds.length === 0) {
       return [];
     }
