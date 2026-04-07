@@ -22,6 +22,12 @@ module.exports = {
   },
   overrides: [
     {
+      files: ['packages/application/src/**/*.{ts,tsx}'],
+      rules: {
+        '@typescript-eslint/require-await': 'off',
+      },
+    },
+    {
       files: ['packages/testing/src/**/*.{ts,tsx}'],
       rules: {
         '@typescript-eslint/require-await': 'off',

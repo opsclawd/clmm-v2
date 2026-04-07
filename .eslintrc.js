@@ -10,4 +10,12 @@ module.exports = {
     project: true,
     tsconfigRootDir: __dirname,
   },
+  overrides: [
+    {
+      files: ['packages/application/src/**/*.test.ts'],
+      parserOptions: {
+        project: ['./packages/application/tsconfig.typecheck.json'],
+      },
+    },
+  ],
 };
