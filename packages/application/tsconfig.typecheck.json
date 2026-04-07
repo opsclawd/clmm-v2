@@ -7,5 +7,5 @@
       "@clmm/testing": ["../testing/src/index.ts"]
     }
   },
-  "include": ["src/**/*"]
+  "include": ["src/**/*", "vitest.config.ts"]
 }
