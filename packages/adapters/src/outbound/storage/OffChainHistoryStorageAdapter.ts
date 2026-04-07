@@ -63,25 +63,6 @@ export class OffChainHistoryStorageAdapter implements ExecutionHistoryRepository
     }).onConflictDoNothing();
   }
 
-  async recordWalletPositionOwnership(
-    walletId: WalletId,
-    positionId: PositionId,
-    observedAt: number,
-  ): Promise<void> {
-    await this.db
-      .insert(walletPositionOwnership)
-      .values({
-        walletId,
-        positionId,
-        firstSeenAt: observedAt,
-        lastSeenAt: observedAt,
-      })
-      .onConflictDoUpdate({
-        target: [walletPositionOwnership.walletId, walletPositionOwnership.positionId],
-        set: { lastSeenAt: observedAt },
-      });
-  }
-
   async getWalletHistory(walletId: WalletId): Promise<readonly HistoryEvent[]> {
     const ownershipRows = await this.db
       .select()
