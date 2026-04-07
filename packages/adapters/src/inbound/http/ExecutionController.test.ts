@@ -173,14 +173,7 @@ describe('ExecutionController', () => {
     if (!storedPreview) {
       throw new Error('Expected preview fixture to exist');
     }
-
-    executionRepo.previews.set(previewId, {
-      ...storedPreview,
-      preview: {
-        ...storedPreview.preview,
-        freshness: { kind: 'stale' },
-      },
-    });
+    clock.set(storedPreview.preview.estimatedAt + 30_001);
 
     await expect(
       controller.approveExecution({

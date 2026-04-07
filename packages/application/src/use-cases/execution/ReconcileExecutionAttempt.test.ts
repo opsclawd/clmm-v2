@@ -167,7 +167,7 @@ describe('ReconcileExecutionAttempt', () => {
       clock,
       ids,
     });
-    expect(result).toBeNull();
+    expect(result).toEqual({ kind: 'pending' });
   });
 
   it('short-circuits a second reconcile after persisting partial completed steps', async () => {
