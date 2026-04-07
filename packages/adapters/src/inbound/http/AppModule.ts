@@ -44,7 +44,7 @@ const systemIds: IdGeneratorPort = {
 
 const orcaPositionRead = new OrcaPositionReadAdapter(rpcUrl);
 const operationalStorage = new OperationalStorageAdapter(db, systemIds, orcaPositionRead);
-const historyStorage = new OffChainHistoryStorageAdapter(db, orcaPositionRead);
+const historyStorage = new OffChainHistoryStorageAdapter(db);
 const jupiterQuote = new JupiterQuoteAdapter();
 const solanaPreparation = new SolanaExecutionPreparationAdapter(rpcUrl);
 const solanaSubmission = new SolanaExecutionSubmissionAdapter(rpcUrl);

@@ -1,7 +1,7 @@
 import { eq, inArray } from 'drizzle-orm';
 import type { Db } from './db.js';
 import { historyEvents, walletPositionOwnership } from './schema/index.js';
-import type { ExecutionHistoryRepository, SupportedPositionReadPort } from '@clmm/application';
+import type { ExecutionHistoryRepository } from '@clmm/application';
 import type {
   HistoryEvent,
   HistoryTimeline,
@@ -46,7 +46,6 @@ function mapHistoryEventRow(row: HistoryEventRow): HistoryEvent {
 export class OffChainHistoryStorageAdapter implements ExecutionHistoryRepository {
   constructor(
     private readonly db: Db,
-    private readonly positionReadPort: SupportedPositionReadPort,
   ) {}
 
   async appendEvent(event: HistoryEvent): Promise<void> {

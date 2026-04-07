@@ -76,7 +76,7 @@ export class SolanaExecutionSubmissionAdapter implements ExecutionSubmissionPort
       finalState = { kind: 'confirmed' };
     } else if (confirmedSteps.length > 0) {
       finalState = { kind: 'partial' };
-    } else if (unresolvedCount > 0) {
+    } else if (failedCount === 0 && unresolvedCount > 0) {
       finalState = null;
     } else {
       finalState = { kind: 'failed' };
