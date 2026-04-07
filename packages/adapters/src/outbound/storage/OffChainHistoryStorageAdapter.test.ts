@@ -77,6 +77,7 @@ describe('OffChainHistoryStorageAdapter', () => {
         occurredAt: 2000,
       },
     ]);
+    // eslint-disable-next-line @typescript-eslint/unbound-method
     expect(positionReadPort.listSupportedPositions).not.toHaveBeenCalled();
     expect(selectMock).toHaveBeenCalledTimes(2);
   });
@@ -122,6 +123,7 @@ describe('OffChainHistoryStorageAdapter', () => {
 
     expect(history).toHaveLength(1);
     expect(history[0]?.eventId).toBe('evt-durable-1');
+    // eslint-disable-next-line @typescript-eslint/unbound-method
     expect(positionReadPort.listSupportedPositions).not.toHaveBeenCalled();
   });
 
