@@ -95,10 +95,10 @@ export function PositionDetailScreen({ position, onViewPreview }: Props): JSX.El
 
         {canViewPreview ? (
           <View style={{ marginTop: 16 }}>
-            <DirectionalPolicyCard direction={breachDirection!} />
+            <DirectionalPolicyCard direction={breachDirection} />
 
             <TouchableOpacity
-              onPress={() => onViewPreview?.(triggerId!)}
+              onPress={() => onViewPreview?.(triggerId)}
               style={{
                 marginTop: 16,
                 padding: 16,
