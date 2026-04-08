@@ -1,0 +1,48 @@
+{
+  "version": "7",
+  "dialect": "postgresql",
+  "entries": [
+    {
+      "idx": 0,
+      "version": "7",
+      "when": 1774708583114,
+      "tag": "0000_acoustic_the_fallen",
+      "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "7",
+      "when": 1774719136000,
+      "tag": "0001_attempt_direction_hardening",
+      "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1775138011536,
+      "tag": "0002_chief_doctor_strange",
+      "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "7",
+      "when": 1775185297953,
+      "tag": "0003_signing_flow_wiring",
+      "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "7",
+      "when": 1775332372503,
+      "tag": "0004_breach_episode_linked_lifecycle",
+      "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "7",
+      "when": 1775500000000,
+      "tag": "0005_wallet_position_ownership",
+      "breakpoints": true
+    }
+  ]
+}

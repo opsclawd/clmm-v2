@@ -1,0 +1,11 @@
+{
+  "extends": "@clmm/config/tsconfig/base",
+  "compilerOptions": {
+    "composite": false,
+    "paths": {
+      "@clmm/domain": ["../domain/src/index.ts"],
+      "@clmm/testing": ["../testing/src/index.ts"]
+    }
+  },
+  "include": ["src/**/*", "vitest.config.ts"]
+}

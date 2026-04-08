@@ -1,12 +1,10 @@
-.ralph/logs/
-
-# Ignore everything under _bmad-output by default
-_bmad-output/*
-
-# But keep planning artifacts in git
-!_bmad-output/planning-artifacts/
-!_bmad-output/planning-artifacts/**
-
-# Optional: also keep implementation planning artifacts
-!_bmad-output/implementation-artifacts/
-!_bmad-output/implementation-artifacts/**
+node_modules/
+dist/
+.turbo/
+*.tsbuildinfo
+.expo/
+.next/
+coverage/
+.worktrees
+.env
+.env.local

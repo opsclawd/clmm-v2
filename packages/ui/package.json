@@ -1,0 +1,25 @@
+{
+  "name": "@clmm/ui",
+  "version": "0.0.1",
+  "private": true,
+  "main": "./src/index.ts",
+  "scripts": {
+    "test": "vitest run",
+    "typecheck": "tsc --noEmit",
+    "build": "tsc -p tsconfig.json",
+    "lint": "eslint src --ext .ts,.tsx"
+  },
+  "dependencies": {
+    "@clmm/application": "workspace:*",
+    "react": "18.3.1",
+    "react-native": "0.76.9"
+  },
+  "devDependencies": {
+    "@clmm/config": "workspace:*",
+    "@testing-library/react": "^16.3.0",
+    "@types/react": "~18.3.1",
+    "react-native-web": "~0.19.13",
+    "vitest": "^1.6.0",
+    "typescript": "^5.4.0"
+  }
+}

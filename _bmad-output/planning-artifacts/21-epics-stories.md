@@ -684,6 +684,40 @@ So that desktop remains helpful without becoming the primary execution model.
 - Given desktop has more horizontal space, when the UI is rendered, then it uses the same narrow IA and does not introduce a broader analytics or dashboard shell.
 - Given mobile web lacks equivalent support, when the same surface is visited there, then degradation is explicit and non-parity claims remain intact.
 
+### Story 6.8: Wire Wallet Connection Entry, Supported Wallet States, And Resume Handoff
+
+As a user,
+I want a clear wallet connection flow with explicit supported-platform and supported-wallet states,
+So that I can connect once, understand whether this device is actually usable for monitoring and execution, and reach my positions without confusion.
+
+**Affected Layer/Package:** `packages/ui`, `apps/app`, `packages/application/public`
+**Requirements:** FR1, FR2, FR5-FR7, FR45-FR47, UX-DR1, UX-DR8, UX-DR11, UX-DR12
+
+**Acceptance Criteria:**
+
+- Given the user opens the app while disconnected, when the initial wallet state is rendered, then the primary screen presents a clear connect-wallet entry point rather than an empty positions surface or generic dashboard.
+- Given the user chooses to connect, when the wallet-selection flow is opened, then only supported wallet options for the current platform are presented and unsupported options are not implied to work.
+- Given the user is on React Native mobile, when the wallet-selection flow renders, then native-supported wallet connection options are shown in plain language without exposing adapter or SDK terminology.
+- Given the user is on a desktop PWA with compatible browser-wallet support, when the wallet-selection flow renders, then supported browser-wallet connection options are shown and desktop review/manual execution capability is represented honestly.
+- Given the user is on unsupported mobile web or degraded mobile PWA, when the wallet-selection flow renders, then the UI explains degraded capability explicitly and does not imply parity with native signing or native push delivery.
+- Given the wallet connection succeeds, when the app resolves the connected state, then the user is taken to the narrow core flow starting with supported positions associated with that wallet rather than to a generic dashboard.
+- Given the wallet connection succeeds but no supported Orca CLMM positions are found, when the post-connect screen renders, then the UI shows a dedicated empty state explaining that the wallet is connected but no supported positions are currently available.
+- Given the wallet connection fails, is cancelled, or is interrupted, when the flow returns to the app, then the UI distinguishes failed connection, user cancellation, and interrupted handoff rather than collapsing them into a generic error.
+- Given a wallet handoff occurs during connection or reconnect, when the user returns to the app, then context is restored to one authoritative current state and the UI does not show conflicting local assumptions.
+- Given the user is already connected, when the wallet state is viewed later from Wallet/Settings, then the screen shows connected-wallet summary plus reconnect, switch-wallet, and disconnect actions without expanding into analytics or protocol configuration.
+- Given a different wallet is connected, when supported positions are queried again, then positions, alerts, and history context refresh against the newly connected wallet identity rather than stale prior-wallet state.
+- Given the screen and route structure are reviewed, when navigation is inspected, then wallet connection remains part of the narrow IA and does not introduce a broader dashboard shell.
+
+**Implementation References (Context7)**
+
+- Resolve the exact Context7 library ID first; do not guess IDs.
+- Solana Mobile Wallet Adapter overview and platform constraints.
+- MWA React Native Installation.
+- MWA React Native Setup.
+- MWA React Native Quickstart.
+- ConnectorKit / `@solana/connector`.
+- Optional only if not using ConnectorKit: Solana `@solana/react-hooks` wallet docs.
+
 ## Epic 7: Notifications
 
 Deliver best-effort notifications and re-entry flows that are operationally useful without implying guaranteed protection.

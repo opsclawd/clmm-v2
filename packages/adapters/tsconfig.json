@@ -1,0 +1,27 @@
+{
+  "extends": "@clmm/config/tsconfig/nestjs",
+  "compilerOptions": {
+    "rootDir": "src",
+    "outDir": "dist",
+    "types": ["node"],
+    "paths": {
+      "@solana-mobile/mobile-wallet-adapter-protocol": [
+        "./src/types/wallet-adapter.d.ts"
+      ],
+      "@solana-mobile/mobile-wallet-adapter-protocol-kit": [
+        "./src/types/wallet-adapter.d.ts"
+      ],
+      "@clmm/application": ["../application/src/index.ts"],
+      "@clmm/application/public": ["../application/src/public/index.ts"],
+      "@clmm/domain": ["../domain/src/index.ts"],
+      "@clmm/testing": ["../testing/src/index.ts"]
+    }
+  },
+  "include": ["src/**/*"],
+  "exclude": ["src/**/*.test.ts", "src/**/*.test.tsx"],
+  "references": [
+    { "path": "../application" },
+    { "path": "../domain" },
+    { "path": "../testing" }
+  ]
+}

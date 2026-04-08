@@ -1,0 +1,21 @@
+{
+  "name": "@clmm/testing",
+  "version": "0.0.1",
+  "private": true,
+  "main": "./src/index.ts",
+  "scripts": {
+    "test": "vitest run",
+    "build": "tsc -p tsconfig.json",
+    "typecheck": "tsc --noEmit",
+    "lint": "eslint src --ext .ts"
+  },
+  "dependencies": {
+    "@clmm/domain": "workspace:*"
+  },
+  "devDependencies": {
+    "@clmm/application": "workspace:*",
+    "@clmm/config": "workspace:*",
+    "vitest": "^1.6.0",
+    "typescript": "^5.4.0"
+  }
+}
