@@ -6,7 +6,6 @@ import {
 } from '@clmm/testing';
 import { LOWER_BOUND_BREACH, UPPER_BOUND_BREACH, makePositionId } from '@clmm/domain';
 import type { Db } from './db.js';
-import type { SupportedPositionReadPort } from '@clmm/application';
 
 describe('OffChainHistoryStorageAdapter', () => {
   it('derives wallet history from wallet-owned positions and maps stored rows into history events', async () => {
@@ -51,11 +50,7 @@ describe('OffChainHistoryStorageAdapter', () => {
       .mockReturnValueOnce(historySelect());
 
     const db = { select: selectMock } as unknown as Db;
-    const positionReadPort: SupportedPositionReadPort = {
-      listSupportedPositions: vi.fn().mockResolvedValue([]),
-      getPosition: vi.fn().mockResolvedValue(null),
-    };
-    const adapter = new OffChainHistoryStorageAdapter(db, positionReadPort);
+    const adapter = new OffChainHistoryStorageAdapter(db);
 
     const history = await adapter.getWalletHistory(FIXTURE_WALLET_ID);
 
@@ -77,8 +72,6 @@ describe('OffChainHistoryStorageAdapter', () => {
         occurredAt: 2000,
       },
     ]);
-    // eslint-disable-next-line @typescript-eslint/unbound-method
-    expect(positionReadPort.listSupportedPositions).not.toHaveBeenCalled();
     expect(selectMock).toHaveBeenCalledTimes(2);
   });
 
@@ -113,18 +106,12 @@ describe('OffChainHistoryStorageAdapter', () => {
       .mockReturnValueOnce(historySelect());
 
     const db = { select: selectMock } as unknown as Db;
-    const positionReadPort: SupportedPositionReadPort = {
-      listSupportedPositions: vi.fn().mockResolvedValue([]),
-      getPosition: vi.fn().mockResolvedValue(null),
-    };
-    const adapter = new OffChainHistoryStorageAdapter(db, positionReadPort);
+    const adapter = new OffChainHistoryStorageAdapter(db);
 
     const history = await adapter.getWalletHistory(FIXTURE_WALLET_ID);
 
     expect(history).toHaveLength(1);
     expect(history[0]?.eventId).toBe('evt-durable-1');
-    // eslint-disable-next-line @typescript-eslint/unbound-method
-    expect(positionReadPort.listSupportedPositions).not.toHaveBeenCalled();
   });
 
   it('getOutcomeSummary method exists and is not a null-stub', () => {
