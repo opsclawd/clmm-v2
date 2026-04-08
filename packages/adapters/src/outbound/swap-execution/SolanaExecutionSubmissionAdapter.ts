@@ -72,11 +72,15 @@ export class SolanaExecutionSubmissionAdapter implements ExecutionSubmissionPort
     const unresolvedCount = references.length - confirmedSteps.length - failedCount;
 
     let finalState: ExecutionLifecycleState | null;
-    if (confirmedSteps.length === references.length) {
+    if (references.length === 0) {
+      finalState = null;
+    } else if (confirmedSteps.length === references.length) {
       finalState = { kind: 'confirmed' };
     } else if (confirmedSteps.length > 0) {
       finalState = { kind: 'partial' };
-    } else if (failedCount === 0 && unresolvedCount > 0) {
+    } else if (failedCount > 0) {
+      finalState = { kind: 'failed' };
+    } else if (unresolvedCount > 0) {
       finalState = null;
     } else {
       finalState = { kind: 'failed' };

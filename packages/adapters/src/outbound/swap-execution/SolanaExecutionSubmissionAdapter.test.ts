@@ -77,5 +77,14 @@ describe('SolanaExecutionSubmissionAdapter', () => {
       expect(result.finalState).toEqual({ kind: 'failed' });
       expect(result.confirmedSteps).toEqual([]);
     });
+
+    it('returns null when the references array is empty', async () => {
+      const adapter = makeAdapter(makeMockRpc({}));
+
+      const result = await adapter.reconcileExecution([]);
+
+      expect(result.finalState).toBeNull();
+      expect(result.confirmedSteps).toEqual([]);
+    });
   });
 });
