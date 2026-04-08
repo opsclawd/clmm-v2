@@ -73,13 +73,14 @@ export default function SigningRoute() {
   const walletAddress = useStore(walletSessionStore, (state) => state.walletAddress);
   const connectionKind = useStore(walletSessionStore, (state) => state.connectionKind);
 
-  if (attemptId == null && walletAddress == null) {
-    router.push('/connect');
-    return null;
-  }
-
   const [statusNotice, setStatusNotice] = useState<string | null>(null);
   const [hasStartedPendingApproval, setHasStartedPendingApproval] = useState(false);
+
+  useEffect(() => {
+    if (attemptId == null && walletAddress == null) {
+      router.push('/connect');
+    }
+  }, [attemptId, walletAddress, router]);
 
   const approveMutation = useMutation({
     mutationFn: approveExecutionPreview,
@@ -237,6 +238,10 @@ export default function SigningRoute() {
       });
     },
   });
+
+  if (attemptId == null && walletAddress == null) {
+    return null;
+  }
 
   return (
     <SigningStatusScreen

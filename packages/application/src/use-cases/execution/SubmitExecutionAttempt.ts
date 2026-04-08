@@ -33,7 +33,7 @@ export async function submitExecutionAttempt(params: {
 
   const preparedPayload = await executionRepo.getPreparedPayload(attemptId);
   const now = clock.now();
-  if (preparedPayload && now > preparedPayload.expiresAt) {
+  if (preparedPayload && now >= preparedPayload.expiresAt) {
     await executionRepo.updateAttemptState(attemptId, { kind: 'expired' });
     await historyRepo.appendEvent({
       eventId: ids.generateId(),

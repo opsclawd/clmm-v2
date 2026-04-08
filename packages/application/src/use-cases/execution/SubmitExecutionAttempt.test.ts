@@ -111,6 +111,49 @@ describe('SubmitExecutionAttempt', () => {
     );
   });
 
+  it('treats payload as expired when clock.now() equals expiresAt (boundary case)', async () => {
+    const clock = new FakeClockPort(makeClockTimestamp(1_060_000));
+    const ids = new FakeIdGeneratorPort();
+    const executionRepo = new FakeExecutionRepository();
+    const submissionPort = new FakeExecutionSubmissionPort();
+    const historyRepo = new FakeExecutionHistoryRepository();
+    const submitSpy = vi.spyOn(submissionPort, 'submitExecution');
+
+    const attempt: StoredExecutionAttempt = {
+      attemptId: 'attempt-at-boundary',
+      positionId: FIXTURE_POSITION_ID,
+      breachDirection: LOWER_BOUND_BREACH,
+      lifecycleState: { kind: 'awaiting-signature' },
+      completedSteps: [],
+      transactionReferences: [],
+    };
+    await executionRepo.saveAttempt(attempt);
+    await executionRepo.savePreparedPayload({
+      payloadId: 'payload-at-boundary',
+      attemptId: 'attempt-at-boundary',
+      unsignedPayload: new Uint8Array([9, 8, 7]),
+      payloadVersion: 'v1',
+      expiresAt: makeClockTimestamp(1_060_000),
+      createdAt: makeClockTimestamp(1_000_000),
+    });
+
+    const result = await submitExecutionAttempt({
+      attemptId: 'attempt-at-boundary',
+      signedPayload: new Uint8Array([1, 2, 3]),
+      executionRepo,
+      submissionPort,
+      historyRepo,
+      clock,
+      ids,
+    });
+
+    expect(result).toEqual({
+      kind: 'expired',
+      currentState: 'expired',
+    });
+    expect(submitSpy).not.toHaveBeenCalled();
+  });
+
   it('preserves legacy submission behavior when no prepared payload is stored', async () => {
     const clock = new FakeClockPort();
     const ids = new FakeIdGeneratorPort();

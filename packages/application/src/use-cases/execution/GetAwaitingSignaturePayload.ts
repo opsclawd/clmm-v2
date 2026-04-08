@@ -50,7 +50,7 @@ export async function getAwaitingSignaturePayload(
     };
   }
 
-  if (input.clock.now() > preparedPayload.expiresAt) {
+  if (input.clock.now() >= preparedPayload.expiresAt) {
     await input.executionRepo.updateAttemptState(input.attemptId, { kind: 'expired' });
     await input.historyRepo.appendEvent({
       eventId: input.ids.generateId(),

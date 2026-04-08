@@ -86,5 +86,20 @@ describe('SolanaExecutionSubmissionAdapter', () => {
       expect(result.finalState).toBeNull();
       expect(result.confirmedSteps).toEqual([]);
     });
+
+    it('treats err with confirmed/finalized status as failed, not confirmed', async () => {
+      const adapter = makeAdapter(makeMockRpc({
+        'sig1': { confirmationStatus: 'confirmed', err: { err: 'transaction failed' } },
+        'sig2': { confirmationStatus: 'finalized', err: { err: 'instruction error' } },
+      }));
+
+      const result = await adapter.reconcileExecution([
+        makeRef('sig1', 'swap-assets'),
+        makeRef('sig2', 'remove-liquidity'),
+      ]);
+
+      expect(result.finalState).toEqual({ kind: 'failed' });
+      expect(result.confirmedSteps).toEqual([]);
+    });
   });
 });

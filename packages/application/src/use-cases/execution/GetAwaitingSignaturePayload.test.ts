@@ -159,4 +159,41 @@ describe('GetAwaitingSignaturePayload', () => {
       }),
     );
   });
+
+  it('treats payload as expired when clock.now() equals expiresAt (boundary case)', async () => {
+    const clock = new FakeClockPort(makeClockTimestamp(1_060_000));
+    const ids = new FakeIdGeneratorPort();
+    const executionRepo = new FakeExecutionRepository();
+    const historyRepo = new FakeExecutionHistoryRepository();
+
+    await executionRepo.saveAttempt({
+      attemptId: 'attempt-at-boundary',
+      positionId: FIXTURE_POSITION_ID,
+      breachDirection: LOWER_BOUND_BREACH,
+      lifecycleState: { kind: 'awaiting-signature' },
+      completedSteps: [],
+      transactionReferences: [],
+    });
+    await executionRepo.savePreparedPayload({
+      payloadId: 'payload-at-boundary',
+      attemptId: 'attempt-at-boundary',
+      unsignedPayload: new Uint8Array([9, 8, 7]),
+      payloadVersion: 'v1',
+      expiresAt: makeClockTimestamp(1_060_000),
+      createdAt: makeClockTimestamp(1_000_000),
+    });
+
+    const result = await getAwaitingSignaturePayload({
+      attemptId: 'attempt-at-boundary',
+      executionRepo,
+      historyRepo,
+      clock,
+      ids,
+    });
+
+    expect(result).toEqual({
+      kind: 'expired',
+      currentState: 'expired',
+    });
+  });
 });

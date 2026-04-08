@@ -59,10 +59,10 @@ export class SolanaExecutionSubmissionAdapter implements ExecutionSubmissionPort
         const status = await rpc.getSignatureStatuses([ref.signature as unknown as Signature], { searchTransactionHistory: true }).send();
         const sigStatus = status.value[0];
 
-        if (sigStatus?.confirmationStatus === 'confirmed' || sigStatus?.confirmationStatus === 'finalized') {
-          confirmedSteps.push(ref.stepKind);
-        } else if (sigStatus?.err) {
+        if (sigStatus?.err) {
           failedCount++;
+        } else if (sigStatus?.confirmationStatus === 'confirmed' || sigStatus?.confirmationStatus === 'finalized') {
+          confirmedSteps.push(ref.stepKind);
         }
       } catch {
         failedCount++;
