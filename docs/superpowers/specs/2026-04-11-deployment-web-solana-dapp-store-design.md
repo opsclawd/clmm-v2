@@ -1,364 +1,313 @@
-# Deployment Plan: Web (Cloudflare Pages) + Solana DApp Store
+# Deployment Plan: Production Web Launch + Solana Mobile Distribution Decision
 
 ## Context
 
-CLMM V2 is a mobile-first, non-custodial LP exit assistant for Orca whirlpool positions on Solana, built as an Expo/React Native monorepo (web + mobile) with a NestJS backend. The project is feature-complete and all tests pass. It is not yet deployed anywhere.
+CLMM V2 is a mobile-first, non-custodial LP exit assistant for Orca whirlpool positions on Solana, built as an Expo/React Native monorepo with a NestJS backend.
 
-**Goal:** Get the web app live, then deploy to Solana Mobile Dapp Store (Android-only for now). Skip iOS App Store and Google Play Store.
+The earlier draft assumed:
 
-**Phase order:** Web deployment first (fastest path to live), then Solana Mobile.
+1. the backend was already deployable,
+2. the web export path was already correct,
+3. native Android was the obvious Solana Mobile path.
+
+Those assumptions are not safe enough for execution. This revision adds explicit decision gates so the team does not confuse "written deployment steps" with "a launchable product."
+
+## Revised Goal
+
+1. Launch a trustworthy production web app on stable custom domains.
+2. Prove the real user journey works end to end on the web deployment.
+3. Decide the Solana Mobile distribution path only after validating whether the deployed web app is sufficient on Android mobile web.
+4. Build a native Android app only if the web/PWA path cannot satisfy wallet flow or store constraints.
+
+## Decision Gates
+
+### Gate 1: Deployability
+
+Before any Railway or Cloudflare setup is treated as executable:
+
+- `pnpm --filter @clmm/adapters build` must pass
+- `pnpm --filter @clmm/app build` must be the authoritative web export command
+- a real HTTP readiness endpoint must exist
+- production support/contact surfaces must be chosen and non-placeholder
+
+If any item above is false, fix the repo or narrow the launch scope before continuing.
+
+### Gate 2: Solana Mobile Distribution
+
+Before native Android work begins:
+
+- verify whether the deployed web app works acceptably on Android mobile web
+- verify whether the dApp Store target can be satisfied by a wrapped PWA/mobile-web path
+- record the reason for choosing native Android if the web/PWA path is rejected
+
+Native Android is a conditional phase, not the default next step.
 
 ---
 
-## Phase 1: Web Deployment
+## Phase 0: Deployment Readiness
 
-### 1.1 `app.config.ts` — Dynamic Environment Configuration
+### 0.1 Restore Backend Deployability
 
-**File:** `apps/app/app.config.ts`
+The current backend deployment target is `packages/adapters`, so the package must compile cleanly before Railway work starts.
 
-Create a TypeScript config file (replaces `app.json` for dynamic values). Reads from environment variables and EAS context.
+Required outcome:
 
-```typescript
-import type { ConfigContext, ExpoConfig } from 'expo';
+- `pnpm --filter @clmm/adapters build` succeeds
 
-const isProduction = process.env.NODE_ENV === 'production';
+This is a hard precondition because Railway cannot deploy a build that does not exist.
 
-export default ({ ctx }: ConfigContext): ExpoConfig => ({
-  ...require('./app.json'),
-  name: isProduction ? 'CLMM V2' : 'CLMM V2 (dev)',
-  scheme: 'clmmv2',
-  extra: {
-    eas: {
-      projectId: process.env.EAS_PROJECT_ID,
-    },
-    API_BASE_URL: process.env.EXPO_PUBLIC_API_BASE_URL,
-    BFF_BASE_URL: process.env.EXPO_PUBLIC_BFF_BASE_URL,
-  },
-});
-```
+### 0.2 Add an Explicit Readiness Endpoint
 
-**Why:** `app.json` is static; `app.config.ts` allows per-environment env var injection (dev vs. preview vs. production builds pointing at different backends). Uses `process.env.NODE_ENV` (set by Expo/EAS) rather than `ctx.env.NODE_ENV` which is not reliably available in all contexts.
+The plan will use `/health` as the canonical readiness probe, so the backend must actually expose it.
 
-### 1.2 `.env.example` — Environment Variable Documentation
+Required behavior:
 
-**File:** `apps/app/.env.example`
+- route: `GET /health`
+- response: `200 OK`
+- payload: small JSON body such as `{ "status": "ok" }`
+- safe for Railway health checks and manual curl verification
+
+### 0.3 Finalize Public Trust Surfaces
+
+Before public launch, the plan requires stable production-facing surfaces:
+
+- web app domain: `https://clmm.v2.app`
+- API domain: `https://api.clmm.v2.app`
+- privacy policy route: `https://clmm.v2.app/privacy-policy`
+- support route: `https://clmm.v2.app/support`
+- support email: `support@clmm.v2.app`
+
+Do not launch or submit with placeholder contact info or temporary platform domains as the canonical public surface.
+
+---
+
+## Phase 1: Web Launch
+
+### 1.1 Keep Phase 1 Runtime Configuration Minimal
+
+Phase 1 does not need a new `app.config.ts` if the only runtime value the web app needs is the public BFF base URL.
+
+Phase 1 configuration rule:
+
+- keep `apps/app/app.json` as the primary Expo config
+- use `EXPO_PUBLIC_BFF_BASE_URL` as the only required app runtime variable unless a second public URL has a real consumer
+- defer `app.config.ts` until native/EAS work actually requires dynamic Expo metadata
+
+This avoids introducing config indirection before it earns its keep.
+
+### 1.2 Split Environment Documentation by Owner
+
+Use separate env docs for app and backend concerns.
+
+`apps/app/.env.example`
 
 ```bash
-# Backend
-DATABASE_URL=postgresql://user:password@host:5432/clmm
-SOLANA_RPC_URL=https://api.mainnet-beta.solana.com
-PORT=3001
-
-# BFF (Backend-for-Frontend proxy — same NestJS app)
+# Public runtime config for the Expo app
 EXPO_PUBLIC_BFF_BASE_URL=https://api.clmm.v2.app
-
-# EAS
-EAS_PROJECT_ID=your-eas-project-id
-
-# Web only (Cloudflare Pages)
-EXPO_PUBLIC_API_BASE_URL=https://api.clmm.v2.app
 ```
 
-**Rule:** Never commit `.env` files. All secrets come from CI/CD or platform environment variables.
-
-### 1.3 `scripts/deploy-web.sh` — Web Build & Deploy Script
-
-**File:** `scripts/deploy-web.sh`
+`packages/adapters/.env.sample`
 
 ```bash
-#!/bin/bash
-set -e
-
-echo "Building web app..."
-pnpm --filter @clmm/app export
-
-echo "Deploying to Cloudflare Pages..."
-# Uses wrangler CLI or Cloudflare Pages GitHub integration
-npx wrangler pages deploy dist --project-name=clmm-v2
+DATABASE_URL=postgresql://user:password@host:5432/clmm
+SOLANA_RPC_URL=https://your-private-rpc.example.com
+PORT=3001
 ```
 
-**Notes:**
-- `pnpm --filter @clmm/app export` runs `expo export:embed` (already configured in `app.json` with `web.output: "static"`)
-- Cloudflare Pages should be connected to the GitHub repo for automatic deploys on merge to `main`
-- The build command in Cloudflare Pages dashboard: `pnpm install && pnpm --filter @clmm/app export`
-- The output directory: `dist`
-- `EXPO_PUBLIC_BFF_BASE_URL` must be set in Cloudflare Pages environment variables
+Do not document backend-only secrets in the app env file.
 
-### 1.4 Privacy Policy Page
+### 1.3 Legal and Support Surfaces
 
-**File:** `apps/app/app/(tabs)/privacy-policy.tsx` (or `apps/app/app/privacy-policy.tsx`)
+The legal/support pages are standalone routes, not tab destinations.
 
-A static page at `/privacy-policy` — required for any app store submission. Minimal content:
+Required IA:
 
-- "CLMM V2 is a non-custodial application. We do not collect, store, or transmit your personal data."
-- "We do not use analytics trackers."
-- "Your transaction signing occurs entirely in your own wallet."
-- Contact email placeholder.
+- `/privacy-policy` lives outside tab navigation
+- `/support` lives outside tab navigation
+- each route in `apps/app/app/` is a thin Expo Router wrapper
+- UI content lives in `packages/ui`
 
-This page must be live and accessible before Solana Mobile submission.
+Required privacy-policy content:
 
-### 1.5 Backend Deployment to Railway
+- truthful statement that CLMM V2 is non-custodial
+- truthful statement that private keys and seed phrases are never stored
+- truthful statement that wallet-linked operational data may be stored off-chain to provide monitoring, previews, execution history, and notification delivery
+- contact path to the support surface
 
-**Prerequisites:** Railway account connected to GitHub.
+The copy must match how the backend actually works.
 
-**Steps:**
-1. Create a new Railway project
-2. Add a PostgreSQL database (Railway will set `DATABASE_URL` automatically)
-3. Set the following environment variables in Railway:
-   - `SOLANA_RPC_URL` — use a private RPC (Helius/QuickNode) for reliability, not the public one
-   - `PORT=3001`
-   - `EXPO_PUBLIC_BFF_BASE_URL=https://[your-railway-app].up.railway.app` (set after deploy)
-4. Connect the `packages/adapters` package or a separate deploy entry point to Railway via GitHub
-5. Run Drizzle migrations: `pnpm --filter @clmm/adapters db:migrate`
-6. Verify API health: `curl https://[app].up.railway.app/health`
+### 1.4 Railway Deployment
 
-**Note:** The NestJS backend is a separate deployment from the monorepo. Railway should deploy the `packages/adapters` NestJS app directly, or a root-level server entry point.
+Railway deployment shape is fixed:
 
-### 1.6 Cloudflare Pages Setup
+- one service for the HTTP API
+- one service for the worker
+- both built from the monorepo root
+- both use `packages/adapters` compiled outputs as their start targets
 
-1. Log in to Cloudflare Dashboard → Pages → Create a project
-2. Connect to GitHub repo
-3. Set build settings:
-   - **Build command:** `pnpm install && pnpm --filter @clmm/app export`
-   - **Build output directory:** `dist`
-4. Add environment variables:
-   - `EXPO_PUBLIC_BFF_BASE_URL` → Railway backend URL
-   - `NODE_VERSION` → `20`
-5. Deploy — verify `https://[project].pages.dev` resolves and loads
+Canonical commands:
+
+- build: `pnpm install && pnpm --filter @clmm/adapters build`
+- API start: `node packages/adapters/dist/inbound/http/main.js`
+- worker start: `node packages/adapters/dist/inbound/jobs/main.js`
+- migrations: `pnpm --filter @clmm/adapters db:migrate`
+
+Required runtime variables in Railway:
+
+- `DATABASE_URL`
+- `SOLANA_RPC_URL`
+- `PORT=3001`
+
+### 1.5 Cloudflare Pages Deployment
+
+The authoritative web export command is:
+
+```bash
+pnpm --filter @clmm/app build
+```
+
+Cloudflare Pages settings:
+
+- build command: `pnpm install && pnpm --filter @clmm/app build`
+- build output directory: `apps/app/dist`
+- root directory: `/`
+- env var: `EXPO_PUBLIC_BFF_BASE_URL=https://api.clmm.v2.app`
+
+If a local deploy script exists, it should deploy `apps/app/dist`, not repo-root `dist`.
+
+### 1.6 Phase 1 Launch Verification
+
+Phase 1 is complete only if the real user journey works on the deployed site.
+
+Required checks:
+
+1. `https://clmm.v2.app/` loads without crash
+2. `https://clmm.v2.app/privacy-policy` and `/support` load and are usable
+3. browser wallet connection works on supported web wallet setups
+4. a supported Orca position can be loaded
+5. an execution preview can be generated
+6. the user can explicitly abandon without broken state
+7. if signing is attempted, the post-submit state remains truthful and does not imply confirmation before reconciliation
+
+Artifact-only checks such as "returns 200" are not enough on their own.
 
 ---
 
-## Phase 2: Solana Mobile Dapp Store
+## Phase 2: Solana Mobile Distribution Decision
 
-### 2.1 Solana Mobile SDK Setup — `expo-dev-client` and Polyfill
+After the web launch is live, test the Android mobile-web path before committing to native Android.
 
-**Problem:** `@solana-mobile/mobile-wallet-adapter-protocol` includes native Kotlin modules. These only work in a **custom Expo development build**, not Expo Go. The codebase already has the MWA packages installed but is missing the build infrastructure.
+Questions this phase must answer:
 
-**Install packages:**
-```bash
-pnpm --filter @clmm/app add expo-dev-client react-native-quick-crypto
-```
+1. Can a real Android user reach the deployed web app and complete the core flow?
+2. Does the current web wallet approach work on target Android wallet/browser combinations?
+3. If the web app is wrapped for store distribution, does the wallet UX remain acceptable?
+4. Does the dApp Store require anything that the web/PWA path cannot satisfy?
 
-**Create `apps/app/polyfill.js`** in the app package root:
-```javascript
-// Required first import for react-native-quick-crypto polyfill
-// This MUST be the first line executed in the JS bundle
-import { install } from 'react-native-quick-crypto';
-install();
-```
+Decision outputs:
 
-**Update `apps/app/index.js`** to import the polyfill before `expo-router`:
-```javascript
-import './polyfill';
-import 'expo-router/entry';
-```
+- `Proceed with wrapped web/PWA path`
+- `Proceed with native Android path`
 
-**Update `apps/app/package.json`**:
-```json
-{
-  "main": "./index.js"
-}
-```
+If the team chooses native Android, record the concrete reason. Example reasons:
 
-### 2.2 `app.json` Updates — Android Package and Version
+- wallet connectivity is not acceptable on Android mobile web
+- store packaging constraints require native integration
+- a native-only capability is required for launch
 
-**File:** `apps/app/app.json`
+---
 
-Add Android configuration to the existing `app.json`:
+## Phase 3: Native Android Path (Conditional)
 
-```json
-{
-  "expo": {
-    "android": {
-      "package": "com.clmm.v2",
-      "versionCode": 1,
-      "adaptiveIcon": {
-        "foregroundImage": "./public/icon.png",
-        "backgroundColor": "#0D0D0D"
-      },
-      "permissions": [
-        "android.permission.INTERNET"
-      ]
-    },
-    "web": {
-      "bundler": "metro",
-      "output": "static",
-      "favicon": "./public/favicon.png"
-    }
-  }
-}
-```
+This phase happens only if Phase 2 rejects the web/PWA option.
 
-### 2.3 `eas.json` — Build Profiles
+### 3.1 Native Entry Point
 
-**File:** `apps/app/eas.json`
+If native Android is required:
 
-```json
-{
-  "cli": {
-    "version": ">= 13.0.0"
-  },
-  "build": {
-    "development": {
-      "developmentClient": true,
-      "distribution": "internal",
-      "android": {
-        "buildType": "debug"
-      }
-    },
-    "preview": {
-      "distribution": "internal",
-      "android": {
-        "buildType": "apk"
-      }
-    },
-    "production": {
-      "android": {
-        "buildType": "app-bundle"
-      }
-    }
-  },
-  "submit": {
-    "production": {
-      "android": {
-        "track": "production"
-      }
-    }
-  }
-}
-```
+- create `apps/app/polyfill.js`
+- create `apps/app/index.js`
+- update `apps/app/package.json` `main` to `./index.js`
 
-**Notes:**
-- `development` — for local device testing with `expo run:android`
-- `preview` — internal test APK via EAS
-- `production` — signed AAB for store submission
+These files belong in `apps/app/`, not the repo root.
 
-### 2.4 `app.config.ts` Updates — Add Android Package
+### 3.2 Native Build Configuration
 
-After Phase 1 `app.config.ts` is in place, add the Android `package` reference:
+Native Android requires:
 
-```typescript
-import type { ConfigContext, ExpoConfig } from 'expo';
+- Android package metadata in Expo config
+- `apps/app/eas.json`
+- EAS project configuration
+- EAS environment variables for every Android profile that needs `EXPO_PUBLIC_BFF_BASE_URL`
 
-const isProduction = process.env.NODE_ENV === 'production';
+Only introduce `apps/app/app.config.ts` if EAS/native configuration truly requires dynamic Expo config values.
 
-export default ({ ctx }: ConfigContext): ExpoConfig => ({
-  ...require('./app.json'),
-  name: isProduction ? 'CLMM V2' : 'CLMM V2 (dev)',
-  scheme: 'clmmv2',
-  android: {
-    package: 'com.clmm.v2',
-  },
-  extra: {
-    eas: {
-      projectId: process.env.EAS_PROJECT_ID,
-    },
-    API_BASE_URL: process.env.EXPO_PUBLIC_API_BASE_URL,
-    BFF_BASE_URL: process.env.EXPO_PUBLIC_BFF_BASE_URL,
-  },
-});
-```
+### 3.3 Native Wallet State Coverage
 
-### 2.5 Run `expo prebuild`
+Native Android verification must cover more than the happy path.
 
-```bash
-cd apps/app
-npx expo prebuild --platform android
-```
+Required states:
 
-This generates `apps/app/android/` — a native Android Studio project. The MWA Kotlin modules will now be included in builds from this directory.
+- no compatible wallet installed
+- user rejects authorization
+- user declines signature
+- app returns from wallet without a completed signature
+- resumed attempt is stale or expired
 
-**Important:** Do NOT manually edit files in `android/` — all native config goes back into `app.json` or `app.config.ts`, then re-run prebuild.
+Each state must specify:
 
-### 2.6 Verify Custom Dev Build
+- user-facing copy
+- CTA
+- landing destination after recovery
 
-```bash
-eas build --platform android --profile development --local
-```
+### 3.4 Native Build Verification
 
-Or with a device connected:
-```bash
-npx expo run:android --variant debug
-```
+Native Android is complete only when:
 
-Verify the app installs and the wallet connection flow (MWA authorize + sign) works on a physical device.
+- the dev build installs on a physical device
+- wallet authorization works on device
+- rejection/interruption states behave intentionally
+- the production AAB is generated with the correct runtime env
 
-### 2.7 Android Signing — EAS Auto-Managed
+---
 
-On the first production build, EAS will prompt to generate an Android keystore:
+## Submission Assets
 
-```bash
-eas build --platform android --profile production
-```
+Store assets must reflect the real product and real support surfaces.
 
-EAS stores the keystore encrypted in their system. You can also import an existing keystore via:
-```bash
-eas credentials --platform android
-```
+Required:
 
-### 2.8 Build Production AAB
+- icon: 1024x1024 PNG
+- screenshot storyboard: 3-5 screenshots in a fixed order
+- description that states Orca support, non-custodial signing, and platform constraints accurately
+- privacy-policy URL: `https://clmm.v2.app/privacy-policy`
+- support URL: `https://clmm.v2.app/support`
+- support email: `support@clmm.v2.app`
 
-```bash
-eas build --platform android --profile production
-```
-
-Download the resulting `.aab` file from the EAS dashboard.
-
-### 2.9 Solana Mobile Publisher Account + Submission
-
-**Account setup (`publish.solanamobile.com`):**
-1. Sign up at `publish.solanamobile.com`
-2. Complete KYC/KYB (individual or company — takes a few business days)
-3. Connect a Solana wallet (Phantom, Solflare) as the publisher wallet
-4. Prepare ~0.2 SOL for ArDrive upload fees + release NFT minting
-
-**App store assets to prepare:**
-- App icon: 1024×1024 PNG
-- Screenshots: 3-5 screenshots of the app running (phone form factor)
-- Description: ~3-5 sentences describing CLMM V2
-- Category: DeFi / Finance
-- Privacy policy URL: `https://[cloudflare-pages-domain]/privacy-policy`
-- Support URL: `https://clmm.v2.app` (or a simpler support page)
-
-**Submission steps:**
-1. In `publish.solanamobile.com` → "Add a dApp" → "New dApp"
-2. Fill in name, description, category, icon, screenshots, privacy policy URL
-3. Upload the AAB/APK via "New Version"
-4. Sign the ArDrive storage transactions with your publisher wallet
-5. Submit — review takes 3-5 business days
+Do not use placeholder copy such as "we collect no data" if the system stores wallet-linked operational records.
 
 ---
 
 ## Verification Gate
 
-Before each phase is considered complete, the following must be verified:
+Before the overall effort is considered complete:
 
-| Phase | Verification |
-|-------|-------------|
-| Web build | `pnpm --filter @clmm/app export` succeeds with no errors |
-| Backend | `curl [railway-url]/health` returns 200 |
-| Web live | `https://[pages-domain]` loads without crash |
-| MWA build | Custom APK installs on Android device; wallet authorize dialog appears |
-| Privacy policy | `/privacy-policy` returns 200 with content |
-| Production AAB | AAB file downloads from EAS dashboard, size > 0 |
-| Solana Mobile | AAB submitted and confirmation email received from dapp.store |
+| Area | Required Verification |
+|------|-----------------------|
+| Backend build | `pnpm --filter @clmm/adapters build` succeeds |
+| Web build | `pnpm --filter @clmm/app build` succeeds |
+| Readiness endpoint | `curl https://api.clmm.v2.app/health` returns 200 |
+| Web launch | `https://clmm.v2.app` supports the real user journey |
+| Legal/support | `/privacy-policy` and `/support` are reachable and usable |
+| Mobile decision | web/PWA viability on Android has been explicitly tested |
+| Native Android | only if chosen: device flow, rejection flow, and AAB generation all pass |
+| Solana Mobile submission | only for the chosen distribution path: submission accepted and review started |
 
 ---
 
 ## Out of Scope
 
-- iOS App Store (skipped per user decision)
-- Google Play Store (skipped per user decision)
-- `dapp.json` / Solana manifest (Solana Dapp Store uses web portal + APK upload, no manifest required)
-
----
-
-## Risks & Mitigations
-
-| Risk | Likelihood | Mitigation |
-|------|-----------|------------|
-| `react-native-quick-crypto` polyfill breaks existing MWA signing flow | Low | Test on physical device early in Phase 2; MWA has been stable in Solana Mobile SDK for 2+ years |
-| Railway cold starts cause preview build failures | Medium | Set Railway min instances = 1; use proper health check endpoint |
-| Solana Mobile KYC/KYB delays | Medium | Start the KYC process in parallel with Phase 1; it is purely human-facing |
-| Cloudflare Pages build timeout | Low | Add `NIKEL_NO_AUTO_ATTACH=1` env var if needed; Expo static export is fast |
-| MWA native module conflicts with Expo SDK 52 | Low | Check Solana Mobile SDK changelog for SDK 52 compatibility before installing `expo-dev-client` |
+- iOS App Store
+- Google Play Store
+- adding portfolio analytics or other non-core product surfaces
+- assuming native Android is mandatory before the distribution decision is made
