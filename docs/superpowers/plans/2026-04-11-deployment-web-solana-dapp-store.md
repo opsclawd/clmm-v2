@@ -326,8 +326,8 @@ If any `app.json` or `app.config.ts` changes were needed for the web build to su
 
 | File | Action | Purpose |
 |------|--------|---------|
-| `polyfill.js` | Create (project root) | Required first import for `react-native-quick-crypto` |
-| `index.js` | Create (project root) | Custom entry point that imports polyfill before expo-router |
+| `apps/app/polyfill.js` | Create | Required first import for `react-native-quick-crypto` |
+| `apps/app/index.js` | Create | Custom entry point that imports polyfill before expo-router |
 | `apps/app/package.json` | Modify | Update `main` field to `./index.js` |
 | `apps/app/app.json` | Modify | Add Android `package`, `versionCode`, `adaptiveIcon`, permissions |
 | `apps/app/eas.json` | Create | EAS build profiles (development, preview, production) |
@@ -363,11 +363,11 @@ git commit -m "feat: install expo-dev-client and react-native-quick-crypto for S
 ### Task 8: Create `polyfill.js` and Custom `index.js`
 
 **Files:**
-- Create: `polyfill.js` (project root — next to `package.json`)
-- Create: `index.js` (project root — next to `package.json`)
+- Create: `apps/app/polyfill.js`
+- Create: `apps/app/index.js`
 - Modify: `apps/app/package.json` (update `main` field)
 
-- [ ] **Step 1: Create `polyfill.js` in project root**
+- [ ] **Step 1: Create `apps/app/polyfill.js`**
 
 ```javascript
 // polyfill.js — MUST be the first import in the JS bundle
@@ -378,7 +378,7 @@ import { install } from 'react-native-quick-crypto';
 install();
 ```
 
-- [ ] **Step 2: Create `index.js` in project root**
+- [ ] **Step 2: Create `apps/app/index.js`**
 
 ```javascript
 // index.js — Custom entry point for Expo
@@ -405,7 +405,7 @@ If `"main"` is `"expo-router/entry"`, update it to `"./index.js"`.
 - [ ] **Step 4: Commit**
 
 ```bash
-git add polyfill.js index.js apps/app/package.json
+git add apps/app/polyfill.js apps/app/index.js apps/app/package.json
 git commit -m "feat: add react-native-quick-crypto polyfill and custom index.js entry point"
 ```
 

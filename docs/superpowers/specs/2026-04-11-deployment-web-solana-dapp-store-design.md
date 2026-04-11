@@ -109,7 +109,7 @@ This page must be live and accessible before Solana Mobile submission.
    - `PORT=3001`
    - `EXPO_PUBLIC_BFF_BASE_URL=https://[your-railway-app].up.railway.app` (set after deploy)
 4. Connect the `packages/adapters` package or a separate deploy entry point to Railway via GitHub
-5. Run Drizzle migrations: `pnpm --filter @clmm/adapters migrate`
+5. Run Drizzle migrations: `pnpm --filter @clmm/adapters db:migrate`
 6. Verify API health: `curl https://[app].up.railway.app/health`
 
 **Note:** The NestJS backend is a separate deployment from the monorepo. Railway should deploy the `packages/adapters` NestJS app directly, or a root-level server entry point.
@@ -139,7 +139,7 @@ This page must be live and accessible before Solana Mobile submission.
 pnpm --filter @clmm/app add expo-dev-client react-native-quick-crypto
 ```
 
-**Create `polyfill.js`** in the project root:
+**Create `apps/app/polyfill.js`** in the app package root:
 ```javascript
 // Required first import for react-native-quick-crypto polyfill
 // This MUST be the first line executed in the JS bundle
@@ -147,13 +147,13 @@ import { install } from 'react-native-quick-crypto';
 install();
 ```
 
-**Update `index.js`** to import polyfill before `expo-router`:
+**Update `apps/app/index.js`** to import the polyfill before `expo-router`:
 ```javascript
 import './polyfill';
 import 'expo-router/entry';
 ```
 
-**Update `package.json` main field** (at `apps/app/`):
+**Update `apps/app/package.json`**:
 ```json
 {
   "main": "./index.js"
