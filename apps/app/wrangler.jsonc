@@ -5,7 +5,7 @@
   "workers_dev": true,
   "preview_urls": true,
   "assets": {
-    "directory": "./apps/app/dist"
+    "directory": "./dist"
   },
   "observability": {
     "enabled": true
