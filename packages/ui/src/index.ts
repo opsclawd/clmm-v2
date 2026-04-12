@@ -9,6 +9,8 @@ export { HistoryListScreen } from './screens/HistoryListScreen.js';
 export { HistoryDetailScreen } from './screens/HistoryDetailScreen.js';
 export { WalletSettingsScreen } from './screens/WalletSettingsScreen.js';
 export { WalletConnectScreen } from './screens/WalletConnectScreen.js';
+export { PrivacyPolicyScreen } from './screens/PrivacyPolicyScreen.js';
+export { SupportScreen } from './screens/SupportScreen.js';
 
 // Components — reusable
 export { DesktopShell } from './components/DesktopShell.js';

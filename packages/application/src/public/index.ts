@@ -20,6 +20,38 @@ export type {
 // Port types needed by UI (capability + permission state)
 export type { PlatformCapabilityState } from '../ports/index.js';
 
+// Port interfaces needed by testing fakes and contracts
+export type {
+  SupportedPositionReadPort,
+  RangeObservationPort,
+  SwapQuotePort,
+  ExecutionPreparationPort,
+  ExecutionSubmissionPort,
+  WalletSigningPort,
+  NotificationPort,
+  NotificationDedupPort,
+  PlatformCapabilityPort,
+  NotificationPermissionPort,
+  DeepLinkEntryPort,
+  DeepLinkMetadata,
+  TriggerRepository,
+  StoredExecutionAttempt,
+  ExecutionRepository,
+  ExecutionSessionRepository,
+  ExecutionHistoryRepository,
+  MonitoredWalletRepository,
+  ObservabilityPort,
+  ClockPort,
+  IdGeneratorPort,
+  DetectionTimingRecord,
+  DeliveryTimingRecord,
+} from '../ports/index.js';
+export type {
+  EpisodeTransition,
+  FinalizationResult,
+  BreachEpisodeRepository,
+} from '../ports/BreachEpisodeRepository.js';
+
 // Domain types re-exported for UI consumption.
 // UI must NEVER import @clmm/domain directly.
 export type {
