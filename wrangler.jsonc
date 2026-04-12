@@ -1,0 +1,8 @@
+{
+  "$schema": "./node_modules/wrangler/config-schema.json",
+  "name": "clmm-v2",
+  "compatibility_date": "2026-04-12",
+  "assets": {
+    "directory": "./apps/app/dist"
+  }
+}
