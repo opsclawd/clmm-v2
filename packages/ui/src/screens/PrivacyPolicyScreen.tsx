@@ -1,11 +1,7 @@
 import { View, Text, ScrollView, Linking } from 'react-native';
 import { colors, typography } from '../design-system/index.js';
 
-type Props = {
-  onContactSupport?: () => void;
-};
-
-export function PrivacyPolicyScreen({ onContactSupport }: Props): JSX.Element {
+export function PrivacyPolicyScreen(): JSX.Element {
   return (
     <ScrollView style={{ flex: 1, backgroundColor: colors.background }} contentContainerStyle={{ padding: 16 }}>
       <Text style={{
@@ -61,7 +57,7 @@ export function PrivacyPolicyScreen({ onContactSupport }: Props): JSX.Element {
             For privacy-related questions, contact us at{' '}
             <Text
               style={{ color: colors.primary }}
-              onPress={() => Linking.openURL('mailto:support@clmm.v2.app')}
+              onPress={() => { void Linking.openURL('mailto:support@clmm.v2.app'); }}
             >
               support@clmm.v2.app
             </Text>
