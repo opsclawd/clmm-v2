@@ -11,8 +11,8 @@ export async function bootstrap(): Promise<void> {
   const rawPort = (process.env as Record<string, string | undefined>)['PORT'];
   const parsedPort = rawPort == null ? Number.NaN : Number(rawPort);
   const port = Number.isFinite(parsedPort) ? parsedPort : 3001;
-  await app.listen(port);
-  console.log(`BFF listening on port ${port}`);
+  await app.listen(port, '0.0.0.0');
+  console.log(`BFF listening on 0.0.0.0:${port}`);
 }
 
 if (require.main === module) {
