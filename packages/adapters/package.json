@@ -2,7 +2,7 @@
   "name": "@clmm/adapters",
   "version": "0.0.1",
   "private": true,
-  "main": "./src/index.ts",
+  "main": "./dist/index.js",
   "scripts": {
     "test": "vitest run",
     "typecheck": "tsc -p tsconfig.typecheck.json --noEmit",

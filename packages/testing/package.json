@@ -2,7 +2,7 @@
   "name": "@clmm/testing",
   "version": "0.0.1",
   "private": true,
-  "main": "./src/index.ts",
+  "main": "./dist/index.js",
   "scripts": {
     "test": "vitest run",
     "build": "tsc -p tsconfig.json",

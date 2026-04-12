@@ -2,11 +2,11 @@
   "name": "@clmm/application",
   "version": "0.0.1",
   "private": true,
-  "main": "./src/public/index.ts",
-  "types": "./src/public/index.ts",
+  "main": "./dist/public/index.js",
+  "types": "./dist/public/index.d.ts",
   "exports": {
-    ".": "./src/index.ts",
-    "./public": "./src/public/index.ts"
+    ".": "./dist/public/index.js",
+    "./public": "./dist/public/index.js"
   },
   "scripts": {
     "test": "vitest run",
