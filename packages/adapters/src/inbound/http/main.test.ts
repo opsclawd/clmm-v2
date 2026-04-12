@@ -43,6 +43,6 @@ describe('http bootstrap', () => {
     expect(fastifyAdapterMock).toHaveBeenCalledTimes(1);
     expect(createMock).toHaveBeenCalledWith(expect.any(Function), expect.any(Object));
     expect(enableCorsMock).toHaveBeenCalledTimes(1);
-    expect(listenMock).toHaveBeenCalledWith(3001);
+    expect(listenMock).toHaveBeenCalledWith(3001, '0.0.0.0');
   });
 });
