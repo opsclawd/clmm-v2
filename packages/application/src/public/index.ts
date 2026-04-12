@@ -73,6 +73,8 @@ export { scanPositionsForBreaches } from '../use-cases/triggers/ScanPositionsFor
 export { qualifyActionableTrigger } from '../use-cases/triggers/QualifyActionableTrigger.js';
 export { createExecutionPreview } from '../use-cases/previews/CreateExecutionPreview.js';
 export { refreshExecutionPreview } from '../use-cases/previews/RefreshExecutionPreview.js';
+export { listSupportedPositions } from '../use-cases/positions/ListSupportedPositions.js';
+export { getPositionDetail } from '../use-cases/positions/GetPositionDetail.js';
 export {
   requestWalletSignature,
   PreviewNotFoundError,
