@@ -1,5 +1,6 @@
 import 'reflect-metadata';
 import { Module } from '@nestjs/common';
+import { HealthController } from './HealthController.js';
 import { PositionController } from './PositionController.js';
 import { AlertController } from './AlertController.js';
 import { PreviewController } from './PreviewController.js';
@@ -51,7 +52,7 @@ const solanaSubmission = new SolanaExecutionSubmissionAdapter(rpcUrl);
 const monitoredWalletStorage = new MonitoredWalletStorageAdapter(db);
 
 @Module({
-  controllers: [PositionController, AlertController, PreviewController, ExecutionController, WalletController],
+  controllers: [HealthController, PositionController, AlertController, PreviewController, ExecutionController, WalletController],
   providers: [
     { provide: TRIGGER_REPOSITORY, useValue: operationalStorage },
     { provide: EXECUTION_REPOSITORY, useValue: operationalStorage },
