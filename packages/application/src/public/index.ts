@@ -85,6 +85,7 @@ export {
   requestWalletSignature,
   PreviewNotFoundError,
   PreviewApprovalNotAllowedError,
+  MissingEpisodeIdForTriggerDerivedApprovalError,
 } from '../use-cases/execution/RequestWalletSignature.js';
 export type { RequestWalletSignatureResult } from '../use-cases/execution/RequestWalletSignature.js';
 export { resumeExecutionAttempt } from '../use-cases/execution/ResumeExecutionAttempt.js';
