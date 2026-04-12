@@ -2,7 +2,12 @@
   "$schema": "./node_modules/wrangler/config-schema.json",
   "name": "clmm-v2",
   "compatibility_date": "2026-04-12",
+  "workers_dev": true,
+  "preview_urls": true,
   "assets": {
     "directory": "./apps/app/dist"
+  },
+  "observability": {
+    "enabled": true
   }
 }
