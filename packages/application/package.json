@@ -2,10 +2,10 @@
   "name": "@clmm/application",
   "version": "0.0.1",
   "private": true,
-  "main": "./dist/public/index.js",
-  "types": "./dist/public/index.d.ts",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
   "exports": {
-    ".": "./dist/public/index.js",
+    ".": "./dist/index.js",
     "./public": "./dist/public/index.js"
   },
   "scripts": {
