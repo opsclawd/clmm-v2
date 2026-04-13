@@ -1,10 +1,14 @@
 export function getBffBaseUrl(): string {
+  
+  // @ts-expect-error: variables are defined at build time
+  // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
   const configuredBaseUrl = process.env.EXPO_PUBLIC_BFF_BASE_URL;
 
   if (!configuredBaseUrl) {
     throw new Error('Missing EXPO_PUBLIC_BFF_BASE_URL');
   }
 
+  // eslint-disable-next-line @typescript-eslint/no-unsafe-return
   return configuredBaseUrl;
 }
 

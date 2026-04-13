@@ -57,28 +57,8 @@ describe('fetchSupportedPositions', () => {
     );
   });
 
-  it('falls back to the current web origin protocol and hostname on port 3001', async () => {
-    vi.stubGlobal('location', { origin: 'https://app.example.test:8081' });
-
-    const positions = [] as PositionSummaryDto[];
-    const fetchMock = vi.fn().mockResolvedValue({
-      ok: true,
-      json: () => Promise.resolve({ positions }),
-    });
-    globalThis.fetch = fetchMock as typeof fetch;
-
-    await expect(
-      fetchSupportedPositions('DemoWallet1111111111111111111111111111111111'),
-    ).resolves.toEqual(positions);
-
-    expect(fetchMock).toHaveBeenCalledWith(
-      'https://app.example.test:3001/positions/DemoWallet1111111111111111111111111111111111',
-      expect.objectContaining({}),
-    );
-  });
-
-  it('throws a controlled error when no BFF base URL can be resolved', async () => {
-    vi.stubGlobal('location', undefined);
+  it('throws a controlled error when EXPO_PUBLIC_BFF_BASE_URL is not set', async () => {
+    delete env.EXPO_PUBLIC_BFF_BASE_URL;
 
     const error = await fetchSupportedPositions(
       'DemoWallet1111111111111111111111111111111111',
@@ -87,8 +67,8 @@ describe('fetchSupportedPositions', () => {
     expect(error).toBeInstanceOf(Error);
     expect((error as Error).message).toBe('Could not load supported positions for this wallet');
     expect((error as Error & { cause?: unknown }).cause).toBeInstanceOf(Error);
-    expect(((error as Error & { cause?: Error }).cause as Error).message).toContain(
-      'EXPO_PUBLIC_BFF_BASE_URL must be configured when no web origin is available',
+    expect(((error as Error & { cause?: Error }).cause as Error).message).toBe(
+      'Missing EXPO_PUBLIC_BFF_BASE_URL',
     );
   });
 
