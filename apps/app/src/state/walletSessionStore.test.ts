@@ -1,5 +1,14 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi, beforeEach } from 'vitest';
 import type { PlatformCapabilityState } from '@clmm/application/public';
+
+// Mock AsyncStorage so tests run in jsdom without a real storage backend
+vi.mock('@react-native-async-storage/async-storage', () => ({
+  default: {
+    setItem: vi.fn(() => Promise.resolve()),
+    getItem: vi.fn(() => Promise.resolve(null)),
+    removeItem: vi.fn(() => Promise.resolve()),
+  },
+}));
 import {
   createWalletSessionStore,
   type WalletConnectionKind,
