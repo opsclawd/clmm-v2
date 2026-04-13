@@ -11,6 +11,7 @@ import { fetchWhirlpool, fetchPosition } from '@orca-so/whirlpools-client';
 import type { RangeObservationPort } from '@clmm/application';
 import type { PositionId, ClockTimestamp } from '@clmm/domain';
 import { makeClockTimestamp } from '@clmm/domain';
+import { withRetry } from '../../utils/rpcRetry.js';
 
 export class SolanaRangeObservationAdapter implements RangeObservationPort {
   constructor(private readonly rpcUrl: string) {}
@@ -29,7 +30,10 @@ export class SolanaRangeObservationAdapter implements RangeObservationPort {
 
     let positionAccount;
     try {
-      positionAccount = await fetchPosition(rpc, positionAddress);
+      positionAccount = await withRetry(
+        () => fetchPosition(rpc, positionAddress),
+        { maxAttempts: 4 },
+      );
     } catch {
       throw new Error(`SolanaRangeObservationAdapter: could not fetch position ${positionId}`);
     }
@@ -39,7 +43,10 @@ export class SolanaRangeObservationAdapter implements RangeObservationPort {
 
     let whirlpoolData;
     try {
-      whirlpoolData = await fetchWhirlpool(rpc, whirlpoolAddress);
+      whirlpoolData = await withRetry(
+        () => fetchWhirlpool(rpc, whirlpoolAddress),
+        { maxAttempts: 4 },
+      );
     } catch {
       throw new Error(`SolanaRangeObservationAdapter: could not fetch whirlpool ${whirlpoolAddress}`);
     }

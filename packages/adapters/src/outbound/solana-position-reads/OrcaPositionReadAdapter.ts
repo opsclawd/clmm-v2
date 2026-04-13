@@ -20,6 +20,7 @@ import {
   makeClockTimestamp,
   evaluateRangeState,
 } from '@clmm/domain';
+import { withRetry } from '../../utils/rpcRetry.js';
 
 export class OrcaPositionReadAdapter implements SupportedPositionReadPort {
   constructor(private readonly rpcUrl: string) {}
@@ -102,7 +103,9 @@ export class OrcaPositionReadAdapter implements SupportedPositionReadPort {
     const rpc = this.getRpc();
     const ownerAddress = this.walletIdToAddress(walletId);
 
-    const positions = await fetchPositionsForOwner(rpc, ownerAddress);
+    const positions = await withRetry(() => fetchPositionsForOwner(rpc, ownerAddress), {
+      maxAttempts: 4,
+    });
 
     const liquidityPositions: LiquidityPosition[] = [];
 
@@ -112,7 +115,10 @@ export class OrcaPositionReadAdapter implements SupportedPositionReadPort {
 
         let whirlpoolData;
         try {
-          whirlpoolData = await fetchWhirlpool(rpc, address(whirlpoolAddress.toString()));
+          whirlpoolData = await withRetry(
+            () => fetchWhirlpool(rpc, address(whirlpoolAddress.toString())),
+            { maxAttempts: 4 },
+          );
         } catch {
           continue;
         }

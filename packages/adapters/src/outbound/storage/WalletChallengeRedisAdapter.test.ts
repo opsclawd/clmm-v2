@@ -10,10 +10,10 @@ const W1 = 'Wallet123' as WalletId;
 const W2 = 'WrongWallet' as WalletId;
 
 interface MockRedis {
-  get: (...args: any[]) => any;
-  set: (...args: any[]) => any;
-  del: (...args: any[]) => any;
-  connect: (...args: any[]) => any;
+  get: (...args: unknown[]) => unknown;
+  set: (...args: unknown[]) => unknown;
+  del: (...args: unknown[]) => unknown;
+  connect: (...args: unknown[]) => unknown;
   _store: Record<string, string>;
 }
 

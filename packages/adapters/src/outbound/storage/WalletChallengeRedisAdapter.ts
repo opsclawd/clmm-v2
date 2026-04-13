@@ -81,9 +81,7 @@ export class WalletChallengeRedisAdapter implements WalletChallengeRepository {
 
     return {
       nonce: challenge.nonce,
-      // eslint-disable-next-line @typescript-eslint/no-unnecessary-type-assertions
       walletId: challenge.walletId as WalletId,
-      // eslint-disable-next-line @typescript-eslint/no-unnecessary-type-assertions
       expiresAt: challenge.expiresAt as ClockTimestamp,
     };
   }
