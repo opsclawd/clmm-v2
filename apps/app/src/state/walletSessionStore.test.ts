@@ -37,8 +37,11 @@ const caps: PlatformCapabilityState = {
 };
 
 describe('walletSessionStore', () => {
-  beforeEach(() => {
+  beforeEach(async () => {
     vi.clearAllMocks();
+    // Clear the in-memory mock storage between tests so state doesn't leak
+    const { default: AsyncStorage } = await import('@react-native-async-storage/async-storage');
+    await AsyncStorage.clear();
   });
   it('loads platform capabilities into state', () => {
     const store = createWalletSessionStore();
