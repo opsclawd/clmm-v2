@@ -81,7 +81,7 @@ export class WorkerLifecycle implements OnModuleInit, OnModuleDestroy {
       },
     );
 
-    await this.boss.schedule(BreachScanJobHandler.JOB_NAME, '*/5 * * * *', {}, {
+    await this.boss.schedule(BreachScanJobHandler.JOB_NAME, '*/1 * * * *', {}, {
       tz: 'UTC',
     });
 
