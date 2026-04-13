@@ -11,6 +11,7 @@ import type { Base64EncodedWireTransaction, Signature } from '@solana/kit';
 import type { ExecutionSubmissionPort } from '@clmm/application';
 import type { TransactionReference, ExecutionLifecycleState, ClockTimestamp } from '@clmm/domain';
 import { makeClockTimestamp } from '@clmm/domain';
+import { withRetry } from '../../utils/rpcRetry.js';
 
 function uint8ArrayToBase64(bytes: Uint8Array): string {
   const binary = String.fromCharCode(...bytes);
@@ -32,7 +33,10 @@ export class SolanaExecutionSubmissionAdapter implements ExecutionSubmissionPort
 
     const base64 = uint8ArrayToBase64(signedPayload) as Base64EncodedWireTransaction;
 
-    const signature = await rpc.sendTransaction(base64, { encoding: 'base64', skipPreflight: true }).send();
+    const signature = await withRetry(
+      () => rpc.sendTransaction(base64, { encoding: 'base64', skipPreflight: true }).send(),
+      { maxAttempts: 4 },
+    );
 
     const reference: TransactionReference = {
       signature: signature.toString(),
@@ -56,7 +60,13 @@ export class SolanaExecutionSubmissionAdapter implements ExecutionSubmissionPort
 
     for (const ref of references) {
       try {
-        const status = await rpc.getSignatureStatuses([ref.signature as unknown as Signature], { searchTransactionHistory: true }).send();
+        const status = await withRetry(
+          () =>
+            rpc
+              .getSignatureStatuses([ref.signature as unknown as Signature], { searchTransactionHistory: true })
+              .send(),
+          { maxAttempts: 4 },
+        );
         const sigStatus = status.value[0];
 
         if (sigStatus?.err) {

@@ -36,6 +36,7 @@ import type { Instruction } from '@solana/kit';
 import type { ExecutionPreparationPort } from '@clmm/application';
 import type { ExecutionPlan, WalletId, PositionId, PoolId, ClockTimestamp, LiquidityPosition } from '@clmm/domain';
 import { makeClockTimestamp } from '@clmm/domain';
+import { withRetry } from '../../utils/rpcRetry.js';
 
 const JUPITER_SWAP_API_BASES = [
   'https://lite-api.jup.ag/swap/v1',
@@ -125,11 +126,17 @@ export class SolanaExecutionPreparationAdapter implements ExecutionPreparationPo
     try {
       const positionMint = address(positionId);
       const [positionAddress] = await getPositionAddress(positionMint);
-      const positionAccount = await fetchPosition(rpc, positionAddress);
+      const positionAccount = await withRetry(
+        () => fetchPosition(rpc, positionAddress),
+        { maxAttempts: 4 },
+      );
       const position = positionAccount.data;
       const whirlpoolAddress = position.whirlpool;
 
-      const whirlpoolAccount = await fetchWhirlpool(rpc, whirlpoolAddress);
+      const whirlpoolAccount = await withRetry(
+        () => fetchWhirlpool(rpc, whirlpoolAddress),
+        { maxAttempts: 4 },
+      );
       const whirlpool = whirlpoolAccount.data;
 
       const bounds = {
