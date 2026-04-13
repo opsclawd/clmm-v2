@@ -1,14 +1,28 @@
-import { describe, expect, it, vi, beforeEach } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type { PlatformCapabilityState } from '@clmm/application/public';
 
-// Mock AsyncStorage so tests run in jsdom without a real storage backend
-vi.mock('@react-native-async-storage/async-storage', () => ({
-  default: {
-    setItem: vi.fn(() => Promise.resolve()),
-    getItem: vi.fn(() => Promise.resolve(null)),
-    removeItem: vi.fn(() => Promise.resolve()),
-  },
-}));
+// In-memory AsyncStorage mock so we can test persist + rehydrate.
+vi.mock('@react-native-async-storage/async-storage', () => {
+  const mem = new Map<string, string>();
+
+  return {
+    default: {
+      setItem: vi.fn((key: string, value: string) => {
+        mem.set(key, value);
+        return Promise.resolve();
+      }),
+      getItem: vi.fn((key: string) => Promise.resolve(mem.get(key) ?? null)),
+      removeItem: vi.fn((key: string) => {
+        mem.delete(key);
+        return Promise.resolve();
+      }),
+      clear: vi.fn(() => {
+        mem.clear();
+        return Promise.resolve();
+      }),
+    },
+  };
+});
 import {
   createWalletSessionStore,
   type WalletConnectionKind,
@@ -23,6 +37,9 @@ const caps: PlatformCapabilityState = {
 };
 
 describe('walletSessionStore', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
   it('loads platform capabilities into state', () => {
     const store = createWalletSessionStore();
 
@@ -82,7 +99,7 @@ describe('walletSessionStore', () => {
     expect(store.getState().connectionKind).toBeNull();
   });
 
-  it('disconnect clears address, kind, and connecting state', () => {
+  it('disconnect clears address, kind, and connecting state, and clears persisted storage', async () => {
     const store = createWalletSessionStore();
 
     store.getState().markConnected({
@@ -91,9 +108,41 @@ describe('walletSessionStore', () => {
     });
     store.getState().disconnect();
 
+    // persist.clearStorage() eventually calls AsyncStorage.removeItem('wallet-session')
+    const { default: AsyncStorage } = await import('@react-native-async-storage/async-storage');
+    // allow any pending promises to settle
+    await Promise.resolve();
+
+    expect(AsyncStorage.removeItem).toHaveBeenCalledWith('wallet-session');
+
     expect(store.getState().walletAddress).toBeNull();
     expect(store.getState().connectionKind).toBeNull();
     expect(store.getState().isConnecting).toBe(false);
+  });
+
+  it('rehydrates persisted session fields but not transient UI state', async () => {
+    const store1 = createWalletSessionStore();
+
+    store1.getState().setPlatformCapabilities(caps);
+    store1.getState().beginConnection();
+    store1.getState().markConnected({
+      walletAddress: 'DemoWallet1111111111111111111111111111111111',
+      connectionKind: 'browser',
+    });
+
+    // Ensure persist has had a chance to write
+    await Promise.resolve();
+
+    const store2 = createWalletSessionStore();
+    await store2.persist.rehydrate();
+
+    expect(store2.getState().walletAddress).toBe('DemoWallet1111111111111111111111111111111111');
+    expect(store2.getState().connectionKind).toBe('browser');
+    expect(store2.getState().platformCapabilities).toEqual(caps);
+
+    // Transient state should not be persisted
+    expect(store2.getState().isConnecting).toBe(false);
+    expect(store2.getState().connectionOutcome).toBeNull();
   });
 
   it('clears stale outcome without dropping connected session', () => {

@@ -27,7 +27,7 @@ export type WalletSessionState = {
 export function createWalletSessionStore() {
   return createStore<WalletSessionState>()(
     persist(
-      (set, get) => ({
+      (set, get, store) => ({
         walletAddress: null,
         connectionKind: null,
         connectionOutcome: null,
@@ -63,7 +63,7 @@ export function createWalletSessionStore() {
             isConnecting: false,
           });
           // Also clear persisted storage so nothing survives across sessions
-          (get() as WalletSessionState & { persist?: { clearStorage: () => void } }).persist?.clearStorage();
+          store.persist.clearStorage();
         },
         clearOutcome: () => set({ connectionOutcome: null }),
       }),
