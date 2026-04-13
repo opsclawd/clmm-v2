@@ -131,6 +131,7 @@ function ConnectedPositionsList({
       data={viewModel.items}
       keyExtractor={(item) => item.positionId}
       style={{ marginTop: 12 }}
+      removeClippedSubviews={false}
       renderItem={({ item }) => (
         <TouchableOpacity
           onPress={() => onSelectPosition?.(item.positionId)}
