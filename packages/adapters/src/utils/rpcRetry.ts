@@ -11,20 +11,25 @@
  */
 
 /**
- * HTTP 429 indicators matched explicitly to avoid false positives from
- * numeric error codes that happen to contain "429" (e.g. 0x429).
+ * HTTP 429 indicators matched on a lowercased message to catch all variants
+ * regardless of capitalisation (e.g. "429 Too Many Requests from upstream").
+ * Numeric Solana error codes (#8100002) are checked case-sensitively.
  */
 const SOLANA_RATE_LIMIT_CODE = '8100002';
-const SOLANA_429_INDICATORS = ['HTTP error (429)', 'Too Many Requests', `#${SOLANA_RATE_LIMIT_CODE}`];
+const SOLANA_429_INDICATORS_LOWER = ['http error (429)', 'too many requests'];
 
 /**
  * Returns true if the error is a Solana RPC rate-limit error (HTTP 429).
  * Handles both the Solana error-code form (#8100002) and the plain HTTP 429 form.
- * Only matches explicit HTTP 429 indicators — not arbitrary "429" substrings.
+ * Performs case-insensitive matching for the HTTP text variants to catch all
+ * capitalisation forms (e.g. "429 Too Many Requests from upstream").
  */
 export function isSolanaRateLimitError(error: unknown): boolean {
   if (error instanceof Error) {
-    return SOLANA_429_INDICATORS.some((indicator) => error.message.includes(indicator));
+    const msg = error.message;
+    if (msg.includes(`#${SOLANA_RATE_LIMIT_CODE}`)) return true;
+    const msgLower = msg.toLowerCase();
+    return SOLANA_429_INDICATORS_LOWER.some((indicator) => msgLower.includes(indicator));
   }
   return false;
 }
