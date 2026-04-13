@@ -61,13 +61,15 @@ export function buildWalletVerificationMessage(
 
 /**
  * Verify an ed25519 signature against a message and Solana wallet address.
- * Uses Node.js built-in crypto (Node 18+).
+ * Uses WebCrypto API (Node 18+) which accepts raw 32-byte Ed25519 public keys
+ * via JWK OKP format — Node's built-in crypto module does not support
+ * Ed25519 public key import from raw DER bytes.
  */
-export function verifyWalletSignature(params: {
+export async function verifyWalletSignature(params: {
   message: string; // raw string that was signed
   signature: Buffer; // 64-byte ed25519 signature
   walletAddress: string; // base58 Solana address
-}): boolean {
+}): Promise<boolean> {
   try {
     const { message, signature, walletAddress } = params;
     if (signature.length !== 64) return false;
@@ -85,15 +87,38 @@ export function verifyWalletSignature(params: {
   }
 }
 
-function verifyEd25519(
+async function verifyEd25519(
   signature: Buffer,
   message: Buffer,
   publicKey: Buffer,
-): boolean {
-  // Node.js 18+ exposes crypto.verify('ed25519', ...)
+): Promise<boolean> {
+  // WebCrypto API (available in Node 18+) accepts Ed25519 public keys directly
+  // as JWK OKP (Octet Key Pair) format. Node's built-in crypto.createPublicKey
+  // does not support Ed25519 SPKI/PKCS#8 DER import.
   // eslint-disable-next-line @typescript-eslint/no-var-requires
-  const crypto = require('crypto') as { verify: (algorithm: string, data: Buffer, key: Buffer, sig: Buffer) => boolean };
-  return crypto.verify('ed25519', message, publicKey, signature);
+  const { webcrypto } = require('crypto') as { webcrypto: Crypto };
+
+  const jwk = {
+    kty: 'OKP',
+    crv: 'Ed25519',
+    x: Buffer.from(publicKey).toString('base64url'),
+  };
+  const key = await webcrypto.subtle.importKey(
+    'jwk',
+    jwk,
+    { name: 'Ed25519' },
+    true,
+    ['verify'],
+  );
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any, @typescript-eslint/no-unsafe-argument
+  return webcrypto.subtle.verify(
+    { name: 'Ed25519' },
+    key,
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any, @typescript-eslint/no-unsafe-argument
+    signature as any,
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any, @typescript-eslint/no-unsafe-argument
+    message as any,
+  );
 }
 
 // ─── Minimal base58 decoder (avoids adding @solana/web3.js as a dependency) ─
@@ -104,36 +129,24 @@ for (let i = 0; i < BASE58_ALPHABET.length; i++) {
   BASE58_MAP[BASE58_ALPHABET.charAt(i)] = i;
 }
 
-function base58ToBuffer(base58: string): Buffer {
-  let result = Buffer.alloc(64);
-  let len = 0;
-  for (const char of base58) {
-    let carry = BASE58_MAP[char];
-    if (carry === undefined) throw new Error(`Invalid base58 character: ${char}`);
-    for (let i = len - 1; i >= 0; i--) {
-      const byte = result[i] ?? 0;
-      carry += 58 * byte;
-      result[i] = carry % 256;
-      carry = Math.floor(carry / 256);
-    }
-    if (carry > 0) {
-      if (len >= result.length) {
-        const newResult = Buffer.alloc(result.length + 64);
-        result.copy(newResult);
-        result = newResult;
-      }
-      result[len++] = carry;
-    }
+// Minimal base58 → Buffer decoder using BigInt arithmetic.
+// Solana wallet addresses are always 32 bytes, so the output length is fixed.
+function base58ToBuffer(str: string): Buffer {
+  let leadingZeros = 0;
+  for (const c of str) {
+    if (c === '1') leadingZeros++;
+    else break;
   }
-  // Leading zeros
-  for (const char of base58) {
-    if (char !== '1') break;
-    if (len >= result.length) {
-      const newResult = Buffer.alloc(result.length + 1);
-      result.copy(newResult);
-      result = newResult;
-    }
-    result[len++] = 0;
+  let n = 0n;
+  for (const c of str.slice(leadingZeros)) {
+    const v = BASE58_MAP[c];
+    if (v === undefined) throw new Error(`Invalid base58 character: ${c}`);
+    n = n * 58n + BigInt(v);
   }
-  return result.slice(0, len);
+  let hex = n === 0n ? '' : n.toString(16);
+  if (hex.length % 2) hex = '0' + hex;
+  const bodyLen = 32 - leadingZeros;
+  const paddedHex = hex.padStart(bodyLen * 2, '0');
+  const body = Buffer.from(paddedHex.slice(-bodyLen * 2), 'hex');
+  return Buffer.concat([Buffer.alloc(leadingZeros), body]);
 }

@@ -89,7 +89,7 @@ export class WalletController {
     }
 
     // Verify the ed25519 signature against the wallet's public key
-    const signatureValid = verifyWalletSignature({
+    const signatureValid = await verifyWalletSignature({
       message: expectedMessage,
       signature: signatureBuffer,
       walletAddress: walletId,
