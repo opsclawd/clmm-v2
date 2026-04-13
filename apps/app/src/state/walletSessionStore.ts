@@ -1,6 +1,19 @@
 import { createStore } from 'zustand/vanilla';
 import { persist, createJSONStorage } from 'zustand/middleware';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+
+// AsyncStorage uses `window.localStorage` internally and crashes in Node.js/SSR.
+// Provide a no-op fallback for non-browser environments so static rendering works.
+const safeStorageFactory = () => {
+  if (typeof window !== 'undefined') {
+    return createJSONStorage(() => AsyncStorage);
+  }
+  return createJSONStorage(() => ({
+    getItem: () => null as string | null,
+    setItem: (_key: string, _value: string) => {},
+    removeItem: (_key: string) => {},
+  }));
+};
 import type { PlatformCapabilityState } from '@clmm/application/public';
 import type { ConnectionOutcome } from '@clmm/ui';
 
@@ -71,16 +84,19 @@ export function createWalletSessionStore() {
       }),
       {
         name: 'wallet-session',
-        storage: createJSONStorage(() => AsyncStorage),
+        storage: safeStorageFactory(),
         partialize: (state) => ({
           walletAddress: state.walletAddress,
           connectionKind: state.connectionKind,
           platformCapabilities: state.platformCapabilities,
         }),
-        onRehydrateStorage: () => (state) => {
+        onRehydrateStorage: () => (_state, _error) => {
           // Mark hydration complete so Zustand subscribers re-render with the
-          // rehydrated state. This uses set() from the initializer closure.
-          state && store.setState({ hasHydrated: true });
+          // rehydrated state. Guard with typeof window check to avoid crashing
+          // AsyncStorage (references `window`) during SSR static rendering.
+          if (typeof window !== 'undefined') {
+            store.setState({ hasHydrated: true });
+          }
         },
       }
     )
