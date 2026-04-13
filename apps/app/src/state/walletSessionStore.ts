@@ -13,6 +13,7 @@ export type WalletSessionState = {
   connectionOutcome: ConnectionOutcome | null;
   platformCapabilities: PlatformCapabilityState | null;
   isConnecting: boolean;
+  hasHydrated: boolean;
   setPlatformCapabilities: (capabilities: PlatformCapabilityState) => void;
   beginConnection: () => void;
   markConnected: (params: {
@@ -33,6 +34,7 @@ export function createWalletSessionStore() {
         connectionOutcome: null,
         platformCapabilities: null,
         isConnecting: false,
+        hasHydrated: false,
         setPlatformCapabilities: (platformCapabilities) => set({ platformCapabilities }),
         beginConnection: () =>
           set({
@@ -75,6 +77,9 @@ export function createWalletSessionStore() {
           connectionKind: state.connectionKind,
           platformCapabilities: state.platformCapabilities,
         }),
+        onRehydrateStorage: () => (state) => {
+          state && (state.hasHydrated = true);
+        },
       }
     )
   );
