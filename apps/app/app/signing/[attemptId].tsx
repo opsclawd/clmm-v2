@@ -71,16 +71,17 @@ export default function SigningRoute() {
   const episodeId = readEpisodeId(params.episodeId);
   const hasPendingAttemptPlaceholder = isPendingAttemptPlaceholder(params.attemptId);
   const walletAddress = useStore(walletSessionStore, (state) => state.walletAddress);
+  const hasHydrated = useStore(walletSessionStore, (s) => s.hasHydrated);
   const connectionKind = useStore(walletSessionStore, (state) => state.connectionKind);
 
   const [statusNotice, setStatusNotice] = useState<string | null>(null);
   const [hasStartedPendingApproval, setHasStartedPendingApproval] = useState(false);
 
   useEffect(() => {
-    if (attemptId == null && walletAddress == null) {
+    if (attemptId == null && walletAddress == null && hasHydrated) {
       router.push('/connect');
     }
-  }, [attemptId, walletAddress, router]);
+  }, [attemptId, walletAddress, hasHydrated, router]);
 
   const approveMutation = useMutation({
     mutationFn: approveExecutionPreview,

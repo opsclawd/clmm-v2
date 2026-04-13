@@ -10,12 +10,14 @@ export default function PositionDetailRoute() {
   const { id, triggerId } = useLocalSearchParams<{ id?: string | string[]; triggerId?: string | string[] }>();
   const router = useRouter();
   const walletAddress = useStore(walletSessionStore, (state) => state.walletAddress);
+  const hasHydrated = useStore(walletSessionStore, (s) => s.hasHydrated);
   const positionId = typeof id === 'string' ? id : undefined;
   const alertTriggerId = typeof triggerId === 'string' && triggerId.length > 0 ? triggerId : undefined;
   const hasValidPositionId = positionId != null && positionId.length > 0;
   const hasWalletAddress = walletAddress != null && walletAddress.length > 0;
 
-  if (hasValidPositionId && !hasWalletAddress) {
+  // Only redirect if we have a valid positionId, no wallet address, AND hydration is complete
+  if (hasValidPositionId && !hasWalletAddress && hasHydrated) {
     router.push('/connect');
     return null;
   }
