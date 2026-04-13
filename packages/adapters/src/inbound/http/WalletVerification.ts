@@ -1,52 +1,7 @@
-import { randomBytes } from 'crypto';
-
 /**
- * Wallet ownership challenge — issued by POST /wallets/:walletId/challenge,
- * consumed by POST /wallets/:walletId/enroll within a 5-minute window.
+ * Wallet signature verification helpers for the enrollment flow.
+ * Does NOT handle challenge storage — that lives in WalletChallengeRepository (Redis-backed).
  */
-export interface WalletChallenge {
-  readonly nonce: string;
-  readonly walletAddress: string;
-  readonly expiresAt: number; // Unix ms
-}
-
-const challenges = new Map<string, WalletChallenge>();
-
-const CHALLENGE_TTL_MS = 5 * 60 * 1_000; // 5 minutes
-
-/**
- * Generate and store a new challenge for the given wallet address.
- */
-export function issueWalletChallenge(walletAddress: string): WalletChallenge {
-  const nonce = randomBytes(32).toString('hex');
-  const expiresAt = Date.now() + CHALLENGE_TTL_MS;
-  const challenge: WalletChallenge = { nonce, walletAddress, expiresAt };
-  challenges.set(nonce, challenge);
-  // Prune expired entries on each issue to keep map bounded
-  for (const [key, c] of challenges.entries()) {
-    if (c.expiresAt < Date.now()) challenges.delete(key);
-  }
-  return challenge;
-}
-
-/**
- * Find a valid (non-expired) challenge by nonce and wallet address.
- * Returns undefined if missing, expired, or address mismatch.
- */
-export function consumeWalletChallenge(
-  nonce: string,
-  walletAddress: string,
-): WalletChallenge | undefined {
-  const challenge = challenges.get(nonce);
-  if (!challenge) return undefined;
-  if (challenge.expiresAt < Date.now()) {
-    challenges.delete(nonce);
-    return undefined;
-  }
-  if (challenge.walletAddress !== walletAddress) return undefined;
-  challenges.delete(nonce); // one-time use
-  return challenge;
-}
 
 /**
  * Build the verification message that must be signed by the wallet.
@@ -77,9 +32,8 @@ export async function verifyWalletSignature(params: {
     // The message bytes (UTF-8)
     const messageBytes = Buffer.from(message, 'utf8');
 
-    // Decode base58 address to 32-byte public key
+    // Decode base58 address to 32-byte public key (throws on invalid address)
     const pubkey = base58ToBuffer(walletAddress);
-    if (pubkey.length !== 32) return false;
 
     return verifyEd25519(signature, messageBytes, pubkey);
   } catch {
@@ -123,14 +77,18 @@ async function verifyEd25519(
 
 // ─── Minimal base58 decoder (avoids adding @solana/web3.js as a dependency) ─
 
-const BASE58_ALPHABET = '123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz';
+const BASE58_ALPHABET =
+  '123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz';
 const BASE58_MAP: Record<string, number> = {};
 for (let i = 0; i < BASE58_ALPHABET.length; i++) {
   BASE58_MAP[BASE58_ALPHABET.charAt(i)] = i;
 }
 
-// Minimal base58 → Buffer decoder using BigInt arithmetic.
-// Solana wallet addresses are always 32 bytes, so the output length is fixed.
+/**
+ * Decode a base58-encoded Solana wallet address to a 32-byte Buffer.
+ * Throws if the input is not valid base58 or decodes to anything other than 32 bytes.
+ * Solana wallet addresses are always exactly 32 bytes.
+ */
 function base58ToBuffer(str: string): Buffer {
   let leadingZeros = 0;
   for (const c of str) {
@@ -140,13 +98,17 @@ function base58ToBuffer(str: string): Buffer {
   let n = 0n;
   for (const c of str.slice(leadingZeros)) {
     const v = BASE58_MAP[c];
-    if (v === undefined) throw new Error(`Invalid base58 character: ${c}`);
+    if (v === undefined)
+      throw new Error(`Invalid base58 character: ${c}`);
     n = n * 58n + BigInt(v);
   }
   let hex = n === 0n ? '' : n.toString(16);
   if (hex.length % 2) hex = '0' + hex;
-  const bodyLen = 32 - leadingZeros;
-  const paddedHex = hex.padStart(bodyLen * 2, '0');
-  const body = Buffer.from(paddedHex.slice(-bodyLen * 2), 'hex');
+  const body = hex === '' ? Buffer.alloc(0) : Buffer.from(hex, 'hex');
+  const total = leadingZeros + body.length;
+  if (total !== 32)
+    throw new Error(
+      `Invalid Solana address: decoded ${total} bytes, expected 32`,
+    );
   return Buffer.concat([Buffer.alloc(leadingZeros), body]);
 }

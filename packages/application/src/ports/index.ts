@@ -237,3 +237,27 @@ export interface ClockPort {
 export interface IdGeneratorPort {
   generateId(): string;
 }
+
+// --- Challenge storage ---
+
+export interface WalletChallengeRepository {
+  /**
+   * Issue a new ownership challenge for the given wallet.
+   * Returns the challenge nonce. The challenge expires after ttlMs.
+   */
+  issue(walletId: WalletId, ttlMs: number, now: ClockTimestamp): Promise<{
+    nonce: string;
+    expiresAt: ClockTimestamp;
+  }>;
+
+  /**
+   * Atomically consume a challenge if it exists, is not expired,
+   * and belongs to the given wallet. Returns the challenge on success,
+   * null if missing, expired, or wallet mismatch.
+   */
+  consume(
+    nonce: string,
+    walletId: WalletId,
+    now: ClockTimestamp,
+  ): Promise<{ nonce: string; walletId: WalletId; expiresAt: ClockTimestamp } | null>;
+}

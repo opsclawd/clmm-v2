@@ -1,7 +1,5 @@
 import { describe, it, expect } from 'vitest';
 import {
-  issueWalletChallenge,
-  consumeWalletChallenge,
   buildWalletVerificationMessage,
   verifyWalletSignature,
 } from './WalletVerification.js';
@@ -10,7 +8,8 @@ const TEST_WALLET = '4Nd1mBQtrMJVYVfKf2PJy9NZUZdTAsp7D4xWLsu4aDB';
 
 // Minimal base58 encoder for test use (inverse of the module's base58ToBuffer)
 function base58Encode32Bytes(bytes: Buffer): string {
-  const ALPHABET = '123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz';
+  const ALPHABET =
+    '123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz';
   let n = BigInt('0x' + bytes.toString('hex'));
   let result = '';
   while (n > 0n) {
@@ -28,43 +27,6 @@ function base58Encode32Bytes(bytes: Buffer): string {
 }
 
 describe('WalletVerification', () => {
-  describe('issueWalletChallenge / consumeWalletChallenge', () => {
-    it('issues a challenge and consumes it successfully', () => {
-      const challenge = issueWalletChallenge(TEST_WALLET);
-      expect(challenge.walletAddress).toBe(TEST_WALLET);
-      expect(challenge.nonce).toHaveLength(64); // 32 bytes hex
-      expect(challenge.expiresAt).toBeGreaterThan(Date.now());
-
-      const consumed = consumeWalletChallenge(challenge.nonce, TEST_WALLET);
-      expect(consumed).not.toBeNull();
-      expect(consumed!.nonce).toBe(challenge.nonce);
-    });
-
-    it('rejects a consumed challenge on second use', () => {
-      const challenge = issueWalletChallenge(TEST_WALLET);
-      consumeWalletChallenge(challenge.nonce, TEST_WALLET);
-      const second = consumeWalletChallenge(challenge.nonce, TEST_WALLET);
-      expect(second).toBeUndefined();
-    });
-
-    it('rejects challenge for mismatched wallet address', () => {
-      const challenge = issueWalletChallenge(TEST_WALLET);
-      const result = consumeWalletChallenge(
-        challenge.nonce,
-        '5DifferentWalletAddressHere123456',
-      );
-      expect(result).toBeUndefined();
-    });
-
-    it('rejects unknown nonce', () => {
-      const result = consumeWalletChallenge(
-        '0000000000000000000000000000000000000000000000000000000000000000',
-        TEST_WALLET,
-      );
-      expect(result).toBeUndefined();
-    });
-  });
-
   describe('buildWalletVerificationMessage', () => {
     it('formats the expected message string', () => {
       const nonce = 'abc123';
@@ -77,26 +39,22 @@ describe('WalletVerification', () => {
 
   describe('verifyWalletSignature', () => {
     it('accepts a valid ed25519 signature end-to-end', async () => {
-      // Generate a real Ed25519 keypair
-      // eslint-disable-next-line @typescript-eslint/no-var-requires, @typescript-eslint/unbound-method
-      const { generateKeyPairSync, sign } = require('crypto') as {
-        generateKeyPairSync(
+      // Generate a real Ed25519 keypair using a Node-appropriate approach
+      // that avoids unbound-method and no-unsafe-* lints.
+      // eslint-disable-next-line @typescript-eslint/no-var-requires
+      const crypto = require('crypto') as {
+        generateKeyPairSync: (
           type: 'ed25519',
           options: Record<string, unknown>,
-        ): { publicKey: unknown; privateKey: unknown };
-        sign(
-          algo: null,
-          data: Buffer,
-          key: unknown,
-        ): Buffer;
+        ) => { publicKey: { export(options: { type: string; format: string }): Buffer }; privateKey: unknown };
       };
-      const { publicKey, privateKey } = generateKeyPairSync('ed25519', {});
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-argument
+      const { publicKey, privateKey } = crypto.generateKeyPairSync('ed25519', {});
 
       // Extract raw 32-byte public key bytes from the SPKI encoding
-      const spkiDer = (publicKey as { export(options: { type: string; format: string }): Buffer }).export({
-        type: 'spki',
-        format: 'der',
-      });
+      const spkiDer = (
+        publicKey as { export(options: { type: string; format: string }): Buffer }
+      ).export({ type: 'spki', format: 'der' });
       const publicKeyRaw = spkiDer.slice(-32);
 
       // Encode public key as base58 for the wallet address
@@ -105,15 +63,25 @@ describe('WalletVerification', () => {
       const message = buildWalletVerificationMessage(walletAddress, nonce);
 
       // Sign the message (Ed25519 requires no algorithm string)
+      /* eslint-disable @typescript-eslint/no-var-requires, @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-argument, @typescript-eslint/unbound-method */
+      const { sign } = require('crypto') as {
+        sign(algo: null, data: Buffer, key: unknown): Buffer;
+      };
+      /* eslint-enable @typescript-eslint/no-var-requires, @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-argument, @typescript-eslint/unbound-method */
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-argument
       const signature = sign(null, Buffer.from(message, 'utf8'), privateKey);
 
       // Verify — should return true
-      const result = await verifyWalletSignature({ message, signature, walletAddress });
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-argument
+      const result = await verifyWalletSignature({
+        message,
+        signature,
+        walletAddress,
+      });
       expect(result).toBe(true);
     });
 
     it('returns false for a 64-byte signature of the wrong message', async () => {
-      // Create a valid 64-byte buffer but sign wrong message
       const fakeSig = Buffer.alloc(64, 1);
       const result = await verifyWalletSignature({
         message: 'wrong message',
@@ -123,12 +91,23 @@ describe('WalletVerification', () => {
       expect(result).toBe(false);
     });
 
-    it('returns false for a malformed address', async () => {
+    it('returns false for a malformed address (invalid base58 chars)', async () => {
       const fakeSig = Buffer.alloc(64, 1);
       const result = await verifyWalletSignature({
         message: 'any',
         signature: fakeSig,
         walletAddress: 'not-valid-base58!@#',
+      });
+      expect(result).toBe(false);
+    });
+
+    it('returns false for a non-32-byte decoded address', async () => {
+      const fakeSig = Buffer.alloc(64, 1);
+      // "1111" decodes to 2 bytes — not a valid 32-byte Solana address
+      const result = await verifyWalletSignature({
+        message: 'any',
+        signature: fakeSig,
+        walletAddress: '1111',
       });
       expect(result).toBe(false);
     });

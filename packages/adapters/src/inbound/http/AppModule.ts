@@ -9,12 +9,13 @@ import { WalletController } from './WalletController.js';
 import { OperationalStorageAdapter } from '../../outbound/storage/OperationalStorageAdapter.js';
 import { OffChainHistoryStorageAdapter } from '../../outbound/storage/OffChainHistoryStorageAdapter.js';
 import { MonitoredWalletStorageAdapter } from '../../outbound/storage/MonitoredWalletStorageAdapter.js';
+import { WalletChallengeRedisAdapter } from '../../outbound/storage/WalletChallengeRedisAdapter.js';
 import { OrcaPositionReadAdapter } from '../../outbound/solana-position-reads/OrcaPositionReadAdapter.js';
 import { JupiterQuoteAdapter } from '../../outbound/swap-execution/JupiterQuoteAdapter.js';
 import { SolanaExecutionPreparationAdapter } from '../../outbound/swap-execution/SolanaExecutionPreparationAdapter.js';
 import { SolanaExecutionSubmissionAdapter } from '../../outbound/swap-execution/SolanaExecutionSubmissionAdapter.js';
 import { createDb } from '../../outbound/storage/db.js';
-import type { ClockPort, IdGeneratorPort } from '@clmm/application';
+import type { ClockPort, IdGeneratorPort, WalletChallengeRepository } from '@clmm/application';
 import type { ClockTimestamp } from '@clmm/domain';
 import {
   TRIGGER_REPOSITORY,
@@ -27,12 +28,14 @@ import {
   CLOCK_PORT,
   ID_GENERATOR_PORT,
   MONITORED_WALLET_REPOSITORY,
+  WALLET_CHALLENGE_REPOSITORY,
 } from './tokens.js';
 
 // boundary: process.env values are untyped at runtime; validated via env schema at deploy
 const dbUrl = (process.env as Record<string, string | undefined>)['DATABASE_URL'] ?? 'postgresql://localhost/clmm';
 const db = createDb(dbUrl);
 const rpcUrl = (process.env as Record<string, string | undefined>)['SOLANA_RPC_URL'] ?? 'https://api.mainnet-beta.solana.com';
+const redisUrl = (process.env as Record<string, string | undefined>)['REDIS_URL'] ?? 'redis://localhost:6379';
 
 const systemClock: ClockPort = {
   now: () => Date.now() as ClockTimestamp,
@@ -50,6 +53,7 @@ const jupiterQuote = new JupiterQuoteAdapter();
 const solanaPreparation = new SolanaExecutionPreparationAdapter(rpcUrl);
 const solanaSubmission = new SolanaExecutionSubmissionAdapter(rpcUrl);
 const monitoredWalletStorage = new MonitoredWalletStorageAdapter(db);
+const walletChallengeStorage = new WalletChallengeRedisAdapter(redisUrl);
 
 @Module({
   controllers: [HealthController, PositionController, AlertController, PreviewController, ExecutionController, WalletController],
@@ -64,6 +68,7 @@ const monitoredWalletStorage = new MonitoredWalletStorageAdapter(db);
     { provide: CLOCK_PORT, useValue: systemClock },
     { provide: ID_GENERATOR_PORT, useValue: systemIds },
     { provide: MONITORED_WALLET_REPOSITORY, useValue: monitoredWalletStorage },
+    { provide: WALLET_CHALLENGE_REPOSITORY, useValue: walletChallengeStorage as WalletChallengeRepository },
   ],
 })
 export class AppModule {}

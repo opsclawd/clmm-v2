@@ -7,15 +7,23 @@ import {
   BadRequestException,
   ConflictException,
 } from '@nestjs/common';
-import type { MonitoredWalletRepository, ClockPort } from '@clmm/application';
+import type {
+  MonitoredWalletRepository,
+  WalletChallengeRepository,
+  ClockPort,
+} from '@clmm/application';
 import type { WalletId } from '@clmm/domain';
-import { MONITORED_WALLET_REPOSITORY, CLOCK_PORT } from './tokens.js';
 import {
-  issueWalletChallenge,
-  consumeWalletChallenge,
+  MONITORED_WALLET_REPOSITORY,
+  WALLET_CHALLENGE_REPOSITORY,
+  CLOCK_PORT,
+} from './tokens.js';
+import {
   buildWalletVerificationMessage,
   verifyWalletSignature,
 } from './WalletVerification.js';
+
+const CHALLENGE_TTL_MS = 5 * 60 * 1_000; // 5 minutes
 
 class WalletEnrollmentBody {
   challenge!: string;
@@ -28,6 +36,8 @@ export class WalletController {
   constructor(
     @Inject(MONITORED_WALLET_REPOSITORY)
     private readonly monitoredWalletRepo: MonitoredWalletRepository,
+    @Inject(WALLET_CHALLENGE_REPOSITORY)
+    private readonly challengeRepo: WalletChallengeRepository,
     @Inject(CLOCK_PORT)
     private readonly clock: ClockPort,
   ) {}
@@ -39,11 +49,13 @@ export class WalletController {
    */
   @Post(':walletId/challenge')
   async requestChallenge(@Param('walletId') walletId: string) {
-    const challenge = issueWalletChallenge(walletId);
-    return {
-      challenge: challenge.nonce,
-      expiresAt: challenge.expiresAt,
-    };
+    const now = this.clock.now();
+    const { nonce, expiresAt } = await this.challengeRepo.issue(
+      walletId as WalletId,
+      CHALLENGE_TTL_MS,
+      now,
+    );
+    return { challenge: nonce, expiresAt };
   }
 
   /**
@@ -62,7 +74,12 @@ export class WalletController {
     }
 
     // Verify the challenge is valid, non-expired, and matches the wallet address
-    const challenge = consumeWalletChallenge(body.challenge, walletId);
+    const now = this.clock.now();
+    const challenge = await this.challengeRepo.consume(
+      body.challenge,
+      walletId as WalletId,
+      now,
+    );
     if (!challenge) {
       throw new BadRequestException(
         'Invalid or expired challenge. Request a new one at POST /wallets/:walletId/challenge',
