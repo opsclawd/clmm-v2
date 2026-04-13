@@ -2,21 +2,24 @@
  * Solana RPC retry utility.
  *
  * The public Solana RPC (api.mainnet-beta.solana.com) and some private RPCs
- * return HTTP 429 ("Too Many Requests") when rate-limited. This manifests as
- * a Solana error with code 8100002 (#8100002).
+ * return HTTP 429 ("Too Many Requests") when rate-limited. Solana surfaces
+ * this in two ways:
+ *   1. Error code #8100002 embedded in the message  (e.g. "…#8100002…")
+ *   2. Plain HTTP 429 text  (e.g. "SolanaError: HTTP error (429): Too Many Requests")
  *
- * This module provides `withRetry` which wraps an async RPC call and
- * automatically retries with exponential backoff + jitter on 429 errors.
+ * Both forms indicate a transient rate-limit condition and should be retried.
  */
 
 const SOLANA_RATE_LIMIT_CODE = '8100002';
+const SOLANA_429_TEXT = '429';
 
 /**
  * Returns true if the error is a Solana RPC rate-limit error (HTTP 429).
+ * Handles both the Solana error-code form (#8100002) and the plain HTTP 429 form.
  */
 export function isSolanaRateLimitError(error: unknown): boolean {
   if (error instanceof Error) {
-    return error.message.includes(`#${SOLANA_RATE_LIMIT_CODE}`);
+    return error.message.includes(`#${SOLANA_RATE_LIMIT_CODE}`) || error.message.includes(SOLANA_429_TEXT);
   }
   return false;
 }
