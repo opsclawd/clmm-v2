@@ -26,9 +26,9 @@ export type WalletSessionState = {
 };
 
 export function createWalletSessionStore() {
-  return createStore<WalletSessionState>()(
+  const store = createStore<WalletSessionState>()(
     persist(
-      (set, get, store) => ({
+      (set, _get, store) => ({
         walletAddress: null,
         connectionKind: null,
         connectionOutcome: null,
@@ -78,11 +78,15 @@ export function createWalletSessionStore() {
           platformCapabilities: state.platformCapabilities,
         }),
         onRehydrateStorage: () => (state) => {
-          state && (state.hasHydrated = true);
+          // Mark hydration complete so Zustand subscribers re-render with the
+          // rehydrated state. This uses set() from the initializer closure.
+          state && store.setState({ hasHydrated: true });
         },
       }
     )
   );
+
+  return store;
 }
 
 export const walletSessionStore = createWalletSessionStore();
