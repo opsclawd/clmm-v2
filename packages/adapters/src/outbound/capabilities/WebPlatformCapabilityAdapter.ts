@@ -9,12 +9,13 @@ export class WebPlatformCapabilityAdapter implements PlatformCapabilityPort {
       /Mobile|Android|iPhone/i.test(navigator.userAgent);
     // Check if a browser wallet (Phantom, Solflare, etc.) is injected in the window.
     // Wallet extensions may be present on both desktop and mobile browsers.
-    const injectedBrowserWallet = (() => {
+    const injectedBrowserWallet = ((): boolean => {
       try {
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        const win = globalThis as any;
+        const win = globalThis as unknown as Record<string, unknown>;
         const solana = win['solana'];
-        return typeof solana !== 'undefined' && typeof solana['connect'] === 'function';
+        if (typeof solana !== 'object' || solana === null) return false;
+        const solanaRecord = solana as Record<string, unknown>;
+        return typeof solanaRecord['connect'] === 'function';
       } catch {
         return false;
       }
