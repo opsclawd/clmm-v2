@@ -76,10 +76,11 @@ export default function ConnectRoute() {
           : await walletPlatform.connectNativeWallet();
 
       markConnected({ walletAddress, connectionKind: kind });
-      // Best-effort enrollment -- non-blocking
       enrollWalletForMonitoring(walletAddress).catch((err) => {
         console.warn('Wallet enrollment failed (will retry on next connect):', err);
       });
+      
+      // Immediate navigation - router.replace should work since we're in the same JS context
       router.replace('/(tabs)/positions');
     } catch (error) {
       handleConnectionError(error);
