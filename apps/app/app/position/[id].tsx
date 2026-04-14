@@ -4,6 +4,7 @@ import { PositionDetailScreen } from '@clmm/ui';
 import { Text, View } from 'react-native';
 import { useStore } from 'zustand';
 import { fetchPositionDetail } from '../../src/api/positions';
+import { navigateRoute } from '../../src/platform/webNavigation';
 import { walletSessionStore } from '../../src/state/walletSessionStore';
 
 export default function PositionDetailRoute() {
@@ -18,7 +19,7 @@ export default function PositionDetailRoute() {
 
   // Only redirect if we have a valid positionId, no wallet address, AND hydration is complete
   if (hasValidPositionId && !hasWalletAddress && hasHydrated) {
-    router.push('/connect');
+    navigateRoute({ router, path: '/connect', method: 'push' });
     return null;
   }
 
@@ -50,7 +51,11 @@ export default function PositionDetailRoute() {
     <PositionDetailScreen
       {...(position ? { position } : {})}
       onViewPreview={(resolvedTriggerId: string) =>
-        router.push(`/preview/${alertTriggerId ?? resolvedTriggerId}`)
+        navigateRoute({
+          router,
+          path: `/preview/${alertTriggerId ?? resolvedTriggerId}`,
+          method: 'push',
+        })
       }
     />
   );

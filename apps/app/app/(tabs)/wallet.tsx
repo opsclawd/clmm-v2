@@ -2,6 +2,7 @@ import { useRouter } from 'expo-router';
 import { WalletSettingsScreen } from '@clmm/ui';
 import { useStore } from 'zustand';
 import { disconnectBrowserWallet } from '../../src/platform/browserWallet';
+import { navigateRoute } from '../../src/platform/webNavigation';
 import { walletSessionStore } from '../../src/state/walletSessionStore';
 
 export default function WalletRoute() {
@@ -14,12 +15,12 @@ export default function WalletRoute() {
 
   function handleReconnect() {
     clearOutcome();
-    router.push('/connect');
+    navigateRoute({ router, path: '/connect', method: 'push' });
   }
 
   function handleSwitchWallet() {
     disconnect();
-    router.push('/connect');
+    navigateRoute({ router, path: '/connect', method: 'push' });
   }
 
   async function handleDisconnect() {

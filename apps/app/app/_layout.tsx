@@ -3,6 +3,7 @@ import { QueryClientProvider } from '@tanstack/react-query';
 import { Stack, useRouter } from 'expo-router';
 import { Platform } from 'react-native';
 import { queryClient } from '../src/composition/queryClient';
+import { navigateRoute } from '../src/platform/webNavigation';
 
 export default function RootLayout() {
   const router = useRouter();
@@ -22,11 +23,11 @@ export default function RootLayout() {
           triggerId?: string;
         };
         if (data.route) {
-          router.push(data.route);
+          navigateRoute({ router, path: data.route, method: 'push' });
         } else if (data.triggerId) {
-          router.push(`/preview/${data.triggerId}`);
+          navigateRoute({ router, path: `/preview/${data.triggerId}`, method: 'push' });
         } else if (data.positionId) {
-          router.push(`/position/${data.positionId}`);
+          navigateRoute({ router, path: `/position/${data.positionId}`, method: 'push' });
         }
       });
     };

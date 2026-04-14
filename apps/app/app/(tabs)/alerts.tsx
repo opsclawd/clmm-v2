@@ -4,6 +4,7 @@ import { AlertsListScreen } from '@clmm/ui';
 import { useStore } from 'zustand';
 import { fetchAlerts } from '../../src/api/alerts';
 import { walletSessionStore } from '../../src/state/walletSessionStore';
+import { navigateRoute } from '../../src/platform/webNavigation';
 
 export default function AlertsRoute() {
   const router = useRouter();
@@ -24,7 +25,11 @@ export default function AlertsRoute() {
       alertsError={alertsQuery.error instanceof Error ? alertsQuery.error.message : null}
       platformCapabilities={platformCapabilities}
       onSelectAlert={(triggerId: string, positionId: string) => {
-        router.push({ pathname: '/position/[id]', params: { id: positionId, triggerId } });
+        navigateRoute({
+          router,
+          path: `/position/${positionId}?triggerId=${encodeURIComponent(triggerId)}`,
+          method: 'push',
+        });
       }}
     />
   );

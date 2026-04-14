@@ -6,6 +6,7 @@ import type { PlatformCapabilityState } from '@clmm/application/public';
 import { platformCapabilityAdapter, walletPlatform } from '../src/composition/index';
 import { connectBrowserWallet } from '../src/platform/browserWallet';
 import { mapWalletErrorToOutcome } from '../src/platform/walletConnection';
+import { navigateRoute } from '../src/platform/webNavigation';
 import { walletSessionStore } from '../src/state/walletSessionStore';
 import { enrollWalletForMonitoring } from '../src/api/wallets';
 
@@ -79,9 +80,11 @@ export default function ConnectRoute() {
       enrollWalletForMonitoring(walletAddress).catch((err) => {
         console.warn('Wallet enrollment failed (will retry on next connect):', err);
       });
-      
-      // Immediate navigation - router.replace should work since we're in the same JS context
-      router.replace('/(tabs)/positions');
+      navigateRoute({
+        router,
+        path: '/(tabs)/positions',
+        method: 'replace',
+      });
     } catch (error) {
       handleConnectionError(error);
     }

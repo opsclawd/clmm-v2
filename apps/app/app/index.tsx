@@ -1,5 +1,6 @@
 import { useEffect, useRef } from 'react';
 import { useRootNavigationState, useRouter } from 'expo-router';
+import { navigateRoute } from '../src/platform/webNavigation';
 
 type RootNavigationState = {
   key?: string;
@@ -21,7 +22,7 @@ export default function IndexRoute() {
     }
 
     hasNavigated.current = true;
-    router.replace('/connect');
+    navigateRoute({ router, path: '/connect', method: 'replace' });
   }, [rootNavigationState?.key, router]);
 
   // Fallback: ensure redirect even if navigation state never becomes ready
@@ -29,7 +30,7 @@ export default function IndexRoute() {
     const timeoutId = setTimeout(() => {
       if (!hasNavigated.current) {
         hasNavigated.current = true;
-        router.replace('/connect');
+        navigateRoute({ router, path: '/connect', method: 'replace' });
       }
     }, 1500);
 
