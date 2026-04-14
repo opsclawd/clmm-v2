@@ -130,7 +130,7 @@ Everything in this section lands on a single feature branch (`feat/workers-migra
 
 ### Storage connection swap
 
-- Rewrite `packages/adapters/src/outbound/storage/db.ts` to use `@neondatabase/serverless` + `drizzle-orm/neon-http`. Preserve the **factory** export shape: `export function createDb(connectionString: string): Database` and `export type Database = ReturnType<typeof createDb>`. Do not introduce a module-level singleton (`export const db = ...`) under any circumstance. In Workers, `env` is not available at module scope — a singleton constructed at import time cannot receive `DATABASE_URL` and fails at runtime with no clear error trail. Callers receive the `Database` instance from the composition root, never by importing `db` directly from this file.
+- Rewrite `packages/adapters/src/outbound/storage/db.ts` to use `@neondatabase/serverless` + `drizzle-orm/neon-http`. Preserve the **factory** export shape with the existing type name: `export function createDb(connectionString: string)` and `export type Db = ReturnType<typeof createDb>`. Keeping the `Db` type name avoids cascading constructor-signature changes across every storage adapter that references it. Do not introduce a module-level singleton (`export const db = ...`) under any circumstance. In Workers, `env` is not available at module scope — a singleton constructed at import time cannot receive `DATABASE_URL` and fails at runtime with no clear error trail. Callers receive the `Database` instance from the composition root, never by importing `db` directly from this file.
 - **Adapter-import audit (Stage 1 task).** Grep every file under `packages/adapters/src/outbound/storage/` for imports of `db` from `./db` or `../db` or `./db.js`. The expected shape is that every storage adapter receives `db` through its constructor and no file imports a module-level `db` instance. If any adapter imports `db` directly, the skeleton branch fixes it to constructor injection before the Neon swap is considered complete — that's a hidden migration task that must be caught here, not discovered during M2.7 dispatch.
 - `drizzle.config.ts` unchanged. Drizzle Kit keeps running in Node for migrations; only runtime uses HTTP.
 - `packages/adapters/package.json` — drop `@nestjs/*`, `pg-boss`, `postgres`, `reflect-metadata`. Add `@neondatabase/serverless`, `hono`.
@@ -154,9 +154,9 @@ Everything in this section lands on a single feature branch (`feat/workers-migra
 
 ### Deletions
 
-- `packages/adapters/src/inbound/http/*Controller.ts`, `AppModule.ts`, `main.ts`, `tokens.ts`, `transient-errors.ts` — all deleted. Controller test files deleted in the same commit.
-- `packages/adapters/src/inbound/jobs/` — entire directory deleted, including all `*JobHandler.ts`, `PgBossProvider.ts`, `WorkerModule.ts`, `WorkerLifecycle.ts`, and their test files.
-- `packages/adapters/src/composition/` — if it exists, deleted.
+- `packages/adapters/src/inbound/jobs/` — entire directory deleted in Stage 1, including all `*JobHandler.ts`, `PgBossProvider.ts`, `WorkerModule.ts`, `WorkerLifecycle.ts`, and their test files. These have no downstream reader in Stage 2 or 3, so they go now. `pg-boss` and `postgres` are removed from `packages/adapters/package.json` in the same commit.
+- `packages/adapters/src/composition/` — if it exists, deleted in Stage 1.
+- `packages/adapters/src/inbound/http/*Controller.ts`, `AppModule.ts`, `main.ts`, `tokens.ts`, `transient-errors.ts` — **deferred to Stage 4 pre-cutover cleanup**, not Stage 1. M2.7's per-controller slices in Stage 3 open these files as source material; they must survive until every slice is accepted. NestJS-related deps (`@nestjs/*`, `reflect-metadata`) likewise stay in `packages/adapters/package.json` until Stage 4.
 
 ### Scope boundary
 
@@ -282,9 +282,11 @@ Each slice is an independent M2.7 session checking out the skeleton branch. Orde
 
 Slices merge into the skeleton branch as each is accepted — not individual PRs, just commits.
 
-### Stage 4 — Cutover
+### Stage 4 — Pre-cutover cleanup and cutover
 
-Skeleton branch complete. Run full `pnpm test` and `pnpm typecheck` top-to-bottom. Deploy to a preview Workers environment. Smoke test: wallet connect → list positions → view position detail → simulate a breach trigger via monitor test-scheduled endpoint → confirm `notification_events` row written → check reconciliation cron against a known pending attempt.
+**Pre-cutover cleanup.** Before the preview deploy, delete the now-unreferenced NestJS controller files (`packages/adapters/src/inbound/http/*Controller.ts`, `AppModule.ts`, `main.ts`, `tokens.ts`, `transient-errors.ts`, and their test files) and remove the NestJS-related deps (`@nestjs/*`, `reflect-metadata`) from `packages/adapters/package.json`. These were retained through Stage 3 as M2.7 source material; after every slice is accepted, they're dead weight. Run `pnpm install`, `pnpm typecheck`, `pnpm test` — all must pass. Commit the cleanup to the skeleton branch.
+
+**Cutover.** Run full `pnpm test` and `pnpm typecheck` top-to-bottom. Deploy to a preview Workers environment. Smoke test: wallet connect → list positions → view position detail → simulate a breach trigger via monitor test-scheduled endpoint → confirm `notification_events` row written → check reconciliation cron against a known pending attempt.
 
 If all green: merge skeleton branch to main, run `pnpm deploy:api && pnpm deploy:monitor && pnpm deploy:app` against production Cloudflare, update DNS / front-end base URLs pointing at Railway, verify production traffic flows end-to-end, then tear down Railway after a 72-hour cool-off period.
 
