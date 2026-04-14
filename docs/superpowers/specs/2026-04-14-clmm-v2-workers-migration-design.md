@@ -130,7 +130,8 @@ Everything in this section lands on a single feature branch (`feat/workers-migra
 
 ### Storage connection swap
 
-- Rewrite `packages/adapters/src/outbound/storage/db.ts` to use `@neondatabase/serverless` + `drizzle-orm/neon-http`. Export `createDb(connectionString)` with the same signature as today.
+- Rewrite `packages/adapters/src/outbound/storage/db.ts` to use `@neondatabase/serverless` + `drizzle-orm/neon-http`. Preserve the **factory** export shape: `export function createDb(connectionString: string): Database` and `export type Database = ReturnType<typeof createDb>`. Do not introduce a module-level singleton (`export const db = ...`) under any circumstance. In Workers, `env` is not available at module scope — a singleton constructed at import time cannot receive `DATABASE_URL` and fails at runtime with no clear error trail. Callers receive the `Database` instance from the composition root, never by importing `db` directly from this file.
+- **Adapter-import audit (Stage 1 task).** Grep every file under `packages/adapters/src/outbound/storage/` for imports of `db` from `./db` or `../db` or `./db.js`. The expected shape is that every storage adapter receives `db` through its constructor and no file imports a module-level `db` instance. If any adapter imports `db` directly, the skeleton branch fixes it to constructor injection before the Neon swap is considered complete — that's a hidden migration task that must be caught here, not discovered during M2.7 dispatch.
 - `drizzle.config.ts` unchanged. Drizzle Kit keeps running in Node for migrations; only runtime uses HTTP.
 - `packages/adapters/package.json` — drop `@nestjs/*`, `pg-boss`, `postgres`, `reflect-metadata`. Add `@neondatabase/serverless`, `hono`.
 
