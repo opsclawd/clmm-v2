@@ -74,7 +74,7 @@ export class SolanaExecutionPreparationAdapter implements ExecutionPreparationPo
 
     const { value: latestBlockhash } = await rpc.getLatestBlockhash().send();
 
-    const positionData = await this.fetchPositionData(rpc, positionId);
+    const positionData = await this.fetchPositionData(rpc, positionId, walletId);
     if (!positionData) {
       throw new Error(`Position not found: ${positionId}`);
     }
@@ -121,7 +121,7 @@ export class SolanaExecutionPreparationAdapter implements ExecutionPreparationPo
     };
   }
 
-  private async fetchPositionData(rpc: ReturnType<typeof createSolanaRpc>, positionId: PositionId): Promise<LiquidityPosition | null> {
+  private async fetchPositionData(rpc: ReturnType<typeof createSolanaRpc>, positionId: PositionId, walletId: WalletId): Promise<LiquidityPosition | null> {
     try {
       const positionMint = address(positionId);
       const [positionAddress] = await getPositionAddress(positionMint);
@@ -142,7 +142,7 @@ export class SolanaExecutionPreparationAdapter implements ExecutionPreparationPo
 
       return {
         positionId,
-        walletId: position.positionMint.toString() as WalletId,
+        walletId,
         // boundary: Orca SDK returns Address type; domain uses branded PoolId
         poolId: whirlpoolAddress.toString() as unknown as PoolId,
         bounds,
