@@ -15,8 +15,9 @@ export default function PreviewRoute() {
   const params = useLocalSearchParams<{ triggerId?: string | string[] }>();
   const triggerId = readTriggerId(params.triggerId);
   const walletAddress = useStore(walletSessionStore, (state) => state.walletAddress);
+  const hasHydrated = useStore(walletSessionStore, (s) => s.hasHydrated);
 
-  if (triggerId != null && walletAddress == null) {
+  if (triggerId != null && walletAddress == null && hasHydrated) {
     router.push('/connect');
     return null;
   }
