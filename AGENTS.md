@@ -66,9 +66,19 @@ Before claiming substantial work is complete, run the narrowest relevant checks 
 - `pnpm boundaries`
 - `pnpm test`
 
+## Compound Engineering
+
+- This repo accumulates reusable engineering knowledge over time using Compound Engineering.
+- Before starting new implementation or debugging work, check `docs/solutions/` for existing learnings relevant to the task.
+- After completing a story or bugfix, capture durable learnings with Compound Engineering when the work produced reusable insight.
+- Use `/ce:compound` for patterns, pitfalls, debugging discoveries, architectural constraints, or process improvements that should help future sessions.
+- If there is no durable learning worth preserving, say so explicitly instead of creating low-signal notes.
+- Supporting guidance lives in `docs/compound-engineering.md`.
+
 ## What To Read Next
 
 - Setup and worktree bootstrap: `README.md`, `docs/setup.md`
+- Compound workflow expectations: `docs/compound-engineering.md`
 - Product definition and out-of-scope requests: `docs/product-scope.md`
 - Architecture overview: `docs/architecture.md`
 - Domain invariants and lifecycle rules: `docs/architecture/invariants.md`, `docs/architecture/domain-model.md`
