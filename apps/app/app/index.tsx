@@ -16,7 +16,6 @@ export default function IndexRoute() {
       return;
     }
 
-    // Primary: navigate when navigation state is ready
     if (!rootNavigationState?.key) {
       return;
     }
@@ -25,11 +24,12 @@ export default function IndexRoute() {
     navigateRoute({ router, path: '/connect', method: 'replace' });
   }, [rootNavigationState?.key, router]);
 
-  // Fallback: ensure redirect even if navigation state never becomes ready
+  // Fallback: ensure redirect even if navigation state never becomes ready.
+  // Does not set hasNavigated — if the fallback fires and the primary
+  // effect later becomes ready, the primary will take over correctly.
   useEffect(() => {
     const timeoutId = setTimeout(() => {
       if (!hasNavigated.current) {
-        hasNavigated.current = true;
         navigateRoute({ router, path: '/connect', method: 'replace' });
       }
     }, 1500);
