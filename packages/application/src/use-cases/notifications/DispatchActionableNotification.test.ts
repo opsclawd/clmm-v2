@@ -32,6 +32,7 @@ describe('DispatchActionableNotification', () => {
     });
 
     expect(result.dispatched).toBe(true);
+    expect(result.deliveredAt).not.toBeNull();
     expect(notificationPort.dispatched).toHaveLength(1);
     expect(notificationPort.dispatched[0]?.breachDirection.kind).toBe('lower-bound-breach');
   });
@@ -47,6 +48,7 @@ describe('DispatchActionableNotification', () => {
     });
 
     expect(result.dispatched).toBe(true);
+    expect(result.deliveredAt).not.toBeNull();
     expect(notificationPort.dispatched[0]?.breachDirection.kind).toBe('upper-bound-breach');
   });
 
@@ -70,6 +72,7 @@ describe('DispatchActionableNotification', () => {
       notificationDedupPort,
     });
     expect(second.dispatched).toBe(false);
+    expect(second.deliveredAt).toBeNull();
     expect(notificationPort.dispatched).toHaveLength(1);
   });
 
@@ -93,6 +96,7 @@ describe('DispatchActionableNotification', () => {
       notificationDedupPort,
     });
     expect(second.dispatched).toBe(true);
+    expect(second.deliveredAt).not.toBeNull();
     expect(notificationPort.dispatched).toHaveLength(2);
   });
 });

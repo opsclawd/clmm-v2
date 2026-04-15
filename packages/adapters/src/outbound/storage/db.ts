@@ -7,6 +7,7 @@ import * as preparedPayloadsSchema from './schema/prepared-payloads.js';
 import * as historySchema from './schema/history.js';
 import * as monitoredWalletsSchema from './schema/monitored-wallets.js';
 import * as notificationDedupSchema from './schema/notification-dedup.js';
+import * as notificationEventsSchema from './schema/notification-events.js';
 
 export function createDb(connectionString: string) {
   const client = postgres(connectionString);
@@ -19,6 +20,7 @@ export function createDb(connectionString: string) {
       ...historySchema,
       ...monitoredWalletsSchema,
       ...notificationDedupSchema,
+      ...notificationEventsSchema,
     },
   });
 }

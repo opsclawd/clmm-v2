@@ -1,5 +1,5 @@
 import type { NotificationPort, NotificationDedupPort } from '../../ports/index.js';
-import type { WalletId, PositionId, BreachDirection, ExitTriggerId } from '@clmm/domain';
+import type { WalletId, PositionId, BreachDirection, ExitTriggerId, ClockTimestamp } from '@clmm/domain';
 
 export async function dispatchActionableNotification(params: {
   walletId: WalletId;
@@ -8,16 +8,16 @@ export async function dispatchActionableNotification(params: {
   breachDirection: BreachDirection;
   notificationPort: NotificationPort;
   notificationDedupPort: NotificationDedupPort;
-}): Promise<{ dispatched: boolean }> {
+}): Promise<{ dispatched: boolean; deliveredAt: ClockTimestamp | null }> {
   const { walletId, positionId, triggerId, breachDirection, notificationPort, notificationDedupPort } =
     params;
 
   const alreadyDispatched = await notificationDedupPort.hasDispatched(triggerId);
   if (alreadyDispatched) {
-    return { dispatched: false };
+    return { dispatched: false, deliveredAt: null };
   }
 
-  await notificationPort.sendActionableAlert({
+  const { deliveredAt } = await notificationPort.sendActionableAlert({
     walletId,
     positionId,
     breachDirection,
@@ -26,5 +26,5 @@ export async function dispatchActionableNotification(params: {
 
   await notificationDedupPort.markDispatched(triggerId);
 
-  return { dispatched: true };
+  return { dispatched: true, deliveredAt };
 }
