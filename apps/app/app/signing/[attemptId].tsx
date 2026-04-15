@@ -14,6 +14,7 @@ import {
 import { signBrowserTransaction } from '../../src/platform/browserWallet';
 import { signNativeTransaction } from '../../src/platform/nativeWallet';
 import { mapWalletErrorToOutcome } from '../../src/platform/walletConnection';
+import { navigateRoute } from '../../src/platform/webNavigation';
 import { walletSessionStore } from '../../src/state/walletSessionStore';
 import type { ExecutionAttemptDto } from '@clmm/application/public';
 
@@ -79,7 +80,7 @@ export default function SigningRoute() {
 
   useEffect(() => {
     if (attemptId == null && walletAddress == null && hasHydrated) {
-      router.push('/connect');
+      navigateRoute({ router, path: '/connect', method: 'push' });
     }
   }, [attemptId, walletAddress, hasHydrated, router]);
 
@@ -110,9 +111,10 @@ export default function SigningRoute() {
       },
       {
         onSuccess: (approval) => {
-          router.replace({
-            pathname: '/signing/[attemptId]',
-            params: { attemptId: approval.attemptId },
+          navigateRoute({
+            router,
+            path: `/signing/${approval.attemptId}`,
+            method: 'replace',
           });
         },
       },
@@ -194,7 +196,11 @@ export default function SigningRoute() {
 
         await submitExecution(attemptId, signedPayload);
         await executionQuery.refetch();
-        router.replace(`/execution/${attemptId}`);
+        navigateRoute({
+          router,
+          path: `/execution/${attemptId}`,
+          method: 'replace',
+        });
       } catch (error: unknown) {
         const outcome = mapWalletErrorToOutcome(error);
 
@@ -288,14 +294,22 @@ export default function SigningRoute() {
       }
       statusNotice={statusNotice}
       onGoHome={() => {
-        router.replace('/(tabs)/positions');
+        navigateRoute({
+          router,
+          path: '/(tabs)/positions',
+          method: 'replace',
+        });
       }}
       {...(isPendingApprovalMode
         ? {
             ...(triggerId != null
               ? {
                   onRefreshQuote: () => {
-                    router.replace(`/preview/${triggerId}`);
+                    navigateRoute({
+                      router,
+                      path: `/preview/${triggerId}`,
+                      method: 'replace',
+                    });
                   },
                 }
               : {}),
@@ -316,7 +330,17 @@ export default function SigningRoute() {
               : {}),
           }
         : {})}
-      {...(attemptId != null ? { onViewResult: () => router.push(`/execution/${attemptId}`) } : {})}
+      {...(attemptId != null
+        ? {
+            onViewResult: () => {
+              navigateRoute({
+                router,
+                path: `/execution/${attemptId}`,
+                method: 'push',
+              });
+            },
+          }
+        : {})}
       signingState={signMutation.isPending ? 'signing' : 'idle'}
       walletConnected={walletAddress != null}
       onSignAndExecute={() => {

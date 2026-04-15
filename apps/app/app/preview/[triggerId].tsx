@@ -4,6 +4,7 @@ import { useMutation } from '@tanstack/react-query';
 import { ExecutionPreviewScreen } from '@clmm/ui';
 import { useStore } from 'zustand';
 import { createPreview, refreshPreview } from '../../src/api/previews';
+import { navigateRoute } from '../../src/platform/webNavigation';
 import { walletSessionStore } from '../../src/state/walletSessionStore';
 
 function readTriggerId(value: string | string[] | undefined): string | null {
@@ -18,7 +19,7 @@ export default function PreviewRoute() {
   const hasHydrated = useStore(walletSessionStore, (s) => s.hasHydrated);
 
   if (triggerId != null && walletAddress == null && hasHydrated) {
-    router.push('/connect');
+    navigateRoute({ router, path: '/connect', method: 'push' });
     return null;
   }
 
@@ -73,9 +74,20 @@ export default function PreviewRoute() {
                 signingParams.episodeId = preview.episodeId;
               }
 
-              router.push({
-                pathname: '/signing/[attemptId]',
-                params: signingParams,
+              navigateRoute({
+                router,
+                path: `/signing/${signingParams.attemptId}?previewId=${encodeURIComponent(
+                  signingParams.previewId,
+                )}${
+                  signingParams.triggerId != null
+                    ? `&triggerId=${encodeURIComponent(signingParams.triggerId)}`
+                    : ''
+                }${
+                  signingParams.episodeId != null
+                    ? `&episodeId=${encodeURIComponent(signingParams.episodeId)}`
+                    : ''
+                }`,
+                method: 'push',
               });
             },
           }
