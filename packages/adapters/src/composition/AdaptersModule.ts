@@ -8,7 +8,7 @@ import { MonitoredWalletStorageAdapter } from '../outbound/storage/MonitoredWall
 import { NotificationDedupStorageAdapter } from '../outbound/storage/NotificationDedupStorageAdapter.js';
 import { SolanaExecutionPreparationAdapter } from '../outbound/swap-execution/SolanaExecutionPreparationAdapter.js';
 import { SolanaExecutionSubmissionAdapter } from '../outbound/swap-execution/SolanaExecutionSubmissionAdapter.js';
-import { InAppAlertAdapter } from '../outbound/notifications/InAppAlertAdapter.js';
+import { DurableNotificationEventAdapter } from '../outbound/notifications/DurableNotificationEventAdapter.js';
 import { TelemetryAdapter } from '../outbound/observability/TelemetryAdapter.js';
 import { createDb } from '../outbound/storage/db.js';
 import type { ClockPort, IdGeneratorPort } from '@clmm/application';
@@ -54,7 +54,7 @@ const monitoredWalletStorage = new MonitoredWalletStorageAdapter(db);
 const notificationDedupStorage = new NotificationDedupStorageAdapter(db);
 const solanaPreparation = new SolanaExecutionPreparationAdapter(rpcUrl);
 const solanaSubmission = new SolanaExecutionSubmissionAdapter(rpcUrl);
-const inAppAlert = new InAppAlertAdapter();
+const durableNotificationEvent = new DurableNotificationEventAdapter(db, systemIds);
 const telemetry = new TelemetryAdapter();
 
 const sharedProviders = [
@@ -67,7 +67,7 @@ const sharedProviders = [
   { provide: EXECUTION_HISTORY_REPOSITORY, useValue: historyStorage },
   { provide: EXECUTION_PREPARATION_PORT, useValue: solanaPreparation },
   { provide: EXECUTION_SUBMISSION_PORT, useValue: solanaSubmission },
-  { provide: NOTIFICATION_PORT, useValue: inAppAlert },
+  { provide: NOTIFICATION_PORT, useValue: durableNotificationEvent },
   { provide: NOTIFICATION_DEDUP_PORT, useValue: notificationDedupStorage },
   { provide: OBSERVABILITY_PORT, useValue: telemetry },
   { provide: CLOCK_PORT, useValue: systemClock },
