@@ -89,7 +89,7 @@ describe('SolanaExecutionSubmissionAdapter', () => {
 
     it('treats err with confirmed/finalized status as failed, not confirmed', async () => {
       const adapter = makeAdapter(makeMockRpc({
-        'sig1': { confirmationStatus: 'confirmed', err: { err: 'transaction failed' } },
+        'sig1': { confirmationStatus: 'confirmed', err: { err: 'Transaction failed' } },
         'sig2': { confirmationStatus: 'finalized', err: { err: 'instruction error' } },
       }));
 
@@ -100,6 +100,62 @@ describe('SolanaExecutionSubmissionAdapter', () => {
 
       expect(result.finalState).toEqual({ kind: 'failed' });
       expect(result.confirmedSteps).toEqual([]);
+    });
+  });
+
+  describe('submitExecution step projection', () => {
+    it('returns one reference per planned step kind, all sharing the same signature', async () => {
+      const mockRpc = makeMockRpc({});
+      const fakeSig = 'submitted-sig-abc';
+      mockRpc.sendTransaction.mockImplementation(() => ({
+        send: vi.fn().mockResolvedValue(fakeSig),
+      }));
+      const adapter = makeAdapter(mockRpc);
+
+      const result = await adapter.submitExecution(
+        new Uint8Array([1, 2, 3]),
+        ['remove-liquidity', 'collect-fees', 'swap-assets'],
+      );
+
+      expect(result.references).toHaveLength(3);
+      expect(result.references[0]).toEqual({ signature: fakeSig, stepKind: 'remove-liquidity' });
+      expect(result.references[1]).toEqual({ signature: fakeSig, stepKind: 'collect-fees' });
+      expect(result.references[2]).toEqual({ signature: fakeSig, stepKind: 'swap-assets' });
+    });
+
+    it('returns one reference for a single-step plan', async () => {
+      const mockRpc = makeMockRpc({});
+      const fakeSig = 'submitted-sig-single';
+      mockRpc.sendTransaction.mockImplementation(() => ({
+        send: vi.fn().mockResolvedValue(fakeSig),
+      }));
+      const adapter = makeAdapter(mockRpc);
+
+      const result = await adapter.submitExecution(
+        new Uint8Array([4, 5, 6]),
+        ['swap-assets'],
+      );
+
+      expect(result.references).toHaveLength(1);
+      expect(result.references[0]).toEqual({ signature: fakeSig, stepKind: 'swap-assets' });
+    });
+
+    it('deduplicates step kinds', async () => {
+      const mockRpc = makeMockRpc({});
+      mockRpc.sendTransaction.mockImplementation(() => ({
+        send: vi.fn().mockResolvedValue('dedup-sig'),
+      }));
+      const adapter = makeAdapter(mockRpc);
+
+      const result = await adapter.submitExecution(
+        new Uint8Array([7]),
+        ['swap-assets', 'swap-assets', 'collect-fees'],
+      );
+
+      expect(result.references).toHaveLength(2);
+      const stepKinds = result.references.map((r) => r.stepKind);
+      expect(stepKinds).toContain('swap-assets');
+      expect(stepKinds).toContain('collect-fees');
     });
   });
 });

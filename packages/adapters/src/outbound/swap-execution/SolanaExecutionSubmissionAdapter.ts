@@ -9,7 +9,7 @@
 import { createSolanaRpc } from '@solana/kit';
 import type { Base64EncodedWireTransaction, Signature } from '@solana/kit';
 import type { ExecutionSubmissionPort } from '@clmm/application';
-import type { TransactionReference, ExecutionLifecycleState, ClockTimestamp } from '@clmm/domain';
+import type { TransactionReference, ExecutionLifecycleState, ClockTimestamp, ExecutionStep } from '@clmm/domain';
 import { makeClockTimestamp } from '@clmm/domain';
 
 function uint8ArrayToBase64(bytes: Uint8Array): string {
@@ -24,7 +24,10 @@ export class SolanaExecutionSubmissionAdapter implements ExecutionSubmissionPort
     return createSolanaRpc(this.rpcUrl);
   }
 
-  async submitExecution(signedPayload: Uint8Array): Promise<{
+  async submitExecution(
+    signedPayload: Uint8Array,
+    plannedStepKinds: ReadonlyArray<ExecutionStep['kind']>,
+  ): Promise<{
     references: TransactionReference[];
     submittedAt: ClockTimestamp;
   }> {
@@ -34,13 +37,14 @@ export class SolanaExecutionSubmissionAdapter implements ExecutionSubmissionPort
 
     const signature = await rpc.sendTransaction(base64, { encoding: 'base64', skipPreflight: true }).send();
 
-    const reference: TransactionReference = {
-      signature: signature.toString(),
-      stepKind: 'swap-assets',
-    };
+    const sig = signature.toString();
+    const uniqueStepKinds = [...new Set(plannedStepKinds)];
+    const references: TransactionReference[] = uniqueStepKinds.map(
+      (stepKind) => ({ signature: sig, stepKind }),
+    );
 
     return {
-      references: [reference],
+      references,
       submittedAt: makeClockTimestamp(Date.now()),
     };
   }
