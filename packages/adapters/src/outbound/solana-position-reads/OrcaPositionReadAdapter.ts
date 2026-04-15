@@ -163,12 +163,12 @@ export class OrcaPositionReadAdapter implements SupportedPositionReadPort {
     }
 
     const now = Date.now();
-    for (const position of liquidityPositions) {
+    for (const entry of allEntries) {
       await this.db
         .insert(walletPositionOwnership)
         .values({
           walletId,
-          positionId: position.positionId,
+          positionId: makePositionId(entry.positionMint),
           firstSeenAt: now,
           lastSeenAt: now,
         })

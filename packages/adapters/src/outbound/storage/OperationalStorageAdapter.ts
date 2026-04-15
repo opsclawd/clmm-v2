@@ -32,6 +32,10 @@ function directionFromKind(kind: string) {
   throw new Error(`directionFromKind: unknown kind ${kind}`);
 }
 
+// Scan jobs run every 60s; keep two cycles of ownership history hot so
+// listActionableTriggers ignores stale ownership rows without dropping history.
+const OWNERSHIP_STALE_AFTER_MS = 2 * 60_000;
+
 export class OperationalStorageAdapter
   implements BreachEpisodeRepository, TriggerRepository, ExecutionRepository, ExecutionSessionRepository
 {
@@ -316,12 +320,17 @@ export class OperationalStorageAdapter
   }
 
   async listActionableTriggers(walletId: WalletId): Promise<ExitTrigger[]> {
+    const now = Date.now();
     const ownershipRows = await this.db
       .select()
       .from(walletPositionOwnership)
       .where(eq(walletPositionOwnership.walletId, walletId));
 
-    const positionIds = ownershipRows.map((row) => row.positionId);
+    const freshOwnershipRows = ownershipRows.filter(
+      (row) => now - row.lastSeenAt <= OWNERSHIP_STALE_AFTER_MS,
+    );
+
+    const positionIds = freshOwnershipRows.map((row) => row.positionId);
     if (positionIds.length === 0) {
       return [];
     }

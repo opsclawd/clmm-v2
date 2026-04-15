@@ -253,6 +253,60 @@ describe('OrcaPositionReadAdapter', () => {
       expect(upsertedRows[0]!.positionId).toBe(MOCK_POSITION_MINT);
     });
 
+    it('upserts ownership rows even when a whirlpool lookup fails for one scanned position', async () => {
+      const { fetchPositionsForOwner } = await import('@orca-so/whirlpools');
+
+      vi.mocked(fetchPositionsForOwner).mockResolvedValue([
+        {
+          address: 'PositionAddress123456789012345678901234',
+          isPositionBundle: false,
+          data: {
+            whirlpool: MOCK_WHIRLPOOL,
+            tickLowerIndex: -18304,
+            tickUpperIndex: -17956,
+            positionMint: MOCK_POSITION_MINT,
+          },
+        },
+        {
+          address: 'PositionAddress223456789012345678901234',
+          isPositionBundle: false,
+          data: {
+            whirlpool: 'missing-whirlpool-1',
+            tickLowerIndex: -1000,
+            tickUpperIndex: 1000,
+            positionMint: makePositionId('missing-position-1'),
+          },
+        },
+      ] as unknown as Awaited<ReturnType<typeof fetchPositionsForOwner>>);
+
+      const mockReader = new SolanaPositionSnapshotReader(mockRpcUrl);
+      mockReader.fetchWhirlpoolsBatched = vi.fn().mockResolvedValue(
+        new Map([[MOCK_WHIRLPOOL, { tickCurrentIndex: -18130 }]]),
+      );
+
+      const upsertedRows: Array<{ walletId: string; positionId: string }> = [];
+      const mockDbWithTracking = {
+        insert: () => ({
+          values: (row: { walletId: string; positionId: string }) => {
+            upsertedRows.push(row);
+            return {
+              onConflictDoUpdate: () => Promise.resolve(),
+            };
+          },
+        }),
+      };
+
+      const adapter = new OrcaPositionReadAdapter(mockRpcUrl, mockReader, mockDbWithTracking as never);
+      const positions = await adapter.listSupportedPositions(MOCK_WALLET);
+
+      expect(positions).toHaveLength(1);
+      expect(upsertedRows).toHaveLength(2);
+      expect(upsertedRows.map((row) => row.positionId)).toEqual([
+        MOCK_POSITION_MINT,
+        makePositionId('missing-position-1'),
+      ]);
+    });
+
     it('excludes positions whose whirlpool data is missing from the batched reader result', async () => {
       const { fetchPositionsForOwner } = await import('@orca-so/whirlpools');
 

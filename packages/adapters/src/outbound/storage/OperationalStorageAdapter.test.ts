@@ -156,14 +156,15 @@ function makeDbForFinalizeQualification(params: {
 
 describe('OperationalStorageAdapter', () => {
   it('scopes actionable triggers to positions owned by the requested wallet via DB lookup', async () => {
+    const now = Date.now();
     const adapter = new OperationalStorageAdapter(
       makeDbWithTriggerRows({
         ownershipRows: [
           {
             walletId: FIXTURE_WALLET_ID,
             positionId: FIXTURE_POSITION_IN_RANGE.positionId,
-            firstSeenAt: 1_000_000,
-            lastSeenAt: 1_000_000,
+            firstSeenAt: now - 1_000,
+            lastSeenAt: now - 1_000,
           },
         ],
         triggerRows: [
@@ -198,14 +199,15 @@ describe('OperationalStorageAdapter', () => {
   });
 
   it('does not return triggers whose breach episode is already closed', async () => {
+    const now = Date.now();
     const adapter = new OperationalStorageAdapter(
       makeDbWithTriggerRows({
         ownershipRows: [
           {
             walletId: FIXTURE_WALLET_ID,
             positionId: FIXTURE_POSITION_IN_RANGE.positionId,
-            firstSeenAt: 1_000_000,
-            lastSeenAt: 1_000_000,
+            firstSeenAt: now - 1_000,
+            lastSeenAt: now - 1_000,
           },
         ],
         triggerRows: [
@@ -226,6 +228,55 @@ describe('OperationalStorageAdapter', () => {
     const triggers = await adapter.listActionableTriggers(FIXTURE_WALLET_ID);
 
     expect(triggers).toHaveLength(0);
+  });
+
+  it('ignores ownership rows older than the freshness window', async () => {
+    const now = Date.now();
+    const adapter = new OperationalStorageAdapter(
+      makeDbWithTriggerRows({
+        ownershipRows: [
+          {
+            walletId: FIXTURE_WALLET_ID,
+            positionId: FIXTURE_POSITION_IN_RANGE.positionId,
+            firstSeenAt: now - 1_000,
+            lastSeenAt: now - 1_000,
+          },
+          {
+            walletId: FIXTURE_WALLET_ID,
+            positionId: leakedPositionId,
+            firstSeenAt: now - 10 * 60_000,
+            lastSeenAt: now - 10 * 60_000,
+          },
+        ],
+        triggerRows: [
+          {
+            triggerId: 'trigger-fresh',
+            positionId: FIXTURE_POSITION_IN_RANGE.positionId,
+            episodeId: 'episode-fresh',
+            directionKind: 'lower-bound-breach',
+            triggeredAt: makeClockTimestamp(now - 1_000),
+            confirmationEvaluatedAt: makeClockTimestamp(now - 900),
+            episodeStatus: 'open',
+          },
+          {
+            triggerId: 'trigger-stale',
+            positionId: leakedPositionId,
+            episodeId: 'episode-stale',
+            directionKind: 'upper-bound-breach',
+            triggeredAt: makeClockTimestamp(now - 10 * 60_000),
+            confirmationEvaluatedAt: makeClockTimestamp(now - 10 * 60_000 + 1),
+            episodeStatus: 'open',
+          },
+        ],
+      }),
+      new FakeIdGeneratorPort('storage'),
+    );
+
+    const triggers = await adapter.listActionableTriggers(FIXTURE_WALLET_ID);
+
+    expect(triggers).toHaveLength(1);
+    expect(triggers[0]?.triggerId).toBe('trigger-fresh');
+    expect(triggers[0]?.positionId).toBe(FIXTURE_POSITION_IN_RANGE.positionId);
   });
 
   it('returns empty array when no ownership rows exist for the wallet', async () => {

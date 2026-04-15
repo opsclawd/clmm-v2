@@ -225,6 +225,7 @@ export class SolanaExecutionPreparationAdapter implements ExecutionPreparationPo
     } catch (jupiterError) {
       const jupiterMessage =
         jupiterError instanceof Error ? jupiterError.message : 'unknown Jupiter swap preparation error';
+      // eslint-disable-next-line no-console
       console.error('Jupiter swap preparation failed, attempting Orca fallback:', jupiterError);
 
       try {
@@ -239,6 +240,7 @@ export class SolanaExecutionPreparationAdapter implements ExecutionPreparationPo
         return { instructions };
       } catch (orcaError) {
         const orcaMessage = orcaError instanceof Error ? orcaError.message : 'unknown Orca fallback error';
+        // eslint-disable-next-line no-console
         console.error('Orca fallback swap preparation failed:', orcaError);
         return {
           instructions: [],

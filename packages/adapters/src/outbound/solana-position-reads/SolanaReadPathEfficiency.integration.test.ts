@@ -51,6 +51,7 @@ describe('Solana read path efficiency integration', () => {
   it('uses the reduced RPC shape for list, detail, and trigger flows', async () => {
     const { fetchPositionsForOwner } = await import('@orca-so/whirlpools');
     const { fetchWhirlpool, getPositionAddress, fetchPosition } = await import('@orca-so/whirlpools-client');
+    const now = Date.now();
 
     // Arrange: wallet scan returns two positions on the same whirlpool
     vi.mocked(fetchPositionsForOwner).mockResolvedValue([
@@ -140,8 +141,8 @@ describe('Solana read path efficiency integration', () => {
             ownershipSelectCalls++;
             return {
               where: async () => [
-                { walletId: MOCK_WALLET, positionId: MOCK_POSITION_MINT, firstSeenAt: 1, lastSeenAt: 1 },
-                { walletId: MOCK_WALLET, positionId: MOCK_POSITION_MINT_2, firstSeenAt: 1, lastSeenAt: 1 },
+                { walletId: MOCK_WALLET, positionId: MOCK_POSITION_MINT, firstSeenAt: now - 1_000, lastSeenAt: now - 1_000 },
+                { walletId: MOCK_WALLET, positionId: MOCK_POSITION_MINT_2, firstSeenAt: now - 1_000, lastSeenAt: now - 1_000 },
               ],
             };
           }
