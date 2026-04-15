@@ -1,53 +1,66 @@
 import { describe, expect, it, vi } from 'vitest';
-import { navigateRoute, normalizeExpoRouterRoute } from './webNavigation';
+import { navigateRoute } from './webNavigation';
 
 describe('webNavigation', () => {
-  it('normalizes expo router group paths to concrete web paths', () => {
-    expect(normalizeExpoRouterRoute('/(tabs)/positions')).toBe('/positions');
-    expect(normalizeExpoRouterRoute('/position/abc')).toBe('/position/abc');
-  });
-
-  it('uses hard browser navigation for mobile web replaces', () => {
+  it('uses router.push for push method', () => {
     const router = {
       push: vi.fn(),
-      replace: vi.fn(),
-    };
-    const location = {
-      assign: vi.fn(),
       replace: vi.fn(),
     };
 
     navigateRoute({
       router,
-      location,
-      path: '/(tabs)/positions',
-      method: 'replace',
-      isMobileWeb: true,
-    });
-
-    expect(location.replace).toHaveBeenCalledWith('/positions');
-    expect(router.replace).not.toHaveBeenCalled();
-  });
-
-  it('uses router push on non-mobile web navigations', () => {
-    const router = {
-      push: vi.fn(),
-      replace: vi.fn(),
-    };
-    const location = {
-      assign: vi.fn(),
-      replace: vi.fn(),
-    };
-
-    navigateRoute({
-      router,
-      location,
       path: '/position/abc',
       method: 'push',
-      isMobileWeb: false,
     });
 
     expect(router.push).toHaveBeenCalledWith('/position/abc');
-    expect(location.assign).not.toHaveBeenCalled();
+    expect(router.replace).not.toHaveBeenCalled();
+  });
+
+  it('uses router.replace for replace method', () => {
+    const router = {
+      push: vi.fn(),
+      replace: vi.fn(),
+    };
+
+    navigateRoute({
+      router,
+      path: '/(tabs)/positions',
+      method: 'replace',
+    });
+
+    expect(router.replace).toHaveBeenCalledWith('/(tabs)/positions');
+    expect(router.push).not.toHaveBeenCalled();
+  });
+
+  it('preserves expo router group paths without normalization', () => {
+    const router = {
+      push: vi.fn(),
+      replace: vi.fn(),
+    };
+
+    navigateRoute({
+      router,
+      path: '/(tabs)/positions',
+      method: 'push',
+    });
+
+    expect(router.push).toHaveBeenCalledWith('/(tabs)/positions');
+  });
+
+  it('preserves dynamic route params', () => {
+    const router = {
+      push: vi.fn(),
+      replace: vi.fn(),
+    };
+
+    navigateRoute({
+      router,
+      path: '/signing/attempt-123?previewId=prev-456&triggerId=trig-789',
+      method: 'push',
+    });
+
+    expect(router.push).toHaveBeenCalledWith('/signing/attempt-123?previewId=prev-456&triggerId=trig-789');
   });
 });
