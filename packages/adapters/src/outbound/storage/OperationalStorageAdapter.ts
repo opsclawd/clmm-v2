@@ -1,6 +1,6 @@
 import { and, eq, inArray } from 'drizzle-orm';
 import type { Db } from './db.js';
-import { breachEpisodes, exitTriggers, executionAttempts, executionSessions, executionPreviews, preparedPayloads } from './schema/index.js';
+import { breachEpisodes, exitTriggers, executionAttempts, executionSessions, executionPreviews, preparedPayloads, walletPositionOwnership } from './schema/index.js';
 import type {
   BreachEpisodeRepository,
   EpisodeTransition,
@@ -9,7 +9,6 @@ import type {
   ExecutionRepository,
   ExecutionSessionRepository,
   IdGeneratorPort,
-  SupportedPositionReadPort,
   StoredExecutionAttempt,
 } from '@clmm/application';
 import type {
@@ -39,7 +38,6 @@ export class OperationalStorageAdapter
   constructor(
     private readonly db: Db,
     private readonly ids: IdGeneratorPort,
-    private readonly positionReadPort: SupportedPositionReadPort,
   ) {}
 
   // --- BreachEpisodeRepository ---
@@ -318,8 +316,12 @@ export class OperationalStorageAdapter
   }
 
   async listActionableTriggers(walletId: WalletId): Promise<ExitTrigger[]> {
-    const positions = await this.positionReadPort.listSupportedPositions(walletId);
-    const positionIds = positions.map((position) => position.positionId);
+    const ownershipRows = await this.db
+      .select()
+      .from(walletPositionOwnership)
+      .where(eq(walletPositionOwnership.walletId, walletId));
+
+    const positionIds = ownershipRows.map((row) => row.positionId);
     if (positionIds.length === 0) {
       return [];
     }
