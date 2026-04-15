@@ -17,6 +17,7 @@ function makeAlert(overrides: Partial<ActionableAlertDto> = {}): ActionableAlert
     triggerId: brand<ActionableAlertDto['triggerId']>('trigger-1'),
     positionId: brand<ActionableAlertDto['positionId']>('position-1'),
     breachDirection: { kind: 'lower-bound-breach' },
+    triggeredAt: brand<ActionableAlertDto['triggeredAt']>('2026-04-15T00:00:00.000Z'),
     ...overrides,
   };
 }
