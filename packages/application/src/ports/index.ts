@@ -20,6 +20,7 @@ import type {
   ExecutionLifecycleState,
   TransactionReference,
   SwapInstruction,
+  ExecutionStep,
 } from '@clmm/domain';
 import type {
   HistoryEvent,
@@ -65,7 +66,10 @@ export interface ExecutionPreparationPort {
 }
 
 export interface ExecutionSubmissionPort {
-  submitExecution(signedPayload: Uint8Array): Promise<{
+  submitExecution(
+    signedPayload: Uint8Array,
+    plannedStepKinds: ReadonlyArray<ExecutionStep['kind']>,
+  ): Promise<{
     references: TransactionReference[];
     submittedAt: ClockTimestamp;
   }>;
