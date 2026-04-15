@@ -1,5 +1,6 @@
 import { useEffect, useRef } from 'react';
-import { useRootNavigationState, useRouter } from 'expo-router';
+import { Platform } from 'react-native';
+import { Redirect, useRootNavigationState, useRouter } from 'expo-router';
 import { navigateRoute } from '../src/platform/webNavigation';
 
 type RootNavigationState = {
@@ -14,7 +15,7 @@ export default function IndexRoute() {
   const isReady = !!rootNavigationState?.key;
 
   useEffect(() => {
-    if (isReady && !hasNavigated.current) {
+    if (Platform.OS === 'web' && isReady && !hasNavigated.current) {
       hasNavigated.current = true;
       navigateRoute({ router, path: '/connect', method: 'replace' });
     }
@@ -24,5 +25,9 @@ export default function IndexRoute() {
     return null;
   }
 
-  return null;
+  if (Platform.OS === 'web') {
+    return null;
+  }
+
+  return <Redirect href="/connect" />;
 }
