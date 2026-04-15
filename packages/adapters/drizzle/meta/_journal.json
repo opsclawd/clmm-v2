@@ -43,6 +43,13 @@
       "when": 1775500000000,
       "tag": "0005_wallet_position_ownership",
       "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "7",
+      "when": 1776214266073,
+      "tag": "0006_daffy_malice",
+      "breakpoints": true
     }
   ]
 }

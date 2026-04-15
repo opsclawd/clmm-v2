@@ -71,6 +71,31 @@ describe('NotificationDispatchJobHandler', () => {
     ).toBe(true);
   });
 
+  it('does not record delivery timing when the notification adapter only records intent', async () => {
+    const intentOnlyPort = {
+      async sendActionableAlert(): Promise<{ deliveredAt: null }> {
+        return { deliveredAt: null };
+      },
+    } as unknown as FakeNotificationPort;
+
+    const intentOnlyHandler = new NotificationDispatchJobHandler(
+      intentOnlyPort,
+      dedupPort,
+      observability,
+      clock,
+    );
+
+    await intentOnlyHandler.handle({
+      triggerId: 'trigger-intent-only',
+      walletId: 'wallet-intent-only',
+      positionId: 'position-intent-only',
+      directionKind: 'lower-bound-breach',
+    });
+
+    expect(observability.deliveryTimings).toHaveLength(0);
+    expect(await dedupPort.hasDispatched('trigger-intent-only')).toBe(true);
+  });
+
   it('catches notification errors and logs them without rethrowing', async () => {
     // Create a port that throws on sendActionableAlert
     const failingPort = {

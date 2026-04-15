@@ -50,7 +50,7 @@ export class NotificationDispatchJobHandler {
         notificationDedupPort: this.dedupPort,
       });
 
-      if (result.dispatched) {
+      if (result.deliveredAt !== null) {
         const completedAt = this.clock.now();
         this.observability.recordDeliveryTiming({
           triggerId: data.triggerId,
