@@ -1,5 +1,6 @@
 import { useEffect, useRef } from 'react';
-import { Redirect, useRootNavigationState } from 'expo-router';
+import { useRootNavigationState } from 'expo-router';
+import { Platform } from 'react-native';
 import { addDebugLog } from './_layout';
 
 type RootNavigationState = {
@@ -19,7 +20,11 @@ export default function IndexRoute() {
   useEffect(() => {
     if (isReady && !hasNavigated.current) {
       hasNavigated.current = true;
-      addDebugLog(`IndexRoute: navState ready, hasNavigated set to true`);
+      addDebugLog(`IndexRoute: navState ready, attempting window.location redirect to /connect`);
+      if (Platform.OS === 'web' && typeof window !== 'undefined') {
+        addDebugLog(`IndexRoute: calling window.location.replace('/connect')`);
+        window.location.replace('/connect');
+      }
     }
   }, [isReady]);
 
@@ -28,6 +33,6 @@ export default function IndexRoute() {
     return null;
   }
 
-  addDebugLog('IndexRoute: navState ready, rendering Redirect to /connect');
-  return <Redirect href="/connect" />;
+  addDebugLog('IndexRoute: navState ready, rendering null (navigation handled by effect)');
+  return null;
 }
