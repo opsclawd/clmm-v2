@@ -1,4 +1,4 @@
-import { View, Text, FlatList, TouchableOpacity } from 'react-native';
+import { View, Text, FlatList, Pressable } from 'react-native';
 import type { PositionSummaryDto } from '@clmm/application/public';
 import { colors } from '../design-system/index.js';
 import { typography } from '../design-system/index.js';
@@ -133,8 +133,9 @@ function ConnectedPositionsList({
       style={{ marginTop: 12 }}
       removeClippedSubviews={false}
       renderItem={({ item }) => (
-        <TouchableOpacity
+        <Pressable
           onPress={() => onSelectPosition?.(item.positionId)}
+          accessibilityRole="button"
           style={{
             padding: 16,
             backgroundColor: colors.surface,
@@ -174,7 +175,7 @@ function ConnectedPositionsList({
             </View>
             <RangeStatusBadge rangeStateKind={item.rangeStatusKind} />
           </View>
-        </TouchableOpacity>
+        </Pressable>
       )}
     />
   );

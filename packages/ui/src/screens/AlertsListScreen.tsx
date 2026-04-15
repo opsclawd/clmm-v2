@@ -1,4 +1,4 @@
-import { ActivityIndicator, View, Text, FlatList, TouchableOpacity } from 'react-native';
+import { ActivityIndicator, View, Text, FlatList, Pressable } from 'react-native';
 import type { ActionableAlertDto } from '@clmm/application/public';
 import { colors } from '../design-system/index.js';
 import { typography } from '../design-system/index.js';
@@ -84,8 +84,9 @@ export function AlertsListScreen({ alerts, alertsLoading, alertsError, onSelectA
             style={{ marginTop: 12 }}
             removeClippedSubviews={false}
             renderItem={({ item }) => (
-              <TouchableOpacity
+              <Pressable
                 onPress={() => onSelectAlert?.(item.triggerId, item.positionId)}
+                accessibilityRole="button"
                 style={{ marginBottom: 12 }}
               >
                 <View style={{
@@ -109,7 +110,7 @@ export function AlertsListScreen({ alerts, alertsLoading, alertsError, onSelectA
                   </View>
                   <DirectionalPolicyCard direction={item.breachDirection} />
                 </View>
-              </TouchableOpacity>
+              </Pressable>
             )}
           />
         </>
