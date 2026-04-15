@@ -5,7 +5,7 @@ import type {
   ClockPort,
   IdGeneratorPort,
 } from '../../ports/index.js';
-import type { TransactionReference } from '@clmm/domain';
+import type { TransactionReference, ExecutionStep } from '@clmm/domain';
 
 export type SubmitExecutionAttemptResult =
   | { kind: 'submitted'; references: TransactionReference[] }
@@ -47,7 +47,19 @@ export async function submitExecutionAttempt(params: {
     return { kind: 'expired', currentState: 'expired' };
   }
 
-  const { references } = await submissionPort.submitExecution(signedPayload);
+  let plannedStepKinds: ReadonlyArray<ExecutionStep['kind']> = ['swap-assets'];
+  if (attempt.previewId) {
+    const previewRecord = await executionRepo.getPreview(attempt.previewId);
+    if (previewRecord) {
+      plannedStepKinds = previewRecord.preview.plan.steps.map((s) => s.kind);
+    } else {
+      console.warn(
+        `submitExecutionAttempt: preview ${attempt.previewId} not found for attempt ${attemptId}, falling back to swap-assets`,
+      );
+    }
+  }
+
+  const { references } = await submissionPort.submitExecution(signedPayload, plannedStepKinds);
 
   await executionRepo.saveAttempt({
     ...attempt,
