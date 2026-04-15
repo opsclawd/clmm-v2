@@ -237,4 +237,91 @@ describe('SubmitExecutionAttempt', () => {
 
     expect(result.kind).toBe('invalid-state');
   });
+
+  it('passes planned step kinds from preview to submitExecution', async () => {
+    const clock = new FakeClockPort();
+    const ids = new FakeIdGeneratorPort();
+    const executionRepo = new FakeExecutionRepository();
+    const submissionPort = new FakeExecutionSubmissionPort();
+    const historyRepo = new FakeExecutionHistoryRepository();
+    const submitSpy = vi.spyOn(submissionPort, 'submitExecution');
+
+    const { previewId } = await executionRepo.savePreview(
+      FIXTURE_POSITION_ID,
+      {
+        plan: {
+          steps: [
+            { kind: 'remove-liquidity' },
+            { kind: 'collect-fees' },
+            { kind: 'swap-assets', instruction: { fromAsset: 'SOL', toAsset: 'USDC', policyReason: 'test' } },
+          ],
+          postExitPosture: { kind: 'exit-to-usdc' },
+          swapInstruction: { fromAsset: 'SOL', toAsset: 'USDC', policyReason: 'test' },
+        },
+        freshness: { kind: 'fresh', expiresAt: Date.now() + 60_000 },
+        estimatedAt: Date.now(),
+      },
+      LOWER_BOUND_BREACH,
+    );
+
+    const attempt: StoredExecutionAttempt = {
+      attemptId: 'attempt-with-preview',
+      positionId: FIXTURE_POSITION_ID,
+      breachDirection: LOWER_BOUND_BREACH,
+      lifecycleState: { kind: 'awaiting-signature' },
+      completedSteps: [],
+      transactionReferences: [],
+      previewId,
+    };
+    await executionRepo.saveAttempt(attempt);
+
+    await submitExecutionAttempt({
+      attemptId: 'attempt-with-preview',
+      signedPayload: new Uint8Array([1, 2, 3]),
+      executionRepo,
+      submissionPort,
+      historyRepo,
+      clock,
+      ids,
+    });
+
+    expect(submitSpy).toHaveBeenCalledWith(
+      expect.any(Uint8Array),
+      ['remove-liquidity', 'collect-fees', 'swap-assets'],
+    );
+  });
+
+  it('falls back to swap-assets when attempt has no previewId', async () => {
+    const clock = new FakeClockPort();
+    const ids = new FakeIdGeneratorPort();
+    const executionRepo = new FakeExecutionRepository();
+    const submissionPort = new FakeExecutionSubmissionPort();
+    const historyRepo = new FakeExecutionHistoryRepository();
+    const submitSpy = vi.spyOn(submissionPort, 'submitExecution');
+
+    const attempt: StoredExecutionAttempt = {
+      attemptId: 'attempt-no-preview',
+      positionId: FIXTURE_POSITION_ID,
+      breachDirection: LOWER_BOUND_BREACH,
+      lifecycleState: { kind: 'awaiting-signature' },
+      completedSteps: [],
+      transactionReferences: [],
+    };
+    await executionRepo.saveAttempt(attempt);
+
+    await submitExecutionAttempt({
+      attemptId: 'attempt-no-preview',
+      signedPayload: new Uint8Array([1, 2, 3]),
+      executionRepo,
+      submissionPort,
+      historyRepo,
+      clock,
+      ids,
+    });
+
+    expect(submitSpy).toHaveBeenCalledWith(
+      expect.any(Uint8Array),
+      ['swap-assets'],
+    );
+  });
 });
