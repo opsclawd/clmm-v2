@@ -8,6 +8,7 @@ export { NativeNotificationPermissionAdapter } from './outbound/capabilities/Nat
 export { WebNotificationPermissionAdapter } from './outbound/capabilities/WebNotificationPermissionAdapter';
 
 // Server-side adapters (imported by NestJS modules internally — re-exported for completeness)
+export { SolanaPositionSnapshotReader } from './outbound/solana-position-reads/SolanaPositionSnapshotReader';
 export { OrcaPositionReadAdapter } from './outbound/solana-position-reads/OrcaPositionReadAdapter';
 export { SolanaRangeObservationAdapter } from './outbound/solana-position-reads/SolanaRangeObservationAdapter';
 export { JupiterQuoteAdapter } from './outbound/swap-execution/JupiterQuoteAdapter';
