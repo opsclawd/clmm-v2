@@ -25,6 +25,7 @@ import type {
   BreachDirection,
 } from '@clmm/domain';
 import { LOWER_BOUND_BREACH, UPPER_BOUND_BREACH, makeClockTimestamp } from '@clmm/domain';
+import { BREACH_SCAN_INTERVAL_MS } from '../../inbound/jobs/breach-scan-schedule.js';
 
 function directionFromKind(kind: string) {
   if (kind === 'lower-bound-breach') return LOWER_BOUND_BREACH;
@@ -32,9 +33,9 @@ function directionFromKind(kind: string) {
   throw new Error(`directionFromKind: unknown kind ${kind}`);
 }
 
-// Scan jobs run every 60s; keep two cycles of ownership history hot so
+// Scan jobs run every 5m; keep two cycles of ownership history hot so
 // listActionableTriggers ignores stale ownership rows without dropping history.
-const OWNERSHIP_STALE_AFTER_MS = 2 * 60_000;
+const OWNERSHIP_STALE_AFTER_MS = 2 * BREACH_SCAN_INTERVAL_MS;
 
 export class OperationalStorageAdapter
   implements BreachEpisodeRepository, TriggerRepository, ExecutionRepository, ExecutionSessionRepository

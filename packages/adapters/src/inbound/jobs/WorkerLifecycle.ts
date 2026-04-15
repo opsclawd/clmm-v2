@@ -4,6 +4,7 @@ import { BreachScanJobHandler } from './BreachScanJobHandler.js';
 import { NotificationDispatchJobHandler } from './NotificationDispatchJobHandler.js';
 import { ReconciliationJobHandler } from './ReconciliationJobHandler.js';
 import { TriggerQualificationJobHandler } from './TriggerQualificationJobHandler.js';
+import { BREACH_SCAN_CRON } from './breach-scan-schedule.js';
 import { PG_BOSS_INSTANCE } from './tokens.js';
 
 @Injectable()
@@ -81,7 +82,7 @@ export class WorkerLifecycle implements OnModuleInit, OnModuleDestroy {
       },
     );
 
-    await this.boss.schedule(BreachScanJobHandler.JOB_NAME, '*/5 * * * *', {}, {
+    await this.boss.schedule(BreachScanJobHandler.JOB_NAME, BREACH_SCAN_CRON, {}, {
       tz: 'UTC',
     });
 

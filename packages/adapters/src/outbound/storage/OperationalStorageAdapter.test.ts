@@ -244,8 +244,8 @@ describe('OperationalStorageAdapter', () => {
           {
             walletId: FIXTURE_WALLET_ID,
             positionId: leakedPositionId,
-            firstSeenAt: now - 10 * 60_000,
-            lastSeenAt: now - 10 * 60_000,
+            firstSeenAt: now - 11 * 60_000,
+            lastSeenAt: now - 11 * 60_000,
           },
         ],
         triggerRows: [
@@ -263,8 +263,8 @@ describe('OperationalStorageAdapter', () => {
             positionId: leakedPositionId,
             episodeId: 'episode-stale',
             directionKind: 'upper-bound-breach',
-            triggeredAt: makeClockTimestamp(now - 10 * 60_000),
-            confirmationEvaluatedAt: makeClockTimestamp(now - 10 * 60_000 + 1),
+            triggeredAt: makeClockTimestamp(now - 11 * 60_000),
+            confirmationEvaluatedAt: makeClockTimestamp(now - 11 * 60_000 + 1),
             episodeStatus: 'open',
           },
         ],
