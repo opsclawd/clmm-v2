@@ -98,16 +98,21 @@ export class SolanaPositionSnapshotReader {
       return results;
     }
 
-    const fetches = uniqueAddresses.map(async (addr) => {
-      try {
-        const whirlpoolAccount = await fetchWhirlpool(rpc, address(addr));
-        results.set(addr, { tickCurrentIndex: whirlpoolAccount.data.tickCurrentIndex });
-      } catch {
-        // Skip failed fetches — positions referencing this pool will be excluded
-      }
-    });
+    const WHIRLPOOL_FETCH_BATCH_SIZE = 2;
 
-    await Promise.all(fetches);
+    for (let i = 0; i < uniqueAddresses.length; i += WHIRLPOOL_FETCH_BATCH_SIZE) {
+      const batch = uniqueAddresses.slice(i, i + WHIRLPOOL_FETCH_BATCH_SIZE);
+
+      await Promise.all(batch.map(async (addr) => {
+        try {
+          const whirlpoolAccount = await fetchWhirlpool(rpc, address(addr));
+          results.set(addr, { tickCurrentIndex: whirlpoolAccount.data.tickCurrentIndex });
+        } catch {
+          // Skip failed fetches — positions referencing this pool will be excluded.
+        }
+      }));
+    }
+
     return results;
   }
 }

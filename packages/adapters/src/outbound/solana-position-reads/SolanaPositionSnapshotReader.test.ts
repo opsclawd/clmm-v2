@@ -247,5 +247,37 @@ describe('SolanaPositionSnapshotReader', () => {
 
       expect(result.size).toBe(0);
     });
+
+    it('limits concurrent whirlpool fetches while still returning all successful results', async () => {
+      const { fetchWhirlpool } = await import('@orca-so/whirlpools-client');
+      const reader = new SolanaPositionSnapshotReader('https://api.mainnet-beta.solana.com');
+      const rpc = {} as ReturnType<typeof createSolanaRpc>;
+
+      let inFlight = 0;
+      let maxInFlight = 0;
+
+      vi.mocked(fetchWhirlpool).mockImplementation(async (_rpc: unknown, addr: { toString: () => string }) => {
+        inFlight += 1;
+        maxInFlight = Math.max(maxInFlight, inFlight);
+
+        await new Promise((resolve) => setTimeout(resolve, 5));
+
+        inFlight -= 1;
+        return {
+          data: { tickCurrentIndex: Number(addr.toString().slice(-1)) },
+        } as never;
+      });
+
+      const result = await reader.fetchWhirlpoolsBatched(rpc, [
+        '7qbRF6YsyGuLUVs6Y1q64bdVrfe4ZcUUz1JRdoVNUJnm',
+        '8qbRF6YsyGuLUVs6Y1q64bdVrfe4ZcUUz1JRdoVNUJno',
+        '9qbRF6YsyGuLUVs6Y1q64bdVrfe4ZcUUz1JRdoVNUJnp',
+        'AqbRF6YsyGuLUVs6Y1q64bdVrfe4ZcUUz1JRdoVNUJnq',
+        'BqbRF6YsyGuLUVs6Y1q64bdVrfe4ZcUUz1JRdoVNUJnr',
+      ]);
+
+      expect(result.size).toBe(5);
+      expect(maxInFlight).toBeLessThanOrEqual(2);
+    });
   });
 });
