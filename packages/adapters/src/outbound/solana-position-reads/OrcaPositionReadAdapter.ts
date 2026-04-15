@@ -183,6 +183,25 @@ export class OrcaPositionReadAdapter implements SupportedPositionReadPort {
 
   async getPosition(walletId: WalletId, positionId: PositionId): Promise<LiquidityPosition | null> {
     const rpc = this.getRpc();
-    return this.snapshotReader.fetchSinglePosition(rpc, positionId, walletId);
+    const position = await this.snapshotReader.fetchSinglePosition(rpc, positionId, walletId);
+    if (!position) {
+      return null;
+    }
+
+    const now = Date.now();
+    await this.db
+      .insert(walletPositionOwnership)
+      .values({
+        walletId,
+        positionId,
+        firstSeenAt: now,
+        lastSeenAt: now,
+      })
+      .onConflictDoUpdate({
+        target: [walletPositionOwnership.walletId, walletPositionOwnership.positionId],
+        set: { lastSeenAt: now },
+      });
+
+    return position;
   }
 }

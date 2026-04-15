@@ -346,13 +346,28 @@ describe('OrcaPositionReadAdapter', () => {
         monitoringReadiness: { kind: 'active' },
       });
 
-      const adapter = new OrcaPositionReadAdapter(mockRpcUrl, mockReader, mockDb as never);
+      const insertedRows: Array<{ walletId: string; positionId: string }> = [];
+      const mockDbWithTracking = {
+        insert: () => ({
+          values: (row: { walletId: string; positionId: string }) => {
+            insertedRows.push(row);
+            return {
+              onConflictDoUpdate: () => Promise.resolve(),
+            };
+          },
+        }),
+      };
+
+      const adapter = new OrcaPositionReadAdapter(mockRpcUrl, mockReader, mockDbWithTracking as never);
       const result = await adapter.getPosition(MOCK_WALLET, makePositionId(MOCK_POSITION_MINT));
 
       expect(result).not.toBeNull();
       expect(result?.positionId).toBe(MOCK_POSITION_MINT);
       expect(result?.walletId).toBe(MOCK_WALLET);
       expect(result?.rangeState.kind).toBe('in-range');
+      expect(insertedRows).toHaveLength(1);
+      expect(insertedRows[0]?.walletId).toBe(MOCK_WALLET);
+      expect(insertedRows[0]?.positionId).toBe(makePositionId(MOCK_POSITION_MINT));
       // eslint-disable-next-line @typescript-eslint/unbound-method
       const fetchSinglePosition = mockReader.fetchSinglePosition;
       expect(fetchSinglePosition).toHaveBeenCalledOnce();
