@@ -9,6 +9,7 @@ import { WalletController } from './WalletController.js';
 import { OperationalStorageAdapter } from '../../outbound/storage/OperationalStorageAdapter.js';
 import { OffChainHistoryStorageAdapter } from '../../outbound/storage/OffChainHistoryStorageAdapter.js';
 import { MonitoredWalletStorageAdapter } from '../../outbound/storage/MonitoredWalletStorageAdapter.js';
+import { SolanaPositionSnapshotReader } from '../../outbound/solana-position-reads/SolanaPositionSnapshotReader.js';
 import { OrcaPositionReadAdapter } from '../../outbound/solana-position-reads/OrcaPositionReadAdapter.js';
 import { JupiterQuoteAdapter } from '../../outbound/swap-execution/JupiterQuoteAdapter.js';
 import { SolanaExecutionPreparationAdapter } from '../../outbound/swap-execution/SolanaExecutionPreparationAdapter.js';
@@ -43,11 +44,12 @@ const systemIds: IdGeneratorPort = {
   generateId: () => `${Date.now()}-${++_idCounter}`,
 };
 
-const orcaPositionRead = new OrcaPositionReadAdapter(rpcUrl);
-const operationalStorage = new OperationalStorageAdapter(db, systemIds, orcaPositionRead);
+const snapshotReader = new SolanaPositionSnapshotReader(rpcUrl);
+const orcaPositionRead = new OrcaPositionReadAdapter(rpcUrl, snapshotReader, db);
+const operationalStorage = new OperationalStorageAdapter(db, systemIds);
 const historyStorage = new OffChainHistoryStorageAdapter(db);
 const jupiterQuote = new JupiterQuoteAdapter();
-const solanaPreparation = new SolanaExecutionPreparationAdapter(rpcUrl);
+const solanaPreparation = new SolanaExecutionPreparationAdapter(rpcUrl, snapshotReader);
 const solanaSubmission = new SolanaExecutionSubmissionAdapter(rpcUrl);
 const monitoredWalletStorage = new MonitoredWalletStorageAdapter(db);
 

@@ -2,6 +2,7 @@ import { describe, it, expect, vi } from 'vitest';
 import type { Instruction } from '@solana/kit';
 import type { ExecutionPlan, PoolId, WalletId } from '@clmm/domain';
 import { SolanaExecutionPreparationAdapter } from './SolanaExecutionPreparationAdapter';
+import { SolanaPositionSnapshotReader } from '../solana-position-reads/SolanaPositionSnapshotReader';
 
 const MOCK_WALLET = '4Nd1mBQtrMJVYVfKf2PJy9NZUZdTAsp7D4xWLs4gDB4T' as WalletId;
 const MOCK_POOL = '7qbRF6YsyGuLUVs6Y1q64bdVrfe4ZcUUz1JRdoVNUJnm' as unknown as PoolId;
@@ -15,11 +16,20 @@ vi.mock('@orca-so/whirlpools-client', () => ({
   fetchWhirlpool: vi.fn(),
 }));
 
+vi.mock('../solana-position-reads/SolanaPositionSnapshotReader', () => ({
+  SolanaPositionSnapshotReader: vi.fn().mockImplementation(() => ({
+    fetchSinglePosition: vi.fn(),
+    fetchWhirlpoolsBatched: vi.fn(),
+    getRpc: vi.fn(() => ({})),
+  })),
+}));
+
 describe('SolanaExecutionPreparationAdapter', () => {
   it('falls back to Orca swap instructions when Jupiter quote is unavailable', async () => {
     vi.spyOn(console, 'error').mockImplementation(() => {});
 
-    const adapter = new SolanaExecutionPreparationAdapter('https://api.mainnet-beta.solana.com');
+    const mockReader = new SolanaPositionSnapshotReader('https://api.mainnet-beta.solana.com');
+    const adapter = new SolanaExecutionPreparationAdapter('https://api.mainnet-beta.solana.com', mockReader);
     const internal = adapter as unknown as {
       getJupiterQuote: (inputMint: string, outputMint: string, amount: string) => Promise<unknown>;
       buildSwapInstructions: (
@@ -64,7 +74,7 @@ describe('SolanaExecutionPreparationAdapter', () => {
     expect(result.instructions).toEqual([fallbackInstruction]);
   });
 
-  it('fetchPositionData returns the real walletId, not the position mint', async () => {
+  it('fetchSinglePosition on reader returns the real walletId, not the position mint', async () => {
     const whirlpoolsClient = await import('@orca-so/whirlpools-client');
 
     const mockPositionMint = '9WzDXwBbmkg8ZTbNMqUxvQRAyrZzDsGYdLVL9zYtAWWM';
@@ -92,16 +102,18 @@ describe('SolanaExecutionPreparationAdapter', () => {
       },
     } as unknown as Awaited<ReturnType<typeof whirlpoolsClient.fetchWhirlpool>>);
 
-    const adapter = new SolanaExecutionPreparationAdapter('https://api.mainnet-beta.solana.com');
-    const internal = adapter as unknown as {
-      fetchPositionData: (
-        rpc: unknown,
-        positionId: string,
-        walletId: WalletId,
-      ) => Promise<{ walletId: string } | null>;
-    };
+    const mockReader = new SolanaPositionSnapshotReader('https://api.mainnet-beta.solana.com');
+    vi.mocked(mockReader.fetchSinglePosition).mockResolvedValue({
+      positionId: mockPositionMint as any,
+      walletId: MOCK_WALLET,
+      poolId: mockWhirlpoolAddress as any,
+      bounds: { lowerBound: -100, upperBound: 100 },
+      lastObservedAt: { timestamp: Date.now() } as any,
+      rangeState: { kind: 'in-range', currentPrice: 50 },
+      monitoringReadiness: { kind: 'active' } as any,
+    } as any);
 
-    const result = await internal.fetchPositionData(mockRpc, mockPositionMint, MOCK_WALLET);
+    const result = await mockReader.fetchSinglePosition(mockRpc as any, mockPositionMint as any, MOCK_WALLET);
 
     expect(result).not.toBeNull();
     expect(result!.walletId).toBe(MOCK_WALLET);
