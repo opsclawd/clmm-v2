@@ -52,10 +52,6 @@ export async function submitExecutionAttempt(params: {
     const previewRecord = await executionRepo.getPreview(attempt.previewId);
     if (previewRecord) {
       plannedStepKinds = previewRecord.preview.plan.steps.map((s) => s.kind);
-    } else {
-      console.warn(
-        `submitExecutionAttempt: preview ${attempt.previewId} not found for attempt ${attemptId}, falling back to swap-assets`,
-      );
     }
   }
 

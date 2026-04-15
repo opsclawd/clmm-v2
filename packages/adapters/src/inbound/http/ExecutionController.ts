@@ -38,6 +38,7 @@ import type {
   PositionId,
   BreachDirection,
   ExecutionAttempt,
+  ExecutionStep,
   HistoryEvent,
   ExecutionLifecycleState,
   TransactionReference,
@@ -348,7 +349,15 @@ export class ExecutionController {
       throw new ConflictException(`Attempt ${attemptId} has no prepared payload`);
     }
 
-    const { references } = await this.submissionPort.submitExecution(signedPayload);
+    let plannedStepKinds: ReadonlyArray<ExecutionStep['kind']> = ['swap-assets'];
+    if (attempt.previewId) {
+      const previewRecord = await this.executionRepo.getPreview(attempt.previewId);
+      if (previewRecord) {
+        plannedStepKinds = previewRecord.preview.plan.steps.map((s) => s.kind);
+      }
+    }
+
+    const { references } = await this.submissionPort.submitExecution(signedPayload, plannedStepKinds);
 
     await this.executionRepo.saveAttempt({
       ...attempt,
