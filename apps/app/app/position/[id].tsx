@@ -4,6 +4,7 @@ import { PositionDetailScreen } from '@clmm/ui';
 import { Text, View } from 'react-native';
 import { useStore } from 'zustand';
 import { fetchPositionDetail } from '../../src/api/positions';
+import { buildPreviewPath } from '../../src/platform/appRoutes';
 import { navigateRoute } from '../../src/platform/webNavigation';
 import { walletSessionStore } from '../../src/state/walletSessionStore';
 
@@ -53,7 +54,7 @@ export default function PositionDetailRoute() {
       onViewPreview={(resolvedTriggerId: string) =>
         navigateRoute({
           router,
-          path: `/preview/${alertTriggerId ?? resolvedTriggerId}`,
+          path: buildPreviewPath({ triggerId: alertTriggerId ?? resolvedTriggerId }),
           method: 'push',
         })
       }

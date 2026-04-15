@@ -3,6 +3,7 @@ import { useQuery } from '@tanstack/react-query';
 import { AlertsListScreen } from '@clmm/ui';
 import { useStore } from 'zustand';
 import { fetchAlerts } from '../../src/api/alerts';
+import { buildPositionDetailPath } from '../../src/platform/appRoutes';
 import { walletSessionStore } from '../../src/state/walletSessionStore';
 import { navigateRoute } from '../../src/platform/webNavigation';
 
@@ -27,7 +28,7 @@ export default function AlertsRoute() {
       onSelectAlert={(triggerId: string, positionId: string) => {
         navigateRoute({
           router,
-          path: `/position/${positionId}?triggerId=${encodeURIComponent(triggerId)}`,
+          path: buildPositionDetailPath({ positionId, triggerId }),
           method: 'push',
         });
       }}

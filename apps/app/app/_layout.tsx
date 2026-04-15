@@ -3,6 +3,7 @@ import { QueryClientProvider } from '@tanstack/react-query';
 import { Stack, useRouter } from 'expo-router';
 import { Platform } from 'react-native';
 import { queryClient } from '../src/composition/queryClient';
+import { buildPositionDetailPath, buildPreviewPath } from '../src/platform/appRoutes';
 import { navigateRoute } from '../src/platform/webNavigation';
 
 export default function RootLayout() {
@@ -25,9 +26,9 @@ export default function RootLayout() {
         if (data.route) {
           navigateRoute({ router, path: data.route, method: 'push' });
         } else if (data.triggerId) {
-          navigateRoute({ router, path: `/preview/${data.triggerId}`, method: 'push' });
+          navigateRoute({ router, path: buildPreviewPath({ triggerId: data.triggerId }), method: 'push' });
         } else if (data.positionId) {
-          navigateRoute({ router, path: `/position/${data.positionId}`, method: 'push' });
+          navigateRoute({ router, path: buildPositionDetailPath({ positionId: data.positionId }), method: 'push' });
         }
       });
     };

@@ -13,6 +13,7 @@ import {
 } from '../../src/api/executions';
 import { signBrowserTransaction } from '../../src/platform/browserWallet';
 import { signNativeTransaction } from '../../src/platform/nativeWallet';
+import { buildExecutionPath, buildPreviewPath, buildSigningPath } from '../../src/platform/appRoutes';
 import { mapWalletErrorToOutcome } from '../../src/platform/walletConnection';
 import { navigateRoute } from '../../src/platform/webNavigation';
 import { walletSessionStore } from '../../src/state/walletSessionStore';
@@ -113,7 +114,7 @@ export default function SigningRoute() {
           onSuccess: (approval) => {
             navigateRoute({
               router,
-              path: `/signing/${approval.attemptId}`,
+              path: buildSigningPath({ attemptId: approval.attemptId }),
               method: 'replace',
             });
           },
@@ -198,7 +199,7 @@ export default function SigningRoute() {
         await executionQuery.refetch();
         navigateRoute({
           router,
-          path: `/execution/${attemptId}`,
+          path: buildExecutionPath({ attemptId }),
           method: 'replace',
         });
       } catch (error: unknown) {
@@ -307,7 +308,7 @@ export default function SigningRoute() {
                     onRefreshQuote: () => {
                       navigateRoute({
                         router,
-                        path: `/preview/${triggerId}`,
+                        path: buildPreviewPath({ triggerId }),
                         method: 'replace',
                       });
                     },
@@ -335,7 +336,7 @@ export default function SigningRoute() {
             onViewResult: () => {
               navigateRoute({
                 router,
-                path: `/execution/${attemptId}`,
+                path: buildExecutionPath({ attemptId }),
                 method: 'push',
               });
             },

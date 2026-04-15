@@ -68,6 +68,6 @@ describe('app shell wallet dependency guard', () => {
 
     expect(routeSource).toContain('onSelectPosition');
     expect(routeSource).toContain('navigateRoute');
-    expect(routeSource).toContain("path: `/position/");
+    expect(routeSource).toContain('buildPositionDetailPath');
   });
 });

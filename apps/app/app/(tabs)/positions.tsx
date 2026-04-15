@@ -5,6 +5,7 @@ import { useStore } from 'zustand';
 import { fetchSupportedPositions } from '../../src/api/positions';
 import { walletSessionStore } from '../../src/state/walletSessionStore';
 import type { PositionListItemViewModel } from '@clmm/ui';
+import { buildPositionDetailPath } from '../../src/platform/appRoutes';
 import { navigateRoute } from '../../src/platform/webNavigation';
 
 export default function PositionsRoute() {
@@ -35,7 +36,7 @@ export default function PositionsRoute() {
       onSelectPosition={(positionId: PositionListItemViewModel['positionId']) =>
         navigateRoute({
           router,
-          path: `/position/${positionId}`,
+          path: buildPositionDetailPath({ positionId }),
           method: 'push',
         })
       }

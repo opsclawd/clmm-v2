@@ -4,6 +4,7 @@ import { useMutation } from '@tanstack/react-query';
 import { ExecutionPreviewScreen } from '@clmm/ui';
 import { useStore } from 'zustand';
 import { createPreview, refreshPreview } from '../../src/api/previews';
+import { buildSigningPath } from '../../src/platform/appRoutes';
 import { navigateRoute } from '../../src/platform/webNavigation';
 import { walletSessionStore } from '../../src/state/walletSessionStore';
 
@@ -76,17 +77,7 @@ export default function PreviewRoute() {
 
               navigateRoute({
                 router,
-                path: `/signing/${signingParams.attemptId}?previewId=${encodeURIComponent(
-                  signingParams.previewId,
-                )}${
-                  signingParams.triggerId != null
-                    ? `&triggerId=${encodeURIComponent(signingParams.triggerId)}`
-                    : ''
-                }${
-                  signingParams.episodeId != null
-                    ? `&episodeId=${encodeURIComponent(signingParams.episodeId)}`
-                    : ''
-                }`,
+                path: buildSigningPath(signingParams),
                 method: 'push',
               });
             },

@@ -10,11 +10,11 @@ describe('webNavigation', () => {
 
     navigateRoute({
       router,
-      path: '/position/abc',
+      path: '/position?id=abc',
       method: 'push',
     });
 
-    expect(router.push).toHaveBeenCalledWith('/position/abc');
+    expect(router.push).toHaveBeenCalledWith('/position?id=abc');
     expect(router.replace).not.toHaveBeenCalled();
   });
 
@@ -57,10 +57,10 @@ describe('webNavigation', () => {
 
     navigateRoute({
       router,
-      path: '/signing/attempt-123?previewId=prev-456&triggerId=trig-789',
+      path: '/signing?attemptId=attempt-123&previewId=prev-456&triggerId=trig-789',
       method: 'push',
     });
 
-    expect(router.push).toHaveBeenCalledWith('/signing/attempt-123?previewId=prev-456&triggerId=trig-789');
+    expect(router.push).toHaveBeenCalledWith('/signing?attemptId=attempt-123&previewId=prev-456&triggerId=trig-789');
   });
 });
