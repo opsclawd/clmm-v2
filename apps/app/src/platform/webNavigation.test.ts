@@ -1,4 +1,4 @@
-import { describe, expect, it, vi } from 'vitest';
+import { describe, expect, it, vi, beforeEach } from 'vitest';
 import { navigateRoute, normalizeExpoRouterRoute } from './webNavigation';
 
 describe('normalizeExpoRouterRoute', () => {
