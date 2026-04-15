@@ -82,7 +82,7 @@ export default function ConnectRoute() {
       });
       navigateRoute({
         router,
-        path: '/(tabs)/positions',
+        path: '/positions',
         method: 'replace',
       });
     } catch (error) {

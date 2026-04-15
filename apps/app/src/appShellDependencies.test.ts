@@ -48,6 +48,21 @@ describe('app shell wallet dependency guard', () => {
     expect(routeSource).toContain('positions={positionsQuery.data}');
   });
 
+  it('uses a declarative root redirect to connect', () => {
+    const routeSource = readText('../app/index.tsx');
+
+    expect(routeSource).toContain('Redirect');
+    expect(routeSource).toContain('href="/connect"');
+    expect(routeSource).not.toContain('useRootNavigationState');
+  });
+
+  it('navigates to the public positions URL after wallet connect', () => {
+    const routeSource = readText('../app/connect.tsx');
+
+    expect(routeSource).toContain("path: '/positions'");
+    expect(routeSource).not.toContain("path: '/(tabs)/positions'");
+  });
+
   it('wires position tap navigation to the position detail route', () => {
     const routeSource = readText('../app/(tabs)/positions.tsx');
 
