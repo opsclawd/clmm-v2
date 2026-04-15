@@ -55,20 +55,42 @@ export class SolanaExecutionSubmissionAdapter implements ExecutionSubmissionPort
   }> {
     const rpc = this.getRpc();
 
+    const uniqueSignatures = [...new Set(references.map((r) => r.signature))];
+    const signatureStatusMap = new Map<string, 'confirmed' | 'failed' | 'pending'>();
+
+    for (const sig of uniqueSignatures) {
+      try {
+        const status = await rpc
+          .getSignatureStatuses(
+            [sig as unknown as Signature],
+            { searchTransactionHistory: true },
+          )
+          .send();
+        const sigStatus = status.value[0];
+
+        if (sigStatus?.err) {
+          signatureStatusMap.set(sig, 'failed');
+        } else if (
+          sigStatus?.confirmationStatus === 'confirmed' ||
+          sigStatus?.confirmationStatus === 'finalized'
+        ) {
+          signatureStatusMap.set(sig, 'confirmed');
+        } else {
+          signatureStatusMap.set(sig, 'pending');
+        }
+      } catch {
+        signatureStatusMap.set(sig, 'failed');
+      }
+    }
+
     const confirmedSteps: Array<'remove-liquidity' | 'collect-fees' | 'swap-assets'> = [];
     let failedCount = 0;
 
     for (const ref of references) {
-      try {
-        const status = await rpc.getSignatureStatuses([ref.signature as unknown as Signature], { searchTransactionHistory: true }).send();
-        const sigStatus = status.value[0];
-
-        if (sigStatus?.err) {
-          failedCount++;
-        } else if (sigStatus?.confirmationStatus === 'confirmed' || sigStatus?.confirmationStatus === 'finalized') {
-          confirmedSteps.push(ref.stepKind);
-        }
-      } catch {
+      const status = signatureStatusMap.get(ref.signature) ?? 'pending';
+      if (status === 'confirmed') {
+        confirmedSteps.push(ref.stepKind);
+      } else if (status === 'failed') {
         failedCount++;
       }
     }

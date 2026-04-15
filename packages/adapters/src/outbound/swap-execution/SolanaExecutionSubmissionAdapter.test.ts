@@ -87,6 +87,41 @@ describe('SolanaExecutionSubmissionAdapter', () => {
       expect(result.confirmedSteps).toEqual([]);
     });
 
+    it('deduplicates signature status lookups for shared-signature references', async () => {
+      const mockRpc = makeMockRpc({
+        'shared-sig': { confirmationStatus: 'confirmed' },
+      });
+      const adapter = makeAdapter(mockRpc);
+
+      const result = await adapter.reconcileExecution([
+        makeRef('shared-sig', 'remove-liquidity'),
+        makeRef('shared-sig', 'collect-fees'),
+        makeRef('shared-sig', 'swap-assets'),
+      ]);
+
+      expect(result.finalState).toEqual({ kind: 'confirmed' });
+      expect(result.confirmedSteps).toEqual(['remove-liquidity', 'collect-fees', 'swap-assets']);
+      expect(mockRpc.getSignatureStatuses).toHaveBeenCalledTimes(1);
+    });
+
+    it('handles mixed signatures correctly — each checked once', async () => {
+      const mockRpc = makeMockRpc({
+        'sig-a': { confirmationStatus: 'confirmed' },
+        'sig-b': { err: { err: 'failed' } },
+      });
+      const adapter = makeAdapter(mockRpc);
+
+      const result = await adapter.reconcileExecution([
+        makeRef('sig-a', 'remove-liquidity'),
+        makeRef('sig-a', 'collect-fees'),
+        makeRef('sig-b', 'swap-assets'),
+      ]);
+
+      expect(result.finalState).toEqual({ kind: 'partial' });
+      expect(result.confirmedSteps).toEqual(['remove-liquidity', 'collect-fees']);
+      expect(mockRpc.getSignatureStatuses).toHaveBeenCalledTimes(2);
+    });
+
     it('treats err with confirmed/finalized status as failed, not confirmed', async () => {
       const adapter = makeAdapter(makeMockRpc({
         'sig1': { confirmationStatus: 'confirmed', err: { err: 'Transaction failed' } },
