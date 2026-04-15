@@ -10,7 +10,6 @@
 import { createSolanaRpc, address } from '@solana/kit';
 import type { Address } from '@solana/kit';
 import { fetchPositionsForOwner } from '@orca-so/whirlpools';
-import { fetchWhirlpool } from '@orca-so/whirlpools-client';
 
 import type { SupportedPositionReadPort } from '@clmm/application';
 import type { LiquidityPosition, WalletId, PositionId } from '@clmm/domain';
@@ -21,8 +20,16 @@ import {
   evaluateRangeState,
 } from '@clmm/domain';
 
+import { SolanaPositionSnapshotReader } from './SolanaPositionSnapshotReader.js';
+import type { Db } from '../storage/db.js';
+import { walletPositionOwnership } from '../storage/schema/index.js';
+
 export class OrcaPositionReadAdapter implements SupportedPositionReadPort {
-  constructor(private readonly rpcUrl: string) {}
+  constructor(
+    private readonly rpcUrl: string,
+    private readonly snapshotReader: SolanaPositionSnapshotReader,
+    private readonly db: Db,
+  ) {}
 
   private isOwnedPositionEntry(value: unknown): value is {
     whirlpool: Address | string;
@@ -104,47 +111,97 @@ export class OrcaPositionReadAdapter implements SupportedPositionReadPort {
 
     const positions = await fetchPositionsForOwner(rpc, ownerAddress);
 
-    const liquidityPositions: LiquidityPosition[] = [];
+    const allEntries: Array<{
+      whirlpool: string;
+      tickLowerIndex: number;
+      tickUpperIndex: number;
+      positionMint: string;
+    }> = [];
 
     for (const positionData of positions) {
-      for (const position of this.getOwnedPositionEntries(positionData)) {
-        const whirlpoolAddress = position.whirlpool;
-
-        let whirlpoolData;
-        try {
-          whirlpoolData = await fetchWhirlpool(rpc, address(whirlpoolAddress.toString()));
-        } catch {
-          continue;
-        }
-
-        const poolId = makePoolId(whirlpoolAddress.toString());
-        const positionId = makePositionId(position.positionMint.toString());
-
-        const bounds = {
-          lowerBound: position.tickLowerIndex,
-          upperBound: position.tickUpperIndex,
-        };
-
-        const currentTick = whirlpoolData.data.tickCurrentIndex;
-        const rangeState = evaluateRangeState(bounds, currentTick);
-
-        liquidityPositions.push({
-          positionId,
-          walletId,
-          poolId,
-          bounds,
-          lastObservedAt: makeClockTimestamp(Date.now()),
-          rangeState,
-          monitoringReadiness: { kind: 'active' },
+      for (const entry of this.getOwnedPositionEntries(positionData)) {
+        allEntries.push({
+          whirlpool: entry.whirlpool.toString(),
+          tickLowerIndex: entry.tickLowerIndex,
+          tickUpperIndex: entry.tickUpperIndex,
+          positionMint: entry.positionMint.toString(),
         });
       }
+    }
+
+    const whirlpoolAddresses = allEntries.map((e) => e.whirlpool);
+    const whirlpoolMap = await this.snapshotReader.fetchWhirlpoolsBatched(rpc, whirlpoolAddresses);
+
+    const liquidityPositions: LiquidityPosition[] = [];
+
+    for (const entry of allEntries) {
+      const whirlpoolData = whirlpoolMap.get(entry.whirlpool);
+      if (!whirlpoolData) {
+        continue;
+      }
+
+      const poolId = makePoolId(entry.whirlpool);
+      const positionId = makePositionId(entry.positionMint);
+
+      const bounds = {
+        lowerBound: entry.tickLowerIndex,
+        upperBound: entry.tickUpperIndex,
+      };
+
+      const currentTick = whirlpoolData.tickCurrentIndex;
+      const rangeState = evaluateRangeState(bounds, currentTick);
+
+      liquidityPositions.push({
+        positionId,
+        walletId,
+        poolId,
+        bounds,
+        lastObservedAt: makeClockTimestamp(Date.now()),
+        rangeState,
+        monitoringReadiness: { kind: 'active' },
+      });
+    }
+
+    const now = Date.now();
+    for (const entry of allEntries) {
+      await this.db
+        .insert(walletPositionOwnership)
+        .values({
+          walletId,
+          positionId: makePositionId(entry.positionMint),
+          firstSeenAt: now,
+          lastSeenAt: now,
+        })
+        .onConflictDoUpdate({
+          target: [walletPositionOwnership.walletId, walletPositionOwnership.positionId],
+          set: { lastSeenAt: now },
+        });
     }
 
     return liquidityPositions;
   }
 
   async getPosition(walletId: WalletId, positionId: PositionId): Promise<LiquidityPosition | null> {
-    const positions = await this.listSupportedPositions(walletId);
-    return positions.find((position) => position.positionId === positionId) ?? null;
+    const rpc = this.getRpc();
+    const position = await this.snapshotReader.fetchSinglePosition(rpc, positionId, walletId);
+    if (!position) {
+      return null;
+    }
+
+    const now = Date.now();
+    await this.db
+      .insert(walletPositionOwnership)
+      .values({
+        walletId,
+        positionId,
+        firstSeenAt: now,
+        lastSeenAt: now,
+      })
+      .onConflictDoUpdate({
+        target: [walletPositionOwnership.walletId, walletPositionOwnership.positionId],
+        set: { lastSeenAt: now },
+      });
+
+    return position;
   }
 }

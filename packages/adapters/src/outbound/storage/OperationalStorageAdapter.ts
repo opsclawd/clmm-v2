@@ -1,6 +1,6 @@
 import { and, eq, inArray } from 'drizzle-orm';
 import type { Db } from './db.js';
-import { breachEpisodes, exitTriggers, executionAttempts, executionSessions, executionPreviews, preparedPayloads } from './schema/index.js';
+import { breachEpisodes, exitTriggers, executionAttempts, executionSessions, executionPreviews, preparedPayloads, walletPositionOwnership } from './schema/index.js';
 import type {
   BreachEpisodeRepository,
   EpisodeTransition,
@@ -9,7 +9,6 @@ import type {
   ExecutionRepository,
   ExecutionSessionRepository,
   IdGeneratorPort,
-  SupportedPositionReadPort,
   StoredExecutionAttempt,
 } from '@clmm/application';
 import type {
@@ -26,6 +25,7 @@ import type {
   BreachDirection,
 } from '@clmm/domain';
 import { LOWER_BOUND_BREACH, UPPER_BOUND_BREACH, makeClockTimestamp } from '@clmm/domain';
+import { BREACH_SCAN_INTERVAL_MS } from '../../inbound/jobs/breach-scan-schedule.js';
 
 function directionFromKind(kind: string) {
   if (kind === 'lower-bound-breach') return LOWER_BOUND_BREACH;
@@ -33,13 +33,16 @@ function directionFromKind(kind: string) {
   throw new Error(`directionFromKind: unknown kind ${kind}`);
 }
 
+// Scan jobs run every 5m; keep two cycles of ownership history hot so
+// listActionableTriggers ignores stale ownership rows without dropping history.
+const OWNERSHIP_STALE_AFTER_MS = 2 * BREACH_SCAN_INTERVAL_MS;
+
 export class OperationalStorageAdapter
   implements BreachEpisodeRepository, TriggerRepository, ExecutionRepository, ExecutionSessionRepository
 {
   constructor(
     private readonly db: Db,
     private readonly ids: IdGeneratorPort,
-    private readonly positionReadPort: SupportedPositionReadPort,
   ) {}
 
   // --- BreachEpisodeRepository ---
@@ -318,8 +321,17 @@ export class OperationalStorageAdapter
   }
 
   async listActionableTriggers(walletId: WalletId): Promise<ExitTrigger[]> {
-    const positions = await this.positionReadPort.listSupportedPositions(walletId);
-    const positionIds = positions.map((position) => position.positionId);
+    const now = Date.now();
+    const ownershipRows = await this.db
+      .select()
+      .from(walletPositionOwnership)
+      .where(eq(walletPositionOwnership.walletId, walletId));
+
+    const freshOwnershipRows = ownershipRows.filter(
+      (row) => now - row.lastSeenAt <= OWNERSHIP_STALE_AFTER_MS,
+    );
+
+    const positionIds = freshOwnershipRows.map((row) => row.positionId);
     if (positionIds.length === 0) {
       return [];
     }

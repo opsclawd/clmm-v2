@@ -21,9 +21,14 @@ export class FakeExecutionSubmissionPort implements ExecutionSubmissionPort {
 
   async submitExecution(
     _payload: Uint8Array,
+    plannedStepKinds: ReadonlyArray<ExecutionStep['kind']> = ['swap-assets'],
   ): Promise<{ references: TransactionReference[]; submittedAt: ClockTimestamp }> {
+    const uniqueStepKinds = [...new Set(plannedStepKinds)];
     return {
-      references: [{ signature: 'fake-sig-1', stepKind: 'remove-liquidity' }],
+      references: uniqueStepKinds.map((stepKind) => ({
+        signature: 'fake-sig-1',
+        stepKind,
+      })),
       submittedAt: makeClockTimestamp(Date.now()),
     };
   }

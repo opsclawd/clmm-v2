@@ -2,36 +2,22 @@ import { describe, it, expect } from 'vitest';
 import { OperationalStorageAdapter } from './OperationalStorageAdapter.js';
 import { FIXTURE_POSITION_IN_RANGE, FIXTURE_WALLET_ID, FakeIdGeneratorPort } from '@clmm/testing';
 import { LOWER_BOUND_BREACH, makeClockTimestamp, makePositionId } from '@clmm/domain';
-import type { SupportedPositionReadPort } from '@clmm/application';
-import type { LiquidityPosition, PositionId, WalletId } from '@clmm/domain';
 import type { Db } from './db.js';
 
 const leakedPositionId = makePositionId('leaked-position');
 
-class WalletScopedPositionReadPort implements SupportedPositionReadPort {
-  receivedWalletId: WalletId | null = null;
-
-  constructor(private readonly positions: LiquidityPosition[]) {}
-
-  async listSupportedPositions(walletId: WalletId): Promise<LiquidityPosition[]> {
-    this.receivedWalletId = walletId;
-    return [...this.positions];
-  }
-
-  async getPosition(_walletId: WalletId, _positionId: PositionId): Promise<LiquidityPosition | null> {
-    return null;
-  }
-}
-
-function makeDbWithTriggerRows(rows: Array<{
-  triggerId: string;
-  positionId: string;
-  episodeId: string;
-  directionKind: string;
-  triggeredAt: number;
-  confirmationEvaluatedAt: number;
-  episodeStatus?: string;
-}>): Db {
+function makeDbWithTriggerRows(params: {
+  ownershipRows: Array<{ walletId: string; positionId: string; firstSeenAt: number; lastSeenAt: number }>;
+  triggerRows: Array<{
+    triggerId: string;
+    positionId: string;
+    episodeId: string;
+    directionKind: string;
+    triggeredAt: number;
+    confirmationEvaluatedAt: number;
+    episodeStatus?: string;
+  }>;
+}): Db {
   function predicateReferencesOpenEpisodeFilter(value: unknown): boolean {
     const visited = new WeakSet<object>();
     function walk(node: unknown): boolean {
@@ -67,16 +53,30 @@ function makeDbWithTriggerRows(rows: Array<{
     return walk(value);
   }
 
+  let selectCallCount = 0;
+
   return {
     select() {
+      selectCallCount++;
       return {
-        from() {
+        from(table: unknown) {
+          const tableName = (table as { name?: string })?.name ??
+            ((table as Record<string | symbol, unknown>)[Symbol.for('drizzle:Name')] as string | undefined) ?? '';
+
+          // First select call in listActionableTriggers queries wallet_position_ownership
+          if (selectCallCount === 1 || tableName === 'wallet_position_ownership') {
+            return {
+              where: async () => params.ownershipRows,
+            };
+          }
+
+          // Second select call queries exit_triggers joined with breach_episodes
           return {
             innerJoin: () => ({
               where: async (predicate: unknown) => (
                 predicateReferencesOpenEpisodeFilter(predicate)
-                  ? rows.filter((row) => row.episodeStatus === 'open')
-                  : rows
+                  ? params.triggerRows.filter((row) => row.episodeStatus === 'open')
+                  : params.triggerRows
               ),
             }),
           };
@@ -155,62 +155,151 @@ function makeDbForFinalizeQualification(params: {
 }
 
 describe('OperationalStorageAdapter', () => {
-  it('scopes actionable triggers to positions owned by the requested wallet', async () => {
-    const positionReadPort = new WalletScopedPositionReadPort([FIXTURE_POSITION_IN_RANGE]);
+  it('scopes actionable triggers to positions owned by the requested wallet via DB lookup', async () => {
+    const now = Date.now();
     const adapter = new OperationalStorageAdapter(
-      makeDbWithTriggerRows([
-        {
-          triggerId: 'trigger-owned',
-          positionId: FIXTURE_POSITION_IN_RANGE.positionId,
-          episodeId: 'episode-owned',
-          directionKind: 'lower-bound-breach',
-          triggeredAt: makeClockTimestamp(1_000_000),
-          confirmationEvaluatedAt: makeClockTimestamp(1_000_001),
-          episodeStatus: 'open',
-        },
-        {
-          triggerId: 'trigger-leaked',
-          positionId: leakedPositionId,
-          episodeId: 'episode-leaked',
-          directionKind: 'upper-bound-breach',
-          triggeredAt: makeClockTimestamp(1_000_002),
-          confirmationEvaluatedAt: makeClockTimestamp(1_000_003),
-          episodeStatus: 'open',
-        },
-      ]),
+      makeDbWithTriggerRows({
+        ownershipRows: [
+          {
+            walletId: FIXTURE_WALLET_ID,
+            positionId: FIXTURE_POSITION_IN_RANGE.positionId,
+            firstSeenAt: now - 1_000,
+            lastSeenAt: now - 1_000,
+          },
+        ],
+        triggerRows: [
+          {
+            triggerId: 'trigger-owned',
+            positionId: FIXTURE_POSITION_IN_RANGE.positionId,
+            episodeId: 'episode-owned',
+            directionKind: 'lower-bound-breach',
+            triggeredAt: makeClockTimestamp(1_000_000),
+            confirmationEvaluatedAt: makeClockTimestamp(1_000_001),
+            episodeStatus: 'open',
+          },
+          {
+            triggerId: 'trigger-leaked',
+            positionId: leakedPositionId,
+            episodeId: 'episode-leaked',
+            directionKind: 'upper-bound-breach',
+            triggeredAt: makeClockTimestamp(1_000_002),
+            confirmationEvaluatedAt: makeClockTimestamp(1_000_003),
+            episodeStatus: 'open',
+          },
+        ],
+      }),
       new FakeIdGeneratorPort('storage'),
-      positionReadPort,
     );
 
     const triggers = await adapter.listActionableTriggers(FIXTURE_WALLET_ID);
 
-    expect(positionReadPort.receivedWalletId).toBe(FIXTURE_WALLET_ID);
     expect(triggers).toHaveLength(1);
     expect(triggers[0]?.triggerId).toBe('trigger-owned');
     expect(triggers[0]?.positionId).toBe(FIXTURE_POSITION_IN_RANGE.positionId);
   });
 
   it('does not return triggers whose breach episode is already closed', async () => {
-    const positionReadPort = new WalletScopedPositionReadPort([FIXTURE_POSITION_IN_RANGE]);
+    const now = Date.now();
     const adapter = new OperationalStorageAdapter(
-      makeDbWithTriggerRows([
-        {
-          triggerId: 'trigger-closed',
-          positionId: FIXTURE_POSITION_IN_RANGE.positionId,
-          episodeId: 'episode-closed',
-          directionKind: 'lower-bound-breach',
-          triggeredAt: makeClockTimestamp(1_000_000),
-          confirmationEvaluatedAt: makeClockTimestamp(1_000_001),
-          episodeStatus: 'closed',
-        },
-      ]),
+      makeDbWithTriggerRows({
+        ownershipRows: [
+          {
+            walletId: FIXTURE_WALLET_ID,
+            positionId: FIXTURE_POSITION_IN_RANGE.positionId,
+            firstSeenAt: now - 1_000,
+            lastSeenAt: now - 1_000,
+          },
+        ],
+        triggerRows: [
+          {
+            triggerId: 'trigger-closed',
+            positionId: FIXTURE_POSITION_IN_RANGE.positionId,
+            episodeId: 'episode-closed',
+            directionKind: 'lower-bound-breach',
+            triggeredAt: makeClockTimestamp(1_000_000),
+            confirmationEvaluatedAt: makeClockTimestamp(1_000_001),
+            episodeStatus: 'closed',
+          },
+        ],
+      }),
       new FakeIdGeneratorPort('storage'),
-      positionReadPort,
     );
 
     const triggers = await adapter.listActionableTriggers(FIXTURE_WALLET_ID);
 
-    expect(positionReadPort.receivedWalletId).toBe(FIXTURE_WALLET_ID);
+    expect(triggers).toHaveLength(0);
+  });
+
+  it('ignores ownership rows older than the freshness window', async () => {
+    const now = Date.now();
+    const adapter = new OperationalStorageAdapter(
+      makeDbWithTriggerRows({
+        ownershipRows: [
+          {
+            walletId: FIXTURE_WALLET_ID,
+            positionId: FIXTURE_POSITION_IN_RANGE.positionId,
+            firstSeenAt: now - 1_000,
+            lastSeenAt: now - 1_000,
+          },
+          {
+            walletId: FIXTURE_WALLET_ID,
+            positionId: leakedPositionId,
+            firstSeenAt: now - 11 * 60_000,
+            lastSeenAt: now - 11 * 60_000,
+          },
+        ],
+        triggerRows: [
+          {
+            triggerId: 'trigger-fresh',
+            positionId: FIXTURE_POSITION_IN_RANGE.positionId,
+            episodeId: 'episode-fresh',
+            directionKind: 'lower-bound-breach',
+            triggeredAt: makeClockTimestamp(now - 1_000),
+            confirmationEvaluatedAt: makeClockTimestamp(now - 900),
+            episodeStatus: 'open',
+          },
+          {
+            triggerId: 'trigger-stale',
+            positionId: leakedPositionId,
+            episodeId: 'episode-stale',
+            directionKind: 'upper-bound-breach',
+            triggeredAt: makeClockTimestamp(now - 11 * 60_000),
+            confirmationEvaluatedAt: makeClockTimestamp(now - 11 * 60_000 + 1),
+            episodeStatus: 'open',
+          },
+        ],
+      }),
+      new FakeIdGeneratorPort('storage'),
+    );
+
+    const triggers = await adapter.listActionableTriggers(FIXTURE_WALLET_ID);
+
+    expect(triggers).toHaveLength(1);
+    expect(triggers[0]?.triggerId).toBe('trigger-fresh');
+    expect(triggers[0]?.positionId).toBe(FIXTURE_POSITION_IN_RANGE.positionId);
+  });
+
+  it('returns empty array when no ownership rows exist for the wallet', async () => {
+    const adapter = new OperationalStorageAdapter(
+      makeDbWithTriggerRows({
+        ownershipRows: [],
+        triggerRows: [
+          {
+            triggerId: 'trigger-orphan',
+            positionId: FIXTURE_POSITION_IN_RANGE.positionId,
+            episodeId: 'episode-orphan',
+            directionKind: 'lower-bound-breach',
+            triggeredAt: makeClockTimestamp(1_000_000),
+            confirmationEvaluatedAt: makeClockTimestamp(1_000_001),
+            episodeStatus: 'open',
+          },
+        ],
+      }),
+      new FakeIdGeneratorPort('storage'),
+    );
+
+    const triggers = await adapter.listActionableTriggers(FIXTURE_WALLET_ID);
+
     expect(triggers).toHaveLength(0);
   });
 
@@ -234,7 +323,6 @@ describe('OperationalStorageAdapter', () => {
     const adapter = new OperationalStorageAdapter(
       db,
       new FakeIdGeneratorPort('storage'),
-      new WalletScopedPositionReadPort([FIXTURE_POSITION_IN_RANGE]),
     );
 
     const result = await adapter.finalizeQualification(episodeId as never, {
@@ -273,7 +361,6 @@ describe('OperationalStorageAdapter', () => {
     const adapter = new OperationalStorageAdapter(
       db,
       new FakeIdGeneratorPort('storage'),
-      new WalletScopedPositionReadPort([FIXTURE_POSITION_IN_RANGE]),
     );
 
     await expect(() => adapter.finalizeQualification(episodeId as never, {
@@ -307,7 +394,6 @@ describe('OperationalStorageAdapter', () => {
     const adapter = new OperationalStorageAdapter(
       db,
       new FakeIdGeneratorPort('storage'),
-      new WalletScopedPositionReadPort([FIXTURE_POSITION_IN_RANGE]),
     );
 
     await expect(() => adapter.finalizeQualification(episodeId as never, {

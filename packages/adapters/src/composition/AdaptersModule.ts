@@ -1,5 +1,6 @@
 import 'reflect-metadata';
 import { Module } from '@nestjs/common';
+import { SolanaPositionSnapshotReader } from '../outbound/solana-position-reads/SolanaPositionSnapshotReader.js';
 import { OrcaPositionReadAdapter } from '../outbound/solana-position-reads/OrcaPositionReadAdapter.js';
 import { SolanaRangeObservationAdapter } from '../outbound/solana-position-reads/SolanaRangeObservationAdapter.js';
 import { OperationalStorageAdapter } from '../outbound/storage/OperationalStorageAdapter.js';
@@ -8,7 +9,7 @@ import { MonitoredWalletStorageAdapter } from '../outbound/storage/MonitoredWall
 import { NotificationDedupStorageAdapter } from '../outbound/storage/NotificationDedupStorageAdapter.js';
 import { SolanaExecutionPreparationAdapter } from '../outbound/swap-execution/SolanaExecutionPreparationAdapter.js';
 import { SolanaExecutionSubmissionAdapter } from '../outbound/swap-execution/SolanaExecutionSubmissionAdapter.js';
-import { InAppAlertAdapter } from '../outbound/notifications/InAppAlertAdapter.js';
+import { DurableNotificationEventAdapter } from '../outbound/notifications/DurableNotificationEventAdapter.js';
 import { TelemetryAdapter } from '../outbound/observability/TelemetryAdapter.js';
 import { createDb } from '../outbound/storage/db.js';
 import type { ClockPort, IdGeneratorPort } from '@clmm/application';
@@ -46,15 +47,16 @@ const systemIds: IdGeneratorPort = {
   generateId: () => `${Date.now()}-${++_idCounter}`,
 };
 
-const orcaPositionRead = new OrcaPositionReadAdapter(rpcUrl);
+const snapshotReader = new SolanaPositionSnapshotReader(rpcUrl);
+const orcaPositionRead = new OrcaPositionReadAdapter(rpcUrl, snapshotReader, db);
 const rangeObservation = new SolanaRangeObservationAdapter(rpcUrl);
-const operationalStorage = new OperationalStorageAdapter(db, systemIds, orcaPositionRead);
+const operationalStorage = new OperationalStorageAdapter(db, systemIds);
 const historyStorage = new OffChainHistoryStorageAdapter(db);
 const monitoredWalletStorage = new MonitoredWalletStorageAdapter(db);
 const notificationDedupStorage = new NotificationDedupStorageAdapter(db);
-const solanaPreparation = new SolanaExecutionPreparationAdapter(rpcUrl);
+const solanaPreparation = new SolanaExecutionPreparationAdapter(rpcUrl, snapshotReader);
 const solanaSubmission = new SolanaExecutionSubmissionAdapter(rpcUrl);
-const inAppAlert = new InAppAlertAdapter();
+const durableNotificationEvent = new DurableNotificationEventAdapter(db, systemIds);
 const telemetry = new TelemetryAdapter();
 
 const sharedProviders = [
@@ -67,7 +69,7 @@ const sharedProviders = [
   { provide: EXECUTION_HISTORY_REPOSITORY, useValue: historyStorage },
   { provide: EXECUTION_PREPARATION_PORT, useValue: solanaPreparation },
   { provide: EXECUTION_SUBMISSION_PORT, useValue: solanaSubmission },
-  { provide: NOTIFICATION_PORT, useValue: inAppAlert },
+  { provide: NOTIFICATION_PORT, useValue: durableNotificationEvent },
   { provide: NOTIFICATION_DEDUP_PORT, useValue: notificationDedupStorage },
   { provide: OBSERVABILITY_PORT, useValue: telemetry },
   { provide: CLOCK_PORT, useValue: systemClock },
