@@ -2,6 +2,7 @@ import { useRouter, useLocalSearchParams } from 'expo-router';
 import { useQuery } from '@tanstack/react-query';
 import { ExecutionResultScreen } from '@clmm/ui';
 import { fetchExecution } from '../../src/api/executions';
+import { navigateRoute } from '../../src/platform/webNavigation';
 
 function readAttemptId(value: string | string[] | undefined): string | null {
   return typeof value === 'string' && value.length > 0 ? value : null;
@@ -32,7 +33,13 @@ export default function ExecutionRoute() {
         : {})}
       resultLoading={executionQuery.isLoading}
       resultError={executionQuery.error instanceof Error ? executionQuery.error.message : null}
-      onViewHistory={() => router.push('/(tabs)/history')}
+      onViewHistory={() => {
+        navigateRoute({
+          router,
+          path: '/(tabs)/history',
+          method: 'push',
+        });
+      }}
     />
   );
 }

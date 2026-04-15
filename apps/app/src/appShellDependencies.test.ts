@@ -52,6 +52,7 @@ describe('app shell wallet dependency guard', () => {
     const routeSource = readText('../app/(tabs)/positions.tsx');
 
     expect(routeSource).toContain('onSelectPosition');
-    expect(routeSource).toContain("router.push(`/position/");
+    expect(routeSource).toContain('navigateRoute');
+    expect(routeSource).toContain("path: `/position/");
   });
 });

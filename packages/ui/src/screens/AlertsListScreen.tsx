@@ -82,6 +82,7 @@ export function AlertsListScreen({ alerts, alertsLoading, alertsError, onSelectA
             data={alertItems}
             keyExtractor={(item) => item.triggerId}
             style={{ marginTop: 12 }}
+            removeClippedSubviews={false}
             renderItem={({ item }) => (
               <TouchableOpacity
                 onPress={() => onSelectAlert?.(item.triggerId, item.positionId)}

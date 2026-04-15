@@ -1,12 +1,12 @@
-import { useEffect, useState } from 'react';
+import { useEffect } from 'react';
 import { QueryClientProvider } from '@tanstack/react-query';
 import { Stack, useRouter } from 'expo-router';
 import { Platform } from 'react-native';
 import { queryClient } from '../src/composition/queryClient';
+import { navigateRoute } from '../src/platform/webNavigation';
 
 export default function RootLayout() {
   const router = useRouter();
-  const [isHydrated, setIsHydrated] = useState(Platform.OS !== 'web');
 
   useEffect(() => {
     if (Platform.OS === 'web') return;
@@ -22,11 +22,11 @@ export default function RootLayout() {
           triggerId?: string;
         };
         if (data.route) {
-          router.push(data.route);
+          navigateRoute({ router, path: data.route, method: 'push' });
         } else if (data.triggerId) {
-          router.push(`/preview/${data.triggerId}`);
+          navigateRoute({ router, path: `/preview/${data.triggerId}`, method: 'push' });
         } else if (data.positionId) {
-          router.push(`/position/${data.positionId}`);
+          navigateRoute({ router, path: `/position/${data.positionId}`, method: 'push' });
         }
       });
     };
@@ -35,16 +35,6 @@ export default function RootLayout() {
 
     return () => subscription?.remove();
   }, [router]);
-
-  useEffect(() => {
-    if (Platform.OS === 'web') {
-      setIsHydrated(true);
-    }
-  }, []);
-
-  if (!isHydrated) {
-    return null;
-  }
 
   return (
     <QueryClientProvider client={queryClient}>
