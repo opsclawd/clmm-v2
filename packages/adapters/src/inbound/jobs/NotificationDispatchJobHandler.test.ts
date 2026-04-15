@@ -1,5 +1,6 @@
 import { describe, it, expect, beforeEach } from 'vitest';
 import { NotificationDispatchJobHandler } from './NotificationDispatchJobHandler.js';
+import { makeClockTimestamp } from '@clmm/domain';
 import {
   FakeNotificationPort,
   FakeNotificationDedupPort,
@@ -69,6 +70,58 @@ describe('NotificationDispatchJobHandler', () => {
     expect(
       observability.logs.some((l: ObservabilityLog) => l.level === 'info' && l.message.includes('dispatched=false')),
     ).toBe(true);
+  });
+
+  it('does not record delivery timing when the notification adapter only records intent', async () => {
+    const intentOnlyPort = {
+      async sendActionableAlert(): Promise<{ deliveredAt: null }> {
+        return { deliveredAt: null };
+      },
+    } as unknown as FakeNotificationPort;
+
+    const intentOnlyHandler = new NotificationDispatchJobHandler(
+      intentOnlyPort,
+      dedupPort,
+      observability,
+      clock,
+    );
+
+    await intentOnlyHandler.handle({
+      triggerId: 'trigger-intent-only',
+      walletId: 'wallet-intent-only',
+      positionId: 'position-intent-only',
+      directionKind: 'lower-bound-breach',
+    });
+
+    expect(observability.deliveryTimings).toHaveLength(0);
+    expect(await dedupPort.hasDispatched('trigger-intent-only')).toBe(true);
+  });
+
+  it('records the adapter-provided delivery timestamp in telemetry', async () => {
+    const deliveredAt = makeClockTimestamp(1_234_567);
+    const timestampedPort = {
+      async sendActionableAlert(): Promise<{ deliveredAt: typeof deliveredAt }> {
+        return { deliveredAt };
+      },
+    } as unknown as FakeNotificationPort;
+
+    const timestampedHandler = new NotificationDispatchJobHandler(
+      timestampedPort,
+      dedupPort,
+      observability,
+      clock,
+    );
+
+    await timestampedHandler.handle({
+      triggerId: 'trigger-timestamped',
+      walletId: 'wallet-timestamped',
+      positionId: 'position-timestamped',
+      directionKind: 'upper-bound-breach',
+    });
+
+    expect(observability.deliveryTimings).toHaveLength(1);
+    expect(observability.deliveryTimings[0]?.deliveredAt).toBe(deliveredAt);
+    expect(observability.deliveryTimings[0]?.durationMs).toBe(deliveredAt - 1_000_000);
   });
 
   it('catches notification errors and logs them without rethrowing', async () => {
