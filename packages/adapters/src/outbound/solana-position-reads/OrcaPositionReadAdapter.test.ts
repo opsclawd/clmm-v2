@@ -252,6 +252,31 @@ describe('OrcaPositionReadAdapter', () => {
       expect(upsertedRows[0]!.walletId).toBe(MOCK_WALLET);
       expect(upsertedRows[0]!.positionId).toBe(MOCK_POSITION_MINT);
     });
+
+    it('excludes positions whose whirlpool data is missing from the batched reader result', async () => {
+      const { fetchPositionsForOwner } = await import('@orca-so/whirlpools');
+
+      vi.mocked(fetchPositionsForOwner).mockResolvedValue([
+        {
+          address: 'PositionAddress123456789012345678901234',
+          isPositionBundle: false,
+          data: {
+            whirlpool: MOCK_WHIRLPOOL,
+            tickLowerIndex: -18304,
+            tickUpperIndex: -17956,
+            positionMint: MOCK_POSITION_MINT,
+          },
+        },
+      ] as unknown as Awaited<ReturnType<typeof fetchPositionsForOwner>>);
+
+      const mockReader = new SolanaPositionSnapshotReader(mockRpcUrl);
+      vi.mocked(mockReader.fetchWhirlpoolsBatched).mockResolvedValue(new Map());
+
+      const adapter = new OrcaPositionReadAdapter(mockRpcUrl, mockReader, mockDb as never);
+      const positions = await adapter.listSupportedPositions(MOCK_WALLET);
+
+      expect(positions).toEqual([]);
+    });
   });
 
   describe('getPosition', () => {
@@ -274,6 +299,12 @@ describe('OrcaPositionReadAdapter', () => {
       expect(result?.positionId).toBe(MOCK_POSITION_MINT);
       expect(result?.walletId).toBe(MOCK_WALLET);
       expect(result?.rangeState.kind).toBe('in-range');
+      expect(mockReader.fetchSinglePosition).toHaveBeenCalledOnce();
+      expect(mockReader.fetchSinglePosition).toHaveBeenCalledWith(
+        expect.anything(),
+        makePositionId(MOCK_POSITION_MINT),
+        MOCK_WALLET,
+      );
     });
 
     it('returns null when the wallet does not own the requested position', async () => {
