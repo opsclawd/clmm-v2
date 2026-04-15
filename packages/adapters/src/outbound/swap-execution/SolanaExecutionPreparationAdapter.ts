@@ -30,12 +30,13 @@ import {
   setTransactionMessageLifetimeUsingBlockhash,
   prependTransactionMessageInstructions,
 } from '@solana/kit';
-import { fetchPosition, fetchWhirlpool, getPositionAddress } from '@orca-so/whirlpools-client';
+import { fetchWhirlpool } from '@orca-so/whirlpools-client';
 import { closePositionInstructions, swapInstructions, setNativeMintWrappingStrategy } from '@orca-so/whirlpools';
 import type { Instruction } from '@solana/kit';
 import type { ExecutionPreparationPort } from '@clmm/application';
 import type { ExecutionPlan, WalletId, PositionId, PoolId, ClockTimestamp, LiquidityPosition } from '@clmm/domain';
 import { makeClockTimestamp } from '@clmm/domain';
+import { SolanaPositionSnapshotReader } from '../solana-position-reads/SolanaPositionSnapshotReader.js';
 
 const JUPITER_SWAP_API_BASES = [
   'https://lite-api.jup.ag/swap/v1',
@@ -50,7 +51,10 @@ const TOKEN_MINTS: Record<'SOL' | 'USDC', string> = {
 };
 
 export class SolanaExecutionPreparationAdapter implements ExecutionPreparationPort {
-  constructor(private readonly rpcUrl: string) {}
+  constructor(
+    private readonly rpcUrl: string,
+    private readonly snapshotReader: SolanaPositionSnapshotReader,
+  ) {}
 
   private getRpc() {
     return createSolanaRpc(this.rpcUrl);
@@ -74,7 +78,7 @@ export class SolanaExecutionPreparationAdapter implements ExecutionPreparationPo
 
     const { value: latestBlockhash } = await rpc.getLatestBlockhash().send();
 
-    const positionData = await this.fetchPositionData(rpc, positionId, walletId);
+    const positionData = await this.snapshotReader.fetchSinglePosition(rpc, positionId, walletId);
     if (!positionData) {
       throw new Error(`Position not found: ${positionId}`);
     }
@@ -119,53 +123,6 @@ export class SolanaExecutionPreparationAdapter implements ExecutionPreparationPo
       serializedPayload: serializedBytes,
       preparedAt: makeClockTimestamp(Date.now()),
     };
-  }
-
-  private async fetchPositionData(rpc: ReturnType<typeof createSolanaRpc>, positionId: PositionId, walletId: WalletId): Promise<LiquidityPosition | null> {
-    try {
-      const positionMint = address(positionId);
-      const [positionAddress] = await getPositionAddress(positionMint);
-      const positionAccount = await fetchPosition(rpc, positionAddress);
-      const position = positionAccount.data;
-      const whirlpoolAddress = position.whirlpool;
-
-      const whirlpoolAccount = await fetchWhirlpool(rpc, whirlpoolAddress);
-      const whirlpool = whirlpoolAccount.data;
-
-      const bounds = {
-        lowerBound: position.tickLowerIndex,
-        upperBound: position.tickUpperIndex,
-      };
-
-      const currentTick = whirlpool.tickCurrentIndex;
-      const rangeState = this.evaluateRangeState(bounds, currentTick);
-
-      return {
-        positionId,
-        walletId,
-        // boundary: Orca SDK returns Address type; domain uses branded PoolId
-        poolId: whirlpoolAddress.toString() as unknown as PoolId,
-        bounds,
-        lastObservedAt: makeClockTimestamp(Date.now()),
-        rangeState,
-        monitoringReadiness: { kind: 'active' },
-      };
-    } catch {
-      return null;
-    }
-  }
-
-  private evaluateRangeState(
-    bounds: { lowerBound: number; upperBound: number },
-    currentTick: number
-  ): { kind: 'in-range' | 'below-range' | 'above-range'; currentPrice: number } {
-    if (currentTick < bounds.lowerBound) {
-      return { kind: 'below-range', currentPrice: currentTick };
-    }
-    if (currentTick > bounds.upperBound) {
-      return { kind: 'above-range', currentPrice: currentTick };
-    }
-    return { kind: 'in-range', currentPrice: currentTick };
   }
 
   private async buildOrcaInstructions(
@@ -268,6 +225,7 @@ export class SolanaExecutionPreparationAdapter implements ExecutionPreparationPo
     } catch (jupiterError) {
       const jupiterMessage =
         jupiterError instanceof Error ? jupiterError.message : 'unknown Jupiter swap preparation error';
+      // eslint-disable-next-line no-console
       console.error('Jupiter swap preparation failed, attempting Orca fallback:', jupiterError);
 
       try {
@@ -282,6 +240,7 @@ export class SolanaExecutionPreparationAdapter implements ExecutionPreparationPo
         return { instructions };
       } catch (orcaError) {
         const orcaMessage = orcaError instanceof Error ? orcaError.message : 'unknown Orca fallback error';
+        // eslint-disable-next-line no-console
         console.error('Orca fallback swap preparation failed:', orcaError);
         return {
           instructions: [],

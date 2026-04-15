@@ -1,5 +1,6 @@
 import 'reflect-metadata';
 import { Module } from '@nestjs/common';
+import { SolanaPositionSnapshotReader } from '../outbound/solana-position-reads/SolanaPositionSnapshotReader.js';
 import { OrcaPositionReadAdapter } from '../outbound/solana-position-reads/OrcaPositionReadAdapter.js';
 import { SolanaRangeObservationAdapter } from '../outbound/solana-position-reads/SolanaRangeObservationAdapter.js';
 import { OperationalStorageAdapter } from '../outbound/storage/OperationalStorageAdapter.js';
@@ -46,13 +47,14 @@ const systemIds: IdGeneratorPort = {
   generateId: () => `${Date.now()}-${++_idCounter}`,
 };
 
-const orcaPositionRead = new OrcaPositionReadAdapter(rpcUrl);
+const snapshotReader = new SolanaPositionSnapshotReader(rpcUrl);
+const orcaPositionRead = new OrcaPositionReadAdapter(rpcUrl, snapshotReader, db);
 const rangeObservation = new SolanaRangeObservationAdapter(rpcUrl);
-const operationalStorage = new OperationalStorageAdapter(db, systemIds, orcaPositionRead);
+const operationalStorage = new OperationalStorageAdapter(db, systemIds);
 const historyStorage = new OffChainHistoryStorageAdapter(db);
 const monitoredWalletStorage = new MonitoredWalletStorageAdapter(db);
 const notificationDedupStorage = new NotificationDedupStorageAdapter(db);
-const solanaPreparation = new SolanaExecutionPreparationAdapter(rpcUrl);
+const solanaPreparation = new SolanaExecutionPreparationAdapter(rpcUrl, snapshotReader);
 const solanaSubmission = new SolanaExecutionSubmissionAdapter(rpcUrl);
 const durableNotificationEvent = new DurableNotificationEventAdapter(db, systemIds);
 const telemetry = new TelemetryAdapter();

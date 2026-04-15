@@ -1,7 +1,7 @@
 /**
  * BreachScanJobHandler
  * pg-boss job handler — scans supported positions for breaches
- * Runs on a schedule (e.g., every 60 seconds) via WorkerModule
+ * Runs on a schedule (e.g., every 5 minutes) via WorkerModule
  */
 import { Inject, Injectable } from '@nestjs/common';
 import { scanPositionsForBreaches, recordExecutionAbandonment } from '@clmm/application';
