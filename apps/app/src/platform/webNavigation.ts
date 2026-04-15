@@ -5,15 +5,21 @@ type RouterLike = {
 
 type NavigationMethod = 'push' | 'replace';
 
+export function normalizeExpoRouterRoute(path: string): string {
+  return path.startsWith('/(tabs)/') ? path.replace('/(tabs)', '') : path;
+}
+
 export function navigateRoute(params: {
   router: RouterLike;
   path: string;
   method: NavigationMethod;
 }): void {
+  const canonicalPath = normalizeExpoRouterRoute(params.path);
+
   if (params.method === 'replace') {
-    params.router.replace(params.path);
+    params.router.replace(canonicalPath);
     return;
   }
 
-  params.router.push(params.path);
+  params.router.push(canonicalPath);
 }

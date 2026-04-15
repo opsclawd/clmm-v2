@@ -1,7 +1,19 @@
 import { describe, expect, it, vi } from 'vitest';
-import { navigateRoute } from './webNavigation';
+import { navigateRoute, normalizeExpoRouterRoute } from './webNavigation';
 
-describe('webNavigation', () => {
+describe('normalizeExpoRouterRoute', () => {
+  it('strips (tabs) group prefix', () => {
+    expect(normalizeExpoRouterRoute('/(tabs)/positions')).toBe('/positions');
+    expect(normalizeExpoRouterRoute('/(tabs)/history')).toBe('/history');
+  });
+
+  it('leaves non-group paths unchanged', () => {
+    expect(normalizeExpoRouterRoute('/position/abc')).toBe('/position/abc');
+    expect(normalizeExpoRouterRoute('/connect')).toBe('/connect');
+  });
+});
+
+describe('navigateRoute', () => {
   it('uses router.push for push method', () => {
     const router = {
       push: vi.fn(),
@@ -26,15 +38,15 @@ describe('webNavigation', () => {
 
     navigateRoute({
       router,
-      path: '/(tabs)/positions',
+      path: '/connect',
       method: 'replace',
     });
 
-    expect(router.replace).toHaveBeenCalledWith('/(tabs)/positions');
+    expect(router.replace).toHaveBeenCalledWith('/connect');
     expect(router.push).not.toHaveBeenCalled();
   });
 
-  it('preserves expo router group paths without normalization', () => {
+  it('normalizes group paths to canonical form before routing', () => {
     const router = {
       push: vi.fn(),
       replace: vi.fn(),
@@ -43,10 +55,10 @@ describe('webNavigation', () => {
     navigateRoute({
       router,
       path: '/(tabs)/positions',
-      method: 'push',
+      method: 'replace',
     });
 
-    expect(router.push).toHaveBeenCalledWith('/(tabs)/positions');
+    expect(router.replace).toHaveBeenCalledWith('/positions');
   });
 
   it('preserves dynamic route params', () => {
