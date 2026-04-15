@@ -58,13 +58,18 @@ Before deeper investigation in a fresh worktree:
 
 ## Validation Expectations
 
-Before claiming substantial work is complete, run the narrowest relevant checks and then the repo-level checks when the change is broad:
+Before claiming work is complete, asking for review, or preparing a PR, confirm verification was run and report the result.
+
+Run the narrowest relevant checks for the change. When the change is broad, cross-package, or likely to affect shared contracts, run the full repo checks:
 
 - `pnpm build`
 - `pnpm typecheck`
 - `pnpm lint`
 - `pnpm boundaries`
 - `pnpm test`
+
+Do not say a task is done or PR-ready without stating what you verified.
+If you could not run a required check, say that explicitly and why.
 
 ## Compound Engineering
 

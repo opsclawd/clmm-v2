@@ -46,6 +46,8 @@ pnpm test
 
 ## Verification Before Completion
 
+Before marking work complete, asking for review, or preparing a PR, run the relevant checks and report what you verified.
+
 Run the narrowest checks that cover your change. For broad or cross-package changes, run the full repo checks:
 
 ```bash
@@ -55,6 +57,8 @@ pnpm lint
 pnpm boundaries
 pnpm test
 ```
+
+If you could not run one of the expected checks, say that explicitly instead of implying the work is fully verified.
 
 ## Notes For Agents
 

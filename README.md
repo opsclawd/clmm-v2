@@ -31,6 +31,22 @@ pnpm boundaries
 pnpm test
 ```
 
+## Completion Gate
+
+Before marking work complete or opening a PR, run the relevant verification commands and report what passed.
+
+For broad or cross-package changes, use the full repo verification set:
+
+```bash
+pnpm build
+pnpm typecheck
+pnpm lint
+pnpm boundaries
+pnpm test
+```
+
+If a required check was not run, say so explicitly.
+
 ## Repo Map
 
 - `apps/app`: Expo shell, routes, composition, and platform edge code
