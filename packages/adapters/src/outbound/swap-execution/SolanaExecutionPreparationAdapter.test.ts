@@ -5,6 +5,7 @@ import { SolanaExecutionPreparationAdapter } from './SolanaExecutionPreparationA
 import { SolanaPositionSnapshotReader } from '../solana-position-reads/SolanaPositionSnapshotReader';
 
 const MOCK_WALLET = '4Nd1mBQtrMJVYVfKf2PJy9NZUZdTAsp7D4xWLs4gDB4T' as WalletId;
+const MOCK_POSITION_ID = '9WzDXwBbmkg8ZTbNMqUxvQRAyrZzDsGYdLVL9zYtAWWM';
 const MOCK_POOL = '7qbRF6YsyGuLUVs6Y1q64bdVrfe4ZcUUz1JRdoVNUJnm' as unknown as PoolId;
 
 const SOL_MINT = 'So11111111111111111111111111111111111111112';
@@ -74,49 +75,62 @@ describe('SolanaExecutionPreparationAdapter', () => {
     expect(result.instructions).toEqual([fallbackInstruction]);
   });
 
-  it('fetchSinglePosition on reader returns the real walletId, not the position mint', async () => {
-    const whirlpoolsClient = await import('@orca-so/whirlpools-client');
-
-    const mockPositionMint = '9WzDXwBbmkg8ZTbNMqUxvQRAyrZzDsGYdLVL9zYtAWWM';
-    const mockWhirlpoolAddress = '7qbRF6YsyGuLUVs6Y1q64bdVrfe4ZcUUz1JRdoVNUJnm';
-    const mockRpc = {} as unknown;
-
-    vi.mocked(whirlpoolsClient.getPositionAddress).mockResolvedValue([
-      'DerivedPositionPDA11111111111111111111111111',
-      0,
-    ] as unknown as Awaited<ReturnType<typeof whirlpoolsClient.getPositionAddress>>);
-
-    vi.mocked(whirlpoolsClient.fetchPosition).mockResolvedValue({
-      address: 'DerivedPositionPDA11111111111111111111111111',
-      data: {
-        whirlpool: mockWhirlpoolAddress,
-        tickLowerIndex: -100,
-        tickUpperIndex: 100,
-        positionMint: mockPositionMint,
-      },
-    } as unknown as Awaited<ReturnType<typeof whirlpoolsClient.fetchPosition>>);
-
-    vi.mocked(whirlpoolsClient.fetchWhirlpool).mockResolvedValue({
-      data: {
-        tickCurrentIndex: 50,
-      },
-    } as unknown as Awaited<ReturnType<typeof whirlpoolsClient.fetchWhirlpool>>);
-
+  it('uses the snapshot reader when preparing execution', async () => {
     const mockReader = new SolanaPositionSnapshotReader('https://api.mainnet-beta.solana.com');
     vi.mocked(mockReader.fetchSinglePosition).mockResolvedValue({
-      positionId: mockPositionMint as any,
+      positionId: MOCK_POSITION_ID as any,
       walletId: MOCK_WALLET,
-      poolId: mockWhirlpoolAddress as any,
+      poolId: MOCK_POOL,
       bounds: { lowerBound: -100, upperBound: 100 },
-      lastObservedAt: { timestamp: Date.now() } as any,
+      lastObservedAt: 1_000_000 as any,
       rangeState: { kind: 'in-range', currentPrice: 50 },
-      monitoringReadiness: { kind: 'active' } as any,
-    } as any);
+      monitoringReadiness: { kind: 'active' },
+    });
 
-    const result = await mockReader.fetchSinglePosition(mockRpc as any, mockPositionMint as any, MOCK_WALLET);
+    const adapter = new SolanaExecutionPreparationAdapter('https://api.mainnet-beta.solana.com', mockReader);
+    const internal = adapter as unknown as {
+      getRpc: () => {
+        getLatestBlockhash: () => { send: () => Promise<{ value: { blockhash: string; lastValidBlockHeight: bigint } }> };
+      };
+      buildOrcaInstructions: (...args: unknown[]) => Promise<{
+        instructions: Instruction[];
+        tokenAmounts: { tokenA: bigint; tokenB: bigint };
+        tokenMintA: string;
+        tokenMintB: string;
+      }>;
+      buildSwapInstructions: (...args: unknown[]) => Promise<{ instructions: Instruction[]; failureReason?: string }>;
+    };
 
-    expect(result).not.toBeNull();
-    expect(result!.walletId).toBe(MOCK_WALLET);
-    expect(result!.walletId).not.toBe(mockPositionMint);
+    vi.spyOn(internal, 'getRpc').mockReturnValue({
+      getLatestBlockhash: () => ({
+        send: async () => ({
+          value: { blockhash: '11111111111111111111111111111111', lastValidBlockHeight: 1n },
+        }),
+      }),
+    } as never);
+
+    vi.spyOn(internal, 'buildOrcaInstructions').mockResolvedValue({
+      instructions: [],
+      tokenAmounts: { tokenA: 0n, tokenB: 0n },
+      tokenMintA: SOL_MINT,
+      tokenMintB: USDC_MINT,
+    });
+
+    vi.spyOn(internal, 'buildSwapInstructions').mockResolvedValue({ instructions: [] });
+
+    await expect(adapter.prepareExecution({
+      plan: { steps: [] } as unknown as ExecutionPlan,
+      walletId: MOCK_WALLET,
+      positionId: MOCK_POSITION_ID as any,
+    })).resolves.toEqual(expect.objectContaining({
+      serializedPayload: expect.any(Uint8Array),
+    }));
+
+    expect(mockReader.fetchSinglePosition).toHaveBeenCalledOnce();
+    expect(mockReader.fetchSinglePosition).toHaveBeenCalledWith(
+      expect.anything(),
+      MOCK_POSITION_ID,
+      MOCK_WALLET,
+    );
   });
 });
