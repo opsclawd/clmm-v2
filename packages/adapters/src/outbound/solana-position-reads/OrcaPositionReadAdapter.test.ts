@@ -29,7 +29,7 @@ describe('OrcaPositionReadAdapter', () => {
 
   const mockDb = {
     insert: () => ({
-      values: (row: { walletId: string; positionId: string; firstSeenAt: number; lastSeenAt: number }) => ({
+      values: (_row: { walletId: string; positionId: string; firstSeenAt: number; lastSeenAt: number }) => ({
         onConflictDoUpdate: () => Promise.resolve(),
       }),
     }),
@@ -53,7 +53,7 @@ describe('OrcaPositionReadAdapter', () => {
       ] as unknown as Awaited<ReturnType<typeof fetchPositionsForOwner>>);
 
       const mockReader = new SolanaPositionSnapshotReader(mockRpcUrl);
-      vi.mocked(mockReader.fetchWhirlpoolsBatched).mockResolvedValue(
+      mockReader.fetchWhirlpoolsBatched = vi.fn().mockResolvedValue(
         new Map([[MOCK_WHIRLPOOL, { tickCurrentIndex: -18130 }]]),
       );
 
@@ -82,7 +82,7 @@ describe('OrcaPositionReadAdapter', () => {
       ] as unknown as Awaited<ReturnType<typeof fetchPositionsForOwner>>);
 
       const mockReader = new SolanaPositionSnapshotReader(mockRpcUrl);
-      vi.mocked(mockReader.fetchWhirlpoolsBatched).mockResolvedValue(
+      mockReader.fetchWhirlpoolsBatched = vi.fn().mockResolvedValue(
         new Map([[MOCK_WHIRLPOOL, { tickCurrentIndex: -18130 }]]),
       );
 
@@ -109,7 +109,7 @@ describe('OrcaPositionReadAdapter', () => {
       ] as unknown as Awaited<ReturnType<typeof fetchPositionsForOwner>>);
 
       const mockReader = new SolanaPositionSnapshotReader(mockRpcUrl);
-      vi.mocked(mockReader.fetchWhirlpoolsBatched).mockResolvedValue(
+      mockReader.fetchWhirlpoolsBatched = vi.fn().mockResolvedValue(
         new Map([[MOCK_WHIRLPOOL, { tickCurrentIndex: -20000 }]]),
       );
 
@@ -136,7 +136,7 @@ describe('OrcaPositionReadAdapter', () => {
       ] as unknown as Awaited<ReturnType<typeof fetchPositionsForOwner>>);
 
       const mockReader = new SolanaPositionSnapshotReader(mockRpcUrl);
-      vi.mocked(mockReader.fetchWhirlpoolsBatched).mockResolvedValue(
+      mockReader.fetchWhirlpoolsBatched = vi.fn().mockResolvedValue(
         new Map([[MOCK_WHIRLPOOL, { tickCurrentIndex: 0 }]]),
       );
 
@@ -168,7 +168,7 @@ describe('OrcaPositionReadAdapter', () => {
       ] as unknown as Awaited<ReturnType<typeof fetchPositionsForOwner>>);
 
       const mockReader = new SolanaPositionSnapshotReader(mockRpcUrl);
-      vi.mocked(mockReader.fetchWhirlpoolsBatched).mockResolvedValue(
+      mockReader.fetchWhirlpoolsBatched = vi.fn().mockResolvedValue(
         new Map([[MOCK_WHIRLPOOL, { tickCurrentIndex: -7500 }]]),
       );
 
@@ -200,7 +200,7 @@ describe('OrcaPositionReadAdapter', () => {
       ] as unknown as Awaited<ReturnType<typeof fetchPositionsForOwner>>);
 
       const mockReader = new SolanaPositionSnapshotReader(mockRpcUrl);
-      vi.mocked(mockReader.fetchWhirlpoolsBatched).mockResolvedValue(
+      mockReader.fetchWhirlpoolsBatched = vi.fn().mockResolvedValue(
         new Map([[MOCK_WHIRLPOOL, { tickCurrentIndex: -18130 }]]),
       );
 
@@ -229,7 +229,7 @@ describe('OrcaPositionReadAdapter', () => {
       ] as unknown as Awaited<ReturnType<typeof fetchPositionsForOwner>>);
 
       const mockReader = new SolanaPositionSnapshotReader(mockRpcUrl);
-      vi.mocked(mockReader.fetchWhirlpoolsBatched).mockResolvedValue(
+      mockReader.fetchWhirlpoolsBatched = vi.fn().mockResolvedValue(
         new Map([[MOCK_WHIRLPOOL, { tickCurrentIndex: -18130 }]]),
       );
 
@@ -270,7 +270,7 @@ describe('OrcaPositionReadAdapter', () => {
       ] as unknown as Awaited<ReturnType<typeof fetchPositionsForOwner>>);
 
       const mockReader = new SolanaPositionSnapshotReader(mockRpcUrl);
-      vi.mocked(mockReader.fetchWhirlpoolsBatched).mockResolvedValue(new Map());
+      mockReader.fetchWhirlpoolsBatched = vi.fn().mockResolvedValue(new Map());
 
       const adapter = new OrcaPositionReadAdapter(mockRpcUrl, mockReader, mockDb as never);
       const positions = await adapter.listSupportedPositions(MOCK_WALLET);
@@ -282,12 +282,12 @@ describe('OrcaPositionReadAdapter', () => {
   describe('getPosition', () => {
     it('returns the requested position when the wallet owns it', async () => {
       const mockReader = new SolanaPositionSnapshotReader(mockRpcUrl);
-      vi.mocked(mockReader.fetchSinglePosition).mockResolvedValue({
+      mockReader.fetchSinglePosition = vi.fn().mockResolvedValue({
         positionId: makePositionId(MOCK_POSITION_MINT),
         walletId: MOCK_WALLET,
-        poolId: MOCK_WHIRLPOOL as any,
+        poolId: MOCK_WHIRLPOOL,
         bounds: { lowerBound: -18304, upperBound: -17956 },
-        lastObservedAt: 1_000_000 as any,
+        lastObservedAt: 1_000_000,
         rangeState: { kind: 'in-range', currentPrice: -18130 },
         monitoringReadiness: { kind: 'active' },
       });
@@ -299,8 +299,10 @@ describe('OrcaPositionReadAdapter', () => {
       expect(result?.positionId).toBe(MOCK_POSITION_MINT);
       expect(result?.walletId).toBe(MOCK_WALLET);
       expect(result?.rangeState.kind).toBe('in-range');
-      expect(mockReader.fetchSinglePosition).toHaveBeenCalledOnce();
-      expect(mockReader.fetchSinglePosition).toHaveBeenCalledWith(
+      // eslint-disable-next-line @typescript-eslint/unbound-method
+      const fetchSinglePosition = mockReader.fetchSinglePosition;
+      expect(fetchSinglePosition).toHaveBeenCalledOnce();
+      expect(fetchSinglePosition).toHaveBeenCalledWith(
         expect.anything(),
         makePositionId(MOCK_POSITION_MINT),
         MOCK_WALLET,
@@ -309,7 +311,7 @@ describe('OrcaPositionReadAdapter', () => {
 
     it('returns null when the wallet does not own the requested position', async () => {
       const mockReader = new SolanaPositionSnapshotReader(mockRpcUrl);
-      vi.mocked(mockReader.fetchSinglePosition).mockResolvedValue(null);
+      mockReader.fetchSinglePosition = vi.fn().mockResolvedValue(null);
 
       const adapter = new OrcaPositionReadAdapter(mockRpcUrl, mockReader, mockDb as never);
       const result = await adapter.getPosition(

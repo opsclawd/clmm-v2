@@ -1,6 +1,6 @@
 import { describe, it, expect, vi } from 'vitest';
 import type { Instruction } from '@solana/kit';
-import type { ExecutionPlan, PoolId, WalletId } from '@clmm/domain';
+import type { ExecutionPlan, PoolId, PositionId, WalletId } from '@clmm/domain';
 import { SolanaExecutionPreparationAdapter } from './SolanaExecutionPreparationAdapter';
 import { SolanaPositionSnapshotReader } from '../solana-position-reads/SolanaPositionSnapshotReader';
 
@@ -77,12 +77,12 @@ describe('SolanaExecutionPreparationAdapter', () => {
 
   it('uses the snapshot reader when preparing execution', async () => {
     const mockReader = new SolanaPositionSnapshotReader('https://api.mainnet-beta.solana.com');
-    vi.mocked(mockReader.fetchSinglePosition).mockResolvedValue({
-      positionId: MOCK_POSITION_ID as any,
+    mockReader.fetchSinglePosition = vi.fn().mockResolvedValue({
+      positionId: MOCK_POSITION_ID,
       walletId: MOCK_WALLET,
       poolId: MOCK_POOL,
       bounds: { lowerBound: -100, upperBound: 100 },
-      lastObservedAt: 1_000_000 as any,
+      lastObservedAt: 1_000_000,
       rangeState: { kind: 'in-range', currentPrice: 50 },
       monitoringReadiness: { kind: 'active' },
     });
@@ -121,13 +121,15 @@ describe('SolanaExecutionPreparationAdapter', () => {
     await expect(adapter.prepareExecution({
       plan: { steps: [] } as unknown as ExecutionPlan,
       walletId: MOCK_WALLET,
-      positionId: MOCK_POSITION_ID as any,
-    })).resolves.toEqual(expect.objectContaining({
-      serializedPayload: expect.any(Uint8Array),
-    }));
+      positionId: MOCK_POSITION_ID as PositionId,
+    })).resolves.toMatchObject({
+      serializedPayload: expect.any(Uint8Array) as Uint8Array,
+    });
 
-    expect(mockReader.fetchSinglePosition).toHaveBeenCalledOnce();
-    expect(mockReader.fetchSinglePosition).toHaveBeenCalledWith(
+    // eslint-disable-next-line @typescript-eslint/unbound-method
+    const fetchSinglePosition = mockReader.fetchSinglePosition;
+    expect(fetchSinglePosition).toHaveBeenCalledOnce();
+    expect(fetchSinglePosition).toHaveBeenCalledWith(
       expect.anything(),
       MOCK_POSITION_ID,
       MOCK_WALLET,
