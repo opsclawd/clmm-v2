@@ -24,18 +24,5 @@ export default function IndexRoute() {
     navigateRoute({ router, path: '/connect', method: 'replace' });
   }, [rootNavigationState?.key, router]);
 
-  // Fallback: ensure redirect even if navigation state never becomes ready.
-  // Does not set hasNavigated — if the fallback fires and the primary
-  // effect later becomes ready, the primary will take over correctly.
-  useEffect(() => {
-    const timeoutId = setTimeout(() => {
-      if (!hasNavigated.current) {
-        navigateRoute({ router, path: '/connect', method: 'replace' });
-      }
-    }, 1500);
-
-    return () => clearTimeout(timeoutId);
-  }, [router]);
-
   return null;
 }
