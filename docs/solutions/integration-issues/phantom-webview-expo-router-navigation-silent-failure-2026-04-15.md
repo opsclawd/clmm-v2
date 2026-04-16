@@ -1,6 +1,7 @@
 ---
-title: Phantom WebView silently fails Expo Router soft navigation
+title: Solana mobile WebView silently fails Expo Router soft navigation
 date: 2026-04-15
+last_refreshed: 2026-04-15
 category: integration-issues
 module: apps/app
 problem_type: integration_issue
@@ -15,6 +16,9 @@ resolution_type: code_fix
 severity: critical
 tags:
   - phantom
+  - backpack
+  - solflare
+  - solana-wallet-browser
   - webview
   - expo-router
   - navigation
@@ -23,11 +27,11 @@ tags:
   - history-api
 ---
 
-# Phantom WebView silently fails Expo Router soft navigation
+# Solana mobile WebView silently fails Expo Router soft navigation
 
 ## Problem
 
-Expo Router's soft navigation (`router.push`, `router.replace`, `<Redirect>`) silently fails in Phantom's in-app WebView. Navigation actions execute without throwing errors, but the DOM and URL bar never change. The app is entirely non-functional on Phantom mobile browser, which is a primary target platform for this Solana dApp.
+Expo Router's soft navigation (`router.push`, `router.replace`, `<Redirect>`) silently fails in Solana wallet in-app browsers (Phantom, Backpack, Solflare, and others). Navigation actions execute without throwing errors, but the DOM and URL bar never change. The app is entirely non-functional on Phantom mobile browser, which is a primary target platform for this Solana dApp.
 
 ## Symptoms
 
@@ -49,19 +53,20 @@ The breakthrough came from adding an on-screen debug overlay that rendered `navS
 
 ## Solution
 
-**1. `apps/app/src/platform/webNavigation.ts`** — Detect Phantom WebView and bypass Expo Router with `window.location`:
+**1. `apps/app/src/platform/webNavigation.ts`** — Detect Solana mobile WebViews and bypass Expo Router with `window.location`:
 
 ```typescript
-function isInPhantomWebView(): boolean {
+export function isSolanaMobileWebView(): boolean {
   if (!isWebPlatform()) return false;
   try {
     const win = window as unknown as Record<string, unknown>;
     const solana = win['solana'];
-    if (solana && typeof solana === 'object' && solana !== null) {
-      const sol = solana as Record<string, unknown>;
-      if (sol['isPhantom'] === true) return true;
-    }
-    if (typeof navigator !== 'undefined' && /Phantom/i.test(navigator.userAgent)) return true;
+    const hasWalletInject =
+      solana && typeof solana === 'object' && solana !== null &&
+      typeof (solana as Record<string, unknown>)['connect'] === 'function';
+    if (!hasWalletInject) return false;
+    const ua = typeof navigator !== 'undefined' ? navigator.userAgent : '';
+    return /wv\)/.test(ua) || /iPhone/.test(ua) || /iPad/.test(ua);
   } catch { /* ignore */ }
   return false;
 }
@@ -81,7 +86,7 @@ export function navigateRoute(params: {
   method: NavigationMethod;
 }): void {
   const canonicalPath = normalizeExpoRouterRoute(params.path);
-  if (isWebPlatform() && isInPhantomWebView()) {
+  if (isWebPlatform() && isSolanaMobileWebView()) {
     hardNavigate(canonicalPath, params.method);
     return;
   }
@@ -92,6 +97,8 @@ export function navigateRoute(params: {
   params.router.push(canonicalPath);
 }
 ```
+
+Detection logic: `window.solana.connect` is present in all Solana wallet browsers. Android WebView sets `wv)` in the UA; iOS/iPadOS in-app WebViews set `iPhone` or `iPad`. Desktop browsers with Solana extensions (no `wv)`, no `iPhone`/`iPad`) keep Expo Router soft navigation — they don't have the WebView History API problem.
 
 **2. `apps/app/app/index.tsx`** — Wait for `navState.key` readiness on web, preserve `<Redirect>` on native:
 
@@ -119,17 +126,17 @@ export default function IndexRoute() {
 
 ## Why This Works
 
-Phantom's in-app WebView has a broken or non-standard browser History API implementation. Expo Router's soft navigation relies on React Navigation dispatching actions through the browser History API (`pushState`/`replaceState` + `popstate` events), which silently fails in Phantom's WebView — the API calls execute without error, but the WebView doesn't process the resulting state changes.
+Solana wallet in-app browsers (Phantom, Backpack, Solflare, etc.) have a broken or non-standard browser History API implementation in their embedded WebViews. Expo Router's soft navigation relies on React Navigation dispatching actions through the browser History API (`pushState`/`replaceState` + `popstate` events), which silently fails — the API calls execute without error, but the WebView doesn't process the resulting state changes.
 
-The fix detects the Phantom environment and falls back to `window.location.replace()` / `window.location.href`, which bypasses the History API entirely and forces a full page navigation. This is the only mechanism that works reliably in Phantom's WebView.
+The fix detects the Solana wallet WebView environment via `window.solana.connect` + mobile WebView UA markers, and falls back to `window.location.replace()` / `window.location.href`, which bypasses the History API entirely and forces a full page navigation. `window.location` hard navigation works because wallet session is persisted to `localStorage` via Zustand `persist` — the app survives the full-page reload.
 
 ## Prevention
 
-- **Centralize navigation through an abstraction layer** — All calls must go through `navigateRoute()` rather than calling `router.push`/`router.replace` directly. This ensures the Phantom fallback applies everywhere without missing call sites.
-- **Never trust the History API in embedded WebViews** — Wallet in-app browsers (Phantom, MetaMask, etc.) often have non-standard WebView implementations. Any SPA routing framework that depends on the History API should have a `window.location` fallback path.
+- **Centralize navigation through an abstraction layer** — All calls must go through `navigateRoute()` rather than calling `router.push`/`router.replace` directly. This ensures the Solana WebView fallback applies everywhere without missing call sites.
+- **Never trust the History API in embedded WebViews** — Wallet in-app browsers (Phantom, MetaMask, Backpack, etc.) often have non-standard WebView implementations. Any SPA routing framework that depends on the History API should have a `window.location` fallback path.
 - **Distinguish trigger from mechanism when debugging navigation failures** — Three failed attempts conflated "the navigation isn't being triggered" with "the navigation mechanism is broken." Testing `window.location.replace()` directly isolated the mechanism as the failure point.
 - **On-screen debug overlay for WebView debugging** — When devtools are unavailable (restricted WebViews, mobile in-app browsers), render navigation state and test actions directly on screen. This pattern should be readily reproducible for future WebView issues.
-- **Test coverage gap** — The Phantom/hard-navigate branch in `webNavigation.ts` lacks unit tests since `window.location` is not easily mockable in the test environment. Consider integration testing with a headless WebView, or at minimum a test that verifies the detection function.
+- **Test `isSolanaMobileWebView` with `vi.stubGlobal`** — `window` and `navigator` can be stubbed in Vitest using `vi.stubGlobal`, making the detection function and the hard-navigation path fully unit-testable. See `webNavigation.test.ts` for the pattern.
 
 ## Related Issues
 
