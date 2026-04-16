@@ -13,16 +13,17 @@ function isWebPlatform(): boolean {
   return typeof window !== 'undefined';
 }
 
-function isInPhantomWebView(): boolean {
+export function isSolanaMobileWebView(): boolean {
   if (!isWebPlatform()) return false;
   try {
     const win = window as unknown as Record<string, unknown>;
     const solana = win['solana'];
-    if (solana && typeof solana === 'object' && solana !== null) {
-      const sol = solana as Record<string, unknown>;
-      if (sol['isPhantom'] === true) return true;
-    }
-    if (typeof navigator !== 'undefined' && /Phantom/i.test(navigator.userAgent)) return true;
+    const hasWalletInject =
+      solana && typeof solana === 'object' && solana !== null &&
+      typeof (solana as Record<string, unknown>)['connect'] === 'function';
+    if (!hasWalletInject) return false;
+    const ua = typeof navigator !== 'undefined' ? navigator.userAgent : '';
+    return /wv\)/.test(ua) || /iPhone/.test(ua);
   } catch {
     // ignore
   }
@@ -45,7 +46,7 @@ export function navigateRoute(params: {
 }): void {
   const canonicalPath = normalizeExpoRouterRoute(params.path);
 
-  if (isWebPlatform() && isInPhantomWebView()) {
+  if (isWebPlatform() && isSolanaMobileWebView()) {
     hardNavigate(canonicalPath, params.method);
     return;
   }

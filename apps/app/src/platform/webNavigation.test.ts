@@ -1,5 +1,46 @@
-import { describe, expect, it, vi } from 'vitest';
-import { navigateRoute, normalizeExpoRouterRoute } from './webNavigation';
+import { describe, expect, it, vi, afterEach } from 'vitest';
+import { navigateRoute, normalizeExpoRouterRoute, isSolanaMobileWebView } from './webNavigation';
+
+describe('isSolanaMobileWebView', () => {
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+
+  it('returns true on Android WebView with window.solana.connect', () => {
+    vi.stubGlobal('window', { solana: { connect: vi.fn() } });
+    vi.stubGlobal('navigator', { userAgent: 'Mozilla/5.0 (Linux; Android 13; Pixel 7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Mobile Safari/537.36 (wv)' });
+
+    expect(isSolanaMobileWebView()).toBe(true);
+  });
+
+  it('returns true on iOS iPhone with window.solana.connect', () => {
+    vi.stubGlobal('window', { solana: { connect: vi.fn() } });
+    vi.stubGlobal('navigator', { userAgent: 'Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) AppleWebKit/605.1.15' });
+
+    expect(isSolanaMobileWebView()).toBe(true);
+  });
+
+  it('returns false on desktop browser with window.solana.connect (e.g. Phantom extension)', () => {
+    vi.stubGlobal('window', { solana: { connect: vi.fn() } });
+    vi.stubGlobal('navigator', { userAgent: 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36' });
+
+    expect(isSolanaMobileWebView()).toBe(false);
+  });
+
+  it('returns false on mobile user agent without window.solana (e.g. Chrome mobile)', () => {
+    vi.stubGlobal('window', {});
+    vi.stubGlobal('navigator', { userAgent: 'Mozilla/5.0 (Linux; Android 13) AppleWebKit/537.36 Mobile Safari/537.36 (wv)' });
+
+    expect(isSolanaMobileWebView()).toBe(false);
+  });
+
+  it('returns false when window.solana exists but has no connect function', () => {
+    vi.stubGlobal('window', { solana: { isPhantom: true } });
+    vi.stubGlobal('navigator', { userAgent: 'Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) AppleWebKit/605.1.15' });
+
+    expect(isSolanaMobileWebView()).toBe(false);
+  });
+});
 
 describe('normalizeExpoRouterRoute', () => {
   it('strips (tabs) group prefix', () => {
@@ -74,5 +115,23 @@ describe('navigateRoute', () => {
     });
 
     expect(router.push).toHaveBeenCalledWith('/signing/attempt-123?previewId=prev-456&triggerId=trig-789');
+  });
+
+  it('uses window.location hard navigation in Solana mobile WebView', () => {
+    const replaceFn = vi.fn();
+    vi.stubGlobal('window', {
+      solana: { connect: vi.fn() },
+      location: { origin: 'https://app.example.com', replace: replaceFn, href: '' },
+    });
+    vi.stubGlobal('navigator', { userAgent: 'Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) AppleWebKit/605.1.15' });
+
+    const router = { push: vi.fn(), replace: vi.fn() };
+
+    navigateRoute({ router, path: '/positions', method: 'replace' });
+
+    expect(replaceFn).toHaveBeenCalledWith('https://app.example.com/positions');
+    expect(router.replace).not.toHaveBeenCalled();
+
+    vi.unstubAllGlobals();
   });
 });
