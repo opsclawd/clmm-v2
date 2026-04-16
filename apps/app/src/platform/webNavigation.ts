@@ -23,7 +23,7 @@ export function isSolanaMobileWebView(): boolean {
       typeof (solana as Record<string, unknown>)['connect'] === 'function';
     if (!hasWalletInject) return false;
     const ua = typeof navigator !== 'undefined' ? navigator.userAgent : '';
-    return /wv\)/.test(ua) || /iPhone/.test(ua);
+    return /wv\)/.test(ua) || /iPhone/.test(ua) || /iPad/.test(ua);
   } catch {
     // ignore
   }

@@ -27,6 +27,13 @@ describe('isSolanaMobileWebView', () => {
     expect(isSolanaMobileWebView()).toBe(false);
   });
 
+  it('returns true on iPad WebView with window.solana.connect', () => {
+    vi.stubGlobal('window', { solana: { connect: vi.fn() } });
+    vi.stubGlobal('navigator', { userAgent: 'Mozilla/5.0 (iPad; CPU OS 17_0 like Mac OS X) AppleWebKit/605.1.15' });
+
+    expect(isSolanaMobileWebView()).toBe(true);
+  });
+
   it('returns false on mobile user agent without window.solana (e.g. Chrome mobile)', () => {
     vi.stubGlobal('window', {});
     vi.stubGlobal('navigator', { userAgent: 'Mozilla/5.0 (Linux; Android 13) AppleWebKit/537.36 Mobile Safari/537.36 (wv)' });
