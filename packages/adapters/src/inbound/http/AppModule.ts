@@ -69,7 +69,9 @@ const regimeEngineEventAdapter: RegimeEngineEventPort = new RegimeEngineExecutio
 );
 const currentSrLevelsAdapter = new CurrentSrLevelsAdapter(regimeEngineBaseUrl, telemetry);
 
-const SR_LEVELS_POOL_ALLOWLIST_MAP = new Map<string, { symbol: string; source: string }>();
+export const SR_LEVELS_POOL_ALLOWLIST_MAP = new Map<string, { symbol: string; source: string }>([
+  ['Czfq3xZZDmsdGdUyrNLtRhGc47cXcZtLG4crryfu44zE', { symbol: 'SOL/USDC', source: 'mco' }],
+]);
 
 @Module({
   controllers: [HealthController, PositionController, AlertController, PreviewController, ExecutionController, WalletController],
