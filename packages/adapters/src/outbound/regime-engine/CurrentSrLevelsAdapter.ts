@@ -24,16 +24,17 @@ export class CurrentSrLevelsAdapter implements CurrentSrLevelsPort {
       const timeout = setTimeout(() => controller.abort(), 2000);
 
       const res = await fetch(url, { signal: controller.signal });
-      clearTimeout(timeout);
 
-      if (res.status === 404) return null;
+      if (res.status === 404) { clearTimeout(timeout); return null; }
 
       if (!res.ok) {
+        clearTimeout(timeout);
         this.observability.log('warn', `SR levels fetch failed: status ${res.status}`, { symbol, source, status: res.status });
         return null;
       }
 
       const data = await res.json() as Record<string, unknown>;
+      clearTimeout(timeout);
 
       if (typeof data['capturedAtIso'] !== 'string' || !Array.isArray(data['supports']) || !Array.isArray(data['resistances'])) {
         this.observability.log('warn', 'SR levels response has unexpected shape', { symbol, source });

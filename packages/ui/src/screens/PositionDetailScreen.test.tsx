@@ -105,4 +105,32 @@ describe('PositionDetailScreen', () => {
 
     expect(screen.getByText('No current MCO levels available')).toBeTruthy();
   });
+
+  it('renders resistance section when supports is empty but resistances are present', () => {
+    const now = Date.now();
+    vi.spyOn(Date, 'now').mockReturnValue(now);
+
+    render(
+      <PositionDetailScreen
+        position={makePosition({
+          srLevels: {
+            briefId: 'brief-1',
+            sourceRecordedAtIso: null,
+            summary: null,
+            capturedAtUnixMs: now,
+            supports: [],
+            resistances: [{ price: 180 }, { price: 210 }],
+          },
+        })}
+      />,
+    );
+
+    expect(screen.getByText('Support & Resistance (MCO)')).toBeTruthy();
+    expect(screen.getByText('Support')).toBeTruthy();
+    expect(screen.getByText('Resistance')).toBeTruthy();
+    expect(screen.getByText('$180.00')).toBeTruthy();
+    expect(screen.getByText('$210.00')).toBeTruthy();
+
+    vi.restoreAllMocks();
+  });
 });
