@@ -5,6 +5,13 @@ const MAX_ATTEMPTS = 3;
 const REQUEST_TIMEOUT_MS = 5000;
 const BACKOFF_MS = [500, 1000];
 
+// Jitter the base backoff by +0-50% so concurrent CLMM instances hitting a
+// shared regime-engine outage do not retry in lockstep. Lower bound stays at
+// `base` so worst-case retry window is unchanged; upper bound is 1.5 * base.
+function jitteredBackoff(base: number): number {
+  return base + Math.random() * (base / 2);
+}
+
 export class RegimeEngineExecutionEventAdapter implements RegimeEngineEventPort {
   private disabledLogged = false;
 
@@ -63,7 +70,7 @@ export class RegimeEngineExecutionEventAdapter implements RegimeEngineEventPort 
         }
 
         if (attempt < MAX_ATTEMPTS - 1) {
-          await new Promise<void>(r => setTimeout(r, BACKOFF_MS[attempt] ?? 1000));
+          await new Promise<void>(r => setTimeout(r, jitteredBackoff(BACKOFF_MS[attempt] ?? 1000)));
           continue;
         }
 
@@ -77,7 +84,7 @@ export class RegimeEngineExecutionEventAdapter implements RegimeEngineEventPort 
         clearTimeout(timer);
 
         if (attempt < MAX_ATTEMPTS - 1) {
-          await new Promise<void>(r => setTimeout(r, BACKOFF_MS[attempt] ?? 1000));
+          await new Promise<void>(r => setTimeout(r, jitteredBackoff(BACKOFF_MS[attempt] ?? 1000)));
           continue;
         }
 
