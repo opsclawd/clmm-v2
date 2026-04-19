@@ -57,7 +57,7 @@ function toSrLevelsViewModelBlock(
   return { supportsSorted, resistancesSorted, freshnessLabel, isStale };
 }
 
-export function buildPositionDetailViewModel(dto: PositionDetailDto, now?: number): PositionDetailViewModel {
+export function buildPositionDetailViewModel(dto: PositionDetailDto, now: number): PositionDetailViewModel {
   const badge = getRangeStatusBadgeProps(dto.rangeState);
 
   const base = {
@@ -71,7 +71,7 @@ export function buildPositionDetailViewModel(dto: PositionDetailDto, now?: numbe
     alertLabel: dto.hasActionableTrigger ? 'Action Required' : 'No Alerts',
   };
 
-  const srLevelsVm = dto.srLevels && now != null
+  const srLevelsVm = dto.srLevels
     ? toSrLevelsViewModelBlock(dto.srLevels, now)
     : undefined;
 

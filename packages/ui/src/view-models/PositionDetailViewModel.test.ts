@@ -34,9 +34,13 @@ describe('buildPositionDetailViewModel srLevels', () => {
     expect(vm.srLevels).toBeUndefined();
   });
 
-  it('returns srLevels undefined when now is not provided', () => {
-    const vm = buildPositionDetailViewModel(makeDto({ srLevels: makeSrBlock() }));
-    expect(vm.srLevels).toBeUndefined();
+  it('returns a populated srLevels block when dto.srLevels is present', () => {
+    const now = 2_000_000;
+    const vm = buildPositionDetailViewModel(
+      makeDto({ srLevels: makeSrBlock({ capturedAtUnixMs: 1_700_000 }) }),
+      now,
+    );
+    expect(vm.srLevels).toBeDefined();
   });
 
   it('computes freshness for 5 minutes ago', () => {
