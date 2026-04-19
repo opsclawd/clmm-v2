@@ -718,4 +718,133 @@ describe('ExecutionController', () => {
     ).rejects.toBeInstanceOf(BadRequestException);
     expect(submissionPort.submittedPayloads).toHaveLength(0);
   });
+
+  describe('regime-engine event port wiring', () => {
+    async function saveAwaitingSignature(attemptId: string, direction = LOWER_BOUND_BREACH) {
+      await saveAttempt({
+        attemptId,
+        positionId: FIXTURE_POSITION_ID,
+        breachDirection: direction,
+        lifecycleState: { kind: 'awaiting-signature' },
+        completedSteps: [],
+        transactionReferences: [],
+      });
+      await executionRepo.savePreparedPayload({
+        payloadId: `payload-${attemptId}`,
+        attemptId,
+        unsignedPayload: new Uint8Array([1, 2, 3]),
+        payloadVersion: 'v1',
+        expiresAt: makeClockTimestamp(1_100_000),
+        createdAt: makeClockTimestamp(1_000_000),
+      });
+    }
+
+    it('fires regime-engine event on confirmed inline reconciliation', async () => {
+      await saveAwaitingSignature('attempt-regime-confirmed');
+      submissionPort.finalState = { kind: 'confirmed' };
+
+      await controller.submitExecution('attempt-regime-confirmed', {
+        signedPayload: Buffer.from([1, 2, 3]).toString('base64'),
+        payloadVersion: 'v1',
+      });
+
+      expect(regimeEngineEventPort.events).toHaveLength(1);
+      expect(regimeEngineEventPort.events[0]!.status).toBe('confirmed');
+      expect(regimeEngineEventPort.events[0]!.correlationId).toBe('attempt-regime-confirmed');
+    });
+
+    it('fires regime-engine event on failed inline reconciliation', async () => {
+      await saveAwaitingSignature('attempt-regime-failed');
+      submissionPort.finalState = { kind: 'failed' };
+
+      await controller.submitExecution('attempt-regime-failed', {
+        signedPayload: Buffer.from([1, 2, 3]).toString('base64'),
+        payloadVersion: 'v1',
+      });
+
+      expect(regimeEngineEventPort.events).toHaveLength(1);
+      expect(regimeEngineEventPort.events[0]!.status).toBe('failed');
+    });
+
+    it('does not fire regime-engine event on partial reconciliation', async () => {
+      await saveAwaitingSignature('attempt-regime-partial');
+      submissionPort.finalState = { kind: 'partial' as const };
+
+      await controller.submitExecution('attempt-regime-partial', {
+        signedPayload: Buffer.from([1, 2, 3]).toString('base64'),
+        payloadVersion: 'v1',
+      });
+
+      expect(regimeEngineEventPort.events).toHaveLength(0);
+    });
+
+    it('does not fire regime-engine event on pending reconciliation', async () => {
+      await saveAwaitingSignature('attempt-regime-pending');
+      submissionPort.finalState = null;
+
+      await controller.submitExecution('attempt-regime-pending', {
+        signedPayload: Buffer.from([1, 2, 3]).toString('base64'),
+        payloadVersion: 'v1',
+      });
+
+      expect(regimeEngineEventPort.events).toHaveLength(0);
+    });
+
+    it('does not fire regime-engine event when reconcileExecution throws', async () => {
+      await saveAwaitingSignature('attempt-regime-throw');
+      submissionPort.reconcileExecution = async () => { throw new Error('boom'); };
+
+      await expect(
+        controller.submitExecution('attempt-regime-throw', {
+          signedPayload: Buffer.from([1, 2, 3]).toString('base64'),
+          payloadVersion: 'v1',
+        }),
+      ).rejects.toThrow('boom');
+
+      expect(regimeEngineEventPort.events).toHaveLength(0);
+    });
+
+    it('returns confirmed HTTP response even when event port rejects', async () => {
+      await saveAwaitingSignature('attempt-regime-port-rejects');
+      submissionPort.finalState = { kind: 'confirmed' };
+      regimeEngineEventPort.notifyExecutionEvent = async () => { throw new Error('port down'); };
+
+      const result = await controller.submitExecution('attempt-regime-port-rejects', {
+        signedPayload: Buffer.from([1, 2, 3]).toString('base64'),
+        payloadVersion: 'v1',
+      });
+
+      expect(result.result).toBe('confirmed');
+    });
+
+    it('event payload includes transactionReferences from the preceding save', async () => {
+      await saveAwaitingSignature('attempt-regime-txrefs');
+      submissionPort.finalState = { kind: 'confirmed' };
+      submissionPort.confirmedSteps = ['remove-liquidity', 'collect-fees', 'swap-assets'];
+
+      await controller.submitExecution('attempt-regime-txrefs', {
+        signedPayload: Buffer.from([1, 2, 3]).toString('base64'),
+        payloadVersion: 'v1',
+      });
+
+      const event = regimeEngineEventPort.events[0]!;
+      expect(event.txSignature).toBe('sig-submit-1');
+      expect(event.tokenOut).toBe('USDC');
+      expect(event.breachDirection).toBe('LowerBoundBreach');
+    });
+
+    it('derives tokenOut from domain policy for upper-bound-breach', async () => {
+      await saveAwaitingSignature('attempt-regime-upper', UPPER_BOUND_BREACH);
+      submissionPort.finalState = { kind: 'confirmed' };
+
+      await controller.submitExecution('attempt-regime-upper', {
+        signedPayload: Buffer.from([1, 2, 3]).toString('base64'),
+        payloadVersion: 'v1',
+      });
+
+      const event = regimeEngineEventPort.events[0]!;
+      expect(event.tokenOut).toBe('SOL');
+      expect(event.breachDirection).toBe('UpperBoundBreach');
+    });
+  });
 });

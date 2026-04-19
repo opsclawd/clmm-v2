@@ -84,7 +84,7 @@ export class ReconciliationJobHandler {
             });
           } else {
             const event = buildClmmExecutionEvent(updatedAttempt, result.kind, this.clock, applyDirectionalExitPolicy(updatedAttempt.breachDirection).swapInstruction.toAsset);
-            void this.regimeEngineEventPort.notifyExecutionEvent(event);
+            await this.regimeEngineEventPort.notifyExecutionEvent(event);
           }
         } catch (adapterError: unknown) {
           this.observability.log('error', `RegimeEngine: failed to notify execution event for ${data.attemptId}`, {

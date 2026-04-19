@@ -233,3 +233,146 @@ describe('PositionController', () => {
     ).rejects.toThrow('Database connection pool exhausted');
   });
 });
+
+describe('PositionController SR-levels integration', () => {
+  const fixturePoolId = FIXTURE_POSITION_IN_RANGE.poolId as string;
+
+  function makeSrBlock(capturedAtUnixMs: number) {
+    return {
+      briefId: 'brief-1',
+      sourceRecordedAtIso: null as string | null,
+      summary: null as string | null,
+      capturedAtUnixMs,
+      supports: [{ price: 90 }, { price: 110 }],
+      resistances: [{ price: 180 }, { price: 210 }],
+    };
+  }
+
+  it('enriches PositionDetailDto with srLevels for allowlisted pool', async () => {
+    const positionReadPort = new FakeSupportedPositionReadPort([FIXTURE_POSITION_IN_RANGE]);
+    const triggerRepo = new FakeTriggerRepository();
+    const fetchCurrent = vi.fn().mockResolvedValue(makeSrBlock(1_000_000));
+    const srPort: CurrentSrLevelsPort = { fetchCurrent };
+    const allowlist = new Map<string, { symbol: string; source: string }>([
+      [fixturePoolId, { symbol: 'SOL/USDC', source: 'mco' }],
+    ]);
+
+    const controller = new PositionController(positionReadPort, triggerRepo, srPort, allowlist);
+    const result = await controller.getPosition(
+      FIXTURE_POSITION_IN_RANGE.walletId,
+      FIXTURE_POSITION_IN_RANGE.positionId,
+    );
+
+    expect(result.position.srLevels).toBeDefined();
+    expect(result.position.srLevels?.supports).toHaveLength(2);
+    expect(result.position.srLevels?.resistances).toHaveLength(2);
+    expect(fetchCurrent).toHaveBeenCalledWith('SOL/USDC', 'mco');
+  });
+
+  it('omits srLevels key when adapter returns null', async () => {
+    const positionReadPort = new FakeSupportedPositionReadPort([FIXTURE_POSITION_IN_RANGE]);
+    const triggerRepo = new FakeTriggerRepository();
+    const fetchCurrent = vi.fn().mockResolvedValue(null);
+    const srPort: CurrentSrLevelsPort = { fetchCurrent };
+    const allowlist = new Map<string, { symbol: string; source: string }>([
+      [fixturePoolId, { symbol: 'SOL/USDC', source: 'mco' }],
+    ]);
+
+    const controller = new PositionController(positionReadPort, triggerRepo, srPort, allowlist);
+    const result = await controller.getPosition(
+      FIXTURE_POSITION_IN_RANGE.walletId,
+      FIXTURE_POSITION_IN_RANGE.positionId,
+    );
+
+    expect(result.position.srLevels).toBeUndefined();
+    expect(fetchCurrent).toHaveBeenCalled();
+  });
+
+  it('does not invoke srLevels adapter for non-allowlisted pool', async () => {
+    const positionReadPort = new FakeSupportedPositionReadPort([FIXTURE_POSITION_IN_RANGE]);
+    const triggerRepo = new FakeTriggerRepository();
+    const fetchCurrent = vi.fn().mockResolvedValue(makeSrBlock(1_000_000));
+    const srPort: CurrentSrLevelsPort = { fetchCurrent };
+    const allowlist = new Map<string, { symbol: string; source: string }>();
+
+    const controller = new PositionController(positionReadPort, triggerRepo, srPort, allowlist);
+    const result = await controller.getPosition(
+      FIXTURE_POSITION_IN_RANGE.walletId,
+      FIXTURE_POSITION_IN_RANGE.positionId,
+    );
+
+    expect(fetchCurrent).not.toHaveBeenCalled();
+    expect(result.position.srLevels).toBeUndefined();
+  });
+
+  it('returns base DTO when srLevels adapter throws unexpectedly', async () => {
+    const positionReadPort = new FakeSupportedPositionReadPort([FIXTURE_POSITION_IN_RANGE]);
+    const triggerRepo = new FakeTriggerRepository();
+    const fetchCurrent = vi.fn().mockRejectedValue(new Error('unexpected'));
+    const srPort: CurrentSrLevelsPort = { fetchCurrent };
+    const allowlist = new Map<string, { symbol: string; source: string }>([
+      [fixturePoolId, { symbol: 'SOL/USDC', source: 'mco' }],
+    ]);
+
+    const controller = new PositionController(positionReadPort, triggerRepo, srPort, allowlist);
+
+    const result = await controller.getPosition(
+      FIXTURE_POSITION_IN_RANGE.walletId,
+      FIXTURE_POSITION_IN_RANGE.positionId,
+    );
+
+    expect(result.position.positionId).toBe(FIXTURE_POSITION_IN_RANGE.positionId);
+    expect(result.position.lowerBound).toBe(FIXTURE_POSITION_IN_RANGE.bounds.lowerBound);
+  });
+
+  it('allowlisted pool triggers both trigger and SR fetches via Promise.all', async () => {
+    const positionReadPort = new FakeSupportedPositionReadPort([FIXTURE_POSITION_IN_RANGE]);
+    const triggerRepo = new FakeTriggerRepository();
+    triggerRepo.triggers.set('trigger-sr-test', {
+      triggerId: 'trigger-sr-test' as ExitTriggerId,
+      positionId: FIXTURE_POSITION_IN_RANGE.positionId,
+      episodeId: 'episode-sr-test' as BreachEpisodeId,
+      breachDirection: { kind: 'lower-bound-breach' },
+      triggeredAt: makeClockTimestamp(1_000_000),
+      confirmationEvaluatedAt: makeClockTimestamp(1_000_001),
+      confirmationPassed: true,
+    });
+    const fetchCurrent = vi.fn().mockResolvedValue(makeSrBlock(1_000_000));
+    const srPort: CurrentSrLevelsPort = { fetchCurrent };
+    const allowlist = new Map<string, { symbol: string; source: string }>([
+      [fixturePoolId, { symbol: 'SOL/USDC', source: 'mco' }],
+    ]);
+
+    const controller = new PositionController(positionReadPort, triggerRepo, srPort, allowlist);
+    const result = await controller.getPosition(
+      FIXTURE_POSITION_IN_RANGE.walletId,
+      FIXTURE_POSITION_IN_RANGE.positionId,
+    );
+
+    expect(result.position.hasActionableTrigger).toBe(true);
+    expect(result.position.srLevels).toBeDefined();
+    expect(fetchCurrent).toHaveBeenCalled();
+  });
+
+  it('trigger fetch still degrades gracefully on transient error with allowlisted pool', async () => {
+    const positionReadPort = new FakeSupportedPositionReadPort([FIXTURE_POSITION_IN_RANGE]);
+    const triggerRepo = new FakeTriggerRepository();
+    triggerRepo.listActionableTriggers = async () => {
+      throw new Error('SolanaError: HTTP error (429): Too Many Requests');
+    };
+    const fetchCurrent = vi.fn().mockResolvedValue(makeSrBlock(1_000_000));
+    const srPort: CurrentSrLevelsPort = { fetchCurrent };
+    const allowlist = new Map<string, { symbol: string; source: string }>([
+      [fixturePoolId, { symbol: 'SOL/USDC', source: 'mco' }],
+    ]);
+
+    const controller = new PositionController(positionReadPort, triggerRepo, srPort, allowlist);
+    const result = await controller.getPosition(
+      FIXTURE_POSITION_IN_RANGE.walletId,
+      FIXTURE_POSITION_IN_RANGE.positionId,
+    );
+
+    expect(result.position.srLevels).toBeDefined();
+    expect(result.error).toBe('Unable to fetch trigger data. Position data temporarily unavailable.');
+  });
+});

@@ -425,7 +425,7 @@ export class ExecutionController {
       try {
         const policy = applyDirectionalExitPolicy(attempt.breachDirection);
         const event = buildClmmExecutionEvent(savedAttempt, reconciliation.finalState.kind, this.clock, policy.swapInstruction.toAsset);
-        void this.regimeEngineEventPort.notifyExecutionEvent(event);
+        this.regimeEngineEventPort.notifyExecutionEvent(event).catch(() => {});
       } catch {
         // intentional: regime-engine event build/fire must never block the HTTP response
       }

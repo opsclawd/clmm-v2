@@ -84,7 +84,10 @@ export class PositionController {
           (triggers) => ({ ok: true as const, triggers }),
           (error: unknown) => ({ ok: false as const, error }),
         ),
-        this.srLevelsPort.fetchCurrent(allowlistEntry.symbol, allowlistEntry.source),
+        this.srLevelsPort.fetchCurrent(allowlistEntry.symbol, allowlistEntry.source).then(
+          (block) => block,
+          () => null,
+        ),
       ]);
 
       if (triggerResult.ok) {
