@@ -16,6 +16,7 @@ import { SolanaExecutionPreparationAdapter } from '../../outbound/swap-execution
 import { SolanaExecutionSubmissionAdapter } from '../../outbound/swap-execution/SolanaExecutionSubmissionAdapter.js';
 import { TelemetryAdapter } from '../../outbound/observability/TelemetryAdapter.js';
 import { RegimeEngineExecutionEventAdapter } from '../../outbound/regime-engine/RegimeEngineExecutionEventAdapter.js';
+import { CurrentSrLevelsAdapter } from '../../outbound/regime-engine/CurrentSrLevelsAdapter.js';
 import type { RegimeEngineEventPort } from '../../outbound/regime-engine/types.js';
 import { createDb } from '../../outbound/storage/db.js';
 import type { ClockPort, IdGeneratorPort } from '@clmm/application';
@@ -32,6 +33,8 @@ import {
   ID_GENERATOR_PORT,
   MONITORED_WALLET_REPOSITORY,
   REGIME_ENGINE_EVENT_PORT,
+  CURRENT_SR_LEVELS_PORT,
+  SR_LEVELS_POOL_ALLOWLIST,
 } from './tokens.js';
 
 // boundary: process.env values are untyped at runtime; validated via env schema at deploy
@@ -64,6 +67,9 @@ const regimeEngineEventAdapter: RegimeEngineEventPort = new RegimeEngineExecutio
   regimeEngineInternalToken,
   telemetry,
 );
+const currentSrLevelsAdapter = new CurrentSrLevelsAdapter(regimeEngineBaseUrl, telemetry);
+
+const SR_LEVELS_POOL_ALLOWLIST_MAP = new Map<string, { symbol: string; source: string }>();
 
 @Module({
   controllers: [HealthController, PositionController, AlertController, PreviewController, ExecutionController, WalletController],
@@ -79,6 +85,8 @@ const regimeEngineEventAdapter: RegimeEngineEventPort = new RegimeEngineExecutio
     { provide: ID_GENERATOR_PORT, useValue: systemIds },
     { provide: MONITORED_WALLET_REPOSITORY, useValue: monitoredWalletStorage },
     { provide: REGIME_ENGINE_EVENT_PORT, useValue: regimeEngineEventAdapter },
+    { provide: CURRENT_SR_LEVELS_PORT, useValue: currentSrLevelsAdapter },
+    { provide: SR_LEVELS_POOL_ALLOWLIST, useValue: SR_LEVELS_POOL_ALLOWLIST_MAP },
   ],
 })
 export class AppModule {}

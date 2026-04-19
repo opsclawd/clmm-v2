@@ -36,3 +36,7 @@ export type SrLevelsBlock = {
 export interface RegimeEngineEventPort {
   notifyExecutionEvent(event: ClmmExecutionEventRequest): Promise<void>;
 }
+
+export interface CurrentSrLevelsPort {
+  fetchCurrent(symbol: string, source: string): Promise<SrLevelsBlock | null>;
+}

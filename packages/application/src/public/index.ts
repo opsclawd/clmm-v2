@@ -15,6 +15,8 @@ export type {
   HistoryEventDto,
   MonitoringReadinessDto,
   EntryContextDto,
+  SrLevel,
+  SrLevelsBlock,
 } from '../dto/index.js';
 
 // Port types needed by UI (capability + permission state)

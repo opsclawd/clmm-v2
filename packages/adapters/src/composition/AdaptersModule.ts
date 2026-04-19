@@ -12,6 +12,7 @@ import { SolanaExecutionSubmissionAdapter } from '../outbound/swap-execution/Sol
 import { DurableNotificationEventAdapter } from '../outbound/notifications/DurableNotificationEventAdapter.js';
 import { TelemetryAdapter } from '../outbound/observability/TelemetryAdapter.js';
 import { RegimeEngineExecutionEventAdapter } from '../outbound/regime-engine/RegimeEngineExecutionEventAdapter.js';
+import { CurrentSrLevelsAdapter } from '../outbound/regime-engine/CurrentSrLevelsAdapter.js';
 import type { RegimeEngineEventPort } from '../outbound/regime-engine/types.js';
 import { createDb } from '../outbound/storage/db.js';
 import type { ClockPort, IdGeneratorPort } from '@clmm/application';
@@ -33,6 +34,7 @@ import {
   CLOCK_PORT,
   ID_GENERATOR_PORT,
   REGIME_ENGINE_EVENT_PORT,
+  CURRENT_SR_LEVELS_PORT,
 } from '../inbound/jobs/tokens.js';
 
 // boundary: process.env values are untyped at runtime; validated via env schema at deploy
@@ -68,6 +70,7 @@ const regimeEngineEventAdapter: RegimeEngineEventPort = new RegimeEngineExecutio
   regimeEngineInternalToken,
   telemetry,
 );
+const currentSrLevelsAdapter = new CurrentSrLevelsAdapter(regimeEngineBaseUrl, telemetry);
 
 const sharedProviders = [
   { provide: MONITORED_WALLET_REPOSITORY, useValue: monitoredWalletStorage },
@@ -85,6 +88,7 @@ const sharedProviders = [
   { provide: CLOCK_PORT, useValue: systemClock },
   { provide: ID_GENERATOR_PORT, useValue: systemIds },
   { provide: REGIME_ENGINE_EVENT_PORT, useValue: regimeEngineEventAdapter },
+  { provide: CURRENT_SR_LEVELS_PORT, useValue: currentSrLevelsAdapter },
 ];
 
 @Module({

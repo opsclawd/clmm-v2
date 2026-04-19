@@ -1,0 +1,58 @@
+import type { CurrentSrLevelsPort, SrLevelsBlock, SrLevel } from './types.js';
+import type { ObservabilityPort } from '@clmm/application';
+
+export class CurrentSrLevelsAdapter implements CurrentSrLevelsPort {
+  private hasLoggedDisabled = false;
+
+  constructor(
+    private readonly baseUrl: string | null,
+    private readonly observability: ObservabilityPort,
+  ) {}
+
+  async fetchCurrent(symbol: string, source: string): Promise<SrLevelsBlock | null> {
+    if (!this.baseUrl) {
+      if (!this.hasLoggedDisabled) {
+        this.observability.log('warn', 'SR levels disabled — no REGIME_ENGINE_BASE_URL configured');
+        this.hasLoggedDisabled = true;
+      }
+      return null;
+    }
+
+    try {
+      const url = `${this.baseUrl}/v1/sr-levels/current?symbol=${encodeURIComponent(symbol)}&source=${encodeURIComponent(source)}`;
+      const controller = new AbortController();
+      const timeout = setTimeout(() => controller.abort(), 2000);
+
+      const res = await fetch(url, { signal: controller.signal });
+      clearTimeout(timeout);
+
+      if (res.status === 404) return null;
+
+      if (!res.ok) {
+        this.observability.log('warn', `SR levels fetch failed: status ${res.status}`, { symbol, source, status: res.status });
+        return null;
+      }
+
+      const data = await res.json() as Record<string, unknown>;
+
+      if (typeof data['capturedAtIso'] !== 'string' || !Array.isArray(data['supports']) || !Array.isArray(data['resistances'])) {
+        this.observability.log('warn', 'SR levels response has unexpected shape', { symbol, source });
+        return null;
+      }
+
+      const sortByPrice = (a: SrLevel, b: SrLevel) => a.price - b.price;
+
+      return {
+        briefId: String(data['briefId'] ?? ''),
+        sourceRecordedAtIso: data['sourceRecordedAtIso'] != null ? String(data['sourceRecordedAtIso']) : null,
+        summary: data['summary'] != null ? String(data['summary']) : null,
+        capturedAtUnixMs: Date.parse(data['capturedAtIso'] as string),
+        supports: ((data['supports'] as SrLevel[]) ?? []).sort(sortByPrice),
+        resistances: ((data['resistances'] as SrLevel[]) ?? []).sort(sortByPrice),
+      };
+    } catch (error: unknown) {
+      this.observability.log('warn', 'SR levels fetch error', { symbol, source, error: error instanceof Error ? error.message : String(error) });
+      return null;
+    }
+  }
+}

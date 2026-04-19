@@ -1,4 +1,4 @@
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, vi } from 'vitest';
 import { NotFoundException } from '@nestjs/common';
 import { PositionController } from './PositionController.js';
 import {
@@ -8,6 +8,13 @@ import {
 } from '@clmm/testing';
 import type { BreachEpisodeId, ExitTriggerId, WalletId } from '@clmm/domain';
 import { makeClockTimestamp, makeWalletId } from '@clmm/domain';
+import type { CurrentSrLevelsPort } from '../../outbound/regime-engine/types.js';
+
+const nullSrLevelsPort: CurrentSrLevelsPort = {
+  fetchCurrent: vi.fn().mockResolvedValue(null),
+};
+
+const emptyAllowlist = new Map<string, { symbol: string; source: string }>();
 
 describe('PositionController', () => {
   it('returns populated position detail with actionable trigger fields when a trigger exists', async () => {
@@ -26,6 +33,8 @@ describe('PositionController', () => {
     const controller = new PositionController(
       positionReadPort,
       triggerRepo,
+      nullSrLevelsPort,
+      emptyAllowlist,
     );
 
     const result = await controller.getPosition(
@@ -48,6 +57,8 @@ describe('PositionController', () => {
     const controller = new PositionController(
       positionReadPort,
       triggerRepo,
+      nullSrLevelsPort,
+      emptyAllowlist,
     );
 
     const result = await controller.getPosition(
@@ -70,6 +81,8 @@ describe('PositionController', () => {
     const controller = new PositionController(
       positionReadPort,
       triggerRepo,
+      nullSrLevelsPort,
+      emptyAllowlist,
     );
 
     await expect(
@@ -80,7 +93,7 @@ describe('PositionController', () => {
   it('throws NotFoundException when wallet does not own the position', async () => {
     const positionReadPort = new FakeSupportedPositionReadPort([FIXTURE_POSITION_IN_RANGE]);
     const triggerRepo = new FakeTriggerRepository();
-    const controller = new PositionController(positionReadPort, triggerRepo);
+    const controller = new PositionController(positionReadPort, triggerRepo, nullSrLevelsPort, emptyAllowlist);
 
     const otherWallet: WalletId = makeWalletId('other-wallet-id');
 
@@ -92,7 +105,7 @@ describe('PositionController', () => {
   it('returns the owned position for the same wallet-position pair used by listPositions', async () => {
     const positionReadPort = new FakeSupportedPositionReadPort([FIXTURE_POSITION_IN_RANGE]);
     const triggerRepo = new FakeTriggerRepository();
-    const controller = new PositionController(positionReadPort, triggerRepo);
+    const controller = new PositionController(positionReadPort, triggerRepo, nullSrLevelsPort, emptyAllowlist);
 
     const listResult = await controller.listPositions(FIXTURE_POSITION_IN_RANGE.walletId);
     const positionId = listResult.positions[0]!.positionId;
@@ -111,7 +124,7 @@ describe('PositionController', () => {
     triggerRepo.listActionableTriggers = async () => {
       throw new Error('SolanaError: HTTP error (429): Too Many Requests');
     };
-    const controller = new PositionController(positionReadPort, triggerRepo);
+    const controller = new PositionController(positionReadPort, triggerRepo, nullSrLevelsPort, emptyAllowlist);
 
     const result = await controller.getPosition(
       FIXTURE_POSITION_IN_RANGE.walletId,
@@ -133,7 +146,7 @@ describe('PositionController', () => {
     triggerRepo.listActionableTriggers = async () => {
       throw new Error('Database connection pool exhausted');
     };
-    const controller = new PositionController(positionReadPort, triggerRepo);
+    const controller = new PositionController(positionReadPort, triggerRepo, nullSrLevelsPort, emptyAllowlist);
 
     await expect(
       controller.getPosition(FIXTURE_POSITION_IN_RANGE.walletId, FIXTURE_POSITION_IN_RANGE.positionId),
@@ -146,7 +159,7 @@ describe('PositionController', () => {
       throw new Error('Solana RPC timeout');
     };
     const triggerRepo = new FakeTriggerRepository();
-    const controller = new PositionController(positionReadPort, triggerRepo);
+    const controller = new PositionController(positionReadPort, triggerRepo, nullSrLevelsPort, emptyAllowlist);
 
     const result = await controller.listPositions(FIXTURE_POSITION_IN_RANGE.walletId);
 
@@ -162,7 +175,7 @@ describe('PositionController', () => {
       throw new Error('Invariant: unknown pool type');
     };
     const triggerRepo = new FakeTriggerRepository();
-    const controller = new PositionController(positionReadPort, triggerRepo);
+    const controller = new PositionController(positionReadPort, triggerRepo, nullSrLevelsPort, emptyAllowlist);
 
     await expect(
       controller.listPositions(FIXTURE_POSITION_IN_RANGE.walletId),
@@ -181,7 +194,7 @@ describe('PositionController', () => {
       confirmationEvaluatedAt: makeClockTimestamp(2_000_001),
       confirmationPassed: true,
     });
-    const controller = new PositionController(positionReadPort, triggerRepo);
+    const controller = new PositionController(positionReadPort, triggerRepo, nullSrLevelsPort, emptyAllowlist);
 
     const result = await controller.listPositions(FIXTURE_POSITION_IN_RANGE.walletId);
 
@@ -197,7 +210,7 @@ describe('PositionController', () => {
     triggerRepo.listActionableTriggers = async () => {
       throw new Error('SolanaError: HTTP error (429): Too Many Requests');
     };
-    const controller = new PositionController(positionReadPort, triggerRepo);
+    const controller = new PositionController(positionReadPort, triggerRepo, nullSrLevelsPort, emptyAllowlist);
 
     const result = await controller.listPositions(FIXTURE_POSITION_IN_RANGE.walletId);
 
@@ -213,7 +226,7 @@ describe('PositionController', () => {
     triggerRepo.listActionableTriggers = async () => {
       throw new Error('Database connection pool exhausted');
     };
-    const controller = new PositionController(positionReadPort, triggerRepo);
+    const controller = new PositionController(positionReadPort, triggerRepo, nullSrLevelsPort, emptyAllowlist);
 
     await expect(
       controller.listPositions(FIXTURE_POSITION_IN_RANGE.walletId),
