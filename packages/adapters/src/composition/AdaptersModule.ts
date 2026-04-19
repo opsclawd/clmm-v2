@@ -11,6 +11,8 @@ import { SolanaExecutionPreparationAdapter } from '../outbound/swap-execution/So
 import { SolanaExecutionSubmissionAdapter } from '../outbound/swap-execution/SolanaExecutionSubmissionAdapter.js';
 import { DurableNotificationEventAdapter } from '../outbound/notifications/DurableNotificationEventAdapter.js';
 import { TelemetryAdapter } from '../outbound/observability/TelemetryAdapter.js';
+import { RegimeEngineExecutionEventAdapter } from '../outbound/regime-engine/RegimeEngineExecutionEventAdapter.js';
+import type { RegimeEngineEventPort } from '../outbound/regime-engine/types.js';
 import { createDb } from '../outbound/storage/db.js';
 import type { ClockPort, IdGeneratorPort } from '@clmm/application';
 import type { ClockTimestamp } from '@clmm/domain';
@@ -30,6 +32,7 @@ import {
   OBSERVABILITY_PORT,
   CLOCK_PORT,
   ID_GENERATOR_PORT,
+  REGIME_ENGINE_EVENT_PORT,
 } from '../inbound/jobs/tokens.js';
 
 // boundary: process.env values are untyped at runtime; validated via env schema at deploy
@@ -58,6 +61,13 @@ const solanaPreparation = new SolanaExecutionPreparationAdapter(rpcUrl, snapshot
 const solanaSubmission = new SolanaExecutionSubmissionAdapter(rpcUrl);
 const durableNotificationEvent = new DurableNotificationEventAdapter(db, systemIds);
 const telemetry = new TelemetryAdapter();
+const regimeEngineBaseUrl = (process.env as Record<string, string | undefined>)['REGIME_ENGINE_BASE_URL'] ?? null;
+const regimeEngineInternalToken = (process.env as Record<string, string | undefined>)['REGIME_ENGINE_INTERNAL_TOKEN'] ?? null;
+const regimeEngineEventAdapter: RegimeEngineEventPort = new RegimeEngineExecutionEventAdapter(
+  regimeEngineBaseUrl,
+  regimeEngineInternalToken,
+  telemetry,
+);
 
 const sharedProviders = [
   { provide: MONITORED_WALLET_REPOSITORY, useValue: monitoredWalletStorage },
@@ -74,6 +84,7 @@ const sharedProviders = [
   { provide: OBSERVABILITY_PORT, useValue: telemetry },
   { provide: CLOCK_PORT, useValue: systemClock },
   { provide: ID_GENERATOR_PORT, useValue: systemIds },
+  { provide: REGIME_ENGINE_EVENT_PORT, useValue: regimeEngineEventAdapter },
 ];
 
 @Module({

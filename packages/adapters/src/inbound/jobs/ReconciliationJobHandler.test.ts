@@ -10,12 +10,21 @@ import {
   FIXTURE_POSITION_ID,
 } from '@clmm/testing';
 import { LOWER_BOUND_BREACH } from '@clmm/domain';
+import type { RegimeEngineEventPort, ClmmExecutionEventRequest } from '../../outbound/regime-engine/types.js';
 
 type ObservabilityLog = {
   level: 'info' | 'warn' | 'error';
   message: string;
   context?: Record<string, unknown> | undefined;
 };
+
+class FakeRegimeEngineEventPort implements RegimeEngineEventPort {
+  events: ClmmExecutionEventRequest[] = [];
+
+  async notifyExecutionEvent(event: ClmmExecutionEventRequest): Promise<void> {
+    this.events.push(event);
+  }
+}
 
 describe('ReconciliationJobHandler', () => {
   let executionRepo: FakeExecutionRepository;
@@ -24,6 +33,7 @@ describe('ReconciliationJobHandler', () => {
   let clock: FakeClockPort;
   let ids: FakeIdGeneratorPort;
   let observability: FakeObservabilityPort;
+  let regimeEngineEventPort: FakeRegimeEngineEventPort;
   let handler: ReconciliationJobHandler;
 
   beforeEach(() => {
@@ -33,8 +43,8 @@ describe('ReconciliationJobHandler', () => {
     clock = new FakeClockPort();
     ids = new FakeIdGeneratorPort();
     observability = new FakeObservabilityPort();
+    regimeEngineEventPort = new FakeRegimeEngineEventPort();
 
-    // Construct directly without NestJS DI
     handler = new ReconciliationJobHandler(
       executionRepo,
       submissionPort,
@@ -42,6 +52,7 @@ describe('ReconciliationJobHandler', () => {
       clock,
       ids,
       observability,
+      regimeEngineEventPort,
     );
   });
 

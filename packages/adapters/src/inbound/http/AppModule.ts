@@ -14,6 +14,9 @@ import { OrcaPositionReadAdapter } from '../../outbound/solana-position-reads/Or
 import { JupiterQuoteAdapter } from '../../outbound/swap-execution/JupiterQuoteAdapter.js';
 import { SolanaExecutionPreparationAdapter } from '../../outbound/swap-execution/SolanaExecutionPreparationAdapter.js';
 import { SolanaExecutionSubmissionAdapter } from '../../outbound/swap-execution/SolanaExecutionSubmissionAdapter.js';
+import { TelemetryAdapter } from '../../outbound/observability/TelemetryAdapter.js';
+import { RegimeEngineExecutionEventAdapter } from '../../outbound/regime-engine/RegimeEngineExecutionEventAdapter.js';
+import type { RegimeEngineEventPort } from '../../outbound/regime-engine/types.js';
 import { createDb } from '../../outbound/storage/db.js';
 import type { ClockPort, IdGeneratorPort } from '@clmm/application';
 import type { ClockTimestamp } from '@clmm/domain';
@@ -28,6 +31,7 @@ import {
   CLOCK_PORT,
   ID_GENERATOR_PORT,
   MONITORED_WALLET_REPOSITORY,
+  REGIME_ENGINE_EVENT_PORT,
 } from './tokens.js';
 
 // boundary: process.env values are untyped at runtime; validated via env schema at deploy
@@ -52,6 +56,14 @@ const jupiterQuote = new JupiterQuoteAdapter();
 const solanaPreparation = new SolanaExecutionPreparationAdapter(rpcUrl, snapshotReader);
 const solanaSubmission = new SolanaExecutionSubmissionAdapter(rpcUrl);
 const monitoredWalletStorage = new MonitoredWalletStorageAdapter(db);
+const telemetry = new TelemetryAdapter();
+const regimeEngineBaseUrl = (process.env as Record<string, string | undefined>)['REGIME_ENGINE_BASE_URL'] ?? null;
+const regimeEngineInternalToken = (process.env as Record<string, string | undefined>)['REGIME_ENGINE_INTERNAL_TOKEN'] ?? null;
+const regimeEngineEventAdapter: RegimeEngineEventPort = new RegimeEngineExecutionEventAdapter(
+  regimeEngineBaseUrl,
+  regimeEngineInternalToken,
+  telemetry,
+);
 
 @Module({
   controllers: [HealthController, PositionController, AlertController, PreviewController, ExecutionController, WalletController],
@@ -66,6 +78,7 @@ const monitoredWalletStorage = new MonitoredWalletStorageAdapter(db);
     { provide: CLOCK_PORT, useValue: systemClock },
     { provide: ID_GENERATOR_PORT, useValue: systemIds },
     { provide: MONITORED_WALLET_REPOSITORY, useValue: monitoredWalletStorage },
+    { provide: REGIME_ENGINE_EVENT_PORT, useValue: regimeEngineEventAdapter },
   ],
 })
 export class AppModule {}

@@ -29,6 +29,7 @@ import type {
   ExecutionSubmissionPort,
   StoredExecutionAttempt,
 } from '@clmm/application';
+import type { RegimeEngineEventPort } from '../../outbound/regime-engine/types.js';
 import type {
   ClockTimestamp,
   ExecutionLifecycleState,
@@ -54,6 +55,14 @@ class RecordingPreparationPort implements ExecutionPreparationPort {
       serializedPayload: Uint8Array.from(this.serializedPayload),
       preparedAt: this.preparedAt,
     };
+  }
+}
+
+class RecordingRegimeEngineEventPort implements RegimeEngineEventPort {
+  events: Array<import('../../outbound/regime-engine/types.js').ClmmExecutionEventRequest> = [];
+
+  async notifyExecutionEvent(event: import('../../outbound/regime-engine/types.js').ClmmExecutionEventRequest): Promise<void> {
+    this.events.push(event);
   }
 }
 
@@ -92,6 +101,7 @@ describe('ExecutionController', () => {
   let historyRepo: FakeExecutionHistoryRepository;
   let preparationPort: RecordingPreparationPort;
   let submissionPort: RecordingSubmissionPort;
+  let regimeEngineEventPort: RecordingRegimeEngineEventPort;
   let ids: FakeIdGeneratorPort;
   let controller: ExecutionController;
 
@@ -117,6 +127,7 @@ describe('ExecutionController', () => {
     preparationPort = new RecordingPreparationPort();
     submissionPort = new RecordingSubmissionPort();
     ids = new FakeIdGeneratorPort('exec-http');
+    regimeEngineEventPort = new RecordingRegimeEngineEventPort();
     controller = new ExecutionController(
       executionRepo as unknown as ExecutionRepository,
       historyRepo as unknown as ExecutionHistoryRepository,
@@ -124,6 +135,7 @@ describe('ExecutionController', () => {
       submissionPort,
       clock,
       ids,
+      regimeEngineEventPort,
     );
   });
 
