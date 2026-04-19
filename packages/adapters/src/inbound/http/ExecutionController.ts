@@ -422,8 +422,10 @@ export class ExecutionController {
         completedSteps: reconciliation.confirmedSteps,
         transactionReferences: references,
       };
-      const event = buildClmmExecutionEvent(savedAttempt, reconciliation.finalState.kind, this.clock);
-      void this.regimeEngineEventPort.notifyExecutionEvent(event);
+      try {
+        const event = buildClmmExecutionEvent(savedAttempt, reconciliation.finalState.kind, this.clock);
+        void this.regimeEngineEventPort.notifyExecutionEvent(event);
+      } catch {}
     }
 
     return { result: reconciliation.finalState.kind === 'confirmed' ? 'confirmed' as const : 'failed' as const };
