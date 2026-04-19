@@ -184,4 +184,52 @@ describe('CurrentSrLevelsAdapter', () => {
     expect(result2).toBeNull();
     expect(obs.logs).toHaveLength(1);
   });
+
+  it('returns null on invalid capturedAtIso producing NaN Date.parse', async () => {
+    const badDateResponse = { ...SAMPLE_RESPONSE, capturedAtIso: 'not-a-date' };
+    vi.mocked(fetch).mockResolvedValue(new Response(JSON.stringify(badDateResponse), { status: 200 }));
+
+    const adapter = new CurrentSrLevelsAdapter('https://regime.example.com', obs.port);
+    const result = await adapter.fetchCurrent('SOL/USDC', 'mco');
+
+    expect(result).toBeNull();
+    expect(obs.logs).toHaveLength(1);
+    expect(obs.logs[0]!.message).toContain('invalid capturedAtIso');
+  });
+
+  it('returns null when supports contains non-numeric price', async () => {
+    const badPriceResponse = { ...SAMPLE_RESPONSE, supports: [{ price: 'not-a-number' }] };
+    vi.mocked(fetch).mockResolvedValue(new Response(JSON.stringify(badPriceResponse), { status: 200 }));
+
+    const adapter = new CurrentSrLevelsAdapter('https://regime.example.com', obs.port);
+    const result = await adapter.fetchCurrent('SOL/USDC', 'mco');
+
+    expect(result).toBeNull();
+    expect(obs.logs).toHaveLength(1);
+    expect(obs.logs[0]!.message).toContain('invalid level entries');
+  });
+
+  it('returns null when resistances contains non-object entry', async () => {
+    const badEntryResponse = { ...SAMPLE_RESPONSE, resistances: ['not-an-object'] };
+    vi.mocked(fetch).mockResolvedValue(new Response(JSON.stringify(badEntryResponse), { status: 200 }));
+
+    const adapter = new CurrentSrLevelsAdapter('https://regime.example.com', obs.port);
+    const result = await adapter.fetchCurrent('SOL/USDC', 'mco');
+
+    expect(result).toBeNull();
+  });
+
+  it('preserves optional fields on valid level entries', async () => {
+    const richResponse = {
+      ...SAMPLE_RESPONSE,
+      supports: [{ price: 90, rank: 'S1', timeframe: '4h', invalidation: 85, notes: 'strong' }],
+    };
+    vi.mocked(fetch).mockResolvedValue(new Response(JSON.stringify(richResponse), { status: 200 }));
+
+    const adapter = new CurrentSrLevelsAdapter('https://regime.example.com', obs.port);
+    const result = await adapter.fetchCurrent('SOL/USDC', 'mco');
+
+    expect(result).not.toBeNull();
+    expect(result!.supports[0]).toEqual({ price: 90, rank: 'S1', timeframe: '4h', invalidation: 85, notes: 'strong' });
+  });
 });
