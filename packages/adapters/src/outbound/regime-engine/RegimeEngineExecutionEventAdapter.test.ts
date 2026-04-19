@@ -333,7 +333,7 @@ describe('buildClmmExecutionEvent', () => {
   const clock = makeClock(1700000000000);
 
   it('maps lower-bound-breach + confirmed correctly', () => {
-    const result = buildClmmExecutionEvent(makeAttempt(), 'confirmed', clock);
+    const result = buildClmmExecutionEvent(makeAttempt(), 'confirmed', clock, 'USDC');
     expect(result.breachDirection).toBe('LowerBoundBreach');
     expect(result.tokenOut).toBe('USDC');
     expect(result.status).toBe('confirmed');
@@ -344,6 +344,7 @@ describe('buildClmmExecutionEvent', () => {
       makeAttempt({ breachDirection: { kind: 'upper-bound-breach' } as unknown as StoredExecutionAttempt['breachDirection'] }),
       'confirmed',
       clock,
+      'SOL',
     );
     expect(result.breachDirection).toBe('UpperBoundBreach');
     expect(result.tokenOut).toBe('SOL');
@@ -351,7 +352,7 @@ describe('buildClmmExecutionEvent', () => {
   });
 
   it('picks swap-assets signature for confirmed', () => {
-    const result = buildClmmExecutionEvent(makeAttempt(), 'confirmed', clock);
+    const result = buildClmmExecutionEvent(makeAttempt(), 'confirmed', clock, 'USDC');
     expect(result.txSignature).toBe('sig-swap');
   });
 
@@ -365,6 +366,7 @@ describe('buildClmmExecutionEvent', () => {
       }),
       'confirmed',
       clock,
+      'USDC',
     );
     expect(result.txSignature).toBe('sig-b');
   });
@@ -379,6 +381,7 @@ describe('buildClmmExecutionEvent', () => {
       }),
       'failed',
       clock,
+      'SOL',
     );
     expect(result.txSignature).toBe('sig-b');
   });
@@ -388,6 +391,7 @@ describe('buildClmmExecutionEvent', () => {
       makeAttempt({ transactionReferences: [] as unknown as StoredExecutionAttempt['transactionReferences'] }),
       'failed',
       clock,
+      'USDC',
     );
     expect(result.txSignature).toBe('');
   });
@@ -397,6 +401,7 @@ describe('buildClmmExecutionEvent', () => {
       makeAttempt({ transactionReferences: [] as unknown as StoredExecutionAttempt['transactionReferences'] }),
       'confirmed',
       clock,
+      'USDC',
     );
     expect(result.txSignature).toBe('');
   });
@@ -406,12 +411,13 @@ describe('buildClmmExecutionEvent', () => {
       makeAttempt({ episodeId: 'ep-1' as unknown as BreachEpisodeId }),
       'confirmed',
       clock,
+      'USDC',
     );
     expect(result.episodeId).toBe('ep-1');
   });
 
   it('omits episodeId when absent', () => {
-    const result = buildClmmExecutionEvent(makeAttempt(), 'confirmed', clock);
+    const result = buildClmmExecutionEvent(makeAttempt(), 'confirmed', clock, 'USDC');
     expect(result.episodeId).toBeUndefined();
   });
 
@@ -420,22 +426,23 @@ describe('buildClmmExecutionEvent', () => {
       makeAttempt({ previewId: 'prev-1' }),
       'confirmed',
       clock,
+      'USDC',
     );
     expect(result.previewId).toBe('prev-1');
   });
 
   it('omits previewId when absent', () => {
-    const result = buildClmmExecutionEvent(makeAttempt(), 'confirmed', clock);
+    const result = buildClmmExecutionEvent(makeAttempt(), 'confirmed', clock, 'USDC');
     expect(result.previewId).toBeUndefined();
   });
 
   it('uses clock.now() for reconciledAtIso', () => {
-    const result = buildClmmExecutionEvent(makeAttempt(), 'confirmed', clock);
+    const result = buildClmmExecutionEvent(makeAttempt(), 'confirmed', clock, 'USDC');
     expect(result.reconciledAtIso).toBe(new Date(1700000000000).toISOString());
   });
 
   it('sets correlationId from attemptId', () => {
-    const result = buildClmmExecutionEvent(makeAttempt(), 'confirmed', clock);
+    const result = buildClmmExecutionEvent(makeAttempt(), 'confirmed', clock, 'USDC');
     expect(result.correlationId).toBe('attempt-1');
   });
 });

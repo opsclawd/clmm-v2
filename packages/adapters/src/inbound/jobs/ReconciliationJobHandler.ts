@@ -1,5 +1,6 @@
 import { Inject, Injectable } from '@nestjs/common';
 import { reconcileExecutionAttempt } from '@clmm/application';
+import { applyDirectionalExitPolicy } from '@clmm/domain';
 import type {
   ExecutionRepository,
   ExecutionSubmissionPort,
@@ -82,7 +83,7 @@ export class ReconciliationJobHandler {
               attemptId: data.attemptId,
             });
           } else {
-            const event = buildClmmExecutionEvent(updatedAttempt, result.kind, this.clock);
+            const event = buildClmmExecutionEvent(updatedAttempt, result.kind, this.clock, applyDirectionalExitPolicy(updatedAttempt.breachDirection).swapInstruction.toAsset);
             void this.regimeEngineEventPort.notifyExecutionEvent(event);
           }
         } catch (adapterError: unknown) {

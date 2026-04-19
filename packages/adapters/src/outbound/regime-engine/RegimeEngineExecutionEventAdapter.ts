@@ -97,6 +97,7 @@ export function buildClmmExecutionEvent(
   attempt: StoredExecutionAttempt,
   finalKind: 'confirmed' | 'failed',
   clock: ClockPort,
+  tokenOut: 'USDC' | 'SOL',
 ): ClmmExecutionEventRequest {
   const isLower = attempt.breachDirection.kind === 'lower-bound-breach';
 
@@ -125,7 +126,7 @@ export function buildClmmExecutionEvent(
     breachDirection: isLower ? 'LowerBoundBreach' : 'UpperBoundBreach',
     reconciledAtIso: new Date(clock.now()).toISOString(),
     txSignature,
-    tokenOut: isLower ? 'USDC' : 'SOL',
+    tokenOut,
     status: finalKind,
   };
 

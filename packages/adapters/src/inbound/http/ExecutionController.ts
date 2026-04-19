@@ -423,9 +423,12 @@ export class ExecutionController {
         transactionReferences: references,
       };
       try {
-        const event = buildClmmExecutionEvent(savedAttempt, reconciliation.finalState.kind, this.clock);
+        const policy = applyDirectionalExitPolicy(attempt.breachDirection);
+        const event = buildClmmExecutionEvent(savedAttempt, reconciliation.finalState.kind, this.clock, policy.swapInstruction.toAsset);
         void this.regimeEngineEventPort.notifyExecutionEvent(event);
-      } catch {}
+      } catch {
+        // intentional: regime-engine event build/fire must never block the HTTP response
+      }
     }
 
     return { result: reconciliation.finalState.kind === 'confirmed' ? 'confirmed' as const : 'failed' as const };
