@@ -46,9 +46,9 @@ export class CurrentSrLevelsAdapter implements CurrentSrLevelsPort {
         briefId: String(data['briefId'] ?? ''),
         sourceRecordedAtIso: data['sourceRecordedAtIso'] != null ? String(data['sourceRecordedAtIso']) : null,
         summary: data['summary'] != null ? String(data['summary']) : null,
-        capturedAtUnixMs: Date.parse(data['capturedAtIso'] as string),
-        supports: ((data['supports'] as SrLevel[]) ?? []).sort(sortByPrice),
-        resistances: ((data['resistances'] as SrLevel[]) ?? []).sort(sortByPrice),
+        capturedAtUnixMs: Date.parse(String(data['capturedAtIso'])),
+        supports: ((data['supports'] ?? []) as SrLevel[]).sort(sortByPrice),
+        resistances: ((data['resistances'] ?? []) as SrLevel[]).sort(sortByPrice),
       };
     } catch (error: unknown) {
       this.observability.log('warn', 'SR levels fetch error', { symbol, source, error: error instanceof Error ? error.message : String(error) });
