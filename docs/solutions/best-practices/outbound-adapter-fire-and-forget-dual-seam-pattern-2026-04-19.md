@@ -1,6 +1,7 @@
 ---
 title: "Outbound adapter pattern: fire-and-forget with dual-seam DI wiring"
 date: 2026-04-19
+last_refreshed: 2026-04-19
 category: best-practices
 module: adapters/outbound/regime-engine
 problem_type: best_practice
@@ -42,7 +43,7 @@ The adapter must never block the caller, never throw, and degrade gracefully whe
 
 **Key properties:**
 - **No-op when unconfigured:** If `baseUrl` or `internalToken` is null, log once and return. Safe to wire in all environments without feature flags.
-- **`void` keyword at call sites:** The caller uses `void this.port.notifyExecutionEvent(event)` — the promise is intentionally discarded so HTTP latency never blocks the response or job handler.
+- **Fire-and-forget insulation at call sites:** The caller wraps the build+fire in a try/catch (guarding synchronous build errors) and uses `.catch(() => {})` on the promise (guarding async adapter errors). The adapter call must never propagate errors to the caller or block the response.
 - **Retry with exponential backoff:** Only for 5xx and network errors. 4xx responses are terminal (except 409 = idempotent success from server dedup).
 - **Never throws:** All paths resolve. Errors are logged but never propagated.
 
@@ -77,17 +78,28 @@ When a side effect must fire from both an HTTP controller and a background job h
 
 ```typescript
 // Seam 1: ExecutionController.submitExecution (inline fast path)
+// HTTP context: fire-and-forget — must never block or throw
 if (reconciliation.finalState.kind === 'confirmed' || reconciliation.finalState.kind === 'failed') {
-  const event = buildClmmExecutionEvent(savedAttempt, reconciliation.finalState.kind, this.clock);
-  void this.regimeEngineEventPort.notifyExecutionEvent(event);
+  try {
+    const policy = applyDirectionalExitPolicy(attempt.breachDirection);
+    const event = buildClmmExecutionEvent(savedAttempt, reconciliation.finalState.kind, this.clock, policy.swapInstruction.toAsset);
+    this.regimeEngineEventPort.notifyExecutionEvent(event).catch(() => {});
+  } catch {
+    // intentional: regime-engine event build/fire must never block the HTTP response
+  }
 }
 
 // Seam 2: ReconciliationJobHandler.handle (worker path)
+// Worker context: best-effort await — blocks job completion but catches and logs errors
 if (result.kind === 'confirmed' || result.kind === 'failed') {
-  const updatedAttempt = await this.executionRepo.getAttempt(data.attemptId);
-  if (updatedAttempt) {
-    const event = buildClmmExecutionEvent(updatedAttempt, result.kind, this.clock);
-    void this.regimeEngineEventPort.notifyExecutionEvent(event);
+  try {
+    const updatedAttempt = await this.executionRepo.getAttempt(data.attemptId);
+    if (updatedAttempt) {
+      const event = buildClmmExecutionEvent(updatedAttempt, result.kind, this.clock, applyDirectionalExitPolicy(updatedAttempt.breachDirection).swapInstruction.toAsset);
+      await this.regimeEngineEventPort.notifyExecutionEvent(event);
+    }
+  } catch (adapterError: unknown) {
+    this.observability.log('error', `RegimeEngine: failed to notify execution event`, { attemptId: data.attemptId, error: ... });
   }
 }
 ```
@@ -129,7 +141,7 @@ export type PositionDetailDto = PositionSummaryDto & {
 };
 ```
 
-The adapter has its own `SrLevelsBlock` type with the same shape. TypeScript structural typing makes them assignable without explicit imports across boundaries. This keeps the `boundaries` check green.
+The adapter has its own `SrLevelsBlock` type with the same shape. TypeScript structural typing makes them assignable without explicit imports across boundaries. This keeps the `boundaries` check green. Both type definitions carry drift-guard comments linking to each other — any field change in one MUST be mirrored in the other.
 
 ### 4. Pool allowlist for selective enrichment
 
@@ -144,7 +156,10 @@ if (allowlistEntry) {
       (triggers) => ({ ok: true as const, triggers }),
       (error: unknown) => ({ ok: false as const, error }),
     ),
-    this.srLevelsPort.fetchCurrent(allowlistEntry.symbol, allowlistEntry.source),
+    this.srLevelsPort.fetchCurrent(allowlistEntry.symbol, allowlistEntry.source).then(
+      (block) => block,
+      () => null, // belt-and-suspenders: adapter never throws, but Promise.all must not reject
+    ),
   ]);
   // merge srResult into response if non-null
 }
@@ -163,10 +178,19 @@ async fetchCurrent(symbol: string, source: string): Promise<SrLevelsBlock | null
     const controller = new AbortController();
     const timeout = setTimeout(() => controller.abort(), 2000); // 2s hard timeout
     const res = await fetch(url, { signal: controller.signal });
+    // clearTimeout deferred until after res.json() to cover slow body reads
+    if (res.status === 404) { clearTimeout(timeout); return null; }
+    if (!res.ok) { clearTimeout(timeout); /* log warn */ return null; }
+    const data = await res.json() as Record<string, unknown>;
     clearTimeout(timeout);
-    if (res.status === 404) return null;
-    if (!res.ok) { /* log warn */ return null; }
-    // parse, validate shape, sort, return block
+    // Validate shape, NaN guards on Date.parse, price numericity
+    if (typeof data['capturedAtIso'] !== 'string' || !Array.isArray(data['supports']) || !Array.isArray(data['resistances'])) {
+      return null;
+    }
+    const capturedAtUnixMs = Date.parse(String(data['capturedAtIso']));
+    if (!Number.isFinite(capturedAtUnixMs)) { return null; } // prevent NaN propagation
+    // Per-level validation: each entry must have a finite numeric price
+    // ... sort, build block, return
   } catch (error: unknown) {
     // log warn, return null — never throw
     return null;
@@ -208,7 +232,7 @@ Thresholds: `<1h` → minutes, `1h-48h` → hours, `>=48h` → hours + stale fla
 ## Why This Matters
 
 - **Fire-and-forget with no-op fallback** means the adapter is safe to wire in every environment (dev, staging, prod) without feature flags. Missing env vars = silent disable, not crashes.
-- **Dual-seam wiring** ensures events are posted regardless of whether execution completes synchronously (controller path) or asynchronously (reconciliation job). Each seam is independently correct. Server-side idempotency (correlation_id UNIQUE) absorbs duplicate posts from both seams firing for the same attempt.
+- **Dual-seam wiring** ensures events are posted regardless of whether execution completes synchronously (controller path) or asynchronously (reconciliation job). Each seam is independently correct, but the isolation strategy differs by context: the HTTP controller uses fire-and-forget (`.catch(() => {})`) to never block the response; the worker uses best-effort await (`await` + try/catch with error logging) so the job completes only after the event is attempted. Server-side idempotency (correlation_id UNIQUE) absorbs duplicate posts from both seams firing for the same attempt.
 - **Boundary-safe types** prevent adapter concerns from leaking into the application layer. This is the difference between a clean hexagonal boundary and a gradual coupling slide.
 - **Pool allowlist** avoids unnecessary HTTP calls for pools that have no external data, and makes the feature easy to expand pool-by-pool without code changes.
 - **Permissive-drop parsing** ensures the mobile app never crashes on a malformed enrichment field. The base position data is always displayed.
