@@ -89,7 +89,7 @@ Expected: a new file `packages/adapters/drizzle/0001_*.sql` is created containin
 
 If `db:generate` complains about missing `DATABASE_URL`, export a placeholder before running:
 ```bash
-DATABASE_URL=postgresql://placeholder cd packages/adapters && pnpm db:generate && cd -
+export DATABASE_URL=postgresql://placeholder && cd packages/adapters && pnpm db:generate && cd -
 ```
 
 - [ ] **Step 1.5: Verify the generated SQL**
@@ -665,6 +665,8 @@ git commit -m "feat(adapters): add WebCrypto Ed25519 signature verification"
 - Create: `packages/adapters/src/outbound/storage/WalletChallengePostgresAdapter.test.ts`
 
 Note on test strategy: existing Postgres adapters in this repo (`MonitoredWalletStorageAdapter.test.ts`) use thin "unit shape" tests that assert method presence. Real behavioral coverage comes from `FakeWalletChallengeRepository` (already written in Task 3) exercised via controller tests. We match that convention: one unit shape test here; behavior is tested through the fake + controller in Tasks 8–9.
+
+> **Review note 1 — adapter test coverage gap:** The unit shape test only asserts method existence; it doesn't exercise any SQL semantics (upsert-on-conflict, delete-returning atomicity, concurrent consume). The fake in Task 3 validates the port logic for controller tests, but the Postgres adapter's actual SQL behavior is untested at this layer. If the repo's existing adapter tests use pg-mem or test containers, consider adding integration tests for the 6 behavioral cases from the spec (upsert overwrite, consume happy path, not_found, mismatch row-deleted, expired row-deleted, concurrent consume). Otherwise, the manual smoke test (Step 11.6) is the only validation of adapter SQL behavior — acknowledge this explicitly if keeping the shape-only approach.
 
 - [ ] **Step 7.1: Write the shape test**
 
@@ -1288,6 +1290,12 @@ Expected: PASS.
 git add packages/adapters/src/inbound/http/WalletController.ts packages/adapters/src/inbound/http/WalletController.test.ts
 git commit -m "feat(adapters): add POST /:walletId/enroll with signature verification"
 ```
+
+> **Review note 2 — enroll test isolation:** `makeSignedChallenge` calls `controller.issueChallenge(walletId)` to obtain the challenge, so all enroll tests are coupled to the challenge endpoint. If `issueChallenge` breaks, every enroll test breaks too. Consider having `makeSignedChallenge` seed `challenges.issue()` directly (the fake's method) for enroll tests, so they're isolated from challenge-endpoint bugs. The current approach is acceptable if you prefer end-to-end-style controller tests, but be aware of the coupling.
+
+> **Review note 3 — `base58Encode` duplication:** The `base58Encode` helper appears in both `WalletVerification.test.ts` (Task 6) and `WalletController.test.ts` (Task 9). This is intentional (test-local utilities, not production code) but worth noting. If a third test file needs it, extract to `packages/testing/src/helpers/` at that point — not now.
+
+> **Review note 4 — `FakeMonitoredWalletRepository.listActiveWallets()`:** The enroll tests call `ctx.monitoredWallets.listActiveWallets()` to assert enrollment happened. This method must exist on `FakeMonitoredWalletRepository`. At implementation time, confirm this method is already defined; if not, add it (or use `getRowForTest()` or another existing introspection method instead).
 
 ---
 
