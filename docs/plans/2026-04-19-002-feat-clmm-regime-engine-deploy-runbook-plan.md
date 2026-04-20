@@ -462,9 +462,15 @@ Expected: `200` with a healthy response body.
 
 Note: the worker does not expose an HTTP `/health` endpoint — skip the `localhost` health check that applies to the API only.
 
-- [ ] **Step 9: Capture Railway deploy IDs**
+- [ ] **Step 9: Capture Railway deploy IDs and epoch-ms timestamps**
 
-Record the CLMM API deploy ID and CLMM worker deploy ID for §7 E2E verification. No commit — this is operator log data.
+Record the CLMM API deploy ID, CLMM worker deploy ID, and the epoch-millisecond timestamp of the most recent deploy. This timestamp is required by Task 8 Step 6 option (b).
+
+```bash
+date +%s%3N
+```
+
+Run this once immediately after Step 5 redeploy completes and both services show healthy. Record the output as `DEPLOY_EPOCH_MS`. No commit — this is operator log data.
 
 **Gate G3 (origin §8):** All 9 steps above pass → proceed to Task 8. If Step 7 cannot succeed on either private or public URL, stop and escalate.
 
@@ -545,11 +551,12 @@ Either:
 - **(b)** Query the CLMM Railway Postgres for terminal attempts created **after the Task 7 deploy timestamps** (recorded in Step 9):
 
 ```bash
-# From Railway CLMM Postgres shell — replace <DEPLOY_TIMESTAMP> with the CLMM API deploy time from Task 7 Step 9:
+# From Railway CLMM Postgres shell — replace <DEPLOY_EPOCH_MS> with the value recorded in Task 7 Step 9.
+# Note: created_at is a bigint epoch-millisecond column.
 SELECT attempt_id, lifecycle_state_kind, created_at
 FROM execution_attempts
 WHERE lifecycle_state_kind IN ('confirmed', 'failed')
-  AND created_at > '<DEPLOY_TIMESTAMP>'
+  AND created_at > <DEPLOY_EPOCH_MS>
 ORDER BY created_at DESC
 LIMIT 5;
 ```
