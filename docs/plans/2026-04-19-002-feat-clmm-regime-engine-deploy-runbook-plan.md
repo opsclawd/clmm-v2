@@ -127,7 +127,7 @@ PORT=3001
 
 # --- Regime engine integration (see docs/plans/2026-04-17-002-opus-clmm-regime-engine-integration-plan.md) ---
 # REGIME_ENGINE_BASE_URL: backend-only URL for the regime-engine service.
-#   Prod: Railway private domain, e.g. http://regime-engine.railway.internal:${PORT}
+#   Prod: Railway private domain, e.g. http://regime-engine.railway.internal:${{regime-engine.PORT}}
 #   Fallback: public Railway domain if private networking is unresolved.
 #   Unset → CLMM skips regime-engine calls (no-op adapter; logs once per process).
 REGIME_ENGINE_BASE_URL=
@@ -226,7 +226,7 @@ CLMM posts terminal execution events to regime-engine and reads current S/R leve
 
 | Var | Purpose | Required in |
 |---|---|---|
-| `REGIME_ENGINE_BASE_URL` | Backend-only base URL for regime-engine. Prefer the Railway private domain (e.g. `http://regime-engine.railway.internal:${PORT}`); fall back to the public domain if private networking is unresolved. | CLMM API + Worker |
+| `REGIME_ENGINE_BASE_URL` | Backend-only base URL for regime-engine. Prefer the Railway private domain (e.g. `http://regime-engine.railway.internal:${{regime-engine.PORT}}`); fall back to the public domain if private networking is unresolved. | CLMM API + Worker |
 | `REGIME_ENGINE_INTERNAL_TOKEN` | Shared secret sent as `X-CLMM-Internal-Token` on `POST /v1/clmm-execution-result`. Must match regime-engine's `CLMM_INTERNAL_TOKEN`. | CLMM API + Worker |
 
 Both vars are optional in local dev: when unset, the adapter logs once per process and becomes a no-op. In Railway production, both MUST be set on the CLMM API and worker services.
@@ -425,7 +425,7 @@ Using the Railway dashboard, trigger a redeploy of the CLMM API and the CLMM wor
 Run (Railway CLMM API shell):
 ```bash
 echo "REGIME_ENGINE_BASE_URL=${REGIME_ENGINE_BASE_URL:-UNSET}"
-echo "REGIME_ENGINE_INTERNAL_TOKEN=${REGIME_ENGINE_INTERNAL_TOKEN:+SET}${REGIME_ENGINE_INTERNAL_TOKEN:-UNSET}"
+echo "REGIME_ENGINE_INTERNAL_TOKEN=$(if [ -n \"$REGIME_ENGINE_INTERNAL_TOKEN\" ]; then echo SET; else echo UNSET; fi)"
 ```
 Expected: both show a value (`SET` for the token — never echo the secret value); neither shows `UNSET`.
 

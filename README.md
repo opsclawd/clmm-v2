@@ -70,7 +70,7 @@ CLMM posts terminal execution events to regime-engine and reads current S/R leve
 
 | Var | Purpose | Required in |
 |---|---|---|
-| `REGIME_ENGINE_BASE_URL` | Backend-only base URL for regime-engine. Prefer the Railway private domain (e.g. `http://regime-engine.railway.internal:${PORT}`); fall back to the public domain if private networking is unresolved. | CLMM API + Worker |
+| `REGIME_ENGINE_BASE_URL` | Backend-only base URL for regime-engine. Prefer the Railway private domain (e.g. `http://regime-engine.railway.internal:${{regime-engine.PORT}}`); fall back to the public domain if private networking is unresolved. | CLMM API + Worker |
 | `REGIME_ENGINE_INTERNAL_TOKEN` | Shared secret sent as `X-CLMM-Internal-Token` on `POST /v1/clmm-execution-result`. Must match regime-engine's `CLMM_INTERNAL_TOKEN`. | CLMM API + Worker |
 
 Both vars are optional in local dev: when unset, the adapter logs once per process and becomes a no-op. In Railway production, both MUST be set on the CLMM API and worker services.
