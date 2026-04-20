@@ -73,7 +73,7 @@ PORT=3001
 
 # --- Regime engine integration (see docs/plans/2026-04-17-002-opus-clmm-regime-engine-integration-plan.md) ---
 # REGIME_ENGINE_BASE_URL: backend-only URL for the regime-engine service.
-#   Prod: Railway private domain, e.g. http://regime-engine.railway.internal:${PORT}
+#   Prod: Railway private domain, e.g. http://regime-engine.railway.internal:${{regime-engine.PORT}}
 #   Fallback: public Railway domain if private networking is unresolved.
 #   Unset → CLMM skips regime-engine calls (no-op adapter; logs once per process).
 REGIME_ENGINE_BASE_URL=
