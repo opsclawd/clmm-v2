@@ -225,6 +225,7 @@ CLMM uses two separate env surfaces:
 CLMM posts terminal execution events to regime-engine and reads current S/R levels back through the BFF. Two env vars wire this up on the CLMM side:
 
 | Var | Purpose | Required in |
+|---|---|---|
 | `REGIME_ENGINE_BASE_URL` | Backend-only base URL for regime-engine. Prefer the Railway private domain (e.g. `http://regime-engine.railway.internal:${{regime-engine.PORT}}`); fall back to the public domain if private networking is unresolved. | CLMM API + Worker |
 | `REGIME_ENGINE_INTERNAL_TOKEN` | Shared secret sent as `X-CLMM-Internal-Token` on `POST /v1/clmm-execution-result`. Must match regime-engine's `CLMM_INTERNAL_TOKEN`. | CLMM API + Worker |
 
