@@ -1,0 +1,16 @@
+{
+  "schemaVersion": "1.0",
+  "source": "mco",
+  "symbol": "SOL/USDC",
+  "brief": {
+    "briefId": "e2e-verification-2026-04-19",
+    "sourceRecordedAtIso": "2026-04-19T00:00:00.000Z",
+    "summary": "Seed brief for CLMM Unit 6 E2E verification. NOT production trading signal."
+  },
+  "levels": [
+    { "levelType": "support",    "price": 120.00, "timeframe": "1D", "rank": "strong" },
+    { "levelType": "support",    "price": 135.50, "timeframe": "1D", "rank": "medium" },
+    { "levelType": "resistance", "price": 155.00, "timeframe": "1D", "rank": "strong" },
+    { "levelType": "resistance", "price": 168.25, "timeframe": "1D", "rank": "medium" }
+  ]
+}

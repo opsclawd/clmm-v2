@@ -1,0 +1,10 @@
+{
+  "schemaVersion": "1.0",
+  "correlationId": "e2e-verification-attempt-2026-04-19",
+  "positionId": "e2e-position-placeholder",
+  "breachDirection": "LowerBoundBreach",
+  "reconciledAtIso": "2026-04-19T00:05:00.000Z",
+  "txSignature": "5xYe2eVerificationSignaturePlaceholder1111111111111111111111111",
+  "tokenOut": "USDC",
+  "status": "confirmed"
+}
