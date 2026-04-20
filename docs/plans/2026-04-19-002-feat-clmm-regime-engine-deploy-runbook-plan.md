@@ -533,9 +533,9 @@ Either:
 
 ```bash
 # From Railway CLMM Postgres shell:
-SELECT attempt_id, lifecycle_state, created_at
+SELECT attempt_id, lifecycle_state_kind, created_at
 FROM execution_attempts
-WHERE lifecycle_state IN ('confirmed', 'failed')
+WHERE lifecycle_state_kind IN ('confirmed', 'failed')
 ORDER BY created_at DESC
 LIMIT 5;
 ```
