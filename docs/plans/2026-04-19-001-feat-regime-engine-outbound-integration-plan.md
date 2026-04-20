@@ -481,6 +481,7 @@ Manual UI smoke (not automated, documented in verification):
 - Origin plan's Unit 6 E2E runbook covers the cross-repo deploy validation — this plan does not duplicate it.
 - When Unit 4 + Unit 5 land, update the companion plan's unit checkboxes:
   - `docs/plans/2026-04-17-002-opus-clmm-regime-engine-integration-plan.md` §6 Unit 4 and Unit 5 checkboxes.
+- [x] Unit 6 CLMM-side deploy + E2E runbook landed in `docs/plans/2026-04-19-002-feat-clmm-regime-engine-deploy-runbook-plan.md`. Railway cross-service wiring, E2E fixtures, and verification log live there.
 
 ## 13. Sources & References
 

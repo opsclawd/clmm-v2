@@ -453,6 +453,12 @@ E2E (one manual run, no CI automation):
 
 **Hard stop:** if G1 or G2 misses by end of Sun W1, shelf the project. Do not extend into weekday time. Pronghorn starts Monday regardless. If G3 or G4 slip, ship code-done without live deployment — G5 can wait 2-4 weeks.
 
+### Gate status — CLMM side (2026-04-19)
+
+- G3 (CLMM): CLMM API + Worker configured with `REGIME_ENGINE_BASE_URL` and `REGIME_ENGINE_INTERNAL_TOKEN`; `/health` green; private-network reach to regime-engine confirmed (or public-URL fallback recorded). See `docs/plans/2026-04-19-002-feat-clmm-regime-engine-deploy-runbook-plan.md` Task 7.
+- G4 (CLMM): One-shot E2E pass recorded. See `docs/plans/2026-04-19-002-feat-clmm-regime-engine-deploy-runbook-plan.md` §Verification Log.
+- G5: unowned by this plan; operator-gated on live-wallet funding.
+
 Budget by unit: U1 2h · U2 2.5h · U3 2h · U4 3h · U5 3h · U6 2.5h + 0.5h buffer = 15.5h.
 
 ## 9. Risks and mitigations
