@@ -445,9 +445,22 @@ Expected: `200` with a healthy response body from regime-engine.
 
 If this fails with DNS or timeout and `${REGIME_ENGINE_BASE_URL}` is the private domain, fall back to the public domain per Step 2. Re-run Step 5 and Step 6 after the fallback, then re-run Step 7.
 
-- [ ] **Step 8: Verify CLMM Worker shell, same commands as Step 6 and Step 7**
+- [ ] **Step 8: Verify CLMM Worker shell**
 
-Same expected outputs on the worker service shell.
+Run (Railway CLMM Worker shell):
+```bash
+echo "REGIME_ENGINE_BASE_URL=${REGIME_ENGINE_BASE_URL:-UNSET}"
+echo "REGIME_ENGINE_INTERNAL_TOKEN=$(if [ -n \"$REGIME_ENGINE_INTERNAL_TOKEN\" ]; then echo SET; else echo UNSET; fi)"
+```
+Expected: both show a value (`SET` for the token); neither shows `UNSET`.
+
+Then verify reachability to regime-engine:
+```bash
+curl -fsS "${REGIME_ENGINE_BASE_URL}/health"
+```
+Expected: `200` with a healthy response body.
+
+Note: the worker does not expose an HTTP `/health` endpoint — skip the `localhost` health check that applies to the API only.
 
 - [ ] **Step 9: Capture Railway deploy IDs**
 
@@ -529,17 +542,18 @@ Expected second call: `HTTP/1.1 200` with body that indicates idempotency (regim
 
 Either:
 - **(a)** Manually adjust a staging position near its bound so the next monitoring pass detects a breach, OR
-- **(b)** Find the most recent `confirmed`/`failed` terminal attempt in the CLMM Railway Postgres via:
+- **(b)** Query the CLMM Railway Postgres for terminal attempts created **after the Task 7 deploy timestamps** (recorded in Step 9):
 
 ```bash
-# From Railway CLMM Postgres shell:
+# From Railway CLMM Postgres shell — replace <DEPLOY_TIMESTAMP> with the CLMM API deploy time from Task 7 Step 9:
 SELECT attempt_id, lifecycle_state_kind, created_at
 FROM execution_attempts
 WHERE lifecycle_state_kind IN ('confirmed', 'failed')
+  AND created_at > '<DEPLOY_TIMESTAMP>'
 ORDER BY created_at DESC
 LIMIT 5;
 ```
-Pick the most recent `attempt_id` as the expected correlation ID for Step 7.
+If no rows return, use option (a) to trigger a fresh breach. Do **not** use historical attempts from before the deploy — they do not prove the current wiring is correct.
 
 - [ ] **Step 7: Verify the dual-seam terminal event landed in regime-engine**
 
