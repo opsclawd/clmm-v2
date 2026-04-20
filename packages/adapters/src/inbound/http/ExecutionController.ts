@@ -49,6 +49,8 @@ import {
   applyDirectionalExitPolicy,
   evaluateRetryEligibility,
 } from '@clmm/domain';
+import type { RegimeEngineEventPort } from '../../outbound/regime-engine/types.js';
+import { buildClmmExecutionEvent } from '../../outbound/regime-engine/RegimeEngineExecutionEventAdapter.js';
 import {
   EXECUTION_REPOSITORY,
   EXECUTION_HISTORY_REPOSITORY,
@@ -56,6 +58,7 @@ import {
   EXECUTION_SUBMISSION_PORT,
   CLOCK_PORT,
   ID_GENERATOR_PORT,
+  REGIME_ENGINE_EVENT_PORT,
 } from './tokens.js';
 
 function toAttemptDto(
@@ -130,6 +133,8 @@ export class ExecutionController {
     private readonly clock: ClockPort,
     @Inject(ID_GENERATOR_PORT)
     private readonly ids: IdGeneratorPort,
+    @Inject(REGIME_ENGINE_EVENT_PORT)
+    private readonly regimeEngineEventPort: RegimeEngineEventPort,
   ) {}
 
   private resolveAttemptDirection(
@@ -406,6 +411,24 @@ export class ExecutionController {
 
     if (reconciliation.finalState.kind === 'partial') {
       return { result: 'partial' as const, confirmedSteps: reconciliation.confirmedSteps };
+    }
+
+    if (reconciliation.finalState.kind === 'confirmed' || reconciliation.finalState.kind === 'failed') {
+      const savedAttempt = {
+        ...attempt,
+        attemptId,
+        positionId: attempt.positionId,
+        lifecycleState: reconciliation.finalState,
+        completedSteps: reconciliation.confirmedSteps,
+        transactionReferences: references,
+      };
+      try {
+        const policy = applyDirectionalExitPolicy(attempt.breachDirection);
+        const event = buildClmmExecutionEvent(savedAttempt, reconciliation.finalState.kind, this.clock, policy.swapInstruction.toAsset);
+        this.regimeEngineEventPort.notifyExecutionEvent(event).catch(() => {});
+      } catch {
+        // intentional: regime-engine event build/fire must never block the HTTP response
+      }
     }
 
     return { result: reconciliation.finalState.kind === 'confirmed' ? 'confirmed' as const : 'failed' as const };
