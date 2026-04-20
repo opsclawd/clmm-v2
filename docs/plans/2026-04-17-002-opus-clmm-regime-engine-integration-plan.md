@@ -455,8 +455,8 @@ E2E (one manual run, no CI automation):
 
 ### Gate status — CLMM side (2026-04-19)
 
-- G3 (CLMM): CLMM API + Worker configured with `REGIME_ENGINE_BASE_URL` and `REGIME_ENGINE_INTERNAL_TOKEN`; `/health` green; private-network reach to regime-engine confirmed (or public-URL fallback recorded). See `docs/plans/2026-04-19-002-feat-clmm-regime-engine-deploy-runbook-plan.md` Task 7.
-- G4 (CLMM): One-shot E2E pass recorded. See `docs/plans/2026-04-19-002-feat-clmm-regime-engine-deploy-runbook-plan.md` §Verification Log.
+- G3 (CLMM): **Pending** — operator must execute Task 7 (Railway cross-service wiring) in `docs/plans/2026-04-19-002-feat-clmm-regime-engine-deploy-runbook-plan.md` §5. Evidence: all 9 checklist steps marked; `/health` green; private-network reach confirmed or public-URL fallback recorded.
+- G4 (CLMM): **Pending** — operator must execute Task 8 (E2E verification) in `docs/plans/2026-04-19-002-feat-clmm-regime-engine-deploy-runbook-plan.md` §5, then append timestamped results to §Verification Log. Gate closes only when concrete evidence is committed.
 - G5: unowned by this plan; operator-gated on live-wallet funding.
 
 Budget by unit: U1 2h · U2 2.5h · U3 2h · U4 3h · U5 3h · U6 2.5h + 0.5h buffer = 15.5h.

@@ -77,7 +77,7 @@ Both vars are optional in local dev: when unset, the adapter logs once per proce
 
 Never define `EXPO_PUBLIC_REGIME_ENGINE_*`. Regime-engine is not reachable from the app bundle under any circumstances. See `docs/plans/2026-04-17-002-opus-clmm-regime-engine-integration-plan.md` §7 rule 4.
 
-Deploy + verification runbook: `docs/plans/2026-04-19-002-feat-clmm-regime-engine-deploy-runbook-plan.md` §6 (Railway wiring) and §7 (E2E verification).
+Deploy + verification runbook: `docs/plans/2026-04-19-002-feat-clmm-regime-engine-deploy-runbook-plan.md` — Task 7 (Railway wiring) and Task 8 (E2E verification) in §5.
 
 ## Important Docs
 
