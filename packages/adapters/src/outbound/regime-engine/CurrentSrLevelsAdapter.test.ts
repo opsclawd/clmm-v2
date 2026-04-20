@@ -68,6 +68,17 @@ describe('CurrentSrLevelsAdapter', () => {
     expect(calledUrl).toContain('source=mco');
   });
 
+  it('strips trailing slash from baseUrl to avoid double-slash path', async () => {
+    vi.mocked(fetch).mockResolvedValue(new Response(JSON.stringify(SAMPLE_RESPONSE), { status: 200 }));
+
+    const adapter = new CurrentSrLevelsAdapter('https://regime.example.com/', obs.port);
+    await adapter.fetchCurrent('SOL/USDC', 'mco');
+
+    const calledUrl = (fetch as ReturnType<typeof vi.fn>).mock.calls[0]![0] as string;
+    expect(calledUrl).toContain('/v1/sr-levels/current');
+    expect(calledUrl).not.toContain('//v1/');
+  });
+
   it('does not send auth headers (public read)', async () => {
     vi.mocked(fetch).mockResolvedValue(new Response(JSON.stringify(SAMPLE_RESPONSE), { status: 200 }));
 

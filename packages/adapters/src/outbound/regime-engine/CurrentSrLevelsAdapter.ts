@@ -19,7 +19,7 @@ export class CurrentSrLevelsAdapter implements CurrentSrLevelsPort {
     }
 
     try {
-      const url = `${this.baseUrl}/v1/sr-levels/current?symbol=${encodeURIComponent(symbol)}&source=${encodeURIComponent(source)}`;
+      const url = `${this.baseUrl.replace(/\/+$/, '')}/v1/sr-levels/current?symbol=${encodeURIComponent(symbol)}&source=${encodeURIComponent(source)}`;
       const controller = new AbortController();
       const timeout = setTimeout(() => controller.abort(), 2000);
 
