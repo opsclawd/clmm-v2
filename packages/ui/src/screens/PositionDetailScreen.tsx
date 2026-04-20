@@ -11,6 +11,43 @@ type Props = {
   onViewPreview?: (triggerId: string) => void;
 };
 
+const srStyles = {
+  sectionTitle: {
+    color: colors.text,
+    fontSize: typography.fontSize.base,
+    fontWeight: typography.fontWeight.semibold,
+    marginTop: 20,
+    marginBottom: 8,
+  },
+  subsectionTitle: {
+    color: colors.textSecondary,
+    fontSize: typography.fontSize.sm,
+    fontWeight: typography.fontWeight.medium,
+    marginTop: 8,
+    marginBottom: 4,
+  },
+  levelRow: {
+    color: colors.text,
+    fontSize: typography.fontSize.sm,
+    marginTop: 2,
+  },
+  freshnessLabel: {
+    color: colors.textSecondary,
+    fontSize: typography.fontSize.xs,
+    marginTop: 8,
+  },
+  staleLabel: {
+    color: '#f59e0b',
+    fontSize: typography.fontSize.xs,
+    marginTop: 8,
+  },
+  muted: {
+    color: colors.textSecondary,
+    fontSize: typography.fontSize.sm,
+    marginTop: 16,
+  },
+};
+
 export function PositionDetailScreen({ position, onViewPreview }: Props): JSX.Element {
   if (!position) {
     return (
@@ -25,7 +62,7 @@ export function PositionDetailScreen({ position, onViewPreview }: Props): JSX.El
     );
   }
 
-  const presentation = presentPositionDetail({ position });
+  const presentation = presentPositionDetail({ position, now: Date.now() });
   const vm = presentation.position;
   const breachDirection = position.breachDirection;
   const triggerId = position.triggerId;
@@ -132,6 +169,31 @@ export function PositionDetailScreen({ position, onViewPreview }: Props): JSX.El
             {vm.alertLabel}
           </Text>
         </View>
+
+        {vm.srLevels ? (
+          <View style={{ marginTop: 4 }}>
+            <Text style={srStyles.sectionTitle}>
+              Support & Resistance (MCO)
+            </Text>
+            <Text style={srStyles.subsectionTitle}>Support</Text>
+            {vm.srLevels.supportsSorted.map((s, i) => (
+              <Text key={`s-${i}`} testID={`sr-support-${i}`} style={srStyles.levelRow}>
+                {s.priceLabel}{s.rankLabel ? ` (${s.rankLabel})` : ''}
+              </Text>
+            ))}
+            <Text style={srStyles.subsectionTitle}>Resistance</Text>
+            {vm.srLevels.resistancesSorted.map((r, i) => (
+              <Text key={`r-${i}`} testID={`sr-resistance-${i}`} style={srStyles.levelRow}>
+                {r.priceLabel}{r.rankLabel ? ` (${r.rankLabel})` : ''}
+              </Text>
+            ))}
+            <Text testID="sr-freshness" style={vm.srLevels.isStale ? srStyles.staleLabel : srStyles.freshnessLabel}>
+              {vm.srLevels.freshnessLabel}
+            </Text>
+          </View>
+        ) : (
+          <Text style={srStyles.muted}>No current MCO levels available</Text>
+        )}
       </View>
     </ScrollView>
   );

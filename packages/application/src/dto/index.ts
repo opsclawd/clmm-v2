@@ -11,6 +11,27 @@ import type { ExecutionLifecycleState, PreviewFreshness, TransactionReference } 
 import type { ExitTriggerId } from '@clmm/domain';
 import type { PlatformCapabilityState } from '../ports/index.js';
 
+// Drift guard: SrLevel and SrLevelsBlock are structurally duplicated in
+// packages/adapters/src/outbound/regime-engine/types.ts. Any field change
+// here MUST be mirrored there. The duplication is intentional — application
+// must not import from adapters (boundaries rule).
+export type SrLevel = {
+  price: number;
+  rank?: string;
+  timeframe?: string;
+  invalidation?: number;
+  notes?: string;
+};
+
+export type SrLevelsBlock = {
+  briefId: string;
+  sourceRecordedAtIso: string | null;
+  summary: string | null;
+  capturedAtUnixMs: number;
+  supports: SrLevel[];
+  resistances: SrLevel[];
+};
+
 // Position DTOs
 export type PositionSummaryDto = {
   positionId: PositionId;
@@ -26,6 +47,7 @@ export type PositionDetailDto = PositionSummaryDto & {
   currentPrice: number;
   triggerId?: ExitTriggerId;
   breachDirection?: BreachDirection;
+  srLevels?: SrLevelsBlock;
 };
 
 // Preview DTOs

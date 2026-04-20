@@ -7,6 +7,7 @@ export type PositionDetailPresentation = {
 
 export function presentPositionDetail(params: {
   position: PositionDetailDto;
+  now: number;
 }): PositionDetailPresentation {
-  return { position: buildPositionDetailViewModel(params.position) };
+  return { position: buildPositionDetailViewModel(params.position, params.now) };
 }
