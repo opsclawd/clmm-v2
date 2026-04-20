@@ -655,7 +655,7 @@ Running end-of-plan verification (covers all file changes Tasks 1–5 and 9–10
 - [ ] `pnpm lint` exits 0.
 - [ ] `pnpm boundaries` exits 0.
 - [ ] `pnpm test` exits 0 — unchanged behavior (no source touched).
-- [ ] `grep -rn "EXPO_PUBLIC_REGIME_ENGINE" apps packages` returns zero matches (origin §7 rule 4).
+- [ ] `grep -rn "EXPO_PUBLIC_REGIME_ENGINE" apps packages` returns zero matches outside of `apps/app/.env.example` (which intentionally contains a comment documenting the forbidden rule). Any match in `.ts`, `.tsx`, `.json`, or non-commented `.env*` lines is a leak.
 - [ ] `grep -rn "from '@clmm/adapters" packages/application/src` returns zero matches (origin §7 rule 3).
 - [ ] `grep -n "^## " README.md` shows the new "Environment Variables" heading between "Repo Map" and "Important Docs".
 - [ ] `grep -n "REGIME_ENGINE_BASE_URL" packages/adapters/.env.sample` shows a documentation comment line above the var.
