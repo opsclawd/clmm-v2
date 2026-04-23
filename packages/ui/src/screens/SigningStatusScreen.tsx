@@ -255,6 +255,26 @@ export function SigningStatusScreen({
           </View>
         ) : null}
 
+        {statusError ? (
+          <View style={{
+            marginBottom: 16,
+            paddingVertical: 8,
+            paddingHorizontal: 12,
+            backgroundColor: `${colors.danger}20`,
+            borderRadius: 8,
+            borderWidth: 1,
+            borderColor: colors.danger,
+          }}>
+            <Text style={{
+              color: colors.danger,
+              fontSize: typography.fontSize.sm,
+              fontWeight: typography.fontWeight.medium,
+            }}>
+              {statusError}
+            </Text>
+          </View>
+        ) : null}
+
         {breachDirection ? (
           <View style={{ marginBottom: 16 }}>
             <DirectionalPolicyCard direction={breachDirection} />
