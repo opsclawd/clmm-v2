@@ -194,7 +194,7 @@ export default function SigningRoute() {
                 walletId: walletAddress,
               });
 
-        await submitExecution(attemptId, signedPayload);
+        await submitExecution(attemptId, signedPayload, signingPayload.payloadVersion);
         await executionQuery.refetch();
         navigateRoute({
           router,
@@ -341,7 +341,7 @@ export default function SigningRoute() {
             },
           }
         : {})}
-      signingState={signMutation.isPending ? 'signing' : 'idle'}
+      signingState={signMutation.isError ? 'error' : signMutation.isPending ? 'signing' : 'idle'}
       walletConnected={walletAddress != null}
       onSignAndExecute={() => {
         signMutation.mutate();

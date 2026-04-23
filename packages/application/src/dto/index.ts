@@ -91,6 +91,7 @@ export type ExecutionApprovalDto = {
 export type ExecutionSigningPayloadDto = {
   readonly attemptId: string;
   readonly serializedPayload: string;
+  readonly payloadVersion: string;
   readonly lifecycleState: ExecutionLifecycleState;
   readonly signingExpiresAt?: ClockTimestamp;
 };

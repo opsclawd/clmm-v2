@@ -114,6 +114,7 @@ function isExecutionSigningPayloadDto(value: unknown): value is ExecutionSigning
     typeof value['attemptId'] === 'string' &&
     typeof value['serializedPayload'] === 'string' &&
     value['serializedPayload'].length > 0 &&
+    typeof value['payloadVersion'] === 'string' &&
     isExecutionLifecycleState(value['lifecycleState']) &&
     (value['signingExpiresAt'] == null || typeof value['signingExpiresAt'] === 'number')
   );
