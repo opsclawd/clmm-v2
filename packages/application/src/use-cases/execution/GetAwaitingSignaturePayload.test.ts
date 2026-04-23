@@ -41,6 +41,7 @@ describe('GetAwaitingSignaturePayload', () => {
       kind: 'found',
       attemptId: 'attempt-1',
       serializedPayload: new Uint8Array([9, 8, 7]),
+      payloadVersion: 'v1',
       lifecycleState: { kind: 'awaiting-signature' },
       signingExpiresAt: makeClockTimestamp(1_060_000),
     });

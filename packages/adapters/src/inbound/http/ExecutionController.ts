@@ -235,6 +235,7 @@ export class ExecutionController {
       signingPayload: {
         attemptId: result.attemptId,
         serializedPayload: Buffer.from(result.serializedPayload).toString('base64'),
+        payloadVersion: result.payloadVersion,
         lifecycleState: result.lifecycleState,
         ...(result.signingExpiresAt ? { signingExpiresAt: result.signingExpiresAt } : {}),
       },
