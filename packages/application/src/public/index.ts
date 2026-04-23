@@ -45,6 +45,7 @@ export type {
   ObservabilityPort,
   ClockPort,
   IdGeneratorPort,
+  ReconciliationJobPort,
   DetectionTimingRecord,
   DeliveryTimingRecord,
 } from '../ports/index.js';

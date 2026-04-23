@@ -17,6 +17,7 @@ import type {
   ExecutionSubmissionPort,
   ClockPort,
   IdGeneratorPort,
+  ReconciliationJobPort,
   ExecutionAttemptDto,
   ExecutionApprovalDto,
   ExecutionSigningPayloadDto,
@@ -61,10 +62,6 @@ import {
   REGIME_ENGINE_EVENT_PORT,
   RECONCILIATION_JOB_PORT,
 } from './tokens.js';
-
-type ReconciliationJobPort = {
-  enqueue(attemptId: string): Promise<void>;
-};
 
 function toAttemptDto(
   attemptId: string,

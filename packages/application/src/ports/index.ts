@@ -241,3 +241,7 @@ export interface ClockPort {
 export interface IdGeneratorPort {
   generateId(): string;
 }
+
+export interface ReconciliationJobPort {
+  enqueue(attemptId: string): Promise<void>;
+}
