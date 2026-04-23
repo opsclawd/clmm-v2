@@ -170,6 +170,7 @@ export interface ExecutionRepository {
     expiresAt: ClockTimestamp;
   } | null>;
   listAwaitingSignatureAttemptsByEpisode(episodeId: BreachEpisodeId): Promise<StoredExecutionAttempt[]>;
+  listSubmittedAttempts(): Promise<StoredExecutionAttempt[]>;
   updateAttemptState(attemptId: string, state: ExecutionLifecycleState): Promise<void>;
 }
 
@@ -208,6 +209,12 @@ export interface MonitoredWalletRepository {
   unenroll(walletId: WalletId): Promise<void>;
   listActiveWallets(): Promise<Array<{ walletId: WalletId; lastScannedAt: ClockTimestamp | null }>>;
   markScanned(walletId: WalletId, scannedAt: ClockTimestamp): Promise<void>;
+}
+
+// --- Job ports ---
+
+export interface ReconciliationJobPort {
+  enqueue(attemptId: string): Promise<void>;
 }
 
 // --- Cross-cutting ports ---

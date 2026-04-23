@@ -482,7 +482,24 @@ export class OperationalStorageAdapter
       lifecycleState: { kind: row.lifecycleStateKind } as ExecutionLifecycleState,
       ...(row.episodeId ? { episodeId: row.episodeId as BreachEpisodeId } : {}),
       ...(row.previewId ? { previewId: row.previewId } : {}),
-      // boundary: Drizzle jsonb columns return unknown; runtime shape matches domain types
+      completedSteps: (row.completedStepsJson as ExecutionAttempt['completedSteps']) ?? [],
+      transactionReferences: (row.transactionRefsJson as ExecutionAttempt['transactionReferences']) ?? [],
+    }));
+  }
+
+  async listSubmittedAttempts(): Promise<StoredExecutionAttempt[]> {
+    const rows = await this.db
+      .select()
+      .from(executionAttempts)
+      .where(eq(executionAttempts.lifecycleStateKind, 'submitted'));
+
+    return rows.map((row) => ({
+      attemptId: row.attemptId,
+      positionId: row.positionId as PositionId,
+      breachDirection: directionFromKind(row.directionKind),
+      lifecycleState: { kind: row.lifecycleStateKind } as ExecutionLifecycleState,
+      ...(row.episodeId ? { episodeId: row.episodeId as BreachEpisodeId } : {}),
+      ...(row.previewId ? { previewId: row.previewId } : {}),
       completedSteps: (row.completedStepsJson as ExecutionAttempt['completedSteps']) ?? [],
       transactionReferences: (row.transactionRefsJson as ExecutionAttempt['transactionReferences']) ?? [],
     }));

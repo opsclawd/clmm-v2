@@ -47,6 +47,7 @@ export type {
   IdGeneratorPort,
   DetectionTimingRecord,
   DeliveryTimingRecord,
+  ReconciliationJobPort,
 } from '../ports/index.js';
 export type {
   EpisodeTransition,
