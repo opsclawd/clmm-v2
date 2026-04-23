@@ -220,6 +220,7 @@ describe('ExecutionController', () => {
       signingPayload: {
         attemptId: 'attempt-signing-payload',
         serializedPayload: Buffer.from([9, 8, 7]).toString('base64'),
+        payloadVersion: 'v1',
         lifecycleState: { kind: 'awaiting-signature' },
         signingExpiresAt: makeClockTimestamp(1_060_000),
       },

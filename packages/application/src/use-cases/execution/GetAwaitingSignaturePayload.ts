@@ -19,6 +19,7 @@ export type GetAwaitingSignaturePayloadResult =
       readonly kind: 'found';
       readonly attemptId: string;
       readonly serializedPayload: Uint8Array;
+      readonly payloadVersion: string;
       readonly lifecycleState: { readonly kind: 'awaiting-signature' };
       readonly signingExpiresAt?: ClockTimestamp;
     }
@@ -71,6 +72,7 @@ export async function getAwaitingSignaturePayload(
     kind: 'found',
     attemptId: input.attemptId,
     serializedPayload: preparedPayload.unsignedPayload,
+    payloadVersion: preparedPayload.payloadVersion,
     lifecycleState: { kind: 'awaiting-signature' },
     signingExpiresAt: preparedPayload.expiresAt,
   };
