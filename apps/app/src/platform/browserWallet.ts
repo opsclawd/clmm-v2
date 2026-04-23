@@ -1,5 +1,11 @@
+import { VersionedTransaction } from '@solana/web3.js';
+
 export type BrowserWalletPublicKey = {
   toBase58(): string;
+};
+
+export type BrowserSignedTransaction = {
+  serialize(): Uint8Array;
 };
 
 export type BrowserWalletProvider = {
@@ -7,7 +13,7 @@ export type BrowserWalletProvider = {
   publicKey?: BrowserWalletPublicKey | null;
   connect(): Promise<{ publicKey?: BrowserWalletPublicKey | null } | null | undefined>;
   disconnect?(): Promise<void>;
-  signTransaction?(payload: unknown): Promise<unknown>;
+  signTransaction?(payload: VersionedTransaction): Promise<BrowserSignedTransaction>;
 };
 
 export type BrowserWalletWindow = {
@@ -52,14 +58,6 @@ export async function disconnectBrowserWallet(browserWindow: BrowserWalletWindow
   await provider?.disconnect?.();
 }
 
-function isSerializedTransaction(value: unknown): value is { serialize(): Uint8Array | ArrayBuffer } {
-  if (typeof value !== 'object' || value == null) {
-    return false;
-  }
-
-  return typeof Reflect.get(value, 'serialize') === 'function';
-}
-
 function decodeBase64Payload(value: string): Uint8Array {
   if (typeof globalThis.atob !== 'function') {
     throw new Error('Base64 decoding is not available in this environment');
@@ -88,34 +86,6 @@ function encodeBase64Payload(value: Uint8Array): string {
   return globalThis.btoa(binary);
 }
 
-function normalizeSignedResult(payload: unknown): Uint8Array {
-  if (payload instanceof Uint8Array) {
-    return payload;
-  }
-
-  if (payload instanceof ArrayBuffer) {
-    return new Uint8Array(payload);
-  }
-
-  if (isSerializedTransaction(payload)) {
-    return normalizeSignedResult(payload.serialize());
-  }
-
-  throw new Error('Wallet returned an unsupported signed transaction payload');
-}
-
-function shouldRetryWithSerializablePayload(error: unknown): boolean {
-  return error instanceof Error && error.message.toLowerCase().includes('serialize is not a function');
-}
-
-function buildSerializablePayload(payloadBytes: Uint8Array): { serialize(): Uint8Array } {
-  return {
-    serialize() {
-      return payloadBytes;
-    },
-  };
-}
-
 export async function signBrowserTransaction(params: {
   browserWindow: BrowserWalletWindow | undefined;
   serializedPayload: string;
@@ -131,17 +101,8 @@ export async function signBrowserTransaction(params: {
   }
 
   const payloadBytes = decodeBase64Payload(params.serializedPayload);
-  let signedPayload: unknown;
+  const transaction = VersionedTransaction.deserialize(payloadBytes);
+  const signedPayload = await provider.signTransaction(transaction);
 
-  try {
-    signedPayload = await provider.signTransaction(payloadBytes);
-  } catch (error: unknown) {
-    if (!shouldRetryWithSerializablePayload(error)) {
-      throw error;
-    }
-
-    signedPayload = await provider.signTransaction(buildSerializablePayload(payloadBytes));
-  }
-
-  return encodeBase64Payload(normalizeSignedResult(signedPayload));
+  return encodeBase64Payload(signedPayload.serialize());
 }

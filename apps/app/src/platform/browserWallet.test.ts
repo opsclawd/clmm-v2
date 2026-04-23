@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import { VersionedTransaction } from '@solana/web3.js';
 import {
   connectBrowserWallet,
   disconnectBrowserWallet,
@@ -7,7 +8,8 @@ import {
   signBrowserTransaction,
 } from './browserWallet';
 
-const VALID_SERIALIZED_PAYLOAD = Buffer.from([1, 2, 3, 4]).toString('base64');
+const VALID_SERIALIZED_PAYLOAD =
+  'AQAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAACAAQABA8Ad1mDmJHOT4w9SKImj8qzR0ItAoMpTpj/M0nP1p4YpfC/b4w9Qc3vmYbf/YFgTZoQYCeG3U3QFBeWvvqvS5/YAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAQICAAEMAgAAAAEAAAAAAAAAAA==';
 
 describe('browserWallet helpers', () => {
   it('returns null when no browser wallet provider exists', () => {
@@ -105,13 +107,15 @@ describe('browserWallet helpers', () => {
     expect(disconnectCalls).toBe(1);
   });
 
-  it('signBrowserTransaction decodes payload and passes bytes to provider', async () => {
+  it('signBrowserTransaction deserializes payload before passing it to the provider', async () => {
     let received: unknown;
+    let signTransactionCalls = 0;
     const provider = {
       connect: () => Promise.resolve({ publicKey: null }),
       signTransaction: (payload: unknown) => {
+        signTransactionCalls += 1;
         received = payload;
-        return Promise.resolve(new Uint8Array([4, 5, 6]));
+        return Promise.resolve({ serialize: () => new Uint8Array([4, 5, 6]) });
       },
     };
 
@@ -120,11 +124,15 @@ describe('browserWallet helpers', () => {
       serializedPayload: VALID_SERIALIZED_PAYLOAD,
     });
 
-    expect(received).toBeInstanceOf(Uint8Array);
-    expect(Array.from(received as Uint8Array)).toEqual([1, 2, 3, 4]);
+    expect(signTransactionCalls).toBe(1);
+    expect(received).toBeInstanceOf(VersionedTransaction);
+    expect(received).not.toBeInstanceOf(Uint8Array);
+    expect(typeof (received as { serialize?: unknown }).serialize).toBe('function');
+    expect((received as { signatures?: unknown }).signatures).toBeDefined();
+    expect((received as { message?: unknown }).message).toBeDefined();
   });
 
-  it('signBrowserTransaction normalizes serialized result and re-encodes as base64', async () => {
+  it('signBrowserTransaction serializes the signed transaction result and re-encodes as base64', async () => {
     const signedPayload = new Uint8Array([4, 5, 6]);
     const fakeSignedPayload = {
       serialize: () => signedPayload,
@@ -140,46 +148,6 @@ describe('browserWallet helpers', () => {
     });
 
     expect(result).toBe(Buffer.from([4, 5, 6]).toString('base64'));
-  });
-
-  it('signBrowserTransaction throws a clear error when the provider returns an unsupported result shape', async () => {
-    const provider = {
-      connect: () => Promise.resolve({ publicKey: null }),
-      signTransaction: () => Promise.resolve('signed-payload'),
-    };
-
-    await expect(
-      signBrowserTransaction({
-        browserWindow: { solana: provider },
-        serializedPayload: VALID_SERIALIZED_PAYLOAD,
-      }),
-    ).rejects.toThrow('Wallet returned an unsupported signed transaction payload');
-  });
-
-  it('retries with a serializable payload when provider rejects raw bytes', async () => {
-    let callCount = 0;
-    const provider = {
-      connect: () => Promise.resolve({ publicKey: null }),
-      signTransaction: (payload: unknown) => {
-        callCount += 1;
-
-        if (callCount === 1) {
-          expect(payload).toBeInstanceOf(Uint8Array);
-          return Promise.reject(new Error('r.serialize is not a function'));
-        }
-
-        expect(typeof (payload as { serialize?: unknown }).serialize).toBe('function');
-        return Promise.resolve(new Uint8Array([7, 8, 9]));
-      },
-    };
-
-    const result = await signBrowserTransaction({
-      browserWindow: { solana: provider },
-      serializedPayload: VALID_SERIALIZED_PAYLOAD,
-    });
-
-    expect(callCount).toBe(2);
-    expect(result).toBe(Buffer.from([7, 8, 9]).toString('base64'));
   });
 
   it('signBrowserTransaction throws when no browser wallet provider is injected', async () => {
