@@ -255,7 +255,7 @@ export function SigningStatusScreen({
           </View>
         ) : null}
 
-        {statusError && signingState !== 'error' ? (
+        {statusError && signingState !== 'error' && lifecycleState?.kind === 'awaiting-signature' ? (
           <View style={{
             marginBottom: 16,
             paddingVertical: 8,

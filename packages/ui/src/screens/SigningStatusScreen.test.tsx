@@ -127,4 +127,18 @@ describe('SigningStatusScreen', () => {
     expect(screen.getByText('Signing error')).toBeDefined();
     expect(screen.getByText('Try Again')).toBeDefined();
   });
+
+  it('suppresses statusError banner once lifecycleState advances past awaiting-signature', () => {
+    render(
+      <SigningStatusScreen
+        lifecycleState={{ kind: 'submitted' }}
+        signingState="idle"
+        statusError="Submit failed"
+        onSignAndExecute={vi.fn()}
+        walletConnected
+      />,
+    );
+
+    expect(screen.queryByText('Submit failed')).toBeNull();
+  });
 });
