@@ -95,4 +95,36 @@ describe('SigningStatusScreen', () => {
 
     expect(screen.queryByText('Could not load signing payload')).toBeNull();
   });
+
+  it('renders statusError exactly once even when signingState is error', () => {
+    render(
+      <SigningStatusScreen
+        lifecycleState={{ kind: 'awaiting-signature' }}
+        signingState="error"
+        signingError="Submit failed"
+        statusError="Submit failed"
+        onSignAndExecute={vi.fn()}
+        walletConnected
+      />,
+    );
+
+    const errorTexts = screen.getAllByText('Submit failed');
+    expect(errorTexts).toHaveLength(1);
+  });
+
+  it('does not render the inline statusError banner when signingState is error', () => {
+    render(
+      <SigningStatusScreen
+        lifecycleState={{ kind: 'awaiting-signature' }}
+        signingState="error"
+        signingError="Submit failed"
+        statusError="Submit failed"
+        onSignAndExecute={vi.fn()}
+        walletConnected
+      />,
+    );
+
+    expect(screen.getByText('Signing error')).toBeDefined();
+    expect(screen.getByText('Try Again')).toBeDefined();
+  });
 });

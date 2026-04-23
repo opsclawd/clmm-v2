@@ -255,7 +255,7 @@ export function SigningStatusScreen({
           </View>
         ) : null}
 
-        {statusError ? (
+        {statusError && signingState !== 'error' ? (
           <View style={{
             marginBottom: 16,
             paddingVertical: 8,

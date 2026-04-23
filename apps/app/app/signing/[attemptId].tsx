@@ -341,7 +341,7 @@ export default function SigningRoute() {
             },
           }
         : {})}
-      signingState={signMutation.isError ? 'error' : signMutation.isPending ? 'signing' : 'idle'}
+      signingState={signMutation.isPending ? 'signing' : 'idle'}
       walletConnected={walletAddress != null}
       onSignAndExecute={() => {
         signMutation.mutate();
