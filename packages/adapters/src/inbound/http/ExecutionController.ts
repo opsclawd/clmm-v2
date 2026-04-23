@@ -17,6 +17,7 @@ import type {
   ExecutionSubmissionPort,
   ClockPort,
   IdGeneratorPort,
+  ReconciliationJobPort,
   ExecutionAttemptDto,
   ExecutionApprovalDto,
   ExecutionSigningPayloadDto,
@@ -59,6 +60,7 @@ import {
   CLOCK_PORT,
   ID_GENERATOR_PORT,
   REGIME_ENGINE_EVENT_PORT,
+  RECONCILIATION_JOB_PORT,
 } from './tokens.js';
 
 function toAttemptDto(
@@ -135,6 +137,8 @@ export class ExecutionController {
     private readonly ids: IdGeneratorPort,
     @Inject(REGIME_ENGINE_EVENT_PORT)
     private readonly regimeEngineEventPort: RegimeEngineEventPort,
+    @Inject(RECONCILIATION_JOB_PORT)
+    private readonly reconciliationJobPort: ReconciliationJobPort,
   ) {}
 
   private resolveAttemptDirection(
@@ -383,6 +387,11 @@ export class ExecutionController {
 
     const reconciliation = await this.submissionPort.reconcileExecution(references);
     if (!reconciliation.finalState) {
+      try {
+        await this.reconciliationJobPort.enqueue(attemptId);
+      } catch {
+        // enqueue failure is non-fatal — the sweep job will re-enqueue
+      }
       return { result: 'pending' as const };
     }
 

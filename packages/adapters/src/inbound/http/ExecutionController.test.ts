@@ -40,6 +40,18 @@ import type {
   WalletId,
 } from '@clmm/domain';
 
+class RecordingReconciliationJobPort {
+  attemptIds: string[] = [];
+  shouldThrow = false;
+
+  async enqueue(attemptId: string): Promise<void> {
+    if (this.shouldThrow) {
+      throw new Error('enqueue failed');
+    }
+    this.attemptIds.push(attemptId);
+  }
+}
+
 class RecordingPreparationPort implements ExecutionPreparationPort {
   calls: Array<{ plan: ExecutionPlan; walletId: WalletId; positionId: PositionId }> = [];
   serializedPayload = new Uint8Array([5, 4, 3]);
@@ -102,6 +114,7 @@ describe('ExecutionController', () => {
   let preparationPort: RecordingPreparationPort;
   let submissionPort: RecordingSubmissionPort;
   let regimeEngineEventPort: RecordingRegimeEngineEventPort;
+  let reconciliationJobPort: RecordingReconciliationJobPort;
   let ids: FakeIdGeneratorPort;
   let controller: ExecutionController;
 
@@ -128,6 +141,7 @@ describe('ExecutionController', () => {
     submissionPort = new RecordingSubmissionPort();
     ids = new FakeIdGeneratorPort('exec-http');
     regimeEngineEventPort = new RecordingRegimeEngineEventPort();
+    reconciliationJobPort = new RecordingReconciliationJobPort();
     controller = new ExecutionController(
       executionRepo as unknown as ExecutionRepository,
       historyRepo as unknown as ExecutionHistoryRepository,
@@ -136,6 +150,7 @@ describe('ExecutionController', () => {
       clock,
       ids,
       regimeEngineEventPort,
+      reconciliationJobPort,
     );
   });
 
@@ -749,6 +764,7 @@ describe('ExecutionController', () => {
       });
 
       expect(regimeEngineEventPort.events).toHaveLength(1);
+      expect(reconciliationJobPort.attemptIds).toEqual([]);
       expect(regimeEngineEventPort.events[0]!.status).toBe('confirmed');
       expect(regimeEngineEventPort.events[0]!.correlationId).toBe('attempt-regime-confirmed');
     });
@@ -782,12 +798,27 @@ describe('ExecutionController', () => {
       await saveAwaitingSignature('attempt-regime-pending');
       submissionPort.finalState = null;
 
-      await controller.submitExecution('attempt-regime-pending', {
+      const result = await controller.submitExecution('attempt-regime-pending', {
         signedPayload: Buffer.from([1, 2, 3]).toString('base64'),
         payloadVersion: 'v1',
       });
 
+      expect(result.result).toBe('pending');
+      expect(reconciliationJobPort.attemptIds).toEqual(['attempt-regime-pending']);
       expect(regimeEngineEventPort.events).toHaveLength(0);
+    });
+
+    it('returns pending even when reconciliation enqueue fails', async () => {
+      await saveAwaitingSignature('attempt-enqueue-failure');
+      submissionPort.finalState = null;
+      reconciliationJobPort.shouldThrow = true;
+
+      const result = await controller.submitExecution('attempt-enqueue-failure', {
+        signedPayload: Buffer.from([1, 2, 3]).toString('base64'),
+        payloadVersion: 'v1',
+      });
+
+      expect(result.result).toBe('pending');
     });
 
     it('does not fire regime-engine event when reconcileExecution throws', async () => {

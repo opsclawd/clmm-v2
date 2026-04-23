@@ -91,6 +91,16 @@ export class FakeExecutionRepository implements ExecutionRepository {
       }));
   }
 
+  async listSubmittedAttempts(): Promise<StoredExecutionAttempt[]> {
+    return Array.from(this.attempts.values())
+      .filter((attempt) => attempt.lifecycleState.kind === 'submitted')
+      .map((attempt) => ({
+        ...attempt,
+        completedSteps: [...attempt.completedSteps],
+        transactionReferences: [...attempt.transactionReferences],
+      }));
+  }
+
   async updateAttemptState(attemptId: string, state: ExecutionLifecycleState): Promise<void> {
     const existing = this.attempts.get(attemptId);
     if (existing) {
