@@ -59,7 +59,12 @@ import {
   CLOCK_PORT,
   ID_GENERATOR_PORT,
   REGIME_ENGINE_EVENT_PORT,
+  RECONCILIATION_JOB_PORT,
 } from './tokens.js';
+
+type ReconciliationJobPort = {
+  enqueue(attemptId: string): Promise<void>;
+};
 
 function toAttemptDto(
   attemptId: string,
@@ -135,6 +140,8 @@ export class ExecutionController {
     private readonly ids: IdGeneratorPort,
     @Inject(REGIME_ENGINE_EVENT_PORT)
     private readonly regimeEngineEventPort: RegimeEngineEventPort,
+    @Inject(RECONCILIATION_JOB_PORT)
+    private readonly reconciliationJobPort: ReconciliationJobPort,
   ) {}
 
   private resolveAttemptDirection(
@@ -383,6 +390,7 @@ export class ExecutionController {
 
     const reconciliation = await this.submissionPort.reconcileExecution(references);
     if (!reconciliation.finalState) {
+      await this.reconciliationJobPort.enqueue(attemptId);
       return { result: 'pending' as const };
     }
 

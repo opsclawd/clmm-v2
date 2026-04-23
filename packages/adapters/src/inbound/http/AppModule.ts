@@ -1,5 +1,5 @@
 import 'reflect-metadata';
-import { Module } from '@nestjs/common';
+import { Injectable, Module, OnModuleDestroy, OnModuleInit } from '@nestjs/common';
 import { HealthController } from './HealthController.js';
 import { PositionController } from './PositionController.js';
 import { AlertController } from './AlertController.js';
@@ -19,6 +19,8 @@ import { RegimeEngineExecutionEventAdapter } from '../../outbound/regime-engine/
 import { CurrentSrLevelsAdapter } from '../../outbound/regime-engine/CurrentSrLevelsAdapter.js';
 import type { RegimeEngineEventPort } from '../../outbound/regime-engine/types.js';
 import { createDb } from '../../outbound/storage/db.js';
+import { createPgBossProvider } from '../jobs/PgBossProvider.js';
+import { ReconciliationJobHandler } from '../jobs/ReconciliationJobHandler.js';
 import type { ClockPort, IdGeneratorPort } from '@clmm/application';
 import type { ClockTimestamp } from '@clmm/domain';
 import {
@@ -34,12 +36,14 @@ import {
   MONITORED_WALLET_REPOSITORY,
   REGIME_ENGINE_EVENT_PORT,
   CURRENT_SR_LEVELS_PORT,
+  RECONCILIATION_JOB_PORT,
   SR_LEVELS_POOL_ALLOWLIST,
 } from './tokens.js';
 
 // boundary: process.env values are untyped at runtime; validated via env schema at deploy
 const dbUrl = (process.env as Record<string, string | undefined>)['DATABASE_URL'] ?? 'postgresql://localhost/clmm';
 const db = createDb(dbUrl);
+const boss = createPgBossProvider(dbUrl);
 const rpcUrl = (process.env as Record<string, string | undefined>)['SOLANA_RPC_URL'] ?? 'https://api.mainnet-beta.solana.com';
 
 const systemClock: ClockPort = {
@@ -68,6 +72,23 @@ const regimeEngineEventAdapter: RegimeEngineEventPort = new RegimeEngineExecutio
   telemetry,
 );
 const currentSrLevelsAdapter = new CurrentSrLevelsAdapter(regimeEngineBaseUrl, telemetry);
+const reconciliationJobPort = {
+  async enqueue(attemptId: string): Promise<void> {
+    await boss.send(ReconciliationJobHandler.JOB_NAME, { attemptId });
+  },
+};
+
+@Injectable()
+class PgBossLifecycle implements OnModuleInit, OnModuleDestroy {
+  async onModuleInit(): Promise<void> {
+    await boss.start();
+    await boss.createQueue(ReconciliationJobHandler.JOB_NAME);
+  }
+
+  async onModuleDestroy(): Promise<void> {
+    await boss.stop();
+  }
+}
 
 export const SR_LEVELS_POOL_ALLOWLIST_MAP = new Map<string, { symbol: string; source: string }>([
   ['Czfq3xZZDmsdGdUyrNLtRhGc47cXcZtLG4crryfu44zE', { symbol: 'SOL/USDC', source: 'mco' }],
@@ -88,7 +109,9 @@ export const SR_LEVELS_POOL_ALLOWLIST_MAP = new Map<string, { symbol: string; so
     { provide: MONITORED_WALLET_REPOSITORY, useValue: monitoredWalletStorage },
     { provide: REGIME_ENGINE_EVENT_PORT, useValue: regimeEngineEventAdapter },
     { provide: CURRENT_SR_LEVELS_PORT, useValue: currentSrLevelsAdapter },
+    { provide: RECONCILIATION_JOB_PORT, useValue: reconciliationJobPort },
     { provide: SR_LEVELS_POOL_ALLOWLIST, useValue: SR_LEVELS_POOL_ALLOWLIST_MAP },
+    PgBossLifecycle,
   ],
 })
 export class AppModule {}
