@@ -18,6 +18,7 @@ import type {
   ClockPort,
   IdGeneratorPort,
   ReconciliationJobPort,
+  ObservabilityPort,
   ExecutionAttemptDto,
   ExecutionApprovalDto,
   ExecutionSigningPayloadDto,
@@ -61,6 +62,7 @@ import {
   ID_GENERATOR_PORT,
   REGIME_ENGINE_EVENT_PORT,
   RECONCILIATION_JOB_PORT,
+  OBSERVABILITY_PORT,
 } from './tokens.js';
 
 function toAttemptDto(
@@ -139,6 +141,8 @@ export class ExecutionController {
     private readonly regimeEngineEventPort: RegimeEngineEventPort,
     @Inject(RECONCILIATION_JOB_PORT)
     private readonly reconciliationJobPort: ReconciliationJobPort,
+    @Inject(OBSERVABILITY_PORT)
+    private readonly observability: ObservabilityPort,
   ) {}
 
   private resolveAttemptDirection(
@@ -390,8 +394,11 @@ export class ExecutionController {
     if (!reconciliation.finalState) {
       try {
         await this.reconciliationJobPort.enqueue(attemptId);
-      } catch {
-        // enqueue failure is non-fatal — the sweep job will re-enqueue
+      } catch (enqueueError: unknown) {
+        this.observability.log('warn', `Failed to enqueue reconciliation for attempt ${attemptId}; sweep job will retry`, {
+          attemptId,
+          error: enqueueError instanceof Error ? enqueueError.message : String(enqueueError),
+        });
       }
       return { result: 'pending' as const };
     }

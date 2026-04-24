@@ -1,11 +1,12 @@
 import 'reflect-metadata';
-import { Injectable, Module, OnModuleDestroy, OnModuleInit } from '@nestjs/common';
+import { Module } from '@nestjs/common';
 import { HealthController } from './HealthController.js';
 import { PositionController } from './PositionController.js';
 import { AlertController } from './AlertController.js';
 import { PreviewController } from './PreviewController.js';
 import { ExecutionController } from './ExecutionController.js';
 import { WalletController } from './WalletController.js';
+import { PgBossLifecycle } from './PgBossLifecycle.js';
 import { OperationalStorageAdapter } from '../../outbound/storage/OperationalStorageAdapter.js';
 import { OffChainHistoryStorageAdapter } from '../../outbound/storage/OffChainHistoryStorageAdapter.js';
 import { MonitoredWalletStorageAdapter } from '../../outbound/storage/MonitoredWalletStorageAdapter.js';
@@ -36,6 +37,8 @@ import {
   MONITORED_WALLET_REPOSITORY,
   REGIME_ENGINE_EVENT_PORT,
   CURRENT_SR_LEVELS_PORT,
+  OBSERVABILITY_PORT,
+  PG_BOSS_INSTANCE,
   RECONCILIATION_JOB_PORT,
   SR_LEVELS_POOL_ALLOWLIST,
 } from './tokens.js';
@@ -78,18 +81,6 @@ const reconciliationJobPort = {
   },
 };
 
-@Injectable()
-class PgBossLifecycle implements OnModuleInit, OnModuleDestroy {
-  async onModuleInit(): Promise<void> {
-    await boss.start();
-    await boss.createQueue(ReconciliationJobHandler.JOB_NAME);
-  }
-
-  async onModuleDestroy(): Promise<void> {
-    await boss.stop();
-  }
-}
-
 export const SR_LEVELS_POOL_ALLOWLIST_MAP = new Map<string, { symbol: string; source: string }>([
   ['Czfq3xZZDmsdGdUyrNLtRhGc47cXcZtLG4crryfu44zE', { symbol: 'SOL/USDC', source: 'mco' }],
 ]);
@@ -109,6 +100,8 @@ export const SR_LEVELS_POOL_ALLOWLIST_MAP = new Map<string, { symbol: string; so
     { provide: MONITORED_WALLET_REPOSITORY, useValue: monitoredWalletStorage },
     { provide: REGIME_ENGINE_EVENT_PORT, useValue: regimeEngineEventAdapter },
     { provide: CURRENT_SR_LEVELS_PORT, useValue: currentSrLevelsAdapter },
+    { provide: OBSERVABILITY_PORT, useValue: telemetry },
+    { provide: PG_BOSS_INSTANCE, useValue: boss },
     { provide: RECONCILIATION_JOB_PORT, useValue: reconciliationJobPort },
     { provide: SR_LEVELS_POOL_ALLOWLIST, useValue: SR_LEVELS_POOL_ALLOWLIST_MAP },
     PgBossLifecycle,
