@@ -62,6 +62,19 @@ The spike must prove this round-trip works end-to-end with a real Phantom wallet
 | Android Firefox/Brave/Opera | No false MWA promise | Required |
 | Social app in-app browsers | Shows escape hatch | Required |
 
+## MWA Registration Ownership
+
+**ConnectorKit owns MWA registration.** No manual registration module needed.
+
+Evidence from `ConnectorProvider` source (`packages/connector/src/ui/connector-provider.tsx`):
+- When the `mobile` config prop is provided, `ConnectorProviderInternal` dynamically imports `@solana-mobile/wallet-standard-mobile` and calls `registerMwa` with the config.
+- The import is async (`await import(...)`) and guarded by a `cancelled` flag on cleanup.
+- This means MWA registration happens inside ConnectorKit's provider boundary, not at app level.
+
+**Implication:** We do NOT create `mobileWalletRegistration.web.ts` / `.native.ts` stubs. Instead, we pass the `mobile` config to `ConnectorProvider`. The plan's Task 0.3 manual registration module should be skipped; Task 3 (BrowserWalletProvider) passes the `mobile` config to the provider.
+
+**Double-registration risk:** If we separately call `registerMwa()`, the Wallet Standard registry will show duplicate wallet entries in `getWallets()`. Conclusion: rely solely on ConnectorKit's registration.
+
 ## Spike Results
 
 _Pending real-device testing._
