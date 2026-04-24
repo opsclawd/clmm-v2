@@ -16,6 +16,7 @@ export type ConnectorKitAdapterResult = {
   account: string | null;
   walletError: Error | null;
   walletStatus: WalletStatus;
+  signTransactionBytes: (payload: Uint8Array) => Promise<Uint8Array>;
 };
 
 export function useConnectorKitAdapter(): ConnectorKitAdapterResult {

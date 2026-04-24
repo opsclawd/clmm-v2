@@ -2,3 +2,4 @@ export type { BrowserWalletAccount, BrowserWalletConnectResult, BrowserWalletSig
 export { base64ToBytes, bytesToBase64 } from './base64Bytes';
 export { BrowserWalletProvider } from './BrowserWalletProvider';
 export { useBrowserWalletConnect } from './useBrowserWalletConnect';
+export { useBrowserWalletSign } from './useBrowserWalletSign';

@@ -1,4 +1,4 @@
-import { useConnector } from '@solana/connector';
+import { useConnector, useTransactionSigner } from '@solana/connector/react';
 import type { ConnectOptions, WalletConnectorId, WalletStatus } from '@solana/connector';
 
 export type ConnectorKitAdapterResult = {
@@ -17,10 +17,12 @@ export type ConnectorKitAdapterResult = {
   account: string | null;
   walletError: Error | null;
   walletStatus: WalletStatus;
+  signTransactionBytes: (payload: Uint8Array) => Promise<Uint8Array>;
 };
 
 export function useConnectorKitAdapter(): ConnectorKitAdapterResult {
   const snapshot = useConnector();
+  const { signer } = useTransactionSigner();
 
   return {
     connectors: snapshot.connectors,
@@ -31,5 +33,23 @@ export function useConnectorKitAdapter(): ConnectorKitAdapterResult {
     account: snapshot.account,
     walletError: snapshot.walletError,
     walletStatus: snapshot.walletStatus,
+    signTransactionBytes: async (payload: Uint8Array): Promise<Uint8Array> => {
+      if (!signer) {
+        throw new Error('No wallet account is connected');
+      }
+      const signed = await signer.signTransaction(payload);
+      if (signed instanceof Uint8Array) {
+        return signed;
+      }
+      if (signed instanceof ArrayBuffer || ArrayBuffer.isView(signed)) {
+        return new Uint8Array(
+          signed instanceof ArrayBuffer ? signed : signed.buffer,
+        );
+      }
+      if (typeof signed === 'object' && signed !== null && 'serialize' in signed) {
+        return (signed as { serialize: () => Uint8Array }).serialize();
+      }
+      throw new Error('Signer returned unsupported transaction format');
+    },
   };
 }
