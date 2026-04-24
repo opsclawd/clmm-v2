@@ -8,23 +8,24 @@ type Props = {
   children: React.ReactNode;
 };
 
-const toneStyles: Record<ChipTone, { text: string; border: string; dot: string; glow?: string }> = {
+const toneStyles: Record<ChipTone, { text: string; border: string; dot: string; shadowColor: string }> = {
   safe: {
     text: colors.safe,
     border: 'rgba(158,236,209,0.30)',
     dot: colors.safe,
-    glow: '0 0 8px rgba(158,236,209,0.5)',
+    shadowColor: colors.safe,
   },
   warn: {
     text: colors.warn,
     border: 'rgba(244,201,122,0.30)',
     dot: colors.warn,
+    shadowColor: colors.warn,
   },
   breach: {
     text: colors.breachAccent,
     border: 'rgba(245,148,132,0.30)',
     dot: colors.breachAccent,
-    glow: '0 0 10px rgba(245,148,132,0.5)',
+    shadowColor: colors.breachAccent,
   },
 };
 
@@ -41,7 +42,6 @@ export function Chip({ tone, children }: Props): JSX.Element {
       style={{
         flexDirection: 'row',
         alignItems: 'center',
-        gap: DOT_SIZE,
         height: CHIP_HEIGHT,
         paddingHorizontal: CHIP_PADDING_HORIZONTAL,
         borderRadius: CHIP_BORDER_RADIUS,
@@ -56,12 +56,11 @@ export function Chip({ tone, children }: Props): JSX.Element {
           height: DOT_SIZE,
           borderRadius: CHIP_BORDER_RADIUS,
           backgroundColor: style.dot,
-          ...(style.glow ? {
-            shadowColor: style.dot,
-            shadowOffset: { width: 0, height: 0 },
-            shadowOpacity: 0.5,
-            shadowRadius: 4,
-          } : {}),
+          marginRight: DOT_SIZE,
+          shadowColor: style.shadowColor,
+          shadowOffset: { width: 0, height: 0 },
+          shadowOpacity: 0.5,
+          shadowRadius: 4,
         }}
       />
       <Text

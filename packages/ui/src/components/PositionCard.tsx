@@ -68,13 +68,14 @@ export function PositionCard({
         }}
       >
         <Chip tone={chip.tone}>{chip.label}</Chip>
-        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 5 }}>
+        <View style={{ flexDirection: 'row', alignItems: 'center' }}>
           <View
             style={{
               width: 6,
               height: 6,
               borderRadius: 999,
               backgroundColor: monitoringColor,
+              marginRight: 5,
             }}
           />
           <Text
