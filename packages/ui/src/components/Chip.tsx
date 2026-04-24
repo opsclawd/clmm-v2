@@ -28,6 +28,12 @@ const toneStyles: Record<ChipTone, { text: string; border: string; dot: string; 
   },
 };
 
+const CHIP_HEIGHT = 24;
+const CHIP_PADDING_HORIZONTAL = 10;
+const CHIP_BORDER_RADIUS = 999;
+const DOT_SIZE = 6;
+const LETTER_SPACING_FACTOR = 0.02;
+
 export function Chip({ tone, children }: Props): JSX.Element {
   const style = toneStyles[tone];
   return (
@@ -35,10 +41,10 @@ export function Chip({ tone, children }: Props): JSX.Element {
       style={{
         flexDirection: 'row',
         alignItems: 'center',
-        gap: 6,
-        height: 24,
-        paddingHorizontal: 10,
-        borderRadius: 999,
+        gap: DOT_SIZE,
+        height: CHIP_HEIGHT,
+        paddingHorizontal: CHIP_PADDING_HORIZONTAL,
+        borderRadius: CHIP_BORDER_RADIUS,
         borderWidth: 1,
         borderColor: style.border,
         alignSelf: 'flex-start',
@@ -46,9 +52,9 @@ export function Chip({ tone, children }: Props): JSX.Element {
     >
       <View
         style={{
-          width: 6,
-          height: 6,
-          borderRadius: 999,
+          width: DOT_SIZE,
+          height: DOT_SIZE,
+          borderRadius: CHIP_BORDER_RADIUS,
           backgroundColor: style.dot,
           ...(style.glow ? {
             shadowColor: style.dot,
@@ -63,7 +69,7 @@ export function Chip({ tone, children }: Props): JSX.Element {
           color: style.text,
           fontSize: typography.fontSize.micro,
           fontWeight: typography.fontWeight.semibold,
-          letterSpacing: 0.02 * typography.fontSize.micro,
+          letterSpacing: LETTER_SPACING_FACTOR * typography.fontSize.micro,
         }}
       >
         {children}

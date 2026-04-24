@@ -24,6 +24,10 @@ export { DegradedCapabilityBanner, buildDegradedBannerMessage } from './componen
 export { ConnectWalletEntry } from './components/ConnectWalletEntry.js';
 export { Icon } from './components/Icon.js';
 export type { IconName } from './components/Icon.js';
+export { Chip } from './components/Chip.js';
+export type { ChipTone } from './components/Chip.js';
+export { SectionHeader } from './components/SectionHeader.js';
+export { PositionCard } from './components/PositionCard.js';
 
 // Wallet connection utils
 export {

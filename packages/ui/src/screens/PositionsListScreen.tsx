@@ -147,7 +147,7 @@ function ConnectedPositionsList({
   const viewModel = buildPositionListViewModel(positions);
 
   return (
-      <>
+    <>
       <SectionHeader
         title="Active positions"
         meta={`${positions.length} monitored`}
