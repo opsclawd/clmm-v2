@@ -1,7 +1,7 @@
 import { useRouter } from 'expo-router';
 import { WalletSettingsScreen } from '@clmm/ui';
 import { useStore } from 'zustand';
-import { disconnectBrowserWallet } from '../../src/platform/browserWallet';
+import { useBrowserWalletDisconnect } from '../../src/platform/browserWallet/index';
 import { navigateRoute } from '../../src/platform/webNavigation';
 import { walletSessionStore } from '../../src/state/walletSessionStore';
 
@@ -12,6 +12,7 @@ export default function WalletRoute() {
   const platformCapabilities = useStore(walletSessionStore, (state) => state.platformCapabilities);
   const disconnect = useStore(walletSessionStore, (state) => state.disconnect);
   const clearOutcome = useStore(walletSessionStore, (state) => state.clearOutcome);
+  const browserDisconnect = useBrowserWalletDisconnect();
 
   function handleReconnect() {
     clearOutcome();
@@ -24,11 +25,11 @@ export default function WalletRoute() {
   }
 
   async function handleDisconnect() {
-    if (connectionKind === 'browser' && typeof window !== 'undefined') {
+    if (connectionKind === 'browser') {
       try {
-        await disconnectBrowserWallet({ solana: Reflect.get(window, 'solana') });
+        await browserDisconnect.disconnect();
       } catch {
-        // Browser wallet disconnect is best-effort; always clear local session.
+        // Best-effort. App session cleanup still proceeds.
       }
     }
 
