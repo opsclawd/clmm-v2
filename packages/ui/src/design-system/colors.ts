@@ -28,4 +28,20 @@ export const colors = {
   // Directional arrows
   downsideArrow: '#60a5fa',
   upsideArrow: '#a78bfa',
+
+  // New semantic tokens from design system
+  appBackground: '#070A0F',
+  card: '#0C1118',
+  cardRaised: '#121923',
+  safe: '#9EECD1',
+  safeMuted: 'rgba(158,236,209,0.12)',
+  warn: '#F4C97A',
+  breachAccent: '#F59484',
+  accent: '#8FB8F5',
+  textPrimary: '#F4F6F8',
+  textBody: '#B6C0CE',
+  textTertiary: '#7C8695',
+  textFaint: '#4F5866',
+  borderLight: 'rgba(255,255,255,0.10)',
+  borderMedium: 'rgba(255,255,255,0.16)',
 } as const;
