@@ -46,7 +46,7 @@ describe('WalletConnectScreen', () => {
     render(<WalletConnectScreen platformCapabilities={makeCaps()} />);
     expect(screen.getByText('Read-only by default')).toBeTruthy();
     expect(screen.getByText('Debounced breach logic')).toBeTruthy();
-    expect(screen.getByText('Auditable receipts')).toBeTruthy();
+    expect(screen.getByText('Action history')).toBeTruthy();
   });
 
   it('renders back button when onGoBack is provided', () => {
