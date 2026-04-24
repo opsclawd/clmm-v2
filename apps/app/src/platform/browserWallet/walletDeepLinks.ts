@@ -36,7 +36,7 @@ export function openInExternalBrowser(currentUrl: string): 'attempted' | 'copy-o
     return 'attempted';
   }
   if (/iPhone|iPad/i.test(ua)) {
-    window.location.href = `x-safari-${currentUrl.replace(/^http/, 'http')}`;
+    window.location.href = `x-safari-${currentUrl}`;
     return 'attempted';
   }
   return 'copy-only';
