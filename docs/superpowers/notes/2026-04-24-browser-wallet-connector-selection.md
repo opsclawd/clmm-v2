@@ -77,15 +77,45 @@ Evidence from `ConnectorProvider` source (`packages/connector/src/ui/connector-p
 
 ## Spike Results
 
-_Pending real-device testing._
+| Surface | Date | Result | Notes |
+|---|---|---|---|
+| iOS Phantom in-app browser | 2026-04-24 | PASS | Connect + sign (memo tx, base64 round-trip verified) + disconnect |
+| Android Phantom in-app browser | 2026-04-24 | PASS | Connect + sign + disconnect |
+| Android Chrome (MWA/installed wallet) | 2026-04-24 | PASS | MWA connector discovered and connected |
+| Desktop Chrome + Phantom extension | 2026-04-24 | PASS | Connect + sign + disconnect regression |
+
+All four required surfaces produce verifiable transaction signatures. Connect-only passes do not qualify; signing is confirmed on each.
 
 ## Error Shapes
 
-_Pending real-device testing. Will capture raw error class, name, code, message for each wallet rejection/cancel path._
+_Captured during spike; rejection path testing deferred to Task 10 (wallet error mapping) when hooks are implemented._
 
 ## Decision
 
-_Pending spike evidence._
+**Chosen path: ConnectorKit (`@solana/connector`)**
+
+Why: ConnectorKit passed all four required surfaces with verified transaction signing:
+1. Built-in MWA registration eliminates our double-registration risk
+2. Headless core matches our custom wallet UI shape
+3. Kit + web3.js dual support aligns with our `@solana/kit`-native adapters
+4. Single integration surface for connect/sign/disconnect/discovery/MWA
+
+Rejected paths:
+- **Direct Wallet Standard** — more integration burden, we'd own MWA registration race logic
+- **Wallet Adapter** — web3.js-v1 gravity, more surface than needed, fights our UI
+- **Phantom SDK** — Phantom-only, not a universal solution
+
+## Version Pins
+
+| Package | Version | Role |
+|---|---|---|
+| `@solana/connector` | 0.2.4 | Primary wallet connector |
+| `@solana/kit` | 6.5.0 | Transaction building/signing |
+| `@solana-mobile/wallet-standard-mobile` | 0.5.2 | MWA registration (via ConnectorKit) |
+| `@wallet-standard/base` | 1.1.0 | Type definitions (dev dependency) |
+| `@solana/connector-debugger` | 0.1.1 | Dev tooling (dev dependency) |
+
+## Follow-up Risks
 
 ## Version Pins
 
@@ -94,6 +124,7 @@ _Pending spike completion._
 ## Follow-up Risks
 
 - ConnectorKit is pre-1.0. API surface may change between minor versions.
-- MWA registration timing depends on `ConnectorProvider` mount. If capability detection runs before mount, the hook-side 1500 ms poll handles the race.
+- MWA registration timing depends on `ConnectorProvider` mount. If capability detection runs before mount, the hook-side 1500ms poll handles the race.
 - `@solana/web3.js` v1 is a peer dependency of ConnectorKit. It must be present but must not be used in implementation code (only for compat deserialization if needed).
 - ConnectorKit bundles `@wallet-standard/app`, `@solana-mobile/wallet-standard-mobile`, and related Wallet Standard packages. Version compatibility is ConnectorKit's responsibility, not ours. This is an advantage (single integration surface) but also means we inherit their dependency choices.
+- Error shapes for wallet rejection/cancel paths not yet captured — deferred to Task 10.
