@@ -4,3 +4,4 @@ export { BrowserWalletProvider } from './BrowserWalletProvider';
 export { useBrowserWalletConnect } from './useBrowserWalletConnect';
 export { useBrowserWalletDisconnect } from './useBrowserWalletDisconnect';
 export { useBrowserWalletSign } from './useBrowserWalletSign';
+export { buildPhantomBrowseUrl, buildSolflareBrowseUrl, isSocialAppWebView, openInExternalBrowser } from './walletDeepLinks';
