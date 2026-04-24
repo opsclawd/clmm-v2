@@ -22,6 +22,8 @@ export { HistoryEventRow } from './components/HistoryEventRow.js';
 export { OffChainHistoryLabel } from './components/OffChainHistoryLabel.js';
 export { DegradedCapabilityBanner, buildDegradedBannerMessage } from './components/DegradedCapabilityBanner.js';
 export { ConnectWalletEntry } from './components/ConnectWalletEntry.js';
+export { Icon } from './components/Icon.js';
+export type { IconName } from './components/Icon.js';
 
 // Wallet connection utils
 export {

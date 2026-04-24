@@ -32,4 +32,27 @@ describe('colors', () => {
       expect(colors).toHaveProperty(key);
     }
   });
+
+  it('has new design system semantic tokens', () => {
+    expect(colors.appBackground).toBe('#070A0F');
+    expect(colors.card).toBe('#0C1118');
+    expect(colors.cardRaised).toBe('#121923');
+    expect(colors.safe).toBe('#9EECD1');
+    expect(colors.safeMuted).toBe('rgba(158,236,209,0.12)');
+    expect(colors.warn).toBe('#F4C97A');
+    expect(colors.breachAccent).toBe('#F59484');
+    expect(colors.accent).toBe('#8FB8F5');
+    expect(colors.textPrimary).toBe('#F4F6F8');
+    expect(colors.textBody).toBe('#B6C0CE');
+    expect(colors.textTertiary).toBe('#7C8695');
+    expect(colors.textFaint).toBe('#4F5866');
+    expect(colors.borderLight).toBe('rgba(255,255,255,0.10)');
+    expect(colors.borderMedium).toBe('rgba(255,255,255,0.16)');
+  });
+
+  it('preserves original color values for existing keys', () => {
+    expect(colors.breach).toBe('#fb923c');
+    expect(colors.textSecondary).toBe('#94a3b8');
+    expect(colors.textMuted).toBe('#64748b');
+  });
 });

@@ -1,12 +1,21 @@
 export const typography = {
+  fontFamily: {
+    ui: 'Inter, system-ui, sans-serif',
+    mono: 'JetBrains Mono, monospace',
+  },
   fontSize: {
     xs: 12,
     sm: 14,
     base: 16,
+    md: 15,
     lg: 18,
     xl: 20,
     '2xl': 24,
     '3xl': 30,
+    display: 22,
+    body: 14,
+    caption: 12,
+    micro: 10,
   },
   fontWeight: {
     normal: '400' as const,

@@ -17,6 +17,7 @@
     "@clmm/ui": "workspace:*",
     "@expo/metro-runtime": "~4.0.1",
     "@react-native-async-storage/async-storage": "^2.1.0",
+    "@expo/vector-icons": "^14.0.0",
     "@solana-mobile/mobile-wallet-adapter-protocol": "^2.2.6",
     "@solana-mobile/mobile-wallet-adapter-protocol-kit": "^0.2.3",
     "@solana-mobile/wallet-standard-mobile": "^0.5.2",
