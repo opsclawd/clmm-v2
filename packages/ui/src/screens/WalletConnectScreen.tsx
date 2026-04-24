@@ -152,7 +152,9 @@ export function WalletConnectScreen({
                     ? colors.breachAccent
                     : vm.outcomeDisplay.severity === 'warning'
                       ? colors.warn
-                      : colors.border,
+                      : vm.outcomeDisplay.severity === 'success'
+                        ? colors.safe
+                        : colors.border,
               },
             ]}
           >
@@ -165,7 +167,9 @@ export function WalletConnectScreen({
                       ? colors.breachAccent
                       : vm.outcomeDisplay.severity === 'warning'
                         ? colors.warn
-                        : colors.textPrimary,
+                        : vm.outcomeDisplay.severity === 'success'
+                          ? colors.safe
+                          : colors.textPrimary,
                 },
               ]}
             >
@@ -174,6 +178,34 @@ export function WalletConnectScreen({
             {vm.outcomeDisplay.detail ? (
               <Text style={styles.outcomeDetail}>{vm.outcomeDisplay.detail}</Text>
             ) : null}
+          </View>
+        ) : null}
+
+        {vm.platformNotice ? (
+          <View
+            style={[
+              styles.outcomeBanner,
+              {
+                borderColor:
+                  vm.platformNotice.severity === 'warning'
+                    ? colors.warn
+                    : colors.breachAccent,
+              },
+            ]}
+          >
+            <Text
+              style={[
+                styles.outcomeTitle,
+                {
+                  color:
+                    vm.platformNotice.severity === 'warning'
+                      ? colors.warn
+                      : colors.breachAccent,
+                },
+              ]}
+            >
+              {vm.platformNotice.message}
+            </Text>
           </View>
         ) : null}
 
@@ -378,6 +410,6 @@ const styles = StyleSheet.create({
   },
   featureDescription: {
     fontSize: 12,
-    color: colors.textTertiary,
+    color: colors.textFaint,
   },
 });
