@@ -65,15 +65,44 @@ describe('PositionsListScreen', () => {
   it('renders the empty state when connected without positions and without an error', () => {
     render(<PositionsListScreen walletAddress="wallet-1" positions={[]} />);
 
-    expect(screen.getByText('Wallet Connected')).toBeTruthy();
+    expect(screen.getByText('No supported positions')).toBeTruthy();
     expect(
       screen.getByText(
-        'No supported Orca CLMM positions found for this wallet. Positions will appear here when you have active concentrated liquidity positions on Orca.',
+        'Connect a wallet with Orca CLMM positions to see them here.',
       ),
     ).toBeTruthy();
   });
 
-  it('calls onSelectPosition with the position id when a position row is tapped', () => {
+  it('renders position cards with correct status chip', () => {
+    render(
+      <PositionsListScreen
+        walletAddress="wallet-1"
+        positions={[
+          makePosition({ rangeState: 'in-range' }),
+          makePosition({ positionId: brand('position-2'), rangeState: 'below-range' }),
+          makePosition({ positionId: brand('position-3'), rangeState: 'above-range', hasActionableTrigger: true }),
+        ]}
+      />,
+    );
+
+    expect(screen.getByText('In range')).toBeTruthy();
+    expect(screen.getByText('Near edge')).toBeTruthy();
+    expect(screen.getByText('Breach')).toBeTruthy();
+  });
+
+  it('renders section header with position count', () => {
+    render(
+      <PositionsListScreen
+        walletAddress="wallet-1"
+        positions={[makePosition(), makePosition({ positionId: brand('position-2') })]}
+      />,
+    );
+
+    expect(screen.getByText('Active positions')).toBeTruthy();
+    expect(screen.getByText('2 monitored')).toBeTruthy();
+  });
+
+  it('calls onSelectPosition with the position id when a card is tapped', () => {
     const onSelectPosition = vi.fn();
 
     render(
