@@ -1,0 +1,284 @@
+/* CLMM Autopilot — Design tokens
+   Aesthetic: financial-terminal minimalism, calm/decisive, mobile-first. */
+
+:root {
+  /* Surfaces — cool neutral, near-black with blue undertone */
+  --bg-0: #070A0F;       /* app bg, behind everything */
+  --bg-1: #0C1118;       /* card base */
+  --bg-2: #121923;       /* raised card / hover */
+  --bg-3: #1A2230;       /* input / inset */
+  --bg-4: #232D3D;       /* divider heavy */
+
+  /* Borders */
+  --line-1: rgba(255,255,255,0.06);
+  --line-2: rgba(255,255,255,0.10);
+  --line-3: rgba(255,255,255,0.16);
+
+  /* Text — carefully stepped */
+  --fg-1: #F4F6F8;       /* primary */
+  --fg-2: #B6C0CE;       /* secondary */
+  --fg-3: #7C8695;       /* tertiary / meta */
+  --fg-4: #4F5866;       /* disabled / faint */
+
+  /* Functional accents — shared chroma for harmony */
+  --safe:    oklch(74% 0.12 165);   /* teal/mint — "safe" */
+  --safe-ink:#9EECD1;
+  --safe-bg: color-mix(in oklab, var(--safe) 12%, transparent);
+  --safe-br: color-mix(in oklab, var(--safe) 30%, transparent);
+
+  --warn:    oklch(78% 0.14 75);    /* amber — caution */
+  --warn-ink:#F4C97A;
+  --warn-bg: color-mix(in oklab, var(--warn) 10%, transparent);
+  --warn-br: color-mix(in oklab, var(--warn) 30%, transparent);
+
+  --breach:  oklch(68% 0.19 25);    /* coral-red — breach */
+  --breach-ink:#F59484;
+  --breach-bg: color-mix(in oklab, var(--breach) 12%, transparent);
+  --breach-br: color-mix(in oklab, var(--breach) 30%, transparent);
+
+  /* Accent for interactive highlights (cool blue) */
+  --accent:  oklch(74% 0.13 235);
+  --accent-ink:#8FB8F5;
+
+  /* Typography */
+  --font-ui: "Inter", system-ui, -apple-system, Segoe UI, Roboto, sans-serif;
+  --font-mono: "JetBrains Mono", ui-monospace, SFMono-Regular, Menlo, monospace;
+
+  /* Radii + spacing */
+  --r-sm: 8px;
+  --r-md: 12px;
+  --r-lg: 16px;
+  --r-xl: 20px;
+  --r-pill: 999px;
+
+  --shadow-card: 0 1px 0 rgba(255,255,255,0.04) inset, 0 8px 24px rgba(0,0,0,0.35);
+}
+
+* { box-sizing: border-box; }
+html, body { margin: 0; padding: 0; }
+
+body {
+  font-family: var(--font-ui);
+  background: #05080C;
+  color: var(--fg-1);
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+  font-feature-settings: "cv02","cv03","cv04","cv11";
+}
+
+.mono { font-family: var(--font-mono); font-feature-settings: "zero","ss01"; }
+.tnum { font-variant-numeric: tabular-nums; }
+
+/* ——— reusable primitives for inside phone screens ——— */
+
+.clmm-screen {
+  position: absolute; inset: 0;
+  background: var(--bg-0);
+  color: var(--fg-1);
+  font-family: var(--font-ui);
+  font-size: 14px;
+  line-height: 1.45;
+  overflow: hidden;
+  display: flex; flex-direction: column;
+}
+
+.clmm-scroll { flex: 1; overflow: auto; -webkit-overflow-scrolling: touch; }
+
+/* Top app bar — thin, generous */
+.clmm-topbar {
+  height: 56px; padding: 0 20px;
+  display: flex; align-items: center; justify-content: space-between;
+  border-bottom: 1px solid var(--line-1);
+  background: var(--bg-0);
+}
+.clmm-topbar__title {
+  font-size: 17px; font-weight: 600; letter-spacing: -0.01em;
+}
+.clmm-topbar__sub {
+  font-size: 11px; color: var(--fg-3); letter-spacing: 0.02em;
+  text-transform: uppercase; margin-top: 2px;
+}
+
+/* Bottom tab bar */
+.clmm-tabbar {
+  height: 68px; padding: 8px 8px 16px;
+  display: grid; grid-template-columns: repeat(4, 1fr);
+  border-top: 1px solid var(--line-1);
+  background: var(--bg-0);
+}
+.clmm-tab {
+  display: flex; flex-direction: column; align-items: center; justify-content: center;
+  gap: 4px; color: var(--fg-3); font-size: 10px; letter-spacing: 0.06em;
+  text-transform: uppercase; font-weight: 500;
+  border-radius: var(--r-md); cursor: pointer;
+}
+.clmm-tab.is-active { color: var(--fg-1); }
+.clmm-tab .dot {
+  width: 4px; height: 4px; border-radius: 50%;
+  background: transparent; margin-top: 2px;
+}
+.clmm-tab.is-active .dot { background: var(--accent-ink); }
+
+/* Cards */
+.clmm-card {
+  background: var(--bg-1);
+  border: 1px solid var(--line-1);
+  border-radius: var(--r-lg);
+  padding: 16px;
+}
+.clmm-card--raised {
+  background: var(--bg-2);
+}
+
+/* Section header */
+.clmm-section-h {
+  display: flex; align-items: baseline; justify-content: space-between;
+  padding: 0 20px; margin: 22px 0 10px;
+}
+.clmm-section-h .title {
+  font-size: 11px; text-transform: uppercase; letter-spacing: 0.08em;
+  color: var(--fg-3); font-weight: 600;
+}
+.clmm-section-h .meta { font-size: 11px; color: var(--fg-4); }
+
+/* Chips / status pills */
+.clmm-chip {
+  display: inline-flex; align-items: center; gap: 6px;
+  height: 24px; padding: 0 10px;
+  border-radius: var(--r-pill);
+  font-size: 11px; font-weight: 600; letter-spacing: 0.02em;
+  border: 1px solid var(--line-2);
+  color: var(--fg-2);
+  background: transparent;
+}
+.clmm-chip .d { width: 6px; height: 6px; border-radius: 50%; background: var(--fg-3); }
+
+.clmm-chip.safe   { color: var(--safe-ink);   border-color: var(--safe-br);   background: var(--safe-bg); }
+.clmm-chip.safe .d{ background: var(--safe-ink); box-shadow: 0 0 8px var(--safe-ink); }
+.clmm-chip.warn   { color: var(--warn-ink);   border-color: var(--warn-br);   background: var(--warn-bg); }
+.clmm-chip.warn .d{ background: var(--warn-ink); }
+.clmm-chip.breach { color: var(--breach-ink); border-color: var(--breach-br); background: var(--breach-bg); }
+.clmm-chip.breach .d{ background: var(--breach-ink); box-shadow: 0 0 10px var(--breach-ink); }
+
+/* Buttons */
+.clmm-btn {
+  appearance: none; border: 0; cursor: pointer;
+  height: 48px; padding: 0 18px;
+  border-radius: var(--r-md);
+  font-family: var(--font-ui); font-size: 15px; font-weight: 600;
+  display: inline-flex; align-items: center; justify-content: center; gap: 8px;
+  letter-spacing: -0.005em;
+}
+.clmm-btn--primary { background: var(--fg-1); color: #0A0E14; }
+.clmm-btn--ghost   { background: transparent; color: var(--fg-1); border: 1px solid var(--line-3); }
+.clmm-btn--danger  {
+  background: var(--breach); color: #1A0806;
+}
+.clmm-btn--safe    { background: var(--safe); color: #06221A; }
+.clmm-btn--block   { width: 100%; }
+
+/* Labels */
+.clmm-label {
+  font-size: 11px; color: var(--fg-3);
+  text-transform: uppercase; letter-spacing: 0.08em;
+  font-weight: 600;
+}
+
+/* KPI number */
+.clmm-kpi {
+  font-family: var(--font-mono);
+  font-feature-settings: "zero","ss01","tnum";
+  font-weight: 500;
+  letter-spacing: -0.01em;
+}
+
+/* Divider row */
+.clmm-row {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 12px 0;
+  border-top: 1px solid var(--line-1);
+}
+.clmm-row:first-child { border-top: 0; }
+.clmm-row .k { color: var(--fg-3); font-size: 13px; }
+.clmm-row .v { color: var(--fg-1); font-size: 13px; }
+
+/* Range bar — core visual for CLMM position */
+.clmm-range {
+  position: relative;
+  height: 10px; border-radius: 999px;
+  background: linear-gradient(to right,
+    rgba(245,148,132,0.18) 0%, rgba(245,148,132,0.18) 14%,
+    rgba(255,255,255,0.05) 14%, rgba(255,255,255,0.05) 86%,
+    rgba(245,148,132,0.18) 86%);
+  border: 1px solid var(--line-2);
+}
+.clmm-range__band {
+  position: absolute; top: -1px; bottom: -1px;
+  border-left: 1px solid var(--line-3);
+  border-right: 1px solid var(--line-3);
+  background: rgba(158,236,209,0.08);
+}
+.clmm-range__tick {
+  position: absolute; top: -6px; width: 2px; height: 22px;
+  background: var(--fg-1);
+  border-radius: 2px;
+  box-shadow: 0 0 0 3px rgba(7,10,15,0.9);
+}
+.clmm-range__tick--breach { background: var(--breach-ink); box-shadow: 0 0 0 3px rgba(7,10,15,0.9), 0 0 16px var(--breach-ink); }
+.clmm-range__label {
+  position: absolute; top: 20px;
+  font-family: var(--font-mono); font-size: 10px; color: var(--fg-3);
+  transform: translateX(-50%);
+  white-space: nowrap;
+}
+
+/* Mini sparkline container */
+.clmm-spark { width: 100%; height: 52px; display: block; }
+
+/* Subtle pulse for live states */
+@keyframes clmmPulse { 0%,100%{opacity:0.55;} 50%{opacity:1;} }
+.clmm-pulse { animation: clmmPulse 1.8s ease-in-out infinite; }
+
+@keyframes clmmBlink { 0%,49%{opacity:1;} 50%,100%{opacity:0.2;} }
+.clmm-blink { animation: clmmBlink 1.2s steps(2) infinite; }
+
+/* Placeholder for imagery we'd drop in */
+.clmm-ph {
+  background-image: repeating-linear-gradient(-45deg,
+    rgba(255,255,255,0.04) 0 6px, transparent 6px 12px);
+  border: 1px dashed var(--line-3);
+  color: var(--fg-3);
+  font-family: var(--font-mono); font-size: 11px;
+  display: flex; align-items: center; justify-content: center;
+  border-radius: var(--r-md);
+}
+
+/* Toast / banner */
+.clmm-banner {
+  margin: 0 20px; padding: 12px 14px;
+  display: flex; gap: 10px; align-items: flex-start;
+  border-radius: var(--r-md);
+  border: 1px solid var(--line-2);
+  background: var(--bg-1);
+  font-size: 13px; color: var(--fg-2); line-height: 1.45;
+}
+.clmm-banner--warn { border-color: var(--warn-br); background: var(--warn-bg); color: var(--warn-ink); }
+.clmm-banner--breach { border-color: var(--breach-br); background: var(--breach-bg); color: var(--breach-ink); }
+
+/* Timeline dots */
+.clmm-step {
+  display: flex; gap: 12px; align-items: flex-start;
+}
+.clmm-step__bullet {
+  width: 22px; height: 22px; border-radius: 50%;
+  border: 1px solid var(--line-3);
+  display: flex; align-items: center; justify-content: center;
+  color: var(--fg-2); font-size: 11px; font-weight: 600;
+  flex: none; background: var(--bg-2);
+}
+.clmm-step__body { flex: 1; padding-top: 1px; }
+
+/* Icons stroke default */
+.ic { width: 16px; height: 16px; stroke: currentColor; fill: none; stroke-width: 1.6; stroke-linecap: round; stroke-linejoin: round; }
+.ic-20 { width: 20px; height: 20px; }
+.ic-24 { width: 24px; height: 24px; }

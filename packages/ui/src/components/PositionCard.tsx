@@ -3,7 +3,6 @@ import { colors, typography } from '../design-system/index.js';
 import { Chip } from './Chip.js';
 
 type Props = {
-  positionId: string;
   poolLabel: string;
   rangeStatusKind: 'in-range' | 'below-range' | 'above-range';
   hasAlert: boolean;

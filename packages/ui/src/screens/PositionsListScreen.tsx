@@ -32,7 +32,7 @@ export function PositionsListScreen({
 
   return (
     <View style={{ flex: 1, backgroundColor: colors.appBackground }}>
-      <ScrollView>
+      <ScrollView contentContainerStyle={{ flexGrow: 1 }}>
         <DegradedCapabilityBanner capabilities={platformCapabilities} />
 
         {!isConnected ? (
@@ -155,7 +155,6 @@ function ConnectedPositionsList({
       {viewModel.items.map((item) => (
         <PositionCard
           key={item.positionId}
-          positionId={item.positionId}
           poolLabel={item.poolLabel}
           rangeStatusKind={item.rangeStatusKind}
           hasAlert={item.hasAlert}

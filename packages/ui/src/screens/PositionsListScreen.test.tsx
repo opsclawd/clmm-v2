@@ -116,4 +116,46 @@ describe('PositionsListScreen', () => {
     fireEvent.click(screen.getByText('Pool pool-tap-test'));
     expect(onSelectPosition).toHaveBeenCalledWith('pos-tap-test');
   });
+
+  it('calls onConnectWallet when Connect Wallet is tapped', () => {
+    const onConnectWallet = vi.fn();
+
+    render(
+      <PositionsListScreen
+        walletAddress={null}
+        onConnectWallet={onConnectWallet}
+      />,
+    );
+
+    fireEvent.click(screen.getByText('Connect Wallet'));
+    expect(onConnectWallet).toHaveBeenCalled();
+  });
+
+  it('renders monitoring indicator with correct text for each status', () => {
+    render(
+      <PositionsListScreen
+        walletAddress="wallet-1"
+        positions={[
+          makePosition({ monitoringStatus: 'active' }),
+          makePosition({ positionId: brand('position-2'), monitoringStatus: 'degraded' }),
+          makePosition({ positionId: brand('position-3'), monitoringStatus: 'inactive' }),
+        ]}
+      />,
+    );
+
+    expect(screen.getByText('Live')).toBeTruthy();
+    expect(screen.getByText('Degraded')).toBeTruthy();
+    expect(screen.getByText('Inactive')).toBeTruthy();
+  });
+
+  it('renders breach chip for positions with actionable trigger', () => {
+    render(
+      <PositionsListScreen
+        walletAddress="wallet-1"
+        positions={[makePosition({ hasActionableTrigger: true, rangeState: 'below-range' })]}
+      />,
+    );
+
+    expect(screen.getByText('Breach')).toBeTruthy();
+  });
 });
