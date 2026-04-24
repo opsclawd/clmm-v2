@@ -3,7 +3,7 @@ import { QueryClientProvider } from '@tanstack/react-query';
 import { Stack, useRouter } from 'expo-router';
 import { Platform } from 'react-native';
 import { queryClient } from '../src/composition/queryClient';
-import { BrowserWalletProvider } from '../src/platform/browserWallet';
+import { BrowserWalletProvider } from '../src/platform/browserWallet/BrowserWalletProvider';
 import { navigateRoute } from '../src/platform/webNavigation';
 
 export default function RootLayout() {

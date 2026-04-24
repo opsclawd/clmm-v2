@@ -8,7 +8,7 @@ export type BrowserSignedTransaction = {
   serialize(): Uint8Array;
 };
 
-export type InjectedBrowserWalletProvider = {
+export type BrowserWalletProvider = {
   isPhantom?: boolean;
   publicKey?: BrowserWalletPublicKey | null;
   connect(): Promise<{ publicKey?: BrowserWalletPublicKey | null } | null | undefined>;
@@ -20,7 +20,7 @@ export type BrowserWalletWindow = {
   solana?: unknown;
 };
 
-function isInjectedBrowserWalletProvider(value: unknown): value is InjectedBrowserWalletProvider {
+function isBrowserWalletProvider(value: unknown): value is BrowserWalletProvider {
   if (typeof value !== 'object' || value == null) {
     return false;
   }
@@ -30,8 +30,8 @@ function isInjectedBrowserWalletProvider(value: unknown): value is InjectedBrows
 
 export function getInjectedBrowserProvider(
   browserWindow: BrowserWalletWindow | undefined,
-): InjectedBrowserWalletProvider | null {
-  return isInjectedBrowserWalletProvider(browserWindow?.solana) ? browserWindow.solana : null;
+): BrowserWalletProvider | null {
+  return isBrowserWalletProvider(browserWindow?.solana) ? browserWindow.solana : null;
 }
 
 export function normalizeBrowserWalletAddress(publicKey: BrowserWalletPublicKey | null | undefined): string {
