@@ -4,7 +4,7 @@ date: 2026-04-23
 category: ui-bugs
 module: execution
 problem_type: ui_bug
-component: frontend_stimulus
+component: frontend_react_native
 symptoms:
   - Errors from signing payload fetch, approval, or execution queries are invisible after initial load
   - Signing page shows no feedback when operations fail after lifecycle state loads
