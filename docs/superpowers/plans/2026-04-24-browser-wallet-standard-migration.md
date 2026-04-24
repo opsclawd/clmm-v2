@@ -158,6 +158,31 @@ This task is the load-bearing gate for the entire plan. It proves, with a deploy
   - Approval sheet appears → user approves → address renders → **Preferred confirmed**.
   - Any other outcome (hang, error, no sheet) → document and try Fallback A.
 
+### Step 0.3b: Error-matcher research (required before Task 11)
+
+After confirming the connect path works, test the **rejection path** so we know what Wallet Standard throws when the user taps Cancel in Phantom.
+
+- [ ] On the same spike route, add a second button "Connect then Cancel". Tap it, but when Phantom's approval sheet appears, tap **Cancel/Reject** instead of approving.
+
+- [ ] Capture the exact error thrown:
+  - Error class name (e.g. `WalletStandardError`, `Error`, `DOMException`)
+  - Error message text (verbatim)
+  - Error code if present (e.g. `code`, `name` property)
+
+- [ ] Record in `docs/superpowers/notes/2026-04-24-wallet-standard-package-survey.md`:
+
+  ```md
+  ## Rejection Error Shape (YYYY-MM-DD)
+
+  - Library path: [Preferred | Fallback A | Fallback B]
+  - Error class: [e.g. WalletStandardError]
+  - Error message: [verbatim]
+  - Error code / name: [if present]
+  - Matches existing walletConnection.ts matchers: [yes / no — if no, list the new matchers Task 11 must add]
+  ```
+
+This feeds directly into Task 11 (error mapping). Do not skip — if Wallet Standard throws `"standard:connect was rejected"` instead of `"User rejected"`, the UI will show an unclassified error unless we add the matcher.
+
 ### Step 0.4: Fallback A spike (only if Preferred fails)
 
 - [ ] Add `@phantom/browser-sdk` to deps:
@@ -198,6 +223,11 @@ This task is the load-bearing gate for the entire plan. It proves, with a deploy
   - Phantom mobile in-app browser registered wallets at page load: [N]
   - Connect attempt outcome: [success / hang / error text]
   - Version pins: @wallet-standard/react-core@X.Y.Z, @solana/react@X.Y.Z, ...
+
+  Rejection error shape (from Step 0.3b):
+  - Error class: [e.g. WalletStandardError]
+  - Error message: [verbatim]
+  - Existing matcher coverage: [yes / no]
   ```
 
 - [ ] Commit the survey note to `main` (not the spike branch). Delete the spike branch after the note lands.
@@ -334,16 +364,18 @@ Sketch (based on Kimi's research — `@wallet-standard/react-core` for discovery
 
 ```ts
 import { useWallets, useConnect } from '@wallet-standard/react-core';
-import { useCallback, useState } from 'react';
+import { useCallback, useMemo, useState } from 'react';
 
 const SOLANA_CHAIN = 'solana:mainnet' as const;
 
-function pickSolanaWallet(wallets: readonly Wallet[]): Wallet | null {
+function pickSolanaWallet(wallets: readonly UiWallet[]): UiWallet | null {
   return wallets.find((w) => w.chains.includes(SOLANA_CHAIN) && w.features['standard:connect']) ?? null;
 }
 
 export function useBrowserWalletConnect() {
   const wallets = useWallets();
+  const wallet = useMemo(() => pickSolanaWallet(wallets), [wallets]);
+  const [isConnecting, connectWallet] = wallet ? useConnect(wallet) : [false, null];
   const [connecting, setConnecting] = useState(false);
   const [error, setError] = useState<Error | null>(null);
 
@@ -351,11 +383,10 @@ export function useBrowserWalletConnect() {
     setConnecting(true);
     setError(null);
     try {
-      const wallet = pickSolanaWallet(wallets);
-      if (!wallet) {
+      if (!wallet || !connectWallet) {
         throw new Error('No supported browser wallet detected on this device');
       }
-      const { accounts } = await wallet.features['standard:connect'].connect();
+      const accounts = await connectWallet();
       const first = accounts[0];
       if (!first) {
         throw new Error('Wallet did not return an account');
@@ -368,11 +399,13 @@ export function useBrowserWalletConnect() {
     } finally {
       setConnecting(false);
     }
-  }, [wallets]);
+  }, [wallet, connectWallet]);
 
-  return { connect, connecting, error };
+  return { connect, connecting: connecting || isConnecting, error };
 }
 ```
+
+**Why use `useConnect(wallet)` instead of raw feature access:** `@wallet-standard/react-core`'s `useConnect` hook handles connection deduplication via `useWeakRef` — if a connect is already in flight, it returns the same promise. Bypassing it loses that safety and can create race conditions when the user double-taps the connect button.
 
 - [ ] **Step 2: Run tests to verify pass**
 
@@ -536,22 +569,32 @@ Expected: FAIL.
 - [ ] **Step 1: Implement**
 
 ```ts
-import { useCallback } from 'react';
-import { useSelectedWalletAccount } from '@solana/react';
-import { useDisconnect } from '@wallet-standard/react-core';
+import { useCallback, useMemo } from 'react';
+import { useWallets, useDisconnect } from '@wallet-standard/react-core';
+
+const SOLANA_CHAIN = 'solana:mainnet' as const;
+
+function pickSolanaWallet(wallets: readonly UiWallet[]): UiWallet | null {
+  return wallets.find((w) => w.chains.includes(SOLANA_CHAIN) && w.features['standard:disconnect']) ?? null;
+}
 
 export function useBrowserWalletDisconnect() {
-  const wallet = useSelectedWallet();
+  const wallets = useWallets();
+  const wallet = useMemo(() => pickSolanaWallet(wallets), [wallets]);
+  const [isDisconnecting, disconnectWallet] = wallet ? useDisconnect(wallet) : [false, null];
 
   const disconnect = useCallback(async (): Promise<void> => {
-    const feature = wallet?.features['standard:disconnect'];
-    if (feature == null) return;
-    await feature.disconnect();
-  }, [wallet]);
+    if (!wallet || !disconnectWallet) {
+      return;
+    }
+    await disconnectWallet();
+  }, [wallet, disconnectWallet]);
 
-  return { disconnect };
+  return { disconnect, disconnecting: isDisconnecting };
 }
 ```
+
+**Why use `useDisconnect(wallet)` instead of raw feature access:** Same reason as `useConnect` — the hook handles in-flight deduplication and cleanup. `useSelectedWallet()` does not exist in either `@solana/react` or `@wallet-standard/react-core`; the correct pattern is to re-discover the wallet via `useWallets()` and filter for the one we connected to.
 
 - [ ] **Step 2: Run tests**
 
@@ -1196,3 +1239,7 @@ The Wallet Standard provider wrapper (Task 9) and the new hook files can stay in
   - Task 13 reverted from blanket `browserWalletAvailable: true` to Wallet-Standard-registry probe with synchronous injected-provider fallback (GLM's catch).
   - Task 14 reverted from UA-only detection back to UA + wallet-presence (either registry or injected provider) — the wallet-presence signal is load-bearing for discriminating wallet WebView from plain mobile Safari (GLM's catch).
   - Commit hygiene loosened for cosmetic commits on the hotfix branch (GPT's preference).
+- **2026-04-24 (revised 2)** — Incorporated Kimi review:
+  - **Task 0.3b added** — Explicit error-matcher research step. Captures the exact rejection error shape from Wallet Standard in Phantom mobile so Task 11 can add matchers before the migration ships.
+  - **Task 4 fixed** — Implementation sketch now uses `useConnect(wallet)` from `@wallet-standard/react-core` instead of manually calling `wallet.features['standard:connect'].connect()`. Preserves connection deduplication via `useWeakRef`. Added explanatory note.
+  - **Task 8 fixed** — Removed undefined `useSelectedWallet()` reference. Now uses `useWallets()` + `useDisconnect(wallet)` from `@wallet-standard/react-core`. Added explanatory note about in-flight deduplication.
