@@ -4,7 +4,7 @@ import { AppProvider, getDefaultConfig, getDefaultMobileConfig } from '@solana/c
 const connectorConfig = getDefaultConfig({
   appName: 'CLMM V2',
   appUrl: 'https://clmm.v2.app',
-  autoConnect: false,
+  autoConnect: true,
   enableMobile: true,
   network: 'mainnet',
 });

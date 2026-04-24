@@ -85,15 +85,21 @@ export function createWalletSessionStore() {
       {
         name: 'wallet-session',
         storage: safeStorageFactory(),
-        partialize: (state) => ({
-          walletAddress: state.walletAddress,
-          connectionKind: state.connectionKind,
-          platformCapabilities: state.platformCapabilities,
-        }),
+        partialize: (state) => {
+          if (state.connectionKind === 'browser') {
+            return {
+              walletAddress: null,
+              connectionKind: null,
+              platformCapabilities: state.platformCapabilities,
+            };
+          }
+          return {
+            walletAddress: state.walletAddress,
+            connectionKind: state.connectionKind,
+            platformCapabilities: state.platformCapabilities,
+          };
+        },
         onRehydrateStorage: () => (_state, _error) => {
-          // Mark hydration complete so Zustand subscribers re-render with the
-          // rehydrated state. Guard with typeof window check to avoid crashing
-          // AsyncStorage (references `window`) during SSR static rendering.
           if (typeof window !== 'undefined') {
             store.setState({ hasHydrated: true });
           }

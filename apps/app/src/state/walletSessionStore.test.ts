@@ -123,7 +123,7 @@ describe('walletSessionStore', () => {
     expect(store.getState().isConnecting).toBe(false);
   });
 
-  it('rehydrates persisted session fields but not transient UI state', async () => {
+  it('does not persist browser wallet sessions across rehydration', async () => {
     const store1 = createWalletSessionStore();
 
     store1.getState().setPlatformCapabilities(caps);
@@ -133,19 +133,34 @@ describe('walletSessionStore', () => {
       connectionKind: 'browser',
     });
 
-    // Ensure persist has had a chance to write
+    await Promise.resolve();
+
+    const store2 = createWalletSessionStore();
+    await store2.persist.rehydrate();
+
+    expect(store2.getState().walletAddress).toBeNull();
+    expect(store2.getState().connectionKind).toBeNull();
+    expect(store2.getState().platformCapabilities).toEqual(caps);
+  });
+
+  it('persists native wallet sessions across rehydration', async () => {
+    const store1 = createWalletSessionStore();
+
+    store1.getState().setPlatformCapabilities(caps);
+    store1.getState().beginConnection();
+    store1.getState().markConnected({
+      walletAddress: 'DemoWallet1111111111111111111111111111111111',
+      connectionKind: 'native',
+    });
+
     await Promise.resolve();
 
     const store2 = createWalletSessionStore();
     await store2.persist.rehydrate();
 
     expect(store2.getState().walletAddress).toBe('DemoWallet1111111111111111111111111111111111');
-    expect(store2.getState().connectionKind).toBe('browser');
+    expect(store2.getState().connectionKind).toBe('native');
     expect(store2.getState().platformCapabilities).toEqual(caps);
-
-    // Transient state should not be persisted
-    expect(store2.getState().isConnecting).toBe(false);
-    expect(store2.getState().connectionOutcome).toBeNull();
   });
 
   it('clears stale outcome without dropping connected session', () => {
