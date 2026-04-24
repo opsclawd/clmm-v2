@@ -42,9 +42,10 @@ export function useConnectorKitAdapter(): ConnectorKitAdapterResult {
         return signed;
       }
       if (signed instanceof ArrayBuffer || ArrayBuffer.isView(signed)) {
-        return new Uint8Array(
-          signed instanceof ArrayBuffer ? signed : signed.buffer,
-        );
+        if (signed instanceof ArrayBuffer) {
+          return new Uint8Array(signed);
+        }
+        return new Uint8Array(signed.buffer, signed.byteOffset, signed.byteLength);
       }
       if (typeof signed === 'object' && signed !== null && 'serialize' in signed) {
         return (signed as { serialize: () => Uint8Array }).serialize();

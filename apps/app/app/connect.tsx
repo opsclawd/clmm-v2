@@ -15,6 +15,7 @@ import {
 import { mapWalletErrorToOutcome } from '../src/platform/walletConnection';
 import { navigateRoute } from '../src/platform/webNavigation';
 import { walletSessionStore } from '../src/state/walletSessionStore';
+import { getConnectionOutcomeDisplay } from '@clmm/ui';
 import { enrollWalletForMonitoring } from '../src/api/wallets';
 
 const NO_WALLET_MESSAGE = 'No supported browser wallet detected on this device';
@@ -60,7 +61,7 @@ const FALLBACK_PLATFORM_CAPABILITIES: PlatformCapabilityState = {
 export default function ConnectRoute() {
   const router = useRouter();
   const platformCapabilities = useStore(walletSessionStore, (state) => state.platformCapabilities);
-  const _connectionOutcome = useStore(walletSessionStore, (state) => state.connectionOutcome);
+  const connectionOutcome = useStore(walletSessionStore, (state) => state.connectionOutcome);
   const isConnecting = useStore(walletSessionStore, (state) => state.isConnecting);
   const setPlatformCapabilities = useStore(walletSessionStore, (state) => state.setPlatformCapabilities);
   const beginConnection = useStore(walletSessionStore, (state) => state.beginConnection);
@@ -482,6 +483,30 @@ export default function ConnectRoute() {
           <Text style={{ color: '#a1a1aa', fontSize: 14 }}>Connecting...</Text>
         </View>
       )}
+
+      {connectionOutcome && connectionOutcome.kind !== 'connected' && (() => {
+        const display = getConnectionOutcomeDisplay(connectionOutcome);
+        const severityColor = display.severity === 'error' ? '#ef4444' : display.severity === 'warning' ? '#f59e0b' : '#a1a1aa';
+        const severityBg = display.severity === 'error' ? '#450a0a' : display.severity === 'warning' ? '#422006' : '#18181b';
+        const severityBorder = display.severity === 'error' ? '#dc2626' : display.severity === 'warning' ? '#f59e0b' : '#3f3f46';
+        return (
+          <View style={{
+            marginTop: 16,
+            padding: 12,
+            backgroundColor: severityBg,
+            borderRadius: 8,
+            borderWidth: 1,
+            borderColor: severityBorder,
+          }}>
+            <Text style={{ color: severityColor, fontSize: 14, fontWeight: '600' }}>
+              {display.title}
+            </Text>
+            <Text style={{ color: '#a1a1aa', fontSize: 13, marginTop: 4 }}>
+              {display.detail}
+            </Text>
+          </View>
+        );
+      })()}
 
       <TouchableOpacity
         onPress={() => { clearOutcome(); router.back(); }}
