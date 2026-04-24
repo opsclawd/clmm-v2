@@ -20,7 +20,7 @@ import { enrollWalletForMonitoring } from '../src/api/wallets';
 const NO_WALLET_MESSAGE = 'No supported browser wallet detected on this device';
 const WALLET_DISCOVERY_TIMEOUT_MS = 2000;
 
-type FallbackState = 'none' | 'wallet-fallback' | 'social-webview';
+type FallbackState = 'none' | 'wallet-fallback' | 'desktop-no-wallet' | 'social-webview';
 type WalletDiscoveryState = 'discovering' | 'ready' | 'timed-out';
 
 function detectFallbackState(
@@ -41,6 +41,7 @@ function detectFallbackState(
     if (isMobile) {
       return 'wallet-fallback';
     }
+    return 'desktop-no-wallet';
   }
 
   return 'none';
@@ -449,6 +450,26 @@ export default function ConnectRoute() {
               >
                 <Text style={{ color: '#fc8748', fontSize: 15, fontWeight: '600' }}>Open in Solflare</Text>
               </TouchableOpacity>
+            </View>
+          )}
+
+          {fallbackState === 'desktop-no-wallet' && (
+            <View style={{ marginTop: 24 }}>
+              <View style={{
+                padding: 12,
+                backgroundColor: '#422006',
+                borderRadius: 8,
+                borderWidth: 1,
+                borderColor: '#f59e0b',
+                marginBottom: 12,
+              }}>
+                <Text style={{ color: '#f59e0b', fontSize: 14, fontWeight: '600' }}>
+                  No wallet extension detected.
+                </Text>
+                <Text style={{ color: '#a1a1aa', fontSize: 13, marginTop: 4 }}>
+                  Install a Solana wallet extension like Phantom or Solflare, then refresh this page.
+                </Text>
+              </View>
             </View>
           )}
         </>

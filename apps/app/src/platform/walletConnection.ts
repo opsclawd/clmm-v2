@@ -24,7 +24,7 @@ const INTERRUPTION_MATCHERS = [
 ] as const;
 
 const CANCELLATION_ERROR_NAMES = [
-  'WalletRejectionError',
+  'walletrejectionerror',
   'connection_error',
 ] as const;
 

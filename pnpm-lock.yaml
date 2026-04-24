@@ -180,6 +180,9 @@ importers:
       '@solana/kit':
         specifier: ^6.5.0
         version: 6.5.0(bufferutil@4.1.0)(fastestsmallesttextencoderdecoder@1.0.22)(typescript@5.9.3)(utf-8-validate@6.0.6)
+      '@wallet-standard/app':
+        specifier: ^1.0.0
+        version: 1.1.0
       drizzle-orm:
         specifier: ^0.36.0
         version: 0.36.4(@types/pg@8.20.0)(@types/react@18.3.28)(pg@8.20.0)(postgres@3.4.8)(react@18.3.1)
@@ -288,6 +291,9 @@ importers:
       '@clmm/application':
         specifier: workspace:*
         version: link:../application
+      '@expo/vector-icons':
+        specifier: ^14.0.0
+        version: 14.0.4
       react:
         specifier: 18.3.1
         version: 18.3.1
@@ -298,9 +304,6 @@ importers:
       '@clmm/config':
         specifier: workspace:*
         version: link:../config
-      '@expo/vector-icons':
-        specifier: ^14.0.0
-        version: 14.0.4
       '@testing-library/react':
         specifier: ^16.3.0
         version: 16.3.2(@testing-library/dom@10.4.1)(@types/react@18.3.28)(react-dom@18.3.1(react@18.3.1))(react@18.3.1)

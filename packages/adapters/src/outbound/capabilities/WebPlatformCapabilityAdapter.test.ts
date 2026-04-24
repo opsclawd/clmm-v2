@@ -32,7 +32,7 @@ describe('WebPlatformCapabilityAdapter', () => {
     (globalThis as Record<string, unknown>)['window'] = globalThis;
     vi.resetModules();
     vi.doMock('@wallet-standard/app', () => ({
-      getWallets: () => ({ get: () => [{ name: 'MockWallet' }] }),
+      getWallets: () => ({ get: () => [{ name: 'Phantom', chains: ['solana:mainnet', 'solana:devnet'] }] }),
     }));
     const { WebPlatformCapabilityAdapter: Adapter } = await import('./WebPlatformCapabilityAdapter');
     const adapter = new Adapter();
@@ -41,6 +41,24 @@ describe('WebPlatformCapabilityAdapter', () => {
     try {
       const result = await adapter.getCapabilities();
       expect(result.browserWalletAvailable).toBe(true);
+    } finally {
+      delete (globalThis as Record<string, unknown>)['window'];
+    }
+  });
+
+  it('returns false when Wallet Standard registry has only non-Solana wallets', async () => {
+    (globalThis as Record<string, unknown>)['window'] = globalThis;
+    vi.resetModules();
+    vi.doMock('@wallet-standard/app', () => ({
+      getWallets: () => ({ get: () => [{ name: 'MetaMask', chains: ['ethereum:mainnet'] }] }),
+    }));
+    const { WebPlatformCapabilityAdapter: Adapter } = await import('./WebPlatformCapabilityAdapter');
+    const adapter = new Adapter();
+    setUserAgent('Mozilla/5.0 (Macintosh; Intel Mac OS X)');
+
+    try {
+      const result = await adapter.getCapabilities();
+      expect(result.browserWalletAvailable).toBe(false);
     } finally {
       delete (globalThis as Record<string, unknown>)['window'];
     }

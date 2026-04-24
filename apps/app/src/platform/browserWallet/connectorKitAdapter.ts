@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/require-await */
 import type { ConnectOptions, WalletConnectorId, WalletStatus } from '@solana/connector';
 
 export type ConnectorKitAdapterResult = {
@@ -19,6 +20,22 @@ export type ConnectorKitAdapterResult = {
   signTransactionBytes: (payload: Uint8Array) => Promise<Uint8Array>;
 };
 
+const UNRESOLVED_STUB: ConnectorKitAdapterResult = {
+  connectors: [],
+  connectWallet: async () => {
+    throw new Error('Browser wallet is not available on this platform');
+  },
+  disconnectWallet: async () => {},
+  isConnected: false,
+  isConnecting: false,
+  account: null,
+  walletError: null,
+  walletStatus: 'disconnected' as unknown as WalletStatus,
+  signTransactionBytes: async () => {
+    throw new Error('Browser wallet is not available on this platform');
+  },
+};
+
 export function useConnectorKitAdapter(): ConnectorKitAdapterResult {
-  throw new Error('Platform-specific adapter not resolved. Check Metro/bundler config.');
+  return UNRESOLVED_STUB;
 }

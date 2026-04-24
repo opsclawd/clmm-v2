@@ -3,6 +3,9 @@ import type { PlatformCapabilityPort, PlatformCapabilityState } from '@clmm/appl
 declare const Notification: { permission: 'granted' | 'denied' | 'default' } | undefined;
 
 type WalletStandardGetWallets = () => { get: () => unknown[] };
+type WalletStandardWallet = { chains: readonly string[] };
+
+const SOLANA_CHAINS = new Set(['solana:mainnet', 'solana:devnet']);
 
 async function hasWalletStandardWallet(): Promise<boolean> {
   try {
@@ -12,7 +15,8 @@ async function hasWalletStandardWallet(): Promise<boolean> {
     const walletStandard: Record<string, unknown> = await import(walletStandardModuleName) as Record<string, unknown>;
     const getWalletsFn = walletStandard['getWallets'] as WalletStandardGetWallets | undefined;
     if (typeof getWalletsFn !== 'function') return false;
-    return getWalletsFn().get().length > 0;
+    const wallets = getWalletsFn().get() as WalletStandardWallet[];
+    return wallets.some((w) => w.chains.some((chain) => SOLANA_CHAINS.has(chain)));
   } catch {
     return false;
   }

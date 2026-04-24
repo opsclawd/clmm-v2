@@ -219,23 +219,20 @@ describe('useBrowserWalletConnect', () => {
     expect(mockConnectorSnapshot.connectWallet).toHaveBeenCalledWith(solanaMainnet.id);
   });
 
-  it('does not touch native MWA path', async () => {
+  it('includes MWA connectors in wallet list on mobile web', async () => {
     const mwaConnector = createConnector('Phantom', ['solana:mainnet']);
     (mwaConnector as Record<string, unknown>)['id'] = 'mwa:phantom';
 
     const walletStandardConnector = createConnector('Solflare', ['solana:mainnet', 'solana:devnet']);
     mockConnectorSnapshot.connectors = [mwaConnector as unknown as ConnectorMetadata, walletStandardConnector];
-    mockConnectorSnapshot.connectWallet = mockConnectSuccess('NonMwaAddress111111111111111111111111111');
+    mockConnectorSnapshot.connectWallet = mockConnectSuccess('MwaAddress1111111111111111111111111111');
 
     const { useBrowserWalletConnect } = await import('./useBrowserWalletConnect');
     const { result } = renderHook(() => useBrowserWalletConnect());
 
-    await act(async () => {
-      await result.current.connect();
-    });
-
-    expect(mockConnectorSnapshot.connectWallet).toHaveBeenCalledWith(walletStandardConnector.id);
-    expect(mockConnectorSnapshot.connectWallet).not.toHaveBeenCalledWith(mwaConnector.id);
+    expect(result.current.wallets).toHaveLength(2);
+    expect(result.current.wallets.map((w) => w.id)).toContain('mwa:phantom');
+    expect(result.current.wallets.map((w) => w.id)).toContain(walletStandardConnector.id);
   });
 
   it('exposes error from connector', async () => {

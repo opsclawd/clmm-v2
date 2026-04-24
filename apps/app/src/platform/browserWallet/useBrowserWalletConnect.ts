@@ -6,10 +6,8 @@ const NO_WALLET_MESSAGE = 'No supported browser wallet detected on this device';
 const WALLET_POLL_INTERVAL_MS = 100;
 const WALLET_POLL_TIMEOUT_MS = 1500;
 const SUPPORTED_CHAINS = new Set(['solana:mainnet', 'solana:devnet']);
-const MWA_PREFIX = 'mwa:';
 
 function isSolanaBrowserWallet(connector: { id: string; chains: readonly string[] }): boolean {
-  if (connector.id.startsWith(MWA_PREFIX)) return false;
   return connector.chains.some((chain) => SUPPORTED_CHAINS.has(chain));
 }
 
