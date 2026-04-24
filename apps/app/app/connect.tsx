@@ -1,8 +1,9 @@
 import { useEffect, useMemo, useState } from 'react';
-import { View, Text, TouchableOpacity, ScrollView, Linking, Platform } from 'react-native';
+import { View, Text, TouchableOpacity, ScrollView, Linking, Platform, Image } from 'react-native';
 import { useRouter } from 'expo-router';
 import { useStore } from 'zustand';
 import type { PlatformCapabilityState } from '@clmm/application/public';
+import type { BrowserWalletOption } from '../src/platform/browserWallet/browserWalletTypes';
 import { platformCapabilityAdapter, walletPlatform } from '../src/composition/index';
 import { useBrowserWalletConnect } from '../src/platform/browserWallet/index';
 import {
@@ -71,6 +72,8 @@ export default function ConnectRoute() {
     [platformCapabilities, browserConnect.error],
   );
 
+  const showWalletPicker = browserConnect.wallets.length > 1;
+
   function handleConnectionError(error: unknown) {
     const outcome = mapWalletErrorToOutcome(error);
     if (outcome.kind === 'connected') {
@@ -107,16 +110,42 @@ export default function ConnectRoute() {
     };
   }, [markOutcome, setPlatformCapabilities]);
 
-  async function handleSelectWallet(kind: 'native' | 'browser') {
+  async function handleSelectBrowserWallet(walletId: string) {
     beginConnection();
 
     try {
-      const walletAddress =
-        kind === 'browser'
-          ? (await browserConnect.connect()).address
-          : await walletPlatform.connectNativeWallet();
+      const { address } = await browserConnect.connect(walletId);
+      markConnected({ walletAddress: address, connectionKind: 'browser' });
+      enrollWalletForMonitoring(address).catch((err) => {
+        console.warn('Wallet enrollment failed:', err);
+      });
+      navigateRoute({ router, path: '/(tabs)/positions', method: 'replace' });
+    } catch (error) {
+      handleConnectionError(error);
+    }
+  }
 
-      markConnected({ walletAddress, connectionKind: kind });
+  async function handleConnectDefaultBrowser() {
+    beginConnection();
+
+    try {
+      const { address } = await browserConnect.connect();
+      markConnected({ walletAddress: address, connectionKind: 'browser' });
+      enrollWalletForMonitoring(address).catch((err) => {
+        console.warn('Wallet enrollment failed:', err);
+      });
+      navigateRoute({ router, path: '/(tabs)/positions', method: 'replace' });
+    } catch (error) {
+      handleConnectionError(error);
+    }
+  }
+
+  async function handleConnectNative() {
+    beginConnection();
+
+    try {
+      const walletAddress = await walletPlatform.connectNativeWallet();
+      markConnected({ walletAddress, connectionKind: 'native' });
       enrollWalletForMonitoring(walletAddress).catch((err) => {
         console.warn('Wallet enrollment failed:', err);
       });
@@ -237,7 +266,7 @@ export default function ConnectRoute() {
             <View style={{ marginTop: 24 }}>
               {platformCapabilities.nativeWalletAvailable && (
                 <TouchableOpacity
-                  onPress={() => void handleSelectWallet('native')}
+                  onPress={() => void handleConnectNative()}
                   disabled={isConnecting}
                   style={{
                     padding: 16,
@@ -257,25 +286,55 @@ export default function ConnectRoute() {
                 </TouchableOpacity>
               )}
               {platformCapabilities.browserWalletAvailable && (
-                <TouchableOpacity
-                  onPress={() => void handleSelectWallet('browser')}
-                  disabled={isConnecting}
-                  style={{
-                    padding: 16,
-                    backgroundColor: '#18181b',
-                    borderRadius: 8,
-                    marginBottom: 12,
-                    borderWidth: 1,
-                    borderColor: '#3f3f46',
-                  }}
-                >
-                  <Text style={{ color: '#f4f4f5', fontSize: 16, fontWeight: '600' }}>
-                    Connect Browser Wallet
-                  </Text>
-                  <Text style={{ color: '#a1a1aa', fontSize: 13, marginTop: 4 }}>
-                    Sign transactions with your browser wallet extension.
-                  </Text>
-                </TouchableOpacity>
+                showWalletPicker ? (
+                  browserConnect.wallets.map((wallet: BrowserWalletOption) => (
+                    <TouchableOpacity
+                      key={wallet.id}
+                      onPress={() => void handleSelectBrowserWallet(wallet.id)}
+                      disabled={isConnecting}
+                      style={{
+                        padding: 16,
+                        backgroundColor: '#18181b',
+                        borderRadius: 8,
+                        marginBottom: 12,
+                        borderWidth: 1,
+                        borderColor: '#3f3f46',
+                        flexDirection: 'row',
+                        alignItems: 'center',
+                        gap: 12,
+                      }}
+                    >
+                      {wallet.icon ? (
+                        <Image source={{ uri: wallet.icon }} style={{ width: 24, height: 24 }} />
+                      ) : null}
+                      <View style={{ flex: 1 }}>
+                        <Text style={{ color: '#f4f4f5', fontSize: 16, fontWeight: '600' }}>
+                          {wallet.name}
+                        </Text>
+                      </View>
+                    </TouchableOpacity>
+                  ))
+                ) : (
+                  <TouchableOpacity
+                    onPress={() => void handleConnectDefaultBrowser()}
+                    disabled={isConnecting}
+                    style={{
+                      padding: 16,
+                      backgroundColor: '#18181b',
+                      borderRadius: 8,
+                      marginBottom: 12,
+                      borderWidth: 1,
+                      borderColor: '#3f3f46',
+                    }}
+                  >
+                    <Text style={{ color: '#f4f4f5', fontSize: 16, fontWeight: '600' }}>
+                      Connect Browser Wallet
+                    </Text>
+                    <Text style={{ color: '#a1a1aa', fontSize: 13, marginTop: 4 }}>
+                      Sign transactions with your browser wallet extension.
+                    </Text>
+                  </TouchableOpacity>
+                )
               )}
             </View>
           )}

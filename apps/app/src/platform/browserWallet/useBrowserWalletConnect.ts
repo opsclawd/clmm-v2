@@ -1,6 +1,6 @@
-import { useCallback, useRef, useState } from 'react';
+import { useCallback, useMemo, useRef, useState } from 'react';
 import { useConnectorKitAdapter } from './connectorKitAdapter';
-import type { BrowserWalletConnectResult } from './browserWalletTypes';
+import type { BrowserWalletConnectResult, BrowserWalletOption } from './browserWalletTypes';
 
 const NO_WALLET_MESSAGE = 'No supported browser wallet detected on this device';
 const WALLET_POLL_INTERVAL_MS = 100;
@@ -13,11 +13,12 @@ function isSolanaBrowserWallet(connector: { id: string; chains: readonly string[
   return connector.chains.some((chain) => SUPPORTED_CHAINS.has(chain));
 }
 
-function findSupportedWallet(
-  connectors: Array<{ id: string; name: string; chains: readonly string[]; ready: boolean }>,
-): { id: string; name: string } | null {
-  const match = connectors.find((c) => isSolanaBrowserWallet(c) && c.ready);
-  return match ? { id: match.id, name: match.name } : null;
+function getSupportedWallets(
+  connectors: Array<{ id: string; name: string; icon: string; chains: readonly string[]; ready: boolean }>,
+): BrowserWalletOption[] {
+  return connectors
+    .filter((c) => isSolanaBrowserWallet(c) && c.ready)
+    .map((c) => ({ id: c.id, name: c.name, icon: c.icon, ready: c.ready, chains: c.chains }));
 }
 
 export function useBrowserWalletConnect() {
@@ -27,29 +28,45 @@ export function useBrowserWalletConnect() {
   const adapterRef = useRef(adapter);
   adapterRef.current = adapter;
 
-  const connect = useCallback(async (): Promise<BrowserWalletConnectResult> => {
+  const wallets = useMemo(
+    () => getSupportedWallets(adapter.connectors),
+    [adapter.connectors],
+  );
+
+  const connect = useCallback(async (walletId?: string): Promise<BrowserWalletConnectResult> => {
     setConnecting(true);
     setError(null);
 
     try {
       const currentAdapter = adapterRef.current;
-      let wallet = findSupportedWallet(currentAdapter.connectors);
+      let supported = getSupportedWallets(currentAdapter.connectors);
 
-      if (!wallet) {
+      if (supported.length === 0) {
         const startTime = Date.now();
         while (Date.now() - startTime < WALLET_POLL_TIMEOUT_MS) {
           await new Promise((resolve) => setTimeout(resolve, WALLET_POLL_INTERVAL_MS));
           const latest = adapterRef.current;
-          wallet = findSupportedWallet(latest.connectors);
-          if (wallet) break;
+          supported = getSupportedWallets(latest.connectors);
+          if (supported.length > 0) break;
         }
       }
 
-      if (!wallet) {
+      if (supported.length === 0) {
         throw new Error(NO_WALLET_MESSAGE);
       }
 
-      await adapterRef.current.connectWallet(wallet.id as import('@solana/connector').WalletConnectorId);
+      let targetWallet: BrowserWalletOption;
+      if (walletId) {
+        const found = supported.find((w) => w.id === walletId);
+        if (!found) {
+          throw new Error(`Wallet "${walletId}" not found or not ready`);
+        }
+        targetWallet = found;
+      } else {
+        targetWallet = supported[0]!;
+      }
+
+      await adapterRef.current.connectWallet(targetWallet.id as import('@solana/connector').WalletConnectorId);
 
       const latestAdapter = adapterRef.current;
       const address = latestAdapter.account;
@@ -57,7 +74,7 @@ export function useBrowserWalletConnect() {
         throw new Error('Wallet did not return an account address');
       }
 
-      return { address, walletName: wallet.name };
+      return { address, walletName: targetWallet.name };
     } catch (err) {
       const error = err instanceof Error ? err : new Error(String(err));
       setError(error);
@@ -71,5 +88,6 @@ export function useBrowserWalletConnect() {
     connect,
     connecting,
     error,
+    wallets,
   };
 }

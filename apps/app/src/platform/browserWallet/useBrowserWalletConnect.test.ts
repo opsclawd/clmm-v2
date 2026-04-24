@@ -253,4 +253,82 @@ describe('useBrowserWalletConnect', () => {
 
     expect(result.current.error).toBe(walletErr);
   });
+
+  it('exposes wallets list with supported solana wallets', async () => {
+    const phantom = createConnector('Phantom');
+    const brave = createConnector('Brave');
+    const ethereumOnly = createConnector('MetaMask', ['ethereum:mainnet']);
+    mockConnectorSnapshot.connectors = [brave, phantom, ethereumOnly];
+
+    const { useBrowserWalletConnect } = await import('./useBrowserWalletConnect');
+    const { result } = renderHook(() => useBrowserWalletConnect());
+
+    expect(result.current.wallets).toHaveLength(2);
+    expect(result.current.wallets.map((w) => w.name)).toEqual(['Brave', 'Phantom']);
+  });
+
+  it('connects specific wallet when walletId is provided', async () => {
+    const brave = createConnector('Brave');
+    const phantom = createConnector('Phantom');
+    mockConnectorSnapshot.connectors = [brave, phantom];
+    mockConnectorSnapshot.connectWallet = mockConnectSuccess('PhantomAddress111111111111111111111111111');
+
+    const { useBrowserWalletConnect } = await import('./useBrowserWalletConnect');
+    const { result } = renderHook(() => useBrowserWalletConnect());
+
+    let connectResult: BrowserWalletConnectResult | undefined;
+    await act(async () => {
+      connectResult = await result.current.connect(phantom.id);
+    });
+
+    expect(connectResult?.address).toBe('PhantomAddress111111111111111111111111111');
+    expect(mockConnectorSnapshot.connectWallet).toHaveBeenCalledWith(phantom.id);
+    expect(mockConnectorSnapshot.connectWallet).not.toHaveBeenCalledWith(brave.id);
+  });
+
+  it('defaults to first ready wallet when no walletId is provided and multiple wallets exist', async () => {
+    const brave = createConnector('Brave');
+    const phantom = createConnector('Phantom');
+    mockConnectorSnapshot.connectors = [brave, phantom];
+    mockConnectorSnapshot.connectWallet = mockConnectSuccess('BraveAddress1111111111111111111111111111');
+
+    const { useBrowserWalletConnect } = await import('./useBrowserWalletConnect');
+    const { result } = renderHook(() => useBrowserWalletConnect());
+
+    await act(async () => {
+      await result.current.connect();
+    });
+
+    expect(mockConnectorSnapshot.connectWallet).toHaveBeenCalledWith(brave.id);
+  });
+
+  it('throws when specified walletId is not found among ready wallets', async () => {
+    const brave = createConnector('Brave');
+    mockConnectorSnapshot.connectors = [brave];
+
+    const { useBrowserWalletConnect } = await import('./useBrowserWalletConnect');
+    const { result } = renderHook(() => useBrowserWalletConnect());
+
+    await act(async () => {
+      await expect(result.current.connect('wallet-standard:phantom' as WalletConnectorId)).rejects.toThrow(
+        'Wallet "wallet-standard:phantom" not found or not ready',
+      );
+    });
+  });
+
+  it('excludes wallets list from poll path and reflects late-arriving wallets', async () => {
+    mockConnectorSnapshot.connectors = [];
+
+    const { useBrowserWalletConnect } = await import('./useBrowserWalletConnect');
+    const { result } = renderHook(() => useBrowserWalletConnect());
+
+    expect(result.current.wallets).toHaveLength(0);
+
+    const phantom = createConnector('Phantom');
+    mockConnectorSnapshot.connectors = [phantom];
+
+    const { result: result2 } = renderHook(() => useBrowserWalletConnect());
+    expect(result2.current.wallets).toHaveLength(1);
+    expect(result2.current.wallets[0]!.name).toBe('Phantom');
+  });
 });
