@@ -315,7 +315,7 @@ const styles = StyleSheet.create({
   },
   title: {
     color: colors.textPrimary,
-    fontSize: typography.fontSize['2xl'],
+    fontSize: typography.fontSize.display,
     fontWeight: typography.fontWeight.semibold,
     letterSpacing: -0.02 * 22,
     marginBottom: 8,
@@ -323,8 +323,8 @@ const styles = StyleSheet.create({
   },
   subtitle: {
     color: colors.textBody,
-    fontSize: typography.fontSize.base,
-    lineHeight: typography.fontSize.base * typography.lineHeight.normal,
+    fontSize: typography.fontSize.body,
+    lineHeight: typography.fontSize.body * typography.lineHeight.normal,
     textAlign: 'center',
     maxWidth: 300,
     marginBottom: 28,
@@ -339,12 +339,12 @@ const styles = StyleSheet.create({
     marginBottom: 16,
   },
   outcomeTitle: {
-    fontSize: typography.fontSize.base,
+    fontSize: typography.fontSize.body,
     fontWeight: typography.fontWeight.semibold,
   },
   outcomeDetail: {
     color: colors.textBody,
-    fontSize: typography.fontSize.sm,
+    fontSize: typography.fontSize.caption,
     marginTop: 4,
   },
   connectingContainer: {
@@ -354,7 +354,7 @@ const styles = StyleSheet.create({
   connectingText: {
     color: colors.textBody,
     marginTop: 12,
-    fontSize: typography.fontSize.base,
+    fontSize: typography.fontSize.body,
   },
   walletOptions: {
     width: '100%',
@@ -377,12 +377,12 @@ const styles = StyleSheet.create({
   },
   walletOptionLabel: {
     color: colors.textPrimary,
-    fontSize: typography.fontSize.base,
+    fontSize: typography.fontSize.body,
     fontWeight: typography.fontWeight.semibold,
   },
   walletOptionDescription: {
     color: colors.textBody,
-    fontSize: typography.fontSize.sm,
+    fontSize: typography.fontSize.caption,
     marginTop: 4,
   },
   featuresContainer: {
