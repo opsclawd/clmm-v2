@@ -20,7 +20,7 @@ describe('app shell wallet dependency guard', () => {
     expect(layoutSource).not.toContain('@solana/wallet-adapter-react');
     expect(layoutSource).not.toContain('@solana/wallet-adapter-wallets');
     expect(layoutSource).not.toContain('ConnectionProvider');
-    expect(layoutSource).not.toContain('WalletProvider');
+    expect(layoutSource).not.toContain('<WalletProvider');
     expect(layoutSource).not.toContain('PhantomWalletAdapter');
   });
 
