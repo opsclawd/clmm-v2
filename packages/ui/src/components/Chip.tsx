@@ -58,7 +58,7 @@ export function Chip({ tone, children }: Props): JSX.Element {
           color: style.text,
           fontSize: 11,
           fontWeight: '600',
-          letterSpacing: 0.22,
+          letterSpacing: 0.02 * 11,
         }}
       >
         {children}
