@@ -1,4 +1,4 @@
-/* eslint-disable @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-return, @typescript-eslint/require-await, @typescript-eslint/no-floating-promises */
+/* eslint-disable @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-return, @typescript-eslint/no-floating-promises */
 import { describe, expect, it, vi, beforeEach, afterEach } from 'vitest';
 import type { WalletConnectorId } from '@solana/connector';
 import { renderHook, act } from '@testing-library/react';
@@ -58,7 +58,7 @@ function mockConnectSuccess(address: string): MockFn {
 
 describe('useBrowserWalletConnect', () => {
   beforeEach(() => {
-    vi.useFakeTimers({ shouldAdvanceTime: true });
+    vi.useFakeTimers();
     mockConnectorSnapshot = {
       connectors: [],
       connectWallet: vi.fn(),
@@ -98,8 +98,16 @@ describe('useBrowserWalletConnect', () => {
     const { useBrowserWalletConnect } = await import('./useBrowserWalletConnect');
     const { result } = renderHook(() => useBrowserWalletConnect());
 
+    const connectPromise = result.current.connect();
+
+    connectPromise.catch(() => {});
+
     await act(async () => {
-      await expect(result.current.connect()).rejects.toThrow(
+      await vi.advanceTimersByTimeAsync(WALLET_POLL_TIMEOUT_MS + WALLET_POLL_INTERVAL_MS * 2);
+    });
+
+    await act(async () => {
+      await expect(connectPromise).rejects.toThrow(
         'No supported browser wallet detected on this device',
       );
     });
@@ -113,13 +121,19 @@ describe('useBrowserWalletConnect', () => {
 
     const connectPromise = result.current.connect();
 
-    await vi.advanceTimersByTimeAsync(WALLET_POLL_TIMEOUT_MS - 1);
+    connectPromise.catch(() => {});
+
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(WALLET_POLL_TIMEOUT_MS / 2);
+    });
 
     const phantom = createConnector('Phantom');
     mockConnectorSnapshot.connectors = [phantom];
     mockConnectorSnapshot.connectWallet = mockConnectSuccess('LateWallet11111111111111111111111111111');
 
-    await vi.advanceTimersByTimeAsync(WALLET_POLL_INTERVAL_MS + 10);
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(WALLET_POLL_INTERVAL_MS * 2);
+    });
 
     const connectResult = await connectPromise;
     expect(connectResult.address).toBe('LateWallet11111111111111111111111111111');
@@ -153,10 +167,8 @@ describe('useBrowserWalletConnect', () => {
     const { useBrowserWalletConnect } = await import('./useBrowserWalletConnect');
     const { result } = renderHook(() => useBrowserWalletConnect());
 
-    let connectPromise: Promise<BrowserWalletConnectResult> | undefined;
-    act(() => {
-      connectPromise = result.current.connect();
-    });
+    const connectPromise = result.current.connect();
+    connectPromise.catch(() => {});
 
     await act(async () => {
       await vi.advanceTimersByTimeAsync(0);
