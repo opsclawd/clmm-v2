@@ -30,7 +30,7 @@ export default function SpikeConnect() {
 
   return (
     <ScrollView contentContainerStyle={styles.container}>
-      <Text style={styles.title}>Wallet Standard Spike</Text>
+      <Text style={styles.title}>Wallet Standard Spike (Fallback A: +@phantom/browser-sdk)</Text>
 
       <View style={styles.section}>
         <Text style={styles.label}>Registered wallets: {wallets.length}</Text>

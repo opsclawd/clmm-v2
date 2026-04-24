@@ -5,6 +5,15 @@ import { Platform } from 'react-native';
 import { queryClient } from '../src/composition/queryClient';
 import { navigateRoute } from '../src/platform/webNavigation';
 
+if (Platform.OS === 'web') {
+  import('@phantom/browser-sdk').then(({ BrowserSDK, AddressType }) => {
+    new BrowserSDK({
+      providers: ['injected'],
+      addressTypes: [AddressType.solana],
+    });
+  }).catch(() => {});
+}
+
 export default function RootLayout() {
   const router = useRouter();
 
