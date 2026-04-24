@@ -80,11 +80,11 @@ const features = [
   },
   {
     title: 'Debounced breach logic',
-    description: "Ignores 30–60s wicks so you don't exit on noise.",
+    description: 'Requires sustained breach before acting, not single wicks.',
   },
   {
-    title: 'Auditable receipts',
-    description: 'Every action saved with tx hash and fills.',
+    title: 'Action history',
+    description: 'Every exit is logged with transaction details.',
   },
 ];
 
