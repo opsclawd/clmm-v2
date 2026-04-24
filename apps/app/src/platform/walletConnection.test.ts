@@ -25,6 +25,15 @@ describe('walletConnection helpers', () => {
     });
   });
 
+  it('maps Phantom unauthorized errors to retry guidance outcome', () => {
+    const error = Object.assign(
+      new Error('The requested method and/or account has not been authorized by the user'),
+      { code: 4100 },
+    );
+
+    expect(mapWalletErrorToOutcome(error)).toEqual({ kind: 'needs-wallet-retry' });
+  });
+
   it('maps non-Error unknown inputs to failed with string reason', () => {
     expect(mapWalletErrorToOutcome({ code: 'WALLET_DOWN' })).toEqual({
       kind: 'failed',

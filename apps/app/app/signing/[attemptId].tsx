@@ -11,7 +11,7 @@ import {
   recordSignatureInterruption,
   submitExecution,
 } from '../../src/api/executions';
-import { signBrowserTransaction } from '../../src/platform/browserWallet';
+import { readInjectedBrowserWalletWindow, signBrowserTransaction } from '../../src/platform/browserWallet';
 import { signNativeTransaction } from '../../src/platform/nativeWallet';
 import { mapWalletErrorToOutcome } from '../../src/platform/walletConnection';
 import { navigateRoute } from '../../src/platform/webNavigation';
@@ -186,7 +186,7 @@ export default function SigningRoute() {
         const signedPayload =
           connectionKind === 'browser'
             ? await signBrowserTransaction({
-                browserWindow: typeof window === 'undefined' ? undefined : { solana: Reflect.get(window, 'solana') },
+                browserWindow: readInjectedBrowserWalletWindow(),
                 serializedPayload: signingPayload.serializedPayload,
               })
             : await signNativeTransaction({

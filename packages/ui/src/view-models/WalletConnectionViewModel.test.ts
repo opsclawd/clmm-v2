@@ -61,6 +61,19 @@ describe('buildWalletConnectViewModel', () => {
     expect(vm.outcomeDisplay!.title).toBe('Connection Failed');
   });
 
+  it('shows retry guidance without staying in connecting state', () => {
+    const vm = buildWalletConnectViewModel({
+      capabilities: makeCaps({ browserWalletAvailable: true }),
+      connectionOutcome: { kind: 'needs-wallet-retry' },
+      isConnecting: false,
+    });
+
+    expect(vm.isConnecting).toBe(false);
+    expect(vm.walletOptions.map((option) => option.kind)).toEqual(['browser']);
+    expect(vm.outcomeDisplay!.title).toBe('Wallet Approval Needed');
+    expect(vm.outcomeDisplay!.severity).toBe('warning');
+  });
+
   it('passes through isConnecting state', () => {
     const vm = buildWalletConnectViewModel({
       capabilities: makeCaps({ nativeWalletAvailable: true }),

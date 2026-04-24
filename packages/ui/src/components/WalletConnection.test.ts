@@ -91,6 +91,14 @@ describe('getConnectionOutcomeDisplay', () => {
     expect(display.severity).toBe('warning');
     expect(display.detail).toContain('returned');
   });
+
+  it('maps wallet retry outcome to Phantom approval guidance', () => {
+    const display = getConnectionOutcomeDisplay({ kind: 'needs-wallet-retry' });
+    expect(display.title).toBe('Wallet Approval Needed');
+    expect(display.severity).toBe('warning');
+    expect(display.detail).toContain('Approve CLMM V2 in Phantom');
+    expect(display.detail).toContain('tap Connect again');
+  });
 });
 
 describe('buildConnectedWalletSummary', () => {

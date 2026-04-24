@@ -12,6 +12,16 @@ export class WebPlatformCapabilityAdapter implements PlatformCapabilityPort {
     const injectedBrowserWallet = ((): boolean => {
       try {
         const win = globalThis as unknown as Record<string, unknown>;
+        const phantom = win['phantom'];
+        const phantomSolana =
+          typeof phantom === 'object' && phantom !== null
+            ? (phantom as Record<string, unknown>)['solana']
+            : undefined;
+        if (typeof phantomSolana === 'object' && phantomSolana !== null) {
+          const phantomSolanaRecord = phantomSolana as Record<string, unknown>;
+          if (typeof phantomSolanaRecord['connect'] === 'function') return true;
+        }
+
         const solana = win['solana'];
         if (typeof solana !== 'object' || solana === null) return false;
         const solanaRecord = solana as Record<string, unknown>;

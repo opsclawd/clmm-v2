@@ -1,7 +1,7 @@
 import { useRouter } from 'expo-router';
 import { WalletSettingsScreen } from '@clmm/ui';
 import { useStore } from 'zustand';
-import { disconnectBrowserWallet } from '../../src/platform/browserWallet';
+import { disconnectBrowserWallet, readInjectedBrowserWalletWindow } from '../../src/platform/browserWallet';
 import { navigateRoute } from '../../src/platform/webNavigation';
 import { walletSessionStore } from '../../src/state/walletSessionStore';
 
@@ -26,7 +26,7 @@ export default function WalletRoute() {
   async function handleDisconnect() {
     if (connectionKind === 'browser' && typeof window !== 'undefined') {
       try {
-        await disconnectBrowserWallet({ solana: Reflect.get(window, 'solana') });
+        await disconnectBrowserWallet(readInjectedBrowserWalletWindow());
       } catch {
         // Browser wallet disconnect is best-effort; always clear local session.
       }

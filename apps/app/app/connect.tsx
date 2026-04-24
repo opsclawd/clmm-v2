@@ -4,7 +4,7 @@ import { WalletConnectScreen } from '@clmm/ui';
 import { useStore } from 'zustand';
 import type { PlatformCapabilityState } from '@clmm/application/public';
 import { platformCapabilityAdapter, walletPlatform } from '../src/composition/index';
-import { connectBrowserWallet } from '../src/platform/browserWallet';
+import { connectBrowserWallet, readInjectedBrowserWalletWindow } from '../src/platform/browserWallet';
 import { mapWalletErrorToOutcome } from '../src/platform/walletConnection';
 import { navigateRoute } from '../src/platform/webNavigation';
 import { walletSessionStore } from '../src/state/walletSessionStore';
@@ -69,11 +69,9 @@ export default function ConnectRoute() {
     beginConnection();
 
     try {
-      const browserWalletWindow =
-        typeof window === 'undefined' ? undefined : { solana: Reflect.get(window, 'solana') as unknown };
       const walletAddress =
         kind === 'browser'
-          ? await connectBrowserWallet(browserWalletWindow)
+          ? await connectBrowserWallet(readInjectedBrowserWalletWindow())
           : await walletPlatform.connectNativeWallet();
 
       markConnected({ walletAddress, connectionKind: kind });

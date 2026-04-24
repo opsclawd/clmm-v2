@@ -10,6 +10,7 @@ export type BrowserSignedTransaction = {
 
 export type BrowserWalletProvider = {
   isPhantom?: boolean;
+  isConnected?: boolean;
   publicKey?: BrowserWalletPublicKey | null;
   connect(): Promise<{ publicKey?: BrowserWalletPublicKey | null } | null | undefined>;
   disconnect?(): Promise<void>;
@@ -17,6 +18,9 @@ export type BrowserWalletProvider = {
 };
 
 export type BrowserWalletWindow = {
+  phantom?: {
+    solana?: unknown;
+  } | null | undefined;
   solana?: unknown;
 };
 
@@ -31,7 +35,27 @@ function isBrowserWalletProvider(value: unknown): value is BrowserWalletProvider
 export function getInjectedBrowserProvider(
   browserWindow: BrowserWalletWindow | undefined,
 ): BrowserWalletProvider | null {
+  const phantomSolana = browserWindow?.phantom?.solana;
+  if (isBrowserWalletProvider(phantomSolana)) {
+    return phantomSolana;
+  }
+
   return isBrowserWalletProvider(browserWindow?.solana) ? browserWindow.solana : null;
+}
+
+export function readInjectedBrowserWalletWindow(): BrowserWalletWindow | undefined {
+  if (typeof window === 'undefined') {
+    return undefined;
+  }
+
+  return {
+    phantom: Reflect.get(window, 'phantom') as { solana?: unknown } | null | undefined,
+    solana: Reflect.get(window, 'solana') as unknown,
+  };
+}
+
+export function hasInjectedBrowserWalletProvider(browserWindow: BrowserWalletWindow | undefined): boolean {
+  return getInjectedBrowserProvider(browserWindow) !== null;
 }
 
 export function normalizeBrowserWalletAddress(publicKey: BrowserWalletPublicKey | null | undefined): string {
@@ -47,6 +71,10 @@ export async function connectBrowserWallet(browserWindow: BrowserWalletWindow | 
 
   if (!provider) {
     throw new Error('No supported browser wallet detected on this device');
+  }
+
+  if (provider.publicKey) {
+    return normalizeBrowserWalletAddress(provider.publicKey);
   }
 
   const result = await provider.connect();

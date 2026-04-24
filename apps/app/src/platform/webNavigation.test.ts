@@ -13,6 +13,13 @@ describe('isSolanaMobileWebView', () => {
     expect(isSolanaMobileWebView()).toBe(true);
   });
 
+  it('returns true on mobile WebView with only window.phantom.solana.connect', () => {
+    vi.stubGlobal('window', { phantom: { solana: { connect: vi.fn() } } });
+    vi.stubGlobal('navigator', { userAgent: 'Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) AppleWebKit/605.1.15' });
+
+    expect(isSolanaMobileWebView()).toBe(true);
+  });
+
   it('returns true on iOS iPhone with window.solana.connect', () => {
     vi.stubGlobal('window', { solana: { connect: vi.fn() } });
     vi.stubGlobal('navigator', { userAgent: 'Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) AppleWebKit/605.1.15' });
@@ -128,6 +135,24 @@ describe('navigateRoute', () => {
     const replaceFn = vi.fn();
     vi.stubGlobal('window', {
       solana: { connect: vi.fn() },
+      location: { origin: 'https://app.example.com', replace: replaceFn, href: '' },
+    });
+    vi.stubGlobal('navigator', { userAgent: 'Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) AppleWebKit/605.1.15' });
+
+    const router = { push: vi.fn(), replace: vi.fn() };
+
+    navigateRoute({ router, path: '/positions', method: 'replace' });
+
+    expect(replaceFn).toHaveBeenCalledWith('https://app.example.com/positions');
+    expect(router.replace).not.toHaveBeenCalled();
+
+    vi.unstubAllGlobals();
+  });
+
+  it('uses window.location hard navigation when only Phantom scoped provider is injected', () => {
+    const replaceFn = vi.fn();
+    vi.stubGlobal('window', {
+      phantom: { solana: { connect: vi.fn() } },
       location: { origin: 'https://app.example.com', replace: replaceFn, href: '' },
     });
     vi.stubGlobal('navigator', { userAgent: 'Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) AppleWebKit/605.1.15' });

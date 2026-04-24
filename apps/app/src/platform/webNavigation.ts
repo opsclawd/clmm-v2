@@ -1,3 +1,5 @@
+import { hasInjectedBrowserWalletProvider, readInjectedBrowserWalletWindow } from './browserWallet';
+
 type RouterLike = {
   push: (path: string) => void;
   replace: (path: string) => void;
@@ -16,12 +18,7 @@ function isWebPlatform(): boolean {
 export function isSolanaMobileWebView(): boolean {
   if (!isWebPlatform()) return false;
   try {
-    const win = window as unknown as Record<string, unknown>;
-    const solana = win['solana'];
-    const hasWalletInject =
-      solana && typeof solana === 'object' && solana !== null &&
-      typeof (solana as Record<string, unknown>)['connect'] === 'function';
-    if (!hasWalletInject) return false;
+    if (!hasInjectedBrowserWalletProvider(readInjectedBrowserWalletWindow())) return false;
     const ua = typeof navigator !== 'undefined' ? navigator.userAgent : '';
     return /wv\)/.test(ua) || /iPhone/.test(ua) || /iPad/.test(ua);
   } catch {

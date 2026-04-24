@@ -39,7 +39,8 @@ export type ConnectionOutcome =
   | { kind: 'connected' }
   | { kind: 'failed'; reason: string }
   | { kind: 'cancelled' }
-  | { kind: 'interrupted' };
+  | { kind: 'interrupted' }
+  | { kind: 'needs-wallet-retry' };
 
 export type ConnectionOutcomeDisplay = {
   title: string;
@@ -71,6 +72,12 @@ export function getConnectionOutcomeDisplay(outcome: ConnectionOutcome): Connect
       return {
         title: 'Connection Interrupted',
         detail: 'The connection was interrupted before completing. You have returned to the app — please try connecting again.',
+        severity: 'warning',
+      };
+    case 'needs-wallet-retry':
+      return {
+        title: 'Wallet Approval Needed',
+        detail: 'Approve CLMM V2 in Phantom, then tap Connect again.',
         severity: 'warning',
       };
     default: {

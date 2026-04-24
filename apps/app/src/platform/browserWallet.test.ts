@@ -1,10 +1,11 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import { VersionedTransaction } from '@solana/web3.js';
 import {
   connectBrowserWallet,
   disconnectBrowserWallet,
   getInjectedBrowserProvider,
   normalizeBrowserWalletAddress,
+  readInjectedBrowserWalletWindow,
   signBrowserTransaction,
 } from './browserWallet';
 
@@ -23,6 +24,42 @@ describe('browserWallet helpers', () => {
     };
 
     expect(getInjectedBrowserProvider({ solana: provider })).toBe(provider);
+  });
+
+  it('prefers the Phantom-scoped Solana provider over the legacy global provider', () => {
+    const phantomProvider = {
+      isPhantom: true,
+      connect: () => Promise.resolve({ publicKey: { toBase58: () => 'phantom' } }),
+    };
+    const legacyProvider = {
+      connect: () => Promise.resolve({ publicKey: { toBase58: () => 'legacy' } }),
+    };
+
+    expect(
+      getInjectedBrowserProvider({
+        phantom: { solana: phantomProvider },
+        solana: legacyProvider,
+      }),
+    ).toBe(phantomProvider);
+  });
+
+  it('reads both Phantom-scoped and legacy global providers from the browser window', () => {
+    const phantomProvider = {
+      isPhantom: true,
+      connect: () => Promise.resolve({ publicKey: { toBase58: () => 'phantom' } }),
+    };
+    const legacyProvider = {
+      connect: () => Promise.resolve({ publicKey: { toBase58: () => 'legacy' } }),
+    };
+    vi.stubGlobal('window', {
+      phantom: { solana: phantomProvider },
+      solana: legacyProvider,
+    });
+
+    expect(readInjectedBrowserWalletWindow()).toEqual({
+      phantom: { solana: phantomProvider },
+      solana: legacyProvider,
+    });
   });
 
   it('returns null when injected solana does not expose a connect function', () => {
@@ -51,6 +88,22 @@ describe('browserWallet helpers', () => {
     await expect(connectBrowserWallet({ solana: provider })).resolves.toBe(
       'ConnectResult111111111111111111111111111111111',
     );
+  });
+
+  it('connectBrowserWallet returns existing provider publicKey without calling connect', async () => {
+    const connect = vi.fn(() => Promise.reject(new Error('connect should not be called')));
+    const provider = {
+      isConnected: true,
+      publicKey: {
+        toBase58: () => 'AlreadyConnected111111111111111111111111111111',
+      },
+      connect,
+    };
+
+    await expect(connectBrowserWallet({ solana: provider })).resolves.toBe(
+      'AlreadyConnected111111111111111111111111111111',
+    );
+    expect(connect).not.toHaveBeenCalled();
   });
 
   it('connectBrowserWallet throws controlled error when no provider is injected', async () => {
@@ -86,6 +139,35 @@ describe('browserWallet helpers', () => {
     await expect(connectBrowserWallet({ solana: provider })).rejects.toThrow(
       'Wallet provider did not return a public key',
     );
+  });
+
+  it('connectBrowserWallet rejects Phantom unauthorized errors immediately for manual retry', async () => {
+    const unauthorizedError = Object.assign(
+      new Error('The requested method and/or account has not been authorized by the user'),
+      { code: 4100 },
+    );
+    const provider = {
+      connect: vi.fn(() => Promise.reject(unauthorizedError)),
+      on: vi.fn(),
+    };
+
+    await expect(connectBrowserWallet({ solana: provider })).rejects.toBe(unauthorizedError);
+    expect(provider.on).not.toHaveBeenCalled();
+  });
+
+  it('connectBrowserWallet rejects user-denied Phantom errors immediately', async () => {
+    vi.useFakeTimers();
+    try {
+      const rejectedError = Object.assign(new Error('User rejected the request'), { code: 4001 });
+      const provider = {
+        connect: vi.fn(() => Promise.reject(rejectedError)),
+        on: vi.fn(),
+      };
+
+      await expect(connectBrowserWallet({ solana: provider })).rejects.toBe(rejectedError);
+    } finally {
+      vi.useRealTimers();
+    }
   });
 
   it('disconnectBrowserWallet is safe when provider is missing', async () => {
