@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import { View, Text, TouchableOpacity, ScrollView, Linking, Platform, Image } from 'react-native';
+import { View, Text, TouchableOpacity, ScrollView, Linking, Platform, ActivityIndicator, Image } from 'react-native';
 import { useRouter } from 'expo-router';
 import { useStore } from 'zustand';
 import type { PlatformCapabilityState } from '@clmm/application/public';
@@ -18,8 +18,10 @@ import { walletSessionStore } from '../src/state/walletSessionStore';
 import { enrollWalletForMonitoring } from '../src/api/wallets';
 
 const NO_WALLET_MESSAGE = 'No supported browser wallet detected on this device';
+const WALLET_DISCOVERY_TIMEOUT_MS = 2000;
 
 type FallbackState = 'none' | 'wallet-fallback' | 'social-webview';
+type WalletDiscoveryState = 'discovering' | 'ready' | 'timed-out';
 
 function detectFallbackState(
   platformCapabilities: PlatformCapabilityState | null,
@@ -64,15 +66,27 @@ export default function ConnectRoute() {
   const clearOutcome = useStore(walletSessionStore, (state) => state.clearOutcome);
 
   const [socialEscapeAttempted, setSocialEscapeAttempted] = useState(false);
+  const [discoveryTimedOut, setDiscoveryTimedOut] = useState(false);
 
   const browserConnect = useBrowserWalletConnect();
+  const walletCount = browserConnect.wallets.length;
+
+  const discoveryState: WalletDiscoveryState = useMemo(() => {
+    if (walletCount > 0) return 'ready';
+    if (discoveryTimedOut) return 'timed-out';
+    return 'discovering';
+  }, [walletCount, discoveryTimedOut]);
+
+  useEffect(() => {
+    if (walletCount > 0 || discoveryTimedOut) return;
+    const timer = setTimeout(() => setDiscoveryTimedOut(true), WALLET_DISCOVERY_TIMEOUT_MS);
+    return () => clearTimeout(timer);
+  }, [walletCount, discoveryTimedOut]);
 
   const fallbackState = useMemo(
     () => detectFallbackState(platformCapabilities, browserConnect.error),
     [platformCapabilities, browserConnect.error],
   );
-
-  const showWalletPicker = browserConnect.wallets.length > 1;
 
   function handleConnectionError(error: unknown) {
     const outcome = mapWalletErrorToOutcome(error);
@@ -168,6 +182,105 @@ export default function ConnectRoute() {
   function handleOpenInBrowser() {
     setSocialEscapeAttempted(true);
     openInExternalBrowser(window.location.href);
+  }
+
+  function renderWalletPicker(wallets: BrowserWalletOption[]) {
+    return wallets.map((wallet) => (
+      <TouchableOpacity
+        key={wallet.id}
+        onPress={() => void handleSelectBrowserWallet(wallet.id)}
+        disabled={isConnecting}
+        style={{
+          padding: 16,
+          backgroundColor: '#18181b',
+          borderRadius: 8,
+          marginBottom: 12,
+          borderWidth: 1,
+          borderColor: '#3f3f46',
+          flexDirection: 'row',
+          alignItems: 'center',
+          gap: 12,
+        }}
+      >
+        {wallet.icon ? (
+          <Image source={{ uri: wallet.icon }} style={{ width: 24, height: 24 }} />
+        ) : null}
+        <View style={{ flex: 1 }}>
+          <Text style={{ color: '#f4f4f5', fontSize: 16, fontWeight: '600' }}>
+            {wallet.name}
+          </Text>
+        </View>
+      </TouchableOpacity>
+    ));
+  }
+
+  function renderBrowserWalletSection() {
+    if (!platformCapabilities?.browserWalletAvailable) return null;
+
+    switch (discoveryState) {
+      case 'discovering':
+        return (
+          <View style={{ padding: 16, backgroundColor: '#18181b', borderRadius: 8, marginBottom: 12, borderWidth: 1, borderColor: '#3f3f46', flexDirection: 'row', alignItems: 'center', gap: 12 }}>
+            <ActivityIndicator size="small" color="#a1a1aa" />
+            <Text style={{ color: '#a1a1aa', fontSize: 14 }}>
+              Detecting browser wallets...
+            </Text>
+          </View>
+        );
+      case 'ready':
+        if (walletCount === 1) {
+          const wallet = browserConnect.wallets[0]!;
+          return (
+            <TouchableOpacity
+              onPress={() => void handleSelectBrowserWallet(wallet.id)}
+              disabled={isConnecting}
+              style={{
+                padding: 16,
+                backgroundColor: '#18181b',
+                borderRadius: 8,
+                marginBottom: 12,
+                borderWidth: 1,
+                borderColor: '#3f3f46',
+                flexDirection: 'row',
+                alignItems: 'center',
+                gap: 12,
+              }}
+            >
+              {wallet.icon ? (
+                <Image source={{ uri: wallet.icon }} style={{ width: 24, height: 24 }} />
+              ) : null}
+              <View style={{ flex: 1 }}>
+                <Text style={{ color: '#f4f4f5', fontSize: 16, fontWeight: '600' }}>
+                  {wallet.name}
+                </Text>
+              </View>
+            </TouchableOpacity>
+          );
+        }
+        return renderWalletPicker(browserConnect.wallets);
+      case 'timed-out':
+        return (
+          <TouchableOpacity
+            onPress={() => void handleConnectDefaultBrowser()}
+            disabled={isConnecting}
+            style={{
+              padding: 16,
+              backgroundColor: '#18181b',
+              borderRadius: 8,
+              marginBottom: 12,
+              borderWidth: 1,
+              borderColor: '#3f3f46',
+            }}
+          >
+            <Text style={{ color: '#f4f4f5', fontSize: 16, fontWeight: '600' }}>
+              Connect Browser Wallet
+            </Text>
+            <Text style={{ color: '#a1a1aa', fontSize: 13, marginTop: 4 }}>
+              Sign transactions with your browser wallet extension.
+            </Text>
+          </TouchableOpacity>
+        );
+    }
   }
 
   if (!platformCapabilities) {
@@ -285,57 +398,7 @@ export default function ConnectRoute() {
                   </Text>
                 </TouchableOpacity>
               )}
-              {platformCapabilities.browserWalletAvailable && (
-                showWalletPicker ? (
-                  browserConnect.wallets.map((wallet: BrowserWalletOption) => (
-                    <TouchableOpacity
-                      key={wallet.id}
-                      onPress={() => void handleSelectBrowserWallet(wallet.id)}
-                      disabled={isConnecting}
-                      style={{
-                        padding: 16,
-                        backgroundColor: '#18181b',
-                        borderRadius: 8,
-                        marginBottom: 12,
-                        borderWidth: 1,
-                        borderColor: '#3f3f46',
-                        flexDirection: 'row',
-                        alignItems: 'center',
-                        gap: 12,
-                      }}
-                    >
-                      {wallet.icon ? (
-                        <Image source={{ uri: wallet.icon }} style={{ width: 24, height: 24 }} />
-                      ) : null}
-                      <View style={{ flex: 1 }}>
-                        <Text style={{ color: '#f4f4f5', fontSize: 16, fontWeight: '600' }}>
-                          {wallet.name}
-                        </Text>
-                      </View>
-                    </TouchableOpacity>
-                  ))
-                ) : (
-                  <TouchableOpacity
-                    onPress={() => void handleConnectDefaultBrowser()}
-                    disabled={isConnecting}
-                    style={{
-                      padding: 16,
-                      backgroundColor: '#18181b',
-                      borderRadius: 8,
-                      marginBottom: 12,
-                      borderWidth: 1,
-                      borderColor: '#3f3f46',
-                    }}
-                  >
-                    <Text style={{ color: '#f4f4f5', fontSize: 16, fontWeight: '600' }}>
-                      Connect Browser Wallet
-                    </Text>
-                    <Text style={{ color: '#a1a1aa', fontSize: 13, marginTop: 4 }}>
-                      Sign transactions with your browser wallet extension.
-                    </Text>
-                  </TouchableOpacity>
-                )
-              )}
+              {renderBrowserWalletSection()}
             </View>
           )}
 
