@@ -27,6 +27,7 @@ import type {
   ExecutionPreparationPort,
   ExecutionRepository,
   ExecutionSubmissionPort,
+  ObservabilityPort,
   StoredExecutionAttempt,
 } from '@clmm/application';
 import type { RegimeEngineEventPort } from '../../outbound/regime-engine/types.js';
@@ -78,6 +79,17 @@ class RecordingRegimeEngineEventPort implements RegimeEngineEventPort {
   }
 }
 
+class RecordingObservabilityPort implements ObservabilityPort {
+  logs: Array<{ level: string; message: string; context?: Record<string, unknown> }> = [];
+
+  log(level: string, message: string, context?: Record<string, unknown>): void {
+    this.logs.push({ level, message, ...(context ? { context } : {}) });
+  }
+  recordTiming(): void {}
+  recordDetectionTiming(): void {}
+  recordDeliveryTiming(): void {}
+}
+
 class RecordingSubmissionPort implements ExecutionSubmissionPort {
   submittedPayloads: Uint8Array[] = [];
   reconcileCalls: TransactionReference[][] = [];
@@ -115,6 +127,7 @@ describe('ExecutionController', () => {
   let submissionPort: RecordingSubmissionPort;
   let regimeEngineEventPort: RecordingRegimeEngineEventPort;
   let reconciliationJobPort: RecordingReconciliationJobPort;
+  let observability: RecordingObservabilityPort;
   let ids: FakeIdGeneratorPort;
   let controller: ExecutionController;
 
@@ -142,6 +155,7 @@ describe('ExecutionController', () => {
     ids = new FakeIdGeneratorPort('exec-http');
     regimeEngineEventPort = new RecordingRegimeEngineEventPort();
     reconciliationJobPort = new RecordingReconciliationJobPort();
+    observability = new RecordingObservabilityPort();
     controller = new ExecutionController(
       executionRepo as unknown as ExecutionRepository,
       historyRepo as unknown as ExecutionHistoryRepository,
@@ -151,6 +165,7 @@ describe('ExecutionController', () => {
       ids,
       regimeEngineEventPort,
       reconciliationJobPort,
+      observability,
     );
   });
 
@@ -820,6 +835,25 @@ describe('ExecutionController', () => {
       });
 
       expect(result.result).toBe('pending');
+    });
+
+    it('logs warn when reconciliation enqueue fails', async () => {
+      await saveAwaitingSignature('attempt-enqueue-warn-log');
+      submissionPort.finalState = null;
+      reconciliationJobPort.shouldThrow = true;
+
+      await controller.submitExecution('attempt-enqueue-warn-log', {
+        signedPayload: Buffer.from([1, 2, 3]).toString('base64'),
+        payloadVersion: 'v1',
+      });
+
+      expect(observability.logs).toHaveLength(1);
+      expect(observability.logs[0]!.level).toBe('warn');
+      expect(observability.logs[0]!.message).toContain('attempt-enqueue-warn-log');
+      expect(observability.logs[0]!.context).toMatchObject({
+        attemptId: 'attempt-enqueue-warn-log',
+        error: 'enqueue failed',
+      });
     });
 
     it('does not fire regime-engine event when reconcileExecution throws', async () => {
