@@ -18,11 +18,7 @@ config.resolver.nodeModulesPaths = [
 
 config.resolver.sourceExts = ['ts', 'tsx', 'js', 'jsx', 'json', 'cjs', 'mjs'];
 
-// Support package.json "exports" field for subpath imports (e.g., @solana/connector/headless)
-config.resolver.unstable_conditionNames = ['import', 'require', 'default'];
-config.resolver.unstable_conditionsByPlatform = {
-  web: ['browser'],
-};
+config.resolver.unstable_enablePackageExports = true;
 
 config.resolver.resolveRequest = (context, moduleName, platform) => {
   if ((moduleName.startsWith('.') || moduleName.startsWith('/')) && moduleName.endsWith('.js')) {
