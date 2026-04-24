@@ -132,6 +132,9 @@ importers:
       '@types/react':
         specifier: ~18.3.1
         version: 18.3.28
+      '@wallet-standard/base':
+        specifier: 1.1.0
+        version: 1.1.0
       jsdom:
         specifier: ^25.0.1
         version: 25.0.1(bufferutil@4.1.0)(utf-8-validate@6.0.6)

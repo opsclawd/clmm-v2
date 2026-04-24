@@ -1,8 +1,3 @@
-// Spike route for ConnectorKit wallet integration testing.
-// This file is NOT production code. It will be removed after the spike is complete.
-// @ts-nocheck because spike code uses dynamic imports and cross-library types
-// that don't need strict type checking for a test harness.
-
 import { useCallback, useEffect, useState } from 'react';
 import { ScrollView, Text, View, StyleSheet, Pressable } from 'react-native';
 import {
@@ -13,6 +8,26 @@ import {
   getWalletsRegistry,
 } from '@solana/connector';
 import type { ViewStyle, TextStyle } from 'react-native';
+import type {
+  Wallet,
+  WalletAccount,
+  WalletWithFeatures,
+} from '@wallet-standard/base';
+
+type SolanaSignTransactionFeature = WalletWithFeatures<{
+  readonly 'solana:signTransaction': {
+    readonly version: '1.0.0';
+    readonly supportedTransactionVersions: readonly ('legacy' | 0)[];
+    readonly signTransaction: (
+      ...inputs: readonly {
+        readonly account: WalletAccount;
+        readonly transaction: Uint8Array;
+        readonly chain?: string;
+        readonly options?: Readonly<Record<string, unknown>>;
+      }[]
+    ) => Promise<readonly { readonly signedTransaction: Uint8Array }[]>;
+  };
+}>;
 
 type SpikeState = {
   platform: string;
@@ -31,6 +46,8 @@ type SpikeState = {
   errorCode: string | null;
   debugJson: string;
 };
+
+const MEMO_PROGRAM_ADDRESS = 'MemoSq4gqABAXKb96qnH8TysNcWxMyWCqXgDLGmfcHr';
 
 function SpikeWalletInner() {
   const [state, setState] = useState<SpikeState>({
@@ -148,13 +165,12 @@ function SpikeWalletInner() {
     setState((prev) => ({ ...prev, signingInProgress: true, error: null, lastSignature: null, inputPayloadBase64: null, signedPayloadBase64: null }));
 
     try {
-      // Dynamic import @solana/kit to construct a devnet no-op v0 transaction
       const {
         createSolanaRpc,
         createTransactionMessage,
         setTransactionMessageFeePayer,
         setTransactionMessageLifetimeUsingBlockhash,
-        appendTransactionMessageInstructions,
+        appendTransactionMessageInstruction,
         compileTransaction,
         getBase64EncodedWireTransaction,
         getTransactionDecoder,
@@ -162,70 +178,68 @@ function SpikeWalletInner() {
         pipe,
         address,
       } = await import('@solana/kit');
-      const { getTransferSolInstruction } = await import('@solana-program/system');
 
       const rpc = createSolanaRpc('https://api.devnet.solana.com');
       const { value: latestBlockhash } = await rpc.getLatestBlockhash().send();
       const payerAddress = address(account as string);
 
-      // Build devnet no-op: self-transfer 0 lamports
+      const memoInstruction: Parameters<typeof appendTransactionMessageInstruction>[0] = {
+        data: new TextEncoder().encode('CLMM V2 spike sign test'),
+        programAddress: address(MEMO_PROGRAM_ADDRESS),
+      };
+
       const transactionMessage = pipe(
         createTransactionMessage({ version: 0 }),
-        (m: any) => setTransactionMessageFeePayer(payerAddress, m),
-        (m: any) => setTransactionMessageLifetimeUsingBlockhash(latestBlockhash, m),
-        (m: any) =>
-          appendTransactionMessageInstructions(
-            [getTransferSolInstruction({ source: payerAddress, destination: payerAddress, amount: 0n })],
-            m,
-          ),
+        (m) => setTransactionMessageFeePayer(payerAddress, m),
+        (m) => setTransactionMessageLifetimeUsingBlockhash(latestBlockhash, m),
+        (m) => appendTransactionMessageInstruction(memoInstruction, m),
       );
 
       const compiledTransaction = compileTransaction(transactionMessage);
       const unsignedBase64 = getBase64EncodedWireTransaction(compiledTransaction);
       const unsignedBytes = Uint8Array.from(atob(unsignedBase64), (c) => c.charCodeAt(0));
 
-      // Get the connected wallet from Wallet Standard registry
-      // getWalletsRegistry is already imported at the top from @solana/connector
       const registry = getWalletsRegistry();
-      const wallets = registry.get();
-      const wallet = wallets.find((w: any) => {
-        // Find a wallet matching the connected account
-        const accounts = (w as any).accounts as { address: string }[] | undefined;
-        return accounts?.some((a: { address: string }) => a.address === account);
+      const wallets: readonly Wallet[] = registry.get();
+      const wallet: Wallet | undefined = wallets.find((w) => {
+        return w.accounts.some((a) => a.address === account);
       }) || wallets[0];
 
       if (!wallet) {
         throw new Error('No wallet found in Wallet Standard registry');
       }
 
-      const features = wallet.features as Record<string, any>;
-      const signFeature = features['solana:signTransaction'];
+      const solanaWallet = wallet as unknown as SolanaSignTransactionFeature;
+      const signFeatureEntry = solanaWallet.features['solana:signTransaction'];
 
-      if (!signFeature) {
-        // Fallback: try signAndSendTransaction, then signMessage
-        throw new Error('Wallet does not support solana:signTransaction. Available features: ' + Object.keys(features).join(', '));
+      if (!signFeatureEntry) {
+        const availableFeatures = Object.keys(wallet.features as Readonly<Record<string, unknown>>);
+        throw new Error('Wallet does not support solana:signTransaction. Available features: ' + availableFeatures.join(', '));
       }
 
-      // Sign via Wallet Standard: bytes in → bytes out
-      const result = await signFeature.signTransaction({
-        account: { address: account as string },
-        transactions: [unsignedBytes],
+      const walletAccount = wallet.accounts.find((a) => a.address === account) || wallet.accounts[0];
+
+      if (!walletAccount) {
+        throw new Error('No matching WalletAccount found');
+      }
+
+      const results = await signFeatureEntry.signTransaction({
+        account: walletAccount,
+        transaction: unsignedBytes,
       });
 
-      const signedBytes = (result as any).signedTransactions?.[0] || (result as any).signedTransaction || result;
-      let signedBase64: string;
-      let signature: string;
+      const signedTransaction = results[0]?.signedTransaction;
+      if (!(signedTransaction instanceof Uint8Array)) {
+        throw new Error('Unexpected signed transaction type: expected Uint8Array');
+      }
 
-      if (signedBytes instanceof Uint8Array) {
-        signedBase64 = btoa(String.fromCharCode(...signedBytes));
-        try {
-          const decoded = getTransactionDecoder().decode(signedBytes);
-          signature = getSignatureFromTransaction(decoded);
-        } catch {
-          signature = '(signature extraction failed — but bytes round-trip succeeded)';
-        }
-      } else {
-        throw new Error('Unexpected signed transaction type: ' + typeof signedBytes);
+      const signedBase64 = btoa(String.fromCharCode(...signedTransaction));
+      let signature: string;
+      try {
+        const decoded = getTransactionDecoder().decode(signedTransaction);
+        signature = getSignatureFromTransaction(decoded);
+      } catch {
+        signature = '(signature extraction failed — but bytes round-trip succeeded)';
       }
 
       setState((prev) => ({
@@ -309,7 +323,7 @@ function SpikeWalletInner() {
           disabled={!account || state.signingInProgress}
           onPress={() => void handleSignTest()}
         >
-          <Text style={styles.buttonText}>{state.signingInProgress ? 'Signing...' : 'Sign Devnet No-op Tx (bytes round-trip)'}</Text>
+          <Text style={styles.buttonText}>{state.signingInProgress ? 'Signing...' : 'Sign Devnet Memo Tx (bytes round-trip)'}</Text>
         </Pressable>
 
         <Pressable
