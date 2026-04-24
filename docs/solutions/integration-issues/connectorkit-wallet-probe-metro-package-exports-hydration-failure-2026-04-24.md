@@ -146,6 +146,17 @@ rg "import\.meta" apps/app/dist/_expo/static/js/web
 - For wallet integration probes, render explicit hydration state and browser-only values in debug JSON.
 - Treat server-rendered Node values in browser diagnostics as a hydration failure until proven otherwise.
 
+## Production Reuse
+
+The targeted resolver pattern from this spike was applied to the real `BrowserWalletProvider` integration. When `connectorKitAdapter.web.ts` imports `@solana/connector/react`, Metro hits the same package-exports subpath resolution gap. The fix is the same pattern: intercept `@solana/connector/*` imports in `metro.config.js` and map them to the correct dist file for the target platform.
+
+The resolver in `apps/app/metro.config.js` now handles both:
+
+1. `@solana/connector/react`, `@solana/connector/headless`, etc. — mapped to `dist/<subpath>.mjs` (web) or `dist/<subpath>.js` (native)
+2. The existing `.js` extension fallback for bare specifier resolution
+
+No `import.meta` references appear in the connector dist, so the Zustand hydration concern does not apply here.
+
 ## Related Issues
 
 - Adjacent wallet WebView runtime failure: `docs/solutions/integration-issues/phantom-webview-expo-router-navigation-silent-failure-2026-04-15.md`

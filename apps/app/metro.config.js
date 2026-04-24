@@ -18,7 +18,35 @@ config.resolver.nodeModulesPaths = [
 
 config.resolver.sourceExts = ['ts', 'tsx', 'js', 'jsx', 'json', 'cjs', 'mjs'];
 
+const connectorsPackageRoot = path.resolve(
+  path.dirname(
+    require.resolve('@solana/connector', {
+      paths: [projectRoot, workspaceRoot],
+    }),
+  ),
+  '..',
+);
+
+function resolveConnectorSubpath(subpath, platform) {
+  const fileName =
+    platform === 'web'
+      ? `${subpath}.mjs`
+      : platform === 'ios' || platform === 'android'
+        ? `${subpath}.js`
+        : `${subpath}.js`;
+
+  return {
+    type: 'sourceFile',
+    filePath: path.join(connectorsPackageRoot, 'dist', fileName),
+  };
+}
+
 config.resolver.resolveRequest = (context, moduleName, platform) => {
+  if (moduleName.startsWith('@solana/connector/')) {
+    const subpath = moduleName.replace('@solana/connector/', '');
+    return resolveConnectorSubpath(subpath, platform);
+  }
+
   if ((moduleName.startsWith('.') || moduleName.startsWith('/')) && moduleName.endsWith('.js')) {
     const extensionlessName = moduleName.replace(/\.js$/, '');
 
