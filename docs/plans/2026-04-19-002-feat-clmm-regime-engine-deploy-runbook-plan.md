@@ -712,3 +712,22 @@ Running end-of-plan verification (covers all file changes Tasks 1–5 and 9–10
   - `apps/app/.env.example` — public env surface.
 - **Existing deploy context:**
   - `docs/superpowers/plans/2026-04-11-deployment-web-solana-dapp-store.md` — baseline CLMM Railway deploy topology (`clmm.v2.app` + `api.clmm.v2.app`).
+
+## Verification Log
+
+### 2026-04-23 — Unit 6 CLMM-side E2E pass
+
+- Operator: Gary
+- CLMM API Railway deploy ID: c238c3af-6cd4-4c70-ae50-76f521100f1d
+- CLMM Worker Railway deploy ID: adb874b8-899b-4c63-8e7e-901223cc1f4e
+- Regime-engine public URL: https://regime-engine-production-04a8.up.railway.app
+- SR read before seed (Step 1): 404
+- SR ingest (Step 2): 201, insertedCount=4
+- SR read after seed (Step 3): 200, 2 supports + 2 resistances, sorted ASC
+- PWA renders SR section (Step 4): confirmed
+- Terminal-event first POST (Step 5): 200
+- Terminal-event replay POST (Step 5): 200 with `idempotent: true`
+- Live breach → confirmed attempt (Step 6): correlation_id=1776994675427-7
+- Terminal event landed in regime-engine (Step 7): confirmed via `clmm_execution_events` SQLite query
+- No regime-engine error logs (Step 8): clean — first-attempt success, no secret visible in CLMM API log stream
+- G3 and G4 gates closed.

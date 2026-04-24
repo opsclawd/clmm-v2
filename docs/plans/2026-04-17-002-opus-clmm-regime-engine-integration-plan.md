@@ -453,10 +453,10 @@ E2E (one manual run, no CI automation):
 
 **Hard stop:** if G1 or G2 misses by end of Sun W1, shelf the project. Do not extend into weekday time. Pronghorn starts Monday regardless. If G3 or G4 slip, ship code-done without live deployment — G5 can wait 2-4 weeks.
 
-### Gate status — CLMM side (2026-04-19)
+### Gate status — CLMM side (2026-04-23)
 
-- G3 (CLMM): **Pending** — operator must execute Task 7 (Railway cross-service wiring) in `docs/plans/2026-04-19-002-feat-clmm-regime-engine-deploy-runbook-plan.md` §5. Evidence: all 9 checklist steps marked; `/health` green; private-network reach confirmed or public-URL fallback recorded.
-- G4 (CLMM): **Pending** — operator must execute Task 8 (E2E verification) in `docs/plans/2026-04-19-002-feat-clmm-regime-engine-deploy-runbook-plan.md` §5, then append timestamped results to §Verification Log. Gate closes only when concrete evidence is committed.
+- G3 (CLMM): **Closed** — Railway cross-service wiring complete. CLMM API (c238c3af-6cd4-4c70-ae50-76f521100f1d) + Worker (adb874b8-899b-4c63-8e7e-901223cc1f4e) configured with `REGIME_ENGINE_BASE_URL` and `REGIME_ENGINE_INTERNAL_TOKEN`. `/health` green on all services. Regime-engine public URL fallback: `https://regime-engine-production-04a8.up.railway.app`. See `docs/plans/2026-04-19-002-feat-clmm-regime-engine-deploy-runbook-plan.md` Task 7.
+- G4 (CLMM): **Closed** — One-shot E2E pass completed 2026-04-23. All 8 verification steps passed: SR ingest/read, PWA enrichment, manual event POST + idempotent replay, live breach (correlation_id=1776994675427-7) confirmed in regime-engine `clmm_execution_events`, no secret leak in CLMM API logs. See `docs/plans/2026-04-19-002-feat-clmm-regime-engine-deploy-runbook-plan.md` §Verification Log.
 - G5: unowned by this plan; operator-gated on live-wallet funding.
 
 Budget by unit: U1 2h · U2 2.5h · U3 2h · U4 3h · U5 3h · U6 2.5h + 0.5h buffer = 15.5h.
