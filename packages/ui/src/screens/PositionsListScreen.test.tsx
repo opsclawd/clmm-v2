@@ -80,13 +80,15 @@ describe('PositionsListScreen', () => {
         positions={[
           makePosition({ rangeState: 'in-range' }),
           makePosition({ positionId: brand('position-2'), rangeState: 'below-range' }),
-          makePosition({ positionId: brand('position-3'), rangeState: 'above-range', hasActionableTrigger: true }),
+          makePosition({ positionId: brand('position-3'), rangeState: 'above-range' }),
+          makePosition({ positionId: brand('position-4'), rangeState: 'above-range', hasActionableTrigger: true }),
         ]}
       />,
     );
 
     expect(screen.getByText('In range')).toBeTruthy();
-    expect(screen.getByText('Near edge')).toBeTruthy();
+    expect(screen.getByText('Below range')).toBeTruthy();
+    expect(screen.getByText('Above range')).toBeTruthy();
     expect(screen.getByText('Breach')).toBeTruthy();
   });
 

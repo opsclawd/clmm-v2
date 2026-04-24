@@ -17,7 +17,13 @@ function getChipProps(rangeStatusKind: string, hasAlert: boolean): { tone: 'safe
   if (rangeStatusKind === 'in-range') {
     return { tone: 'safe', label: 'In range' };
   }
-  return { tone: 'warn', label: 'Near edge' };
+  if (rangeStatusKind === 'below-range') {
+    return { tone: 'warn', label: 'Below range' };
+  }
+  if (rangeStatusKind === 'above-range') {
+    return { tone: 'warn', label: 'Above range' };
+  }
+  return { tone: 'warn', label: 'Unknown' };
 }
 
 function getMonitoringColor(status: string): string {

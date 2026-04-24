@@ -1,4 +1,4 @@
-import { View, Text, ScrollView, ActivityIndicator } from 'react-native';
+import { View, Text, ScrollView, ActivityIndicator, FlatList } from 'react-native';
 import type { PositionSummaryDto } from '@clmm/application/public';
 import { colors, typography } from '../design-system/index.js';
 import { buildPositionListViewModel } from '../view-models/PositionListViewModel.js';
@@ -152,16 +152,21 @@ function ConnectedPositionsList({
         title="Active positions"
         meta={`${positions.length} monitored`}
       />
-      {viewModel.items.map((item) => (
-        <PositionCard
-          key={item.positionId}
-          poolLabel={item.poolLabel}
-          rangeStatusKind={item.rangeStatusKind}
-          hasAlert={item.hasAlert}
-          monitoringLabel={item.monitoringLabel}
-          onPress={() => onSelectPosition?.(item.positionId)}
-        />
-      ))}
+      <FlatList
+        data={viewModel.items}
+        keyExtractor={(item) => item.positionId}
+        removeClippedSubviews={false}
+        scrollEnabled={false}
+        renderItem={({ item }) => (
+          <PositionCard
+            poolLabel={item.poolLabel}
+            rangeStatusKind={item.rangeStatusKind}
+            hasAlert={item.hasAlert}
+            monitoringLabel={item.monitoringLabel}
+            onPress={() => onSelectPosition?.(item.positionId)}
+          />
+        )}
+      />
     </>
   );
 }
