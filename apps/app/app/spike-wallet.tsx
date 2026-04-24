@@ -5,8 +5,13 @@
 
 import { useCallback, useEffect, useState } from 'react';
 import { ScrollView, Text, View, StyleSheet, Pressable } from 'react-native';
-import { getDefaultConfig, getDefaultMobileConfig } from '@solana/connector/headless';
-import { AppProvider, useConnector } from '@solana/connector/react';
+import {
+  getDefaultConfig,
+  getDefaultMobileConfig,
+  AppProvider,
+  useConnector,
+  getWalletsRegistry,
+} from '@solana/connector';
 import type { ViewStyle, TextStyle } from 'react-native';
 
 type SpikeState = {
@@ -180,7 +185,7 @@ function SpikeWalletInner() {
       const unsignedBytes = Uint8Array.from(atob(unsignedBase64), (c) => c.charCodeAt(0));
 
       // Get the connected wallet from Wallet Standard registry
-      const { getWalletsRegistry } = await import('@solana/connector/headless');
+      // getWalletsRegistry is already imported at the top from @solana/connector
       const registry = getWalletsRegistry();
       const wallets = registry.get();
       const wallet = wallets.find((w: any) => {
