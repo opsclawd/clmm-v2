@@ -1,5 +1,5 @@
 import { View, Text } from 'react-native';
-import { colors } from '../design-system/index.js';
+import { colors, typography } from '../design-system/index.js';
 
 export type ChipTone = 'safe' | 'warn' | 'breach';
 
@@ -50,15 +50,20 @@ export function Chip({ tone, children }: Props): JSX.Element {
           height: 6,
           borderRadius: 999,
           backgroundColor: style.dot,
-          ...(style.glow ? { boxShadow: style.glow } : {}),
+          ...(style.glow ? {
+            shadowColor: style.dot,
+            shadowOffset: { width: 0, height: 0 },
+            shadowOpacity: 0.5,
+            shadowRadius: 4,
+          } : {}),
         }}
       />
       <Text
         style={{
           color: style.text,
-          fontSize: 11,
-          fontWeight: '600',
-          letterSpacing: 0.02 * 11,
+          fontSize: typography.fontSize.micro,
+          fontWeight: typography.fontWeight.semibold,
+          letterSpacing: 0.02 * typography.fontSize.micro,
         }}
       >
         {children}
