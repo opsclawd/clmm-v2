@@ -27,7 +27,11 @@ function detectFallbackState(
   platformCapabilities: PlatformCapabilityState | null,
   connectError: Error | null,
 ): FallbackState {
-  if (Platform.OS === 'web' && typeof navigator !== 'undefined' && isSocialAppWebView(navigator.userAgent)) {
+  if (Platform.OS !== 'web') {
+    return 'none';
+  }
+
+  if (typeof navigator !== 'undefined' && isSocialAppWebView(navigator.userAgent)) {
     return 'social-webview';
   }
 
@@ -35,9 +39,7 @@ function detectFallbackState(
   const connectThrewNoWallet = connectError?.message === NO_WALLET_MESSAGE;
 
   if (noWalletDetected || connectThrewNoWallet) {
-    const isMobile = Platform.OS === 'web'
-      ? /Mobi|Android/i.test(typeof navigator !== 'undefined' ? navigator.userAgent : '')
-      : false;
+    const isMobile = /Mobi|Android/i.test(typeof navigator !== 'undefined' ? navigator.userAgent : '');
     if (isMobile) {
       return 'wallet-fallback';
     }
