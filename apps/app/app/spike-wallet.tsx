@@ -3,7 +3,7 @@ import { View, Text, StyleSheet } from 'react-native';
 export default function SpikeWalletRoute() {
   return (
     <View style={styles.container}>
-      <Text style={styles.text}>ConnectorKit Wallet Spike — web-only</Text>
+      <Text style={styles.text}>ConnectorKit Wallet Spike - web-only</Text>
       <Text style={styles.subtext}>Open this route in a browser to test wallet discovery and signing.</Text>
     </View>
   );

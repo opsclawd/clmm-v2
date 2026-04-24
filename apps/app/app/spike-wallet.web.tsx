@@ -51,8 +51,8 @@ const MEMO_PROGRAM_ADDRESS = 'MemoSq4gqABAXKb96qnH8TysNcWxMyWCqXgDLGmfcHr';
 
 function SpikeWalletInner() {
   const [state, setState] = useState<SpikeState>({
-    platform: typeof navigator !== 'undefined' ? navigator.platform : 'unknown',
-    userAgent: typeof navigator !== 'undefined' ? navigator.userAgent : 'unknown',
+    platform: 'pending client hydration',
+    userAgent: 'pending client hydration',
     hasPhantomInjected: false,
     connectors: [],
     connectedAddress: null,
@@ -79,17 +79,38 @@ function SpikeWalletInner() {
 
   useEffect(() => {
     const win = typeof window !== 'undefined' ? (window as unknown as Record<string, unknown>) : {};
+    const nav = typeof navigator !== 'undefined' ? navigator : undefined;
     const phantomObj = win['phantom'] as Record<string, unknown> | undefined;
-    const hasPhantom = !!(phantomObj && typeof phantomObj['solana'] === 'object');
+    const solanaObj = win['solana'];
+    const hasPhantom = !!(
+      (phantomObj && typeof phantomObj['solana'] === 'object') ||
+      (solanaObj && typeof solanaObj === 'object')
+    );
+    let registryWallets: readonly Wallet[] = [];
+
+    try {
+      registryWallets = getWalletsRegistry().get();
+    } catch {
+      registryWallets = [];
+    }
 
     setState((prev) => ({
       ...prev,
+      platform: nav?.platform ?? 'unknown',
+      userAgent: nav?.userAgent ?? 'unknown',
       hasPhantomInjected: hasPhantom,
       connectors: connectors.map((c) => ({ id: c.id, name: c.name, ready: c.ready, chains: c.chains })),
       connectedAddress: account ?? null,
       debugJson: JSON.stringify(
         {
+          hydrated: true,
+          secureContext: typeof window !== 'undefined' ? window.isSecureContext : false,
           connectors: connectors.map((c) => ({ id: c.id, name: c.name, ready: c.ready, chains: c.chains })),
+          registryWallets: registryWallets.map((w) => ({
+            name: w.name,
+            accounts: w.accounts.map((a) => a.address),
+            features: Object.keys(w.features as Readonly<Record<string, unknown>>),
+          })),
           connected: isConnected,
           account,
           hasPhantomInjected: hasPhantom,

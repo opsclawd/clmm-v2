@@ -7,6 +7,21 @@ const workspaceRoot = path.resolve(projectRoot, '../..');
 
 const config = getDefaultConfig(projectRoot);
 
+function resolveSolanaKitProgramClientCore(platform) {
+  const kitDistRoot = path.dirname(require.resolve('@solana/kit', { paths: [projectRoot, workspaceRoot] }));
+  const fileName =
+    platform === 'web'
+      ? 'program-client-core.browser.mjs'
+      : platform === 'ios' || platform === 'android'
+        ? 'program-client-core.native.mjs'
+        : 'program-client-core.node.mjs';
+
+  return {
+    type: 'sourceFile',
+    filePath: path.join(kitDistRoot, fileName),
+  };
+}
+
 // Watch all packages in the monorepo
 config.watchFolders = [workspaceRoot];
 
@@ -18,9 +33,11 @@ config.resolver.nodeModulesPaths = [
 
 config.resolver.sourceExts = ['ts', 'tsx', 'js', 'jsx', 'json', 'cjs', 'mjs'];
 
-config.resolver.unstable_enablePackageExports = true;
-
 config.resolver.resolveRequest = (context, moduleName, platform) => {
+  if (moduleName === '@solana/kit/program-client-core') {
+    return resolveSolanaKitProgramClientCore(platform);
+  }
+
   if ((moduleName.startsWith('.') || moduleName.startsWith('/')) && moduleName.endsWith('.js')) {
     const extensionlessName = moduleName.replace(/\.js$/, '');
 
