@@ -44,6 +44,7 @@
     "@clmm/adapters": "workspace:*",
     "@clmm/config": "workspace:*",
     "@solana/connector-debugger": "^0.1.1",
+    "@testing-library/react": "^16.3.0",
     "@types/react": "~18.3.1",
     "@wallet-standard/base": "1.1.0",
     "jsdom": "^25.0.1",
