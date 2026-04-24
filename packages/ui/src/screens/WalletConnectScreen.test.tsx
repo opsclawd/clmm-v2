@@ -2,6 +2,7 @@ import React from 'react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { cleanup, fireEvent, render, screen } from '@testing-library/react';
 import { WalletConnectScreen } from './WalletConnectScreen.js';
+import type { PlatformCapabilities } from '../components/DegradedCapabilityBannerUtils.js';
 
 vi.mock('@expo/vector-icons/Feather', () => ({
   default: function MockFeather({ name, size, color }: { name: string; size: number; color: string }) {
@@ -10,7 +11,7 @@ vi.mock('@expo/vector-icons/Feather', () => ({
   glyphMap: {},
 }));
 
-function makeCaps(overrides: Record<string, unknown> = {}) {
+function makeCaps(overrides: Partial<PlatformCapabilities> = {}) {
   return {
     nativePushAvailable: false,
     browserNotificationAvailable: false,
@@ -28,7 +29,7 @@ afterEach(() => {
 describe('WalletConnectScreen', () => {
   it('renders loading spinner when platformCapabilities is null', () => {
     render(<WalletConnectScreen />);
-    expect(document.querySelector('div[role="progressbar"]')).toBeTruthy();
+    expect(screen.getByRole('progressbar')).toBeTruthy();
   });
 
   it('renders title and subtitle', () => {
@@ -56,8 +57,12 @@ describe('WalletConnectScreen', () => {
         onGoBack={onGoBack}
       />,
     );
-    const backButton = document.querySelector('[data-name="chevron-left"]');
-    expect(backButton).toBeTruthy();
+    expect(screen.getByLabelText('Back')).toBeTruthy();
+  });
+
+  it('does not render back button when onGoBack is omitted', () => {
+    render(<WalletConnectScreen platformCapabilities={makeCaps()} />);
+    expect(screen.queryByLabelText('Back')).toBeNull();
   });
 
   it('calls onGoBack when back button is pressed', () => {
@@ -68,10 +73,7 @@ describe('WalletConnectScreen', () => {
         onGoBack={onGoBack}
       />,
     );
-    const backButton = document.querySelector('[data-name="chevron-left"]');
-    if (backButton) {
-      fireEvent.click(backButton);
-    }
+    fireEvent.click(screen.getByLabelText('Back'));
     expect(onGoBack).toHaveBeenCalled();
   });
 
@@ -128,6 +130,26 @@ describe('WalletConnectScreen', () => {
       />,
     );
     expect(screen.getByText('Wallet Connected')).toBeTruthy();
+  });
+
+  it('renders outcome banner for cancelled connection', () => {
+    render(
+      <WalletConnectScreen
+        platformCapabilities={makeCaps()}
+        connectionOutcome={{ kind: 'cancelled' }}
+      />,
+    );
+    expect(screen.getByText('Connection Cancelled')).toBeTruthy();
+  });
+
+  it('renders outcome banner for interrupted connection', () => {
+    render(
+      <WalletConnectScreen
+        platformCapabilities={makeCaps()}
+        connectionOutcome={{ kind: 'interrupted' }}
+      />,
+    );
+    expect(screen.getByText('Connection Interrupted')).toBeTruthy();
   });
 
   it('renders platform notice when no wallet is available', () => {

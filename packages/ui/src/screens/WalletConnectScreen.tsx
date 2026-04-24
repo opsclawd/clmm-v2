@@ -130,7 +130,7 @@ export function WalletConnectScreen({
         contentContainerStyle={styles.contentContainer}
       >
         {onGoBack ? (
-          <TouchableOpacity onPress={onGoBack} style={styles.backButton}>
+          <TouchableOpacity onPress={onGoBack} style={styles.backButton} accessibilityLabel="Back">
             <Icon name="chevronLeft" size={20} color={colors.textBody} />
           </TouchableOpacity>
         ) : null}
