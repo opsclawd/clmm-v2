@@ -219,6 +219,8 @@ export default function ConnectRoute() {
   }
 
   function renderBrowserWalletSection() {
+    if (Platform.OS !== 'web') return null;
+
     switch (discoveryState) {
       case 'discovering':
         return (
