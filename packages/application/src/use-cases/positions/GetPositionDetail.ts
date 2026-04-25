@@ -17,6 +17,8 @@ export async function getPositionDetail(params: {
   if (!detail) return { kind: 'not-found' };
 
   const { position, poolData, fees, positionLiquidity } = detail;
+  const { decimalsA, decimalsB } = poolData.tokenPair;
+  const decimalsKnown = decimalsA !== null && decimalsB !== null;
 
   const priceMap = new Map<string, { usdValue: number; symbol: string }>();
   try {
@@ -31,7 +33,10 @@ export async function getPositionDetail(params: {
     // Price fetch failed — degrade gracefully
   }
 
-  const currentPrice = priceFromSqrtPrice(poolData.sqrtPrice, poolData.tokenPair.decimalsA, poolData.tokenPair.decimalsB);
+  const currentPrice = decimalsKnown
+    ? priceFromSqrtPrice(poolData.sqrtPrice, decimalsA, decimalsB)
+    : position.rangeState.currentPrice;
+
   const distance = rangeDistancePercent(
     position.rangeState.currentPrice,
     position.bounds.lowerBound,
@@ -43,16 +48,16 @@ export async function getPositionDetail(params: {
 
   const feeOwedA: TokenAmountValue = {
     raw: fees.feeOwedA.toString(),
-    decimals: poolData.tokenPair.decimalsA,
+    decimals: decimalsA ?? 0,
     symbol: poolData.tokenPair.symbolA,
-    usdValue: priceA ? tokenAmountToUsd(fees.feeOwedA, poolData.tokenPair.decimalsA, priceA.usdValue) : 0,
+    usdValue: (decimalsA && priceA) ? tokenAmountToUsd(fees.feeOwedA, decimalsA, priceA.usdValue) : 0,
   };
 
   const feeOwedB: TokenAmountValue = {
     raw: fees.feeOwedB.toString(),
-    decimals: poolData.tokenPair.decimalsB,
+    decimals: decimalsB ?? 0,
     symbol: poolData.tokenPair.symbolB,
-    usdValue: priceB ? tokenAmountToUsd(fees.feeOwedB, poolData.tokenPair.decimalsB, priceB.usdValue) : 0,
+    usdValue: (decimalsB && priceB) ? tokenAmountToUsd(fees.feeOwedB, decimalsB, priceB.usdValue) : 0,
   };
 
   const totalFeesUsd = feeOwedA.usdValue + feeOwedB.usdValue;
@@ -62,22 +67,32 @@ export async function getPositionDetail(params: {
     return {
       mint: r.mint,
       amount: r.amountOwed.toString(),
-      decimals: r.decimals,
+      decimals: r.decimals ?? 0,
       symbol: rPrice?.symbol ?? r.mint,
-      usdValue: rPrice ? tokenAmountToUsd(r.amountOwed, r.decimals, rPrice.usdValue) : 0,
+      usdValue: (r.decimals && rPrice) ? tokenAmountToUsd(r.amountOwed, r.decimals, rPrice.usdValue) : 0,
     };
   });
 
   const totalRewardsUsd = rewardValues.reduce((sum, r) => sum + r.usdValue, 0);
 
-  const poolDepthLabel = 'depth unavailable';
+  const currentPriceLabel = decimalsKnown
+    ? `$${currentPrice.toFixed(2)}`
+    : `tick: ${position.rangeState.currentPrice}`;
+
+  const lowerBoundLabel = decimalsKnown
+    ? `$${tickToPrice(position.bounds.lowerBound, decimalsA, decimalsB).toFixed(2)}`
+    : `tick ${position.bounds.lowerBound}`;
+
+  const upperBoundLabel = decimalsKnown
+    ? `$${tickToPrice(position.bounds.upperBound, decimalsA, decimalsB).toFixed(2)}`
+    : `tick ${position.bounds.upperBound}`;
 
   const detailDto: PositionDetailDto = {
     positionId: position.positionId,
     poolId: position.poolId,
     tokenPairLabel: `${poolData.tokenPair.symbolA} / ${poolData.tokenPair.symbolB}`,
     currentPrice,
-    currentPriceLabel: `$${currentPrice.toFixed(2)}`,
+    currentPriceLabel,
     feeRateLabel: `${poolData.feeRate} bps`,
     rangeState: position.rangeState.kind,
     rangeDistance: {
@@ -88,8 +103,8 @@ export async function getPositionDetail(params: {
     monitoringStatus: position.monitoringReadiness.kind,
     lowerBound: position.bounds.lowerBound,
     upperBound: position.bounds.upperBound,
-    lowerBoundLabel: `$${tickToPrice(position.bounds.lowerBound, poolData.tokenPair.decimalsA, poolData.tokenPair.decimalsB).toFixed(2)}`,
-    upperBoundLabel: `$${tickToPrice(position.bounds.upperBound, poolData.tokenPair.decimalsA, poolData.tokenPair.decimalsB).toFixed(2)}`,
+    lowerBoundLabel,
+    upperBoundLabel,
     sqrtPrice: poolData.sqrtPrice.toString(),
     unclaimedFees: {
       feeOwedA,
@@ -102,7 +117,7 @@ export async function getPositionDetail(params: {
     },
     positionLiquidity: positionLiquidity.toString(),
     poolLiquidity: poolData.liquidity.toString(),
-    poolDepthLabel,
+    poolDepthLabel: 'depth unavailable',
   };
 
   return { kind: 'found', position, detailDto };

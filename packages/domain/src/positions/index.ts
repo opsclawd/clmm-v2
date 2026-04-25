@@ -43,8 +43,8 @@ export type TokenPair = {
   readonly mintB: string;
   readonly symbolA: string;
   readonly symbolB: string;
-  readonly decimalsA: number;
-  readonly decimalsB: number;
+  readonly decimalsA: number | null;
+  readonly decimalsB: number | null;
 };
 
 export type PoolData = {
@@ -66,7 +66,7 @@ export type PositionFees = {
 export type PositionRewardInfo = {
   readonly mint: string;
   readonly amountOwed: bigint;
-  readonly decimals: number;
+  readonly decimals: number | null;
 };
 
 export type PositionDetail = {

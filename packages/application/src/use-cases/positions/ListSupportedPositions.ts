@@ -1,4 +1,4 @@
-import type { SupportedPositionReadPort, PricePort } from '../../ports/index.js';
+import type { SupportedPositionReadPort } from '../../ports/index.js';
 import type { WalletId, LiquidityPosition, PoolId } from '@clmm/domain';
 import type { PositionSummaryDto } from '../../dto/index.js';
 import { priceFromSqrtPrice, rangeDistancePercent } from '@clmm/domain';
@@ -11,7 +11,6 @@ export type ListSupportedPositionsResult = {
 export async function listSupportedPositions(params: {
   walletId: WalletId;
   positionReadPort: SupportedPositionReadPort;
-  pricePort: PricePort;
 }): Promise<ListSupportedPositionsResult> {
   const positions = await params.positionReadPort.listSupportedPositions(params.walletId);
 
@@ -23,24 +22,11 @@ export async function listSupportedPositions(params: {
     if (poolData) poolDataMap.set(poolId, poolData);
   }));
 
-  const priceMap = new Map<string, { usdValue: number; symbol: string }>();
-  try {
-    const allMints = [...poolDataMap.values()].flatMap((pd) =>
-      pd ? [pd.tokenPair.mintA, pd.tokenPair.mintB] : [],
-    );
-    if (allMints.length > 0) {
-      const quotes = await params.pricePort.getPrices([...new Set(allMints)]);
-      for (const q of quotes) {
-        priceMap.set(q.tokenMint, { usdValue: q.usdValue, symbol: q.symbol });
-      }
-    }
-  } catch {
-    // Price fetch failed — degrade gracefully
-  }
-
   const summaryDtos: PositionSummaryDto[] = positions.map((p) => {
     const poolData = poolDataMap.get(p.poolId);
-    const currentPrice = poolData
+    const decimalsKnown = poolData && poolData.tokenPair.decimalsA !== null && poolData.tokenPair.decimalsB !== null;
+
+    const currentPrice = (poolData && decimalsKnown)
       ? priceFromSqrtPrice(poolData.sqrtPrice, poolData.tokenPair.decimalsA, poolData.tokenPair.decimalsB)
       : p.rangeState.currentPrice;
 
@@ -55,7 +41,9 @@ export async function listSupportedPositions(params: {
       poolId: p.poolId,
       tokenPairLabel: poolData ? `${poolData.tokenPair.symbolA} / ${poolData.tokenPair.symbolB}` : `Pool ${p.poolId}`,
       currentPrice,
-      currentPriceLabel: poolData ? `$${currentPrice.toFixed(2)}` : `tick: ${p.rangeState.currentPrice}`,
+      currentPriceLabel: (poolData && decimalsKnown)
+        ? `$${currentPrice.toFixed(2)}`
+        : `tick: ${p.rangeState.currentPrice}`,
       feeRateLabel: poolData ? `${poolData.feeRate} bps` : '',
       rangeState: p.rangeState.kind,
       rangeDistance: {

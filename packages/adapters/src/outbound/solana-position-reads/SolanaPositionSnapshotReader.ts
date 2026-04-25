@@ -174,8 +174,8 @@ export class SolanaPositionSnapshotReader {
           mintB,
           symbolA: knownA?.symbol ?? mintA,
           symbolB: knownB?.symbol ?? mintB,
-          decimalsA: knownA?.decimals ?? 0,
-          decimalsB: knownB?.decimals ?? 0,
+          decimalsA: knownA?.decimals ?? null,
+          decimalsB: knownB?.decimals ?? null,
         },
         sqrtPrice: w.sqrtPrice,
         feeRate: w.feeRate,
@@ -191,7 +191,7 @@ export class SolanaPositionSnapshotReader {
         return {
           mint: rewardMint,
           amountOwed: ri.amountOwed,
-          decimals: known?.decimals ?? 0,
+          decimals: known?.decimals ?? null,
         };
       });
 

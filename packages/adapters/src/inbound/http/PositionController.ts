@@ -136,7 +136,6 @@ export class PositionController {
       const result = await listSupportedPositions({
         walletId: wallet,
         positionReadPort: this.positionReadPort,
-        pricePort: this.pricePort,
       });
       summaryDtos = result.summaryDtos;
     } catch (error: unknown) {
