@@ -117,7 +117,7 @@ describe('JupiterPriceAdapter', () => {
   });
 
   it('sends x-api-key header when apiKey is provided', async () => {
-    const fetchSpy = vi.fn((_input: RequestInfo | URL, init?: RequestInit) => {
+    const fetchSpy = vi.fn((_input: RequestInfo | URL, _init?: RequestInit) => {
       return jsonRes({
         data: {
           [SOL_MINT]: { id: SOL_MINT, symbol: 'SOL', price: 150.5 },
@@ -129,7 +129,7 @@ describe('JupiterPriceAdapter', () => {
     const adapter = new JupiterPriceAdapter({ apiKey: 'test-key' });
     await adapter.getPrices([SOL_MINT]);
 
-    const init = fetchSpy.mock.calls[0]![1] as RequestInit | undefined;
+    const init = fetchSpy.mock.calls[0]![1];
     expect((init?.headers as Record<string, string>)['x-api-key']).toBe('test-key');
   });
 

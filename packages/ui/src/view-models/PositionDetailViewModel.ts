@@ -67,7 +67,8 @@ function toSrLevelsViewModelBlock(
   return { supportsSorted, resistancesSorted, freshnessLabel, isStale };
 }
 
-function formatTokenAmount(raw: string, decimals: number, symbol: string): string {
+function formatTokenAmount(raw: string, decimals: number | null, symbol: string): string {
+  if (decimals === null) return `${raw} (unknown decimals) ${symbol}`;
   const humanReadable = Number(raw) / 10 ** decimals;
   return `${humanReadable.toFixed(decimals > 2 ? 4 : 2)} ${symbol}`;
 }

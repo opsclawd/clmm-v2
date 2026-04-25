@@ -48,14 +48,14 @@ export async function getPositionDetail(params: {
 
   const feeOwedA: TokenAmountValue = {
     raw: fees.feeOwedA.toString(),
-    decimals: decimalsA ?? 0,
+    decimals: decimalsA,
     symbol: poolData.tokenPair.symbolA,
     usdValue: (decimalsA && priceA) ? tokenAmountToUsd(fees.feeOwedA, decimalsA, priceA.usdValue) : 0,
   };
 
   const feeOwedB: TokenAmountValue = {
     raw: fees.feeOwedB.toString(),
-    decimals: decimalsB ?? 0,
+    decimals: decimalsB,
     symbol: poolData.tokenPair.symbolB,
     usdValue: (decimalsB && priceB) ? tokenAmountToUsd(fees.feeOwedB, decimalsB, priceB.usdValue) : 0,
   };
@@ -67,7 +67,7 @@ export async function getPositionDetail(params: {
     return {
       mint: r.mint,
       amount: r.amountOwed.toString(),
-      decimals: r.decimals ?? 0,
+      decimals: r.decimals,
       symbol: rPrice?.symbol ?? r.mint,
       usdValue: (r.decimals && rPrice) ? tokenAmountToUsd(r.amountOwed, r.decimals, rPrice.usdValue) : 0,
     };

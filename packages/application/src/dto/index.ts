@@ -51,7 +51,7 @@ export type PositionSummaryDto = {
 
 export type TokenAmountValue = {
   raw: string;
-  decimals: number;
+  decimals: number | null;
   symbol: string;
   usdValue: number;
 };
@@ -59,7 +59,7 @@ export type TokenAmountValue = {
 export type RewardAmountValue = {
   mint: string;
   amount: string;
-  decimals: number;
+  decimals: number | null;
   symbol: string;
   usdValue: number;
 };
