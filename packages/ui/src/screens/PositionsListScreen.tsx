@@ -1,4 +1,4 @@
-import { View, Text, ScrollView, ActivityIndicator, FlatList } from 'react-native';
+import { View, Text, FlatList, ActivityIndicator } from 'react-native';
 import type { PositionSummaryDto } from '@clmm/application/public';
 import { colors, typography } from '../design-system/index.js';
 import { buildPositionListViewModel } from '../view-models/PositionListViewModel.js';
@@ -32,24 +32,22 @@ export function PositionsListScreen({
 
   return (
     <View style={{ flex: 1, backgroundColor: colors.appBackground }}>
-      <ScrollView contentContainerStyle={{ flexGrow: 1 }}>
-        <DegradedCapabilityBanner capabilities={platformCapabilities} />
+      <DegradedCapabilityBanner capabilities={platformCapabilities} />
 
-        {!isConnected ? (
-          <ConnectWalletEntry {...(onConnectWallet != null ? { onConnectWallet } : {})} />
-        ) : positionsLoading ? (
-          <LoadingState />
-        ) : positionsError && !hasPositions ? (
-          <ErrorState error={positionsError} />
-        ) : hasPositions ? (
-          <ConnectedPositionsList
-            positions={positions ?? []}
-            {...(onSelectPosition != null ? { onSelectPosition } : {})}
-          />
-        ) : (
-          <EmptyState />
-        )}
-      </ScrollView>
+      {!isConnected ? (
+        <ConnectWalletEntry {...(onConnectWallet != null ? { onConnectWallet } : {})} />
+      ) : positionsLoading ? (
+        <LoadingState />
+      ) : positionsError && !hasPositions ? (
+        <ErrorState error={positionsError} />
+      ) : hasPositions ? (
+        <ConnectedPositionsList
+          positions={positions ?? []}
+          {...(onSelectPosition != null ? { onSelectPosition } : {})}
+        />
+      ) : (
+        <EmptyState />
+      )}
     </View>
   );
 }
@@ -147,26 +145,26 @@ function ConnectedPositionsList({
   const viewModel = buildPositionListViewModel(positions);
 
   return (
-    <>
-      <SectionHeader
-        title="Active positions"
-        meta={`${positions.length} monitored`}
-      />
-      <FlatList
-        data={viewModel.items}
-        keyExtractor={(item) => item.positionId}
-        removeClippedSubviews={false}
-        scrollEnabled={false}
-        renderItem={({ item }) => (
-          <PositionCard
-            poolLabel={item.poolLabel}
-            rangeStatusKind={item.rangeStatusKind}
-            hasAlert={item.hasAlert}
-            monitoringLabel={item.monitoringLabel}
-            onPress={() => onSelectPosition?.(item.positionId)}
-          />
-        )}
-      />
-    </>
+    <FlatList
+      contentContainerStyle={{ flexGrow: 1 }}
+      data={viewModel.items}
+      keyExtractor={(item) => item.positionId}
+      removeClippedSubviews={false}
+      ListHeaderComponent={
+        <SectionHeader
+          title="Active positions"
+          meta={`${positions.length} monitored`}
+        />
+      }
+      renderItem={({ item }) => (
+        <PositionCard
+          poolLabel={item.poolLabel}
+          rangeStatusKind={item.rangeStatusKind}
+          hasAlert={item.hasAlert}
+          monitoringLabel={item.monitoringLabel}
+          onPress={() => onSelectPosition?.(item.positionId)}
+        />
+      )}
+    />
   );
 }
