@@ -1,7 +1,7 @@
 import type { SupportedPositionReadPort, PricePort } from '../../ports/index.js';
 import type { PositionId, WalletId, LiquidityPosition } from '@clmm/domain';
 import type { PositionDetailDto, TokenAmountValue, RewardAmountValue } from '../../dto/index.js';
-import { priceFromSqrtPrice, rangeDistancePercent, tokenAmountToUsd } from '@clmm/domain';
+import { priceFromSqrtPrice, rangeDistancePercent, tokenAmountToUsd, tickToPrice } from '@clmm/domain';
 
 export type GetPositionDetailResult =
   | { kind: 'found'; position: LiquidityPosition; detailDto: PositionDetailDto }
@@ -42,14 +42,14 @@ export async function getPositionDetail(params: {
   const priceB = priceMap.get(poolData.tokenPair.mintB);
 
   const feeOwedA: TokenAmountValue = {
-    raw: fees.feeOwedA,
+    raw: fees.feeOwedA.toString(),
     decimals: poolData.tokenPair.decimalsA,
     symbol: poolData.tokenPair.symbolA,
     usdValue: priceA ? tokenAmountToUsd(fees.feeOwedA, poolData.tokenPair.decimalsA, priceA.usdValue) : 0,
   };
 
   const feeOwedB: TokenAmountValue = {
-    raw: fees.feeOwedB,
+    raw: fees.feeOwedB.toString(),
     decimals: poolData.tokenPair.decimalsB,
     symbol: poolData.tokenPair.symbolB,
     usdValue: priceB ? tokenAmountToUsd(fees.feeOwedB, poolData.tokenPair.decimalsB, priceB.usdValue) : 0,
@@ -61,7 +61,7 @@ export async function getPositionDetail(params: {
     const rPrice = priceMap.get(r.mint);
     return {
       mint: r.mint,
-      amount: r.amountOwed,
+      amount: r.amountOwed.toString(),
       decimals: r.decimals,
       symbol: rPrice?.symbol ?? r.mint,
       usdValue: rPrice ? tokenAmountToUsd(r.amountOwed, r.decimals, rPrice.usdValue) : 0,
@@ -70,12 +70,7 @@ export async function getPositionDetail(params: {
 
   const totalRewardsUsd = rewardValues.reduce((sum, r) => sum + r.usdValue, 0);
 
-  const poolDepthUsd = priceB
-    ? tokenAmountToUsd(poolData.liquidity, poolData.tokenPair.decimalsB, priceB.usdValue)
-    : 0;
-  const poolDepthLabel = poolDepthUsd > 0
-    ? `$${(poolDepthUsd / 1_000_000).toFixed(1)}M pool depth`
-    : 'depth unavailable';
+  const poolDepthLabel = 'depth unavailable';
 
   const detailDto: PositionDetailDto = {
     positionId: position.positionId,
@@ -93,7 +88,9 @@ export async function getPositionDetail(params: {
     monitoringStatus: position.monitoringReadiness.kind,
     lowerBound: position.bounds.lowerBound,
     upperBound: position.bounds.upperBound,
-    sqrtPrice: poolData.sqrtPrice,
+    lowerBoundLabel: `$${tickToPrice(position.bounds.lowerBound, poolData.tokenPair.decimalsA, poolData.tokenPair.decimalsB).toFixed(2)}`,
+    upperBoundLabel: `$${tickToPrice(position.bounds.upperBound, poolData.tokenPair.decimalsA, poolData.tokenPair.decimalsB).toFixed(2)}`,
+    sqrtPrice: poolData.sqrtPrice.toString(),
     unclaimedFees: {
       feeOwedA,
       feeOwedB,
@@ -103,8 +100,8 @@ export async function getPositionDetail(params: {
       rewards: rewardValues,
       totalUsd: totalRewardsUsd,
     },
-    positionLiquidity,
-    poolLiquidity: poolData.liquidity,
+    positionLiquidity: positionLiquidity.toString(),
+    poolLiquidity: poolData.liquidity.toString(),
     poolDepthLabel,
   };
 

@@ -50,7 +50,7 @@ export type PositionSummaryDto = {
 };
 
 export type TokenAmountValue = {
-  raw: bigint;
+  raw: string;
   decimals: number;
   symbol: string;
   usdValue: number;
@@ -58,7 +58,7 @@ export type TokenAmountValue = {
 
 export type RewardAmountValue = {
   mint: string;
-  amount: bigint;
+  amount: string;
   decimals: number;
   symbol: string;
   usdValue: number;
@@ -67,8 +67,10 @@ export type RewardAmountValue = {
 export type PositionDetailDto = PositionSummaryDto & {
   lowerBound: number;
   upperBound: number;
+  lowerBoundLabel: string;
+  upperBoundLabel: string;
   currentPrice: number;
-  sqrtPrice: bigint;
+  sqrtPrice: string;
   unclaimedFees: {
     feeOwedA: TokenAmountValue;
     feeOwedB: TokenAmountValue;
@@ -78,8 +80,8 @@ export type PositionDetailDto = PositionSummaryDto & {
     rewards: RewardAmountValue[];
     totalUsd: number;
   };
-  positionLiquidity: bigint;
-  poolLiquidity: bigint;
+  positionLiquidity: string;
+  poolLiquidity: string;
   poolDepthLabel: string;
   triggerId?: ExitTriggerId;
   breachDirection?: BreachDirection;

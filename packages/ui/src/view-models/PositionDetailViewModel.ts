@@ -67,7 +67,7 @@ function toSrLevelsViewModelBlock(
   return { supportsSorted, resistancesSorted, freshnessLabel, isStale };
 }
 
-function formatTokenAmount(raw: bigint, decimals: number, symbol: string): string {
+function formatTokenAmount(raw: string, decimals: number, symbol: string): string {
   const humanReadable = Number(raw) / 10 ** decimals;
   return `${humanReadable.toFixed(decimals > 2 ? 4 : 2)} ${symbol}`;
 }
@@ -100,7 +100,7 @@ export function buildPositionDetailViewModel(dto: PositionDetailDto, now: number
     poolLabel: dto.tokenPairLabel,
     currentPriceLabel: dto.currentPriceLabel,
     feeRateLabel: dto.feeRateLabel,
-    rangeBoundsLabel: `$${dto.lowerBound} — $${dto.upperBound}`,
+    rangeBoundsLabel: `${dto.lowerBoundLabel} — ${dto.upperBoundLabel}`,
     rangeStatusLabel: badge.label,
     rangeStatusColorKey: badge.colorKey,
     rangeDistanceLabel: rangeDistanceLabel(dto.rangeDistance),
