@@ -38,4 +38,24 @@ describe('buildReturnToPath', () => {
   it('URL-encodes search values', () => {
     expect(buildReturnToPath('/x', { q: 'a b/c' })).toBe('/x?q=a%20b%2Fc');
   });
+
+  it('excludes path param keys when provided', () => {
+    expect(buildReturnToPath('/signing/pending', { attemptId: 'pending', tab: 'details' }, new Set(['attemptId'])))
+      .toBe('/signing/pending?tab=details');
+  });
+
+  it('excludes multiple path param keys', () => {
+    expect(buildReturnToPath('/preview/xyz', { triggerId: 'xyz', attemptId: 'xyz' }, new Set(['triggerId', 'attemptId'])))
+      .toBe('/preview/xyz');
+  });
+
+  it('does not exclude a key if it is not in the pathParamKeys set', () => {
+    expect(buildReturnToPath('/signing/real-id', { attemptId: 'different-id', tab: 'details' }, new Set(['attemptId'])))
+      .toBe('/signing/real-id?tab=details');
+  });
+
+  it('returns plain pathname when all params are excluded as path params', () => {
+    expect(buildReturnToPath('/position/abc', { id: 'abc' }, new Set(['id'])))
+      .toBe('/position/abc');
+  });
 });

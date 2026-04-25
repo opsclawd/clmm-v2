@@ -86,6 +86,15 @@ describe('RequireWallet', () => {
     expect(screen.queryByTestId('children')).toBeNull();
   });
 
+  it('excludes path params from returnTo query string', () => {
+    mockPathname = '/signing/mypass';
+    mockSearch = { attemptId: 'mypass', tab: 'details' };
+    render(<Harness initial="disconnected" />);
+    expect(navigateMock).toHaveBeenCalledTimes(1);
+    const call = navigateMock.mock.calls[0]![0]! as { path: string; method: string };
+    expect(call.path).toBe('/connect?returnTo=' + encodeURIComponent('/signing/mypass?tab=details'));
+  });
+
   it('does not call navigate again if status flips back to connected', () => {
     render(<Harness initial="disconnected" />);
     expect(navigateMock).toHaveBeenCalledTimes(1);
