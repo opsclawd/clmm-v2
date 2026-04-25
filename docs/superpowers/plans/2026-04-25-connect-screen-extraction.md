@@ -2,384 +2,1106 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-**Goal:** Extract the connect screen rendering from `apps/app/app/connect.tsx` into `packages/ui`, replacing the existing simple `WalletConnectScreen` with a view-model-driven screen that handles wallet discovery, fallback states, and deep links.
+**Goal:** Extract the connect-wallet screen from `apps/app/app/connect.tsx` into `packages/ui` behind a discriminated `ConnectScreenState` model, so the route file collapses to a thin wiring layer (~90 lines) and `packages/ui` owns every visual case.
 
-**Architecture:** Extend `WalletConnectViewModel` with discovery/fallback/outcome fields. The route shell (`connect.tsx`) becomes a thin orchestrator (~60-80 lines) that wires hooks, builds the view model, and passes it + action callbacks to `WalletConnectScreen`. The screen owns all rendering. New types (`DiscoveredWallet`, `FallbackState`, `WalletDiscoveryState`, `WalletConnectActions`) live in `packages/ui`.
+**Architecture:** A new pure builder `buildConnectScreenViewModel` in `packages/ui` maps shell-provided inputs (capabilities, fallback state, discovery state, wallets, outcome, flags) onto a discriminated `ConnectScreenState`. `WalletConnectScreen` is rewritten to take `{ viewModel, actions }` and render a state-driven body inside the existing hero/features layout. Two new shell-side helpers (`detectFallbackState`, `useDiscoveryState`) get lifted out of the inline route. The existing `buildWalletConnectViewModel` stays untouched (still used by `WalletSettingsScreen`).
 
-**Tech Stack:** React Native, React, Zustand, Vitest, React Testing Library
+**Tech Stack:** React, React Native (via react-native-web), Zustand, Vitest, `@testing-library/react`, Expo Router, `@solana/connector`.
+
+**Spec:** `docs/superpowers/specs/2026-04-25-connect-screen-extraction-design.md`
 
 ---
 
 ## File Structure
 
-| File | Responsibility |
-|---|---|
-| `packages/ui/src/components/WalletConnectionUtils.ts` | Add `FallbackState`, `WalletDiscoveryState`, `DiscoveredWallet`, `WalletConnectActions` types |
-| `packages/ui/src/view-models/WalletConnectionViewModel.ts` | Extend `WalletConnectViewModel` type and `buildWalletConnectViewModel` builder |
-| `packages/ui/src/view-models/WalletConnectionViewModel.test.ts` | Add unit tests for extended view model builder |
-| `packages/ui/src/screens/WalletConnectScreen.tsx` | Full rewrite — renders from view model + actions |
-| `packages/ui/src/screens/WalletConnectScreen.test.tsx` | Full rewrite — component tests for all screen states |
-| `packages/ui/src/index.ts` | Export new types |
-| `apps/app/app/connect.tsx` | Strip to thin shell — only hook wiring, VM build, callbacks |
+| File | Change | Responsibility |
+|---|---|---|
+| `packages/ui/src/components/WalletConnectionUtils.ts` | Modify | Add `WalletPickerOption`, `ConnectScreenState`, `ConnectScreenActions` types |
+| `packages/ui/src/view-models/WalletConnectionViewModel.ts` | Modify | Add `ConnectScreenInputs`, `ConnectScreenViewModel`, `buildConnectScreenViewModel` (additive — old builders untouched) |
+| `packages/ui/src/view-models/WalletConnectionViewModel.test.ts` | Create | Unit tests for `buildConnectScreenViewModel` |
+| `packages/ui/src/components/ConnectWalletPicker.tsx` | Create | Per-wallet row list (icon + name + onSelect) |
+| `packages/ui/src/components/ConnectFallbackPanel.tsx` | Create | No-extension warning + Phantom/Solflare deep-link CTAs |
+| `packages/ui/src/components/SocialWebviewEscapePanel.tsx` | Create | Social-webview warning + "Open in Browser" + Phantom/Solflare CTAs |
+| `packages/ui/src/screens/WalletConnectScreen.tsx` | Rewrite | Renders hero+features+state-driven body from `{viewModel, actions}` |
+| `packages/ui/src/screens/WalletConnectScreen.test.tsx` | Rewrite | Per-state-variant render tests |
+| `packages/ui/src/index.ts` | Modify | Export new types and `buildConnectScreenViewModel` |
+| `apps/app/src/platform/detectFallbackState.ts` | Create | Lifted from inline `connect.tsx` (pure function) |
+| `apps/app/src/platform/detectFallbackState.test.ts` | Create | UA matrix tests |
+| `apps/app/src/platform/browserWallet/useDiscoveryState.ts` | Create | Hook wrapping walletCount + 2s timeout, sticky |
+| `apps/app/src/platform/browserWallet/useDiscoveryState.test.ts` | Create | Timer + sticky behavior tests |
+| `apps/app/app/connect.tsx` | Rewrite | ~90-line shell: hooks → view-model → actions → screen |
+
+**Build invariant:** Phase A (tasks 1–6) and Phase B (tasks 7–8) are purely additive and the tree compiles after each task. Phase C (task 9) rewrites the screen + route together in one task because their type contracts change in lockstep — splitting them would leave the tree unbuildable mid-phase.
 
 ---
 
-### Task 1: Add new types to WalletConnectionUtils
+## Conventions
+
+- **Test command (per package):** `pnpm --filter <pkg> test -- <pattern>` runs vitest in that package filtered to files matching `<pattern>`.
+- **Typecheck:** `pnpm --filter <pkg> typecheck` (alias for `tsc --noEmit`).
+- **Boundaries:** `pnpm boundaries` runs at repo root.
+- **Existing test style:** `@testing-library/react` + `vitest`. The file extension stays `.tsx` for screen tests (matches existing `WalletConnectScreen.test.tsx`). The spec mentions `@testing-library/react-native`; the actual repo uses `@testing-library/react` with `react-native-web`. Match the repo.
+- **Commit style:** lowercase conventional-commit prefix (`feat(ui):`, `refactor(app):`, `test(ui):`). Match recent commits in the repo (e.g. `fix(wallet-boot):`).
+- **DO NOT use `--no-verify`** on commits. If a hook fails, fix the root cause.
+
+---
+
+## Phase A — Additive `packages/ui` work
+
+### Task 1: Add new types to `WalletConnectionUtils.ts`
 
 **Files:**
-- Modify: `packages/ui/src/components/WalletConnectionUtils.ts`
-- Modify: `packages/ui/src/index.ts`
+- Modify: `packages/ui/src/components/WalletConnectionUtils.ts` (append at end of file)
 
-- [ ] **Step 1: Add types to WalletConnectionUtils.ts**
+- [ ] **Step 1: Append new types**
 
-Append after `PlatformNotice` type and `buildPlatformNotice` function:
+Add at the bottom of the file, after `buildPlatformNotice`:
 
 ```ts
-export type FallbackState =
-  | 'none'
-  | 'wallet-fallback'
-  | 'desktop-no-wallet'
-  | 'social-webview';
+// --- Connect Screen state model ---
 
-export type WalletDiscoveryState =
-  | 'discovering'
-  | 'ready'
-  | 'timed-out';
-
-export type DiscoveredWallet = {
+export type WalletPickerOption = {
   id: string;
   name: string;
-  icon: string | null;
+  iconUri: string | null;
 };
 
-export type WalletConnectActions = {
-  onSelectNative: () => void;
-  onSelectDiscoveredWallet: (walletId: string) => void;
+export type ConnectScreenState =
+  | { kind: 'loading-capabilities' }
+  | { kind: 'social-webview'; socialEscapeAttempted: boolean }
+  | { kind: 'discovering'; nativeAvailable: boolean }
+  | {
+      kind: 'ready';
+      nativeAvailable: boolean;
+      browserWallets: WalletPickerOption[];
+    }
+  | { kind: 'timed-out-discovery'; nativeAvailable: boolean }
+  | { kind: 'wallet-fallback'; nativeAvailable: boolean }
+  | { kind: 'desktop-no-wallet' };
+
+export type ConnectScreenActions = {
+  onSelectNativeWallet: () => void;
+  onSelectBrowserWallet: (walletId: string) => void;
   onConnectDefaultBrowser: () => void;
-  onOpenPhantom: () => void;
-  onOpenSolflare: () => void;
-  onOpenInBrowser: () => void;
+  onOpenInExternalBrowser: () => void;
+  onOpenInPhantom: () => void;
+  onOpenInSolflare: () => void;
   onGoBack: () => void;
+  onDismissOutcome: () => void;
 };
 ```
 
-- [ ] **Step 2: Export new types from index.ts**
+- [ ] **Step 2: Run typecheck**
 
-Add to the type export block in `packages/ui/src/index.ts` (after the existing `PlatformNotice` export):
+Run: `pnpm --filter @clmm/ui typecheck`
+Expected: passes (no consumers yet).
 
-```ts
-export type {
-  FallbackState,
-  WalletDiscoveryState,
-  DiscoveredWallet,
-  WalletConnectActions,
-} from './components/WalletConnectionUtils.js';
-```
-
-- [ ] **Step 3: Run typecheck**
-
-Run: `pnpm --filter @clmm/ui typecheck && pnpm --filter @clmm/app typecheck`
-Expected: PASS
-
-- [ ] **Step 4: Commit**
+- [ ] **Step 3: Commit**
 
 ```bash
-git add packages/ui/src/components/WalletConnectionUtils.ts packages/ui/src/index.ts
-git commit -m "feat(ui): add FallbackState, WalletDiscoveryState, DiscoveredWallet, WalletConnectActions types"
+git add packages/ui/src/components/WalletConnectionUtils.ts
+git commit -m "feat(ui): add ConnectScreenState type model"
 ```
 
 ---
 
-### Task 2: Extend the view model builder
+### Task 2: Add `buildConnectScreenViewModel` (TDD)
 
 **Files:**
+- Create: `packages/ui/src/view-models/WalletConnectionViewModel.test.ts`
 - Modify: `packages/ui/src/view-models/WalletConnectionViewModel.ts`
-- Modify: `packages/ui/src/view-models/WalletConnectionViewModel.test.ts`
 
-- [ ] **Step 1: Update existing buildWalletConnectViewModel tests for the new signature**
+- [ ] **Step 1: Write failing tests**
 
-The existing tests pass `{ capabilities, connectionOutcome, isConnecting }`. Add a `baseParams` helper and update each test to include the new required fields:
-
-Add after the `makeCaps` function:
+Create `packages/ui/src/view-models/WalletConnectionViewModel.test.ts` with the full decision-tree coverage:
 
 ```ts
-const baseExtendedParams = {
-  discovery: 'ready' as const,
-  discoveredWallets: [] as DiscoveredWallet[],
-  fallback: 'none' as const,
-  socialEscapeAttempted: false,
+import { describe, it, expect } from 'vitest';
+import { buildConnectScreenViewModel } from './WalletConnectionViewModel.js';
+import type { PlatformCapabilities } from '../components/DegradedCapabilityBannerUtils.js';
+import type { WalletPickerOption } from '../components/WalletConnectionUtils.js';
+
+const CAPS_NATIVE_ONLY: PlatformCapabilities = {
+  nativePushAvailable: false,
+  browserNotificationAvailable: false,
+  nativeWalletAvailable: true,
+  browserWalletAvailable: false,
+  isMobileWeb: false,
 };
-```
 
-Then update each call to `buildWalletConnectViewModel` in the existing `describe('buildWalletConnectViewModel')` block to spread `baseExtendedParams`:
+const CAPS_BROWSER_ONLY: PlatformCapabilities = {
+  ...CAPS_NATIVE_ONLY,
+  nativeWalletAvailable: false,
+  browserWalletAvailable: true,
+};
 
-```ts
-const vm = buildWalletConnectViewModel({
-  ...baseExtendedParams,
-  capabilities: makeCaps({ nativeWalletAvailable: true, nativePushAvailable: true }),
-  connectionOutcome: null,
-  isConnecting: false,
-});
-```
+const CAPS_NEITHER: PlatformCapabilities = {
+  ...CAPS_NATIVE_ONLY,
+  nativeWalletAvailable: false,
+  browserWalletAvailable: false,
+};
 
-Add the `DiscoveredWallet` import from `'../components/WalletConnectionUtils.js'`.
+const WALLET_PHANTOM: WalletPickerOption = { id: 'phantom', name: 'Phantom', iconUri: null };
 
-- [ ] **Step 2: Add new failing tests for extended view model builder**
+function baseInputs(overrides: Partial<Parameters<typeof buildConnectScreenViewModel>[0]> = {}) {
+  return {
+    capabilities: CAPS_BROWSER_ONLY,
+    fallbackState: 'none' as const,
+    discoveryState: 'discovering' as const,
+    browserWallets: [],
+    connectionOutcome: null,
+    isConnecting: false,
+    socialEscapeAttempted: false,
+    ...overrides,
+  };
+}
 
-Add to `packages/ui/src/view-models/WalletConnectionViewModel.test.ts`, after the existing `describe('buildWalletConnectViewModel')` block:
-
-```ts
-describe('buildWalletConnectViewModel (extended)', () => {
-  it('returns loading screenState when platformCapabilities is null', () => {
-    const vm = buildWalletConnectViewModel({
-      platformCapabilities: null,
-      discovery: 'discovering',
-      discoveredWallets: [],
-      fallback: 'none',
-      socialEscapeAttempted: false,
-      isConnecting: false,
-      connectionOutcome: null,
-    });
-    expect(vm.screenState).toBe('loading');
+describe('buildConnectScreenViewModel', () => {
+  it('returns loading-capabilities when capabilities is null', () => {
+    const vm = buildConnectScreenViewModel(baseInputs({ capabilities: null }));
+    expect(vm.state.kind).toBe('loading-capabilities');
   });
 
-  it('returns social-webview screenState when fallback is social-webview', () => {
-    const vm = buildWalletConnectViewModel({
-      platformCapabilities: makeCaps(),
-      discovery: 'timed-out',
-      discoveredWallets: [],
-      fallback: 'social-webview',
-      socialEscapeAttempted: false,
-      isConnecting: false,
-      connectionOutcome: null,
-    });
-    expect(vm.screenState).toBe('social-webview');
+  it('returns social-webview and passes socialEscapeAttempted=false through', () => {
+    const vm = buildConnectScreenViewModel(
+      baseInputs({ fallbackState: 'social-webview', socialEscapeAttempted: false }),
+    );
+    expect(vm.state).toEqual({ kind: 'social-webview', socialEscapeAttempted: false });
   });
 
-  it('returns standard screenState for normal wallet flow', () => {
-    const vm = buildWalletConnectViewModel({
-      platformCapabilities: makeCaps({ nativeWalletAvailable: true }),
-      discovery: 'ready',
-      discoveredWallets: [{ id: 'phantom', name: 'Phantom', icon: 'https://example.com/icon.png' }],
-      fallback: 'none',
-      socialEscapeAttempted: false,
-      isConnecting: false,
-      connectionOutcome: null,
-    });
-    expect(vm.screenState).toBe('standard');
-    expect(vm.nativeWalletAvailable).toBe(true);
-    expect(vm.discoveredWallets).toHaveLength(1);
-    expect(vm.discovery).toBe('ready');
+  it('returns social-webview and passes socialEscapeAttempted=true through', () => {
+    const vm = buildConnectScreenViewModel(
+      baseInputs({ fallbackState: 'social-webview', socialEscapeAttempted: true }),
+    );
+    expect(vm.state).toEqual({ kind: 'social-webview', socialEscapeAttempted: true });
   });
 
-  it('passes through discovery and fallback states', () => {
-    const vm = buildWalletConnectViewModel({
-      platformCapabilities: makeCaps(),
-      discovery: 'discovering',
-      discoveredWallets: [],
-      fallback: 'desktop-no-wallet',
-      socialEscapeAttempted: false,
-      isConnecting: false,
-      connectionOutcome: null,
-    });
-    expect(vm.discovery).toBe('discovering');
-    expect(vm.fallback).toBe('desktop-no-wallet');
+  it('returns desktop-no-wallet when fallbackState is desktop-no-wallet', () => {
+    const vm = buildConnectScreenViewModel(baseInputs({ fallbackState: 'desktop-no-wallet' }));
+    expect(vm.state).toEqual({ kind: 'desktop-no-wallet' });
   });
 
-  it('passes through socialEscapeAttempted', () => {
-    const vm = buildWalletConnectViewModel({
-      platformCapabilities: makeCaps(),
-      discovery: 'timed-out',
-      discoveredWallets: [],
-      fallback: 'social-webview',
-      socialEscapeAttempted: true,
-      isConnecting: false,
-      connectionOutcome: null,
-    });
-    expect(vm.socialEscapeAttempted).toBe(true);
+  it('returns wallet-fallback with nativeAvailable=true', () => {
+    const vm = buildConnectScreenViewModel(
+      baseInputs({ fallbackState: 'wallet-fallback', capabilities: CAPS_NATIVE_ONLY }),
+    );
+    expect(vm.state).toEqual({ kind: 'wallet-fallback', nativeAvailable: true });
   });
 
-  it('maps connection outcome to outcome display', () => {
-    const vm = buildWalletConnectViewModel({
-      platformCapabilities: makeCaps({ nativeWalletAvailable: true }),
-      discovery: 'ready',
-      discoveredWallets: [],
-      fallback: 'none',
-      socialEscapeAttempted: false,
-      isConnecting: false,
-      connectionOutcome: { kind: 'failed', reason: 'timeout' },
-    });
-    expect(vm.outcomeDisplay).not.toBeNull();
-    expect(vm.outcomeDisplay!.severity).toBe('error');
+  it('returns wallet-fallback with nativeAvailable=false', () => {
+    const vm = buildConnectScreenViewModel(
+      baseInputs({ fallbackState: 'wallet-fallback', capabilities: CAPS_NEITHER }),
+    );
+    expect(vm.state).toEqual({ kind: 'wallet-fallback', nativeAvailable: false });
   });
 
-  it('computes platform notice', () => {
-    const vm = buildWalletConnectViewModel({
-      platformCapabilities: makeCaps({ isMobileWeb: true }),
-      discovery: 'timed-out',
-      discoveredWallets: [],
-      fallback: 'none',
-      socialEscapeAttempted: false,
-      isConnecting: false,
-      connectionOutcome: null,
+  it('returns discovering when discoveryState is discovering', () => {
+    const vm = buildConnectScreenViewModel(baseInputs({ discoveryState: 'discovering' }));
+    expect(vm.state).toEqual({ kind: 'discovering', nativeAvailable: false });
+  });
+
+  it('returns ready with non-empty browserWallets', () => {
+    const vm = buildConnectScreenViewModel(
+      baseInputs({ discoveryState: 'ready', browserWallets: [WALLET_PHANTOM] }),
+    );
+    expect(vm.state).toEqual({
+      kind: 'ready',
+      nativeAvailable: false,
+      browserWallets: [WALLET_PHANTOM],
     });
-    expect(vm.platformNotice).not.toBeNull();
-    expect(vm.platformNotice!.message).toContain('mobile web');
+  });
+
+  it('returns ready with empty browserWallets when nativeAvailable is true (native-only path)', () => {
+    const vm = buildConnectScreenViewModel(
+      baseInputs({
+        capabilities: CAPS_NATIVE_ONLY,
+        discoveryState: 'ready',
+        browserWallets: [],
+      }),
+    );
+    expect(vm.state).toEqual({
+      kind: 'ready',
+      nativeAvailable: true,
+      browserWallets: [],
+    });
+  });
+
+  it('returns timed-out-discovery when discoveryState is timed-out', () => {
+    const vm = buildConnectScreenViewModel(baseInputs({ discoveryState: 'timed-out' }));
+    expect(vm.state).toEqual({ kind: 'timed-out-discovery', nativeAvailable: false });
+  });
+
+  it('social-webview wins over discoveryState=ready', () => {
+    const vm = buildConnectScreenViewModel(
+      baseInputs({
+        fallbackState: 'social-webview',
+        discoveryState: 'ready',
+        browserWallets: [WALLET_PHANTOM],
+        socialEscapeAttempted: false,
+      }),
+    );
+    expect(vm.state.kind).toBe('social-webview');
+  });
+
+  it('outcome is the failed display when outcome is failed', () => {
+    const vm = buildConnectScreenViewModel(
+      baseInputs({ connectionOutcome: { kind: 'failed', reason: 'x' } }),
+    );
+    expect(vm.outcome).not.toBeNull();
+    expect(vm.outcome?.title).toBe('Connection Failed');
+  });
+
+  it('outcome is null when outcome is connected', () => {
+    const vm = buildConnectScreenViewModel(
+      baseInputs({ connectionOutcome: { kind: 'connected' } }),
+    );
+    expect(vm.outcome).toBeNull();
+  });
+
+  it('outcome is null when outcome is null', () => {
+    const vm = buildConnectScreenViewModel(baseInputs({ connectionOutcome: null }));
+    expect(vm.outcome).toBeNull();
+  });
+
+  it('passes isConnecting through', () => {
+    const vm = buildConnectScreenViewModel(baseInputs({ isConnecting: true }));
+    expect(vm.isConnecting).toBe(true);
   });
 });
 ```
 
 - [ ] **Step 2: Run tests to verify they fail**
 
-Run: `pnpm --filter @clmm/ui test -- --run`
-Expected: FAIL — `buildWalletConnectViewModel` doesn't accept the new parameter shape yet.
+Run: `pnpm --filter @clmm/ui test -- WalletConnectionViewModel`
+Expected: FAIL — `buildConnectScreenViewModel is not exported`.
 
-- [ ] **Step 3: Extend the WalletConnectViewModel type and builder**
+- [ ] **Step 3: Implement `buildConnectScreenViewModel`**
 
-In `packages/ui/src/view-models/WalletConnectionViewModel.ts`, add imports and replace the existing `WalletConnectViewModel` type and `buildWalletConnectViewModel` function. Keep the existing `WalletSettingsViewModel` and `buildWalletSettingsViewModel` unchanged.
-
-Replace the `WalletConnectViewModel` type with:
+Append to `packages/ui/src/view-models/WalletConnectionViewModel.ts`:
 
 ```ts
 import type {
-  FallbackState,
-  WalletDiscoveryState,
-  DiscoveredWallet,
-  WalletConnectActions,
+  WalletPickerOption,
+  ConnectScreenState,
 } from '../components/WalletConnectionUtils.js';
 
-export type WalletConnectViewModel = {
-  screenState: 'loading' | 'social-webview' | 'standard';
-  nativeWalletAvailable: boolean;
-  discovery: WalletDiscoveryState;
-  discoveredWallets: DiscoveredWallet[];
-  fallback: FallbackState;
-  socialEscapeAttempted: boolean;
-  isConnecting: boolean;
-  outcomeDisplay: ConnectionOutcomeDisplay | null;
-  platformNotice: PlatformNotice | null;
-};
-```
+// --- Connect Screen ViewModel (state-driven) ---
 
-Replace `buildWalletConnectViewModel` with:
-
-```ts
-export function buildWalletConnectViewModel(params: {
-  platformCapabilities: PlatformCapabilities | null;
-  discovery: WalletDiscoveryState;
-  discoveredWallets: DiscoveredWallet[];
-  fallback: FallbackState;
-  socialEscapeAttempted: boolean;
-  isConnecting: boolean;
+export type ConnectScreenInputs = {
+  capabilities: PlatformCapabilities | null;
+  fallbackState: 'none' | 'social-webview' | 'wallet-fallback' | 'desktop-no-wallet';
+  discoveryState: 'discovering' | 'ready' | 'timed-out';
+  browserWallets: WalletPickerOption[];
   connectionOutcome: ConnectionOutcome | null;
-}): WalletConnectViewModel {
-  const caps = params.platformCapabilities ?? {
-    nativePushAvailable: false,
-    browserNotificationAvailable: false,
-    nativeWalletAvailable: false,
-    browserWalletAvailable: false,
-    isMobileWeb: false,
-  };
+  isConnecting: boolean;
+  socialEscapeAttempted: boolean;
+};
 
-  const screenState: WalletConnectViewModel['screenState'] =
-    !params.platformCapabilities ? 'loading'
-    : params.fallback === 'social-webview' ? 'social-webview'
-    : 'standard';
+export type ConnectScreenViewModel = {
+  state: ConnectScreenState;
+  outcome: ConnectionOutcomeDisplay | null;
+  isConnecting: boolean;
+};
 
-  return {
-    screenState,
-    nativeWalletAvailable: caps.nativeWalletAvailable,
-    discovery: params.discovery,
-    discoveredWallets: params.discoveredWallets,
-    fallback: params.fallback,
-    socialEscapeAttempted: params.socialEscapeAttempted,
-    isConnecting: params.isConnecting,
-    outcomeDisplay: params.connectionOutcome
-      ? getConnectionOutcomeDisplay(params.connectionOutcome)
-      : null,
-    platformNotice: buildPlatformNotice(caps),
-  };
+export function buildConnectScreenViewModel(
+  inputs: ConnectScreenInputs,
+): ConnectScreenViewModel {
+  const outcome =
+    inputs.connectionOutcome === null || inputs.connectionOutcome.kind === 'connected'
+      ? null
+      : getConnectionOutcomeDisplay(inputs.connectionOutcome);
+
+  if (inputs.capabilities === null) {
+    return { state: { kind: 'loading-capabilities' }, outcome, isConnecting: inputs.isConnecting };
+  }
+
+  const nativeAvailable = inputs.capabilities.nativeWalletAvailable;
+
+  // Decision rules — first match wins (top-to-bottom).
+  if (inputs.fallbackState === 'social-webview') {
+    return {
+      state: { kind: 'social-webview', socialEscapeAttempted: inputs.socialEscapeAttempted },
+      outcome,
+      isConnecting: inputs.isConnecting,
+    };
+  }
+
+  if (inputs.fallbackState === 'desktop-no-wallet') {
+    return { state: { kind: 'desktop-no-wallet' }, outcome, isConnecting: inputs.isConnecting };
+  }
+
+  if (inputs.fallbackState === 'wallet-fallback') {
+    return {
+      state: { kind: 'wallet-fallback', nativeAvailable },
+      outcome,
+      isConnecting: inputs.isConnecting,
+    };
+  }
+
+  switch (inputs.discoveryState) {
+    case 'discovering':
+      return {
+        state: { kind: 'discovering', nativeAvailable },
+        outcome,
+        isConnecting: inputs.isConnecting,
+      };
+    case 'ready':
+      return {
+        state: { kind: 'ready', nativeAvailable, browserWallets: inputs.browserWallets },
+        outcome,
+        isConnecting: inputs.isConnecting,
+      };
+    case 'timed-out':
+      return {
+        state: { kind: 'timed-out-discovery', nativeAvailable },
+        outcome,
+        isConnecting: inputs.isConnecting,
+      };
+  }
 }
 ```
 
-Remove the now-unused `buildWalletOptions` import and the `WalletOption` import if no longer referenced by this file. Keep `buildWalletSettingsViewModel` and all its imports intact.
+Note: `PlatformCapabilities`, `ConnectionOutcome`, `ConnectionOutcomeDisplay`, and `getConnectionOutcomeDisplay` are already imported at the top of this file. If imports need expansion, also add `WalletPickerOption` and `ConnectScreenState` from `../components/WalletConnectionUtils.js`.
 
 - [ ] **Step 4: Run tests to verify they pass**
 
-Run: `pnpm --filter @clmm/ui test -- --run`
-Expected: ALL PASS
+Run: `pnpm --filter @clmm/ui test -- WalletConnectionViewModel`
+Expected: all tests pass.
 
-- [ ] **Step 5: Commit**
+- [ ] **Step 5: Run typecheck**
+
+Run: `pnpm --filter @clmm/ui typecheck`
+Expected: passes.
+
+- [ ] **Step 6: Commit**
 
 ```bash
-git add packages/ui/src/view-models/WalletConnectionViewModel.ts packages/ui/src/view-models/WalletConnectionViewModel.test.ts
-git commit -m "feat(ui): extend WalletConnectViewModel with discovery, fallback, and outcome fields"
+git add packages/ui/src/view-models/WalletConnectionViewModel.ts \
+        packages/ui/src/view-models/WalletConnectionViewModel.test.ts
+git commit -m "feat(ui): add buildConnectScreenViewModel"
 ```
 
 ---
 
-### Task 3: Rewrite WalletConnectScreen to render from view model + actions
+### Task 3: Add `ConnectWalletPicker` sub-component
 
 **Files:**
-- Modify: `packages/ui/src/screens/WalletConnectScreen.tsx`
+- Create: `packages/ui/src/components/ConnectWalletPicker.tsx`
 
-**Important:** PR #35 redesigned this screen with a hero animation, feature bullets, and `colors`/`typography` design system tokens. The rewrite must preserve ALL of these visual elements — `HeroAnimation`, `FeatureRow`, the feature list, `StyleSheet.create(...)`, and the existing design system styling. Only the props and rendering logic change; the visual identity stays.
+This component renders one row per `WalletPickerOption`. It is internal to `packages/ui` (not exported from `index.ts`) and is exercised by the `WalletConnectScreen` tests in Task 9. We do not write a separate test file — render coverage comes via the screen test in the `ready` state.
 
-The existing `WalletConnectScreen` accepts `{ platformCapabilities, connectionOutcome, isConnecting, onSelectWallet, onGoBack }`. The new version accepts:
+- [ ] **Step 1: Implement the component**
 
-```ts
+```tsx
+import { TouchableOpacity, View, Text, Image, StyleSheet } from 'react-native';
+import { colors, typography } from '../design-system/index.js';
+import type { WalletPickerOption } from './WalletConnectionUtils.js';
+
 type Props = {
-  vm: WalletConnectViewModel;
-  actions: WalletConnectActions;
+  wallets: WalletPickerOption[];
+  disabled: boolean;
+  onSelect: (walletId: string) => void;
 };
+
+export function ConnectWalletPicker({ wallets, disabled, onSelect }: Props): JSX.Element {
+  return (
+    <View style={styles.container}>
+      {wallets.map((wallet) => (
+        <TouchableOpacity
+          key={wallet.id}
+          onPress={() => onSelect(wallet.id)}
+          disabled={disabled}
+          accessibilityRole="button"
+          accessibilityLabel={`Connect ${wallet.name}`}
+          style={styles.row}
+        >
+          {wallet.iconUri ? (
+            <Image source={{ uri: wallet.iconUri }} style={styles.icon} />
+          ) : null}
+          <View style={styles.label}>
+            <Text style={styles.name}>{wallet.name}</Text>
+          </View>
+        </TouchableOpacity>
+      ))}
+    </View>
+  );
+}
+
+const styles = StyleSheet.create({
+  container: { width: '100%' },
+  row: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    padding: 16,
+    backgroundColor: colors.card,
+    borderRadius: 12,
+    marginBottom: 12,
+    borderWidth: 1,
+    borderColor: colors.border,
+  },
+  icon: { width: 24, height: 24 },
+  label: { flex: 1 },
+  name: {
+    color: colors.textPrimary,
+    fontSize: typography.fontSize.body,
+    fontWeight: typography.fontWeight.semibold,
+  },
+});
 ```
-
-- [ ] **Step 1: Rewrite WalletConnectScreen.tsx**
-
-The new component:
-
-1. Keeps `HeroAnimation` and `FeatureRow` components unchanged
-2. Keeps the `features` array and `StyleSheet` unchanged
-3. Changes props from the old flat shape to `{ vm, actions }`
-4. Replaces the `buildWalletConnectViewModel` call inside the component with the passed-in `vm`
-5. Replaces `onSelectWallet?.(kind)` with the new callbacks:
-   - `vm.nativeWalletAvailable` → `actions.onSelectNative` for native wallet button
-   - Discovery state rendering calls `actions.onSelectDiscoveredWallet(wallet.id)` or `actions.onConnectDefaultBrowser`
-   - `vm.screenState === 'social-webview'` renders the social webview fallback with `actions.onOpenInBrowser`, `actions.onOpenPhantom`, `actions.onOpenSolflare`
-   - `vm.fallback` renders fallback banners with deep link buttons calling `actions.onOpenPhantom`/`actions.onOpenSolflare`
-   - `actions.onGoBack` for the back button
-6. `vm.screenState === 'loading'` renders the `<ActivityIndicator>` (same as current null-platformCapabilities handling)
-7. Outcome banner renders from `vm.outcomeDisplay` using existing severity color logic
-8. Connecting indicator renders when `vm.isConnecting`
-
-The screen keeps its existing visual structure: `<View style={styles.container}>` → `<ScrollView>` → back button (if `actions.onGoBack`) → `<HeroAnimation />` → title → subtitle → outcome banner → platform notice → wallet discovery / fallback sections → feature list.
 
 - [ ] **Step 2: Run typecheck**
 
-Run: `pnpm --filter @clmm/ui typecheck && pnpm --filter @clmm/app typecheck`
-Expected: PASS
+Run: `pnpm --filter @clmm/ui typecheck`
+Expected: passes.
 
 - [ ] **Step 3: Commit**
 
 ```bash
-git add packages/ui/src/screens/WalletConnectScreen.tsx
-git commit -m "feat(ui): rewrite WalletConnectScreen to render from view model + actions"
+git add packages/ui/src/components/ConnectWalletPicker.tsx
+git commit -m "feat(ui): add ConnectWalletPicker component"
 ```
 
 ---
 
-### Task 4: Rewrite WalletConnectScreen component tests
+### Task 4: Add `ConnectFallbackPanel` sub-component
 
-- [ ] **Step 1: Rewrite test file for new props**
+**Files:**
+- Create: `packages/ui/src/components/ConnectFallbackPanel.tsx`
 
-Replace the entire test file. The tests should cover:
+Renders the no-extension warning + Phantom/Solflare deep-link buttons used by both `wallet-fallback` and (within a wider panel) `social-webview`. We expose it as a small, reusable block. Tested via the screen tests in Task 9.
+
+- [ ] **Step 1: Implement the component**
+
+```tsx
+import { TouchableOpacity, View, Text, StyleSheet } from 'react-native';
+import { colors, typography } from '../design-system/index.js';
+
+type Props = {
+  /** When true, renders the no-wallet warning banner above the deep-link buttons. */
+  showNoWalletWarning: boolean;
+  onOpenInPhantom: () => void;
+  onOpenInSolflare: () => void;
+};
+
+export function ConnectFallbackPanel({
+  showNoWalletWarning,
+  onOpenInPhantom,
+  onOpenInSolflare,
+}: Props): JSX.Element {
+  return (
+    <View style={styles.container}>
+      {showNoWalletWarning ? (
+        <View style={styles.warning}>
+          <Text style={styles.warningTitle}>No wallet extension detected in this browser.</Text>
+          <Text style={styles.warningDetail}>
+            You can open this page directly in a wallet browser, or switch to a desktop browser
+            with an installed extension.
+          </Text>
+        </View>
+      ) : null}
+      <Text style={styles.label}>Open in a wallet browser:</Text>
+      <TouchableOpacity
+        onPress={onOpenInPhantom}
+        accessibilityRole="button"
+        accessibilityLabel="Open in Phantom"
+        style={styles.linkButton}
+      >
+        <Text style={[styles.linkText, { color: '#ab9ff2' }]}>Open in Phantom</Text>
+      </TouchableOpacity>
+      <TouchableOpacity
+        onPress={onOpenInSolflare}
+        accessibilityRole="button"
+        accessibilityLabel="Open in Solflare"
+        style={styles.linkButton}
+      >
+        <Text style={[styles.linkText, { color: '#fc8748' }]}>Open in Solflare</Text>
+      </TouchableOpacity>
+    </View>
+  );
+}
+
+const styles = StyleSheet.create({
+  container: { width: '100%', marginTop: 16 },
+  warning: {
+    padding: 12,
+    backgroundColor: colors.card,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: colors.warn,
+    marginBottom: 12,
+  },
+  warningTitle: {
+    color: colors.warn,
+    fontSize: typography.fontSize.body,
+    fontWeight: typography.fontWeight.semibold,
+  },
+  warningDetail: {
+    color: colors.textBody,
+    fontSize: typography.fontSize.caption,
+    marginTop: 4,
+  },
+  label: {
+    color: colors.textFaint,
+    fontSize: typography.fontSize.caption,
+    marginBottom: 8,
+  },
+  linkButton: {
+    padding: 12,
+    backgroundColor: colors.card,
+    borderRadius: 12,
+    marginBottom: 8,
+    borderWidth: 1,
+    borderColor: colors.border,
+  },
+  linkText: {
+    fontSize: typography.fontSize.body,
+    fontWeight: typography.fontWeight.semibold,
+  },
+});
+```
+
+- [ ] **Step 2: Run typecheck**
+
+Run: `pnpm --filter @clmm/ui typecheck`
+Expected: passes.
+
+- [ ] **Step 3: Commit**
+
+```bash
+git add packages/ui/src/components/ConnectFallbackPanel.tsx
+git commit -m "feat(ui): add ConnectFallbackPanel component"
+```
+
+---
+
+### Task 5: Add `SocialWebviewEscapePanel` sub-component
+
+**Files:**
+- Create: `packages/ui/src/components/SocialWebviewEscapePanel.tsx`
+
+- [ ] **Step 1: Implement the component**
+
+```tsx
+import { TouchableOpacity, View, Text, StyleSheet } from 'react-native';
+import { colors, typography } from '../design-system/index.js';
+import { ConnectFallbackPanel } from './ConnectFallbackPanel.js';
+
+type Props = {
+  socialEscapeAttempted: boolean;
+  onOpenInExternalBrowser: () => void;
+  onOpenInPhantom: () => void;
+  onOpenInSolflare: () => void;
+};
+
+export function SocialWebviewEscapePanel({
+  socialEscapeAttempted,
+  onOpenInExternalBrowser,
+  onOpenInPhantom,
+  onOpenInSolflare,
+}: Props): JSX.Element {
+  return (
+    <View style={styles.container}>
+      <View style={styles.warning}>
+        <Text style={styles.warningTitle}>
+          Social app browsers block wallet extensions.
+        </Text>
+        <Text style={styles.warningDetail}>
+          Open this page in Safari or Chrome to connect your wallet, or use Phantom / Solflare directly below.
+        </Text>
+      </View>
+
+      <TouchableOpacity
+        onPress={onOpenInExternalBrowser}
+        disabled={socialEscapeAttempted}
+        accessibilityRole="button"
+        accessibilityLabel="Open in Browser"
+        style={[
+          styles.escapeButton,
+          socialEscapeAttempted && styles.escapeButtonDisabled,
+        ]}
+      >
+        <Text style={[
+          styles.escapeText,
+          socialEscapeAttempted && styles.escapeTextDisabled,
+        ]}>
+          Open in Browser
+        </Text>
+        <Text style={styles.escapeDetail}>
+          Opens this page in your default browser where wallet extensions work.
+        </Text>
+      </TouchableOpacity>
+
+      <ConnectFallbackPanel
+        showNoWalletWarning={false}
+        onOpenInPhantom={onOpenInPhantom}
+        onOpenInSolflare={onOpenInSolflare}
+      />
+    </View>
+  );
+}
+
+const styles = StyleSheet.create({
+  container: { width: '100%', marginTop: 16 },
+  warning: {
+    padding: 12,
+    backgroundColor: colors.card,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: colors.warn,
+    marginBottom: 16,
+  },
+  warningTitle: {
+    color: colors.warn,
+    fontSize: typography.fontSize.body,
+    fontWeight: typography.fontWeight.semibold,
+  },
+  warningDetail: {
+    color: colors.textBody,
+    fontSize: typography.fontSize.caption,
+    marginTop: 4,
+  },
+  escapeButton: {
+    padding: 16,
+    backgroundColor: colors.card,
+    borderRadius: 12,
+    marginBottom: 12,
+    borderWidth: 1,
+    borderColor: colors.safe,
+  },
+  escapeButtonDisabled: {
+    borderColor: colors.border,
+    opacity: 0.6,
+  },
+  escapeText: {
+    color: colors.safe,
+    fontSize: typography.fontSize.body,
+    fontWeight: typography.fontWeight.semibold,
+  },
+  escapeTextDisabled: {
+    color: colors.textFaint,
+  },
+  escapeDetail: {
+    color: colors.textBody,
+    fontSize: typography.fontSize.caption,
+    marginTop: 4,
+  },
+});
+```
+
+- [ ] **Step 2: Run typecheck**
+
+Run: `pnpm --filter @clmm/ui typecheck`
+Expected: passes.
+
+- [ ] **Step 3: Commit**
+
+```bash
+git add packages/ui/src/components/SocialWebviewEscapePanel.tsx
+git commit -m "feat(ui): add SocialWebviewEscapePanel component"
+```
+
+---
+
+### Task 6: Export new types and builder from `packages/ui/src/index.ts`
+
+**Files:**
+- Modify: `packages/ui/src/index.ts`
+
+- [ ] **Step 1: Add exports**
+
+In the "Wallet connection utils" type block, append `WalletPickerOption`, `ConnectScreenState`, and `ConnectScreenActions` to the existing `export type { ... } from './components/WalletConnectionUtils.js'` block.
+
+In the "View models" block, add:
 
 ```ts
+export { buildConnectScreenViewModel } from './view-models/WalletConnectionViewModel.js';
+export type {
+  ConnectScreenInputs,
+  ConnectScreenViewModel,
+} from './view-models/WalletConnectionViewModel.js';
+```
+
+Do not remove or change any existing exports. `buildWalletConnectViewModel`, `buildWalletSettingsViewModel`, `WalletConnectViewModel`, and `WalletSettingsViewModel` stay exported (still used by `WalletSettingsScreen`).
+
+- [ ] **Step 2: Run typecheck across the workspace**
+
+Run: `pnpm typecheck`
+Expected: passes (no consumers of the new exports yet, but the workspace must still build).
+
+- [ ] **Step 3: Commit**
+
+```bash
+git add packages/ui/src/index.ts
+git commit -m "feat(ui): export ConnectScreen view-model and types"
+```
+
+---
+
+## Phase B — Additive `apps/app` shell helpers
+
+### Task 7: Lift `detectFallbackState` to its own file
+
+**Files:**
+- Create: `apps/app/src/platform/detectFallbackState.ts`
+- Create: `apps/app/src/platform/detectFallbackState.test.ts`
+
+The existing inline `detectFallbackState` in `apps/app/app/connect.tsx` is moved verbatim, plus a small structural change: the constant `NO_WALLET_MESSAGE` moves with it and is exported (so the route file can reuse the same string when it cares about the error message, though after Task 9 it won't need to).
+
+- [ ] **Step 1: Write failing tests**
+
+Create `apps/app/src/platform/detectFallbackState.test.ts`:
+
+```ts
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
+import type { PlatformCapabilityState } from '@clmm/application/public';
+import { Platform } from 'react-native';
+
+import { detectFallbackState, NO_WALLET_MESSAGE } from './detectFallbackState';
+
+const CAPS_NO_WALLET: PlatformCapabilityState = {
+  nativePushAvailable: false,
+  browserNotificationAvailable: false,
+  nativeWalletAvailable: false,
+  browserWalletAvailable: false,
+  isMobileWeb: false,
+};
+
+const CAPS_BROWSER_OK: PlatformCapabilityState = {
+  ...CAPS_NO_WALLET,
+  browserWalletAvailable: true,
+};
+
+function withUserAgent(ua: string, fn: () => void) {
+  const original = globalThis.navigator;
+  Object.defineProperty(globalThis, 'navigator', {
+    value: { userAgent: ua },
+    configurable: true,
+    writable: true,
+  });
+  try {
+    fn();
+  } finally {
+    if (original) {
+      Object.defineProperty(globalThis, 'navigator', { value: original, configurable: true, writable: true });
+    }
+  }
+}
+
+beforeEach(() => {
+  vi.spyOn(Platform, 'OS', 'get').mockReturnValue('web');
+});
+afterEach(() => {
+  vi.restoreAllMocks();
+});
+
+describe('detectFallbackState', () => {
+  it('returns "none" when Platform.OS is not web', () => {
+    vi.spyOn(Platform, 'OS', 'get').mockReturnValue('ios');
+    expect(detectFallbackState(CAPS_NO_WALLET, null)).toBe('none');
+  });
+
+  it.each([
+    ['Mozilla/5.0 (iPhone; CPU iPhone OS 16_0 like Mac OS X) FBAN/FBIOS', 'social-webview'],
+    ['Mozilla/5.0 (Linux; Android 10) Instagram 200.0.0', 'social-webview'],
+    ['Mozilla/5.0 Twitter for iPhone', 'social-webview'],
+    ['Mozilla/5.0 TikTok 26.5', 'social-webview'],
+    ['Mozilla/5.0 LinkedInApp/9.0', 'social-webview'],
+    ['Mozilla/5.0 Line/12.0', 'social-webview'],
+  ])('detects social webview for UA %#', (ua, expected) => {
+    withUserAgent(ua, () => {
+      expect(detectFallbackState(CAPS_NO_WALLET, null)).toBe(expected);
+    });
+  });
+
+  it('returns "wallet-fallback" on mobile UA when no wallet detected', () => {
+    withUserAgent('Mozilla/5.0 (iPhone; CPU iPhone OS 16_0 like Mac OS X) Mobile/15E148', () => {
+      expect(detectFallbackState(CAPS_NO_WALLET, null)).toBe('wallet-fallback');
+    });
+  });
+
+  it('returns "desktop-no-wallet" on desktop UA when no wallet detected', () => {
+    withUserAgent('Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15) Chrome/120', () => {
+      expect(detectFallbackState(CAPS_NO_WALLET, null)).toBe('desktop-no-wallet');
+    });
+  });
+
+  it('returns "none" on mobile UA when browser wallet is available', () => {
+    withUserAgent('Mozilla/5.0 (iPhone; CPU iPhone OS 16_0 like Mac OS X) Mobile/15E148', () => {
+      expect(detectFallbackState(CAPS_BROWSER_OK, null)).toBe('none');
+    });
+  });
+
+  it('falls into wallet-fallback when connectError matches NO_WALLET_MESSAGE on mobile', () => {
+    withUserAgent('Mozilla/5.0 (iPhone; CPU iPhone OS 16_0 like Mac OS X) Mobile/15E148', () => {
+      expect(
+        detectFallbackState(CAPS_BROWSER_OK, new Error(NO_WALLET_MESSAGE)),
+      ).toBe('wallet-fallback');
+    });
+  });
+
+  it('returns "none" when capabilities is null', () => {
+    expect(detectFallbackState(null, null)).toBe('none');
+  });
+});
+```
+
+Note the last case: the existing inline implementation reads `platformCapabilities?.browserWalletAvailable`, so a `null` capabilities argument is equivalent to "no wallet detected." However, we don't want `null` capabilities to render the desktop-no-wallet panel before the user even sees a loading spinner. The view-model handles that by returning `loading-capabilities` when `capabilities === null` — so `detectFallbackState` returning `'none'` for null caps is harmless but worth a guard. The tests above pin this behavior.
+
+- [ ] **Step 2: Run tests to verify they fail**
+
+Run: `pnpm --filter @clmm/app test -- detectFallbackState`
+Expected: FAIL — file does not exist.
+
+- [ ] **Step 3: Implement `detectFallbackState`**
+
+Create `apps/app/src/platform/detectFallbackState.ts`:
+
+```ts
+import { Platform } from 'react-native';
+import type { PlatformCapabilityState } from '@clmm/application/public';
+import { isSocialAppWebView } from './browserWallet/walletDeepLinks';
+
+export const NO_WALLET_MESSAGE = 'No supported browser wallet detected on this device';
+
+export type FallbackState =
+  | 'none'
+  | 'wallet-fallback'
+  | 'desktop-no-wallet'
+  | 'social-webview';
+
+export function detectFallbackState(
+  platformCapabilities: PlatformCapabilityState | null,
+  connectError: Error | null,
+): FallbackState {
+  if (Platform.OS !== 'web') {
+    return 'none';
+  }
+  if (platformCapabilities === null) {
+    return 'none';
+  }
+  if (typeof navigator !== 'undefined' && isSocialAppWebView(navigator.userAgent)) {
+    return 'social-webview';
+  }
+
+  const noWalletDetected = !platformCapabilities.browserWalletAvailable;
+  const connectThrewNoWallet = connectError?.message === NO_WALLET_MESSAGE;
+
+  if (noWalletDetected || connectThrewNoWallet) {
+    const ua = typeof navigator !== 'undefined' ? navigator.userAgent : '';
+    if (/Mobi|Android|iPad/i.test(ua)) {
+      return 'wallet-fallback';
+    }
+    return 'desktop-no-wallet';
+  }
+
+  return 'none';
+}
+```
+
+- [ ] **Step 4: Run tests to verify they pass**
+
+Run: `pnpm --filter @clmm/app test -- detectFallbackState`
+Expected: all tests pass.
+
+- [ ] **Step 5: Run typecheck**
+
+Run: `pnpm --filter @clmm/app typecheck`
+Expected: passes.
+
+- [ ] **Step 6: Commit**
+
+```bash
+git add apps/app/src/platform/detectFallbackState.ts \
+        apps/app/src/platform/detectFallbackState.test.ts
+git commit -m "refactor(app): lift detectFallbackState into its own module"
+```
+
+---
+
+### Task 8: Add `useDiscoveryState` hook
+
+**Files:**
+- Create: `apps/app/src/platform/browserWallet/useDiscoveryState.ts`
+- Create: `apps/app/src/platform/browserWallet/useDiscoveryState.test.ts`
+
+The hook returns `'discovering' | 'ready' | 'timed-out'` from a `walletCount: number`. It is sticky: once `'ready'` or `'timed-out'`, it does not return to `'discovering'`. Once `'timed-out'`, it stays `'timed-out'` even if wallets later appear.
+
+- [ ] **Step 1: Write failing tests**
+
+Create `apps/app/src/platform/browserWallet/useDiscoveryState.test.ts`:
+
+```ts
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
+import { act, renderHook } from '@testing-library/react';
+import { useDiscoveryState, WALLET_DISCOVERY_TIMEOUT_MS } from './useDiscoveryState';
+
+beforeEach(() => {
+  vi.useFakeTimers();
+});
+afterEach(() => {
+  vi.useRealTimers();
+});
+
+describe('useDiscoveryState', () => {
+  it('starts at "discovering" with walletCount 0', () => {
+    const { result } = renderHook(({ count }) => useDiscoveryState(count), {
+      initialProps: { count: 0 },
+    });
+    expect(result.current).toBe('discovering');
+  });
+
+  it('transitions to "ready" when walletCount becomes >0 before timeout', () => {
+    const { result, rerender } = renderHook(({ count }) => useDiscoveryState(count), {
+      initialProps: { count: 0 },
+    });
+    expect(result.current).toBe('discovering');
+    rerender({ count: 1 });
+    expect(result.current).toBe('ready');
+  });
+
+  it('transitions to "timed-out" after WALLET_DISCOVERY_TIMEOUT_MS with walletCount 0', () => {
+    const { result } = renderHook(({ count }) => useDiscoveryState(count), {
+      initialProps: { count: 0 },
+    });
+    act(() => {
+      vi.advanceTimersByTime(WALLET_DISCOVERY_TIMEOUT_MS);
+    });
+    expect(result.current).toBe('timed-out');
+  });
+
+  it('stays "timed-out" even if walletCount later becomes >0 (sticky)', () => {
+    const { result, rerender } = renderHook(({ count }) => useDiscoveryState(count), {
+      initialProps: { count: 0 },
+    });
+    act(() => {
+      vi.advanceTimersByTime(WALLET_DISCOVERY_TIMEOUT_MS);
+    });
+    expect(result.current).toBe('timed-out');
+    rerender({ count: 2 });
+    expect(result.current).toBe('timed-out');
+  });
+
+  it('once "ready", does not return to "discovering" if walletCount drops to 0', () => {
+    const { result, rerender } = renderHook(({ count }) => useDiscoveryState(count), {
+      initialProps: { count: 1 },
+    });
+    expect(result.current).toBe('ready');
+    rerender({ count: 0 });
+    expect(result.current).toBe('ready');
+  });
+});
+```
+
+- [ ] **Step 2: Run tests to verify they fail**
+
+Run: `pnpm --filter @clmm/app test -- useDiscoveryState`
+Expected: FAIL — module does not exist.
+
+- [ ] **Step 3: Implement the hook**
+
+Create `apps/app/src/platform/browserWallet/useDiscoveryState.ts`:
+
+```ts
+import { useEffect, useState } from 'react';
+
+export const WALLET_DISCOVERY_TIMEOUT_MS = 2000;
+
+export type WalletDiscoveryState = 'discovering' | 'ready' | 'timed-out';
+
+export function useDiscoveryState(walletCount: number): WalletDiscoveryState {
+  const [timedOut, setTimedOut] = useState(false);
+
+  useEffect(() => {
+    if (walletCount > 0 || timedOut) return;
+    const timer = setTimeout(() => setTimedOut(true), WALLET_DISCOVERY_TIMEOUT_MS);
+    return () => clearTimeout(timer);
+  }, [walletCount, timedOut]);
+
+  if (timedOut) return 'timed-out';
+  if (walletCount > 0) return 'ready';
+  return 'discovering';
+}
+```
+
+Sticky behavior: the `'ready'` → `'discovering'` rollback is prevented because `walletCount > 0` is the only path to `'ready'`; if it drops back to 0, the hook returns `'discovering'`. **Wait — that contradicts the test "once ready, does not return to discovering."** We need real stickiness:
+
+```ts
+import { useEffect, useState } from 'react';
+
+export const WALLET_DISCOVERY_TIMEOUT_MS = 2000;
+
+export type WalletDiscoveryState = 'discovering' | 'ready' | 'timed-out';
+
+export function useDiscoveryState(walletCount: number): WalletDiscoveryState {
+  const [state, setState] = useState<WalletDiscoveryState>(
+    walletCount > 0 ? 'ready' : 'discovering',
+  );
+
+  useEffect(() => {
+    if (state === 'ready' || state === 'timed-out') return;
+    if (walletCount > 0) {
+      setState('ready');
+      return;
+    }
+    const timer = setTimeout(() => setState('timed-out'), WALLET_DISCOVERY_TIMEOUT_MS);
+    return () => clearTimeout(timer);
+  }, [walletCount, state]);
+
+  return state;
+}
+```
+
+Use this version. The earlier draft was wrong — the second draft is sticky in both directions.
+
+- [ ] **Step 4: Run tests to verify they pass**
+
+Run: `pnpm --filter @clmm/app test -- useDiscoveryState`
+Expected: all tests pass.
+
+- [ ] **Step 5: Run typecheck**
+
+Run: `pnpm --filter @clmm/app typecheck`
+Expected: passes.
+
+- [ ] **Step 6: Commit**
+
+```bash
+git add apps/app/src/platform/browserWallet/useDiscoveryState.ts \
+        apps/app/src/platform/browserWallet/useDiscoveryState.test.ts
+git commit -m "feat(app): add useDiscoveryState hook"
+```
+
+---
+
+## Phase C — Coupled rewrite of screen + route
+
+### Task 9: Rewrite `WalletConnectScreen` and `connect.tsx` together
+
+**Files:**
+- Rewrite: `packages/ui/src/screens/WalletConnectScreen.tsx`
+- Rewrite: `packages/ui/src/screens/WalletConnectScreen.test.tsx`
+- Rewrite: `apps/app/app/connect.tsx`
+
+This is one task because the screen's prop contract changes from `{platformCapabilities, connectionOutcome, isConnecting, onSelectWallet, onGoBack}` to `{viewModel, actions}`, and `connect.tsx` is the only consumer. Rewriting one without the other breaks `pnpm typecheck` for the workspace.
+
+- [ ] **Step 1: Write the new screen test file**
+
+Replace `packages/ui/src/screens/WalletConnectScreen.test.tsx` with the per-state-variant tests:
+
+```tsx
 import React from 'react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { cleanup, fireEvent, render, screen } from '@testing-library/react';
 import { WalletConnectScreen } from './WalletConnectScreen.js';
-import type { WalletConnectViewModel, WalletConnectActions } from '../view-models/WalletConnectionViewModel.js';
+import type {
+  ConnectScreenViewModel,
+} from '../view-models/WalletConnectionViewModel.js';
+import type {
+  ConnectScreenActions,
+  ConnectScreenState,
+  WalletPickerOption,
+} from '../components/WalletConnectionUtils.js';
 
 vi.mock('@expo/vector-icons/Feather', () => ({
   default: function MockFeather({ name, size, color }: { name: string; size: number; color: string }) {
@@ -388,216 +1110,573 @@ vi.mock('@expo/vector-icons/Feather', () => ({
   glyphMap: {},
 }));
 
-function makeVm(overrides: Partial<WalletConnectViewModel> = {}): WalletConnectViewModel {
+afterEach(() => {
+  cleanup();
+});
+
+const PHANTOM: WalletPickerOption = { id: 'phantom', name: 'Phantom', iconUri: null };
+const SOLFLARE: WalletPickerOption = { id: 'solflare', name: 'Solflare', iconUri: null };
+
+function makeVM(state: ConnectScreenState, overrides: Partial<ConnectScreenViewModel> = {}): ConnectScreenViewModel {
   return {
-    screenState: 'standard',
-    nativeWalletAvailable: false,
-    discovery: 'ready',
-    discoveredWallets: [],
-    fallback: 'none',
-    socialEscapeAttempted: false,
+    state,
+    outcome: null,
     isConnecting: false,
-    outcomeDisplay: null,
-    platformNotice: null,
     ...overrides,
   };
 }
 
-const noopActions: WalletConnectActions = {
-  onSelectNative: vi.fn(),
-  onSelectDiscoveredWallet: vi.fn(),
-  onConnectDefaultBrowser: vi.fn(),
-  onOpenPhantom: vi.fn(),
-  onOpenSolflare: vi.fn(),
-  onOpenInBrowser: vi.fn(),
-  onGoBack: vi.fn(),
-};
-
-afterEach(() => {
-  cleanup();
-  vi.clearAllMocks();
-});
+function makeActions(overrides: Partial<ConnectScreenActions> = {}): ConnectScreenActions {
+  return {
+    onSelectNativeWallet: vi.fn(),
+    onSelectBrowserWallet: vi.fn(),
+    onConnectDefaultBrowser: vi.fn(),
+    onOpenInExternalBrowser: vi.fn(),
+    onOpenInPhantom: vi.fn(),
+    onOpenInSolflare: vi.fn(),
+    onGoBack: vi.fn(),
+    onDismissOutcome: vi.fn(),
+    ...overrides,
+  };
+}
 
 describe('WalletConnectScreen', () => {
-  it('renders loading state', () => {
-    render(<WalletConnectScreen vm={makeVm({ screenState: 'loading' })} actions={noopActions} />);
-    expect(screen.getByText('Loading...')).toBeTruthy();
+  describe('hybrid layout (always visible)', () => {
+    it('renders title and subtitle in every state', () => {
+      render(<WalletConnectScreen viewModel={makeVM({ kind: 'discovering', nativeAvailable: false })} actions={makeActions()} />);
+      expect(screen.getByText('Protect your Orca positions')).toBeTruthy();
+      expect(screen.getByText(/concentrated liquidity range/)).toBeTruthy();
+    });
+
+    it('renders feature bullets in every state', () => {
+      render(<WalletConnectScreen viewModel={makeVM({ kind: 'discovering', nativeAvailable: false })} actions={makeActions()} />);
+      expect(screen.getByText('Read-only by default')).toBeTruthy();
+      expect(screen.getByText('Debounced breach logic')).toBeTruthy();
+      expect(screen.getByText('Action history')).toBeTruthy();
+    });
+
+    it('back button calls actions.onGoBack', () => {
+      const actions = makeActions();
+      render(<WalletConnectScreen viewModel={makeVM({ kind: 'discovering', nativeAvailable: false })} actions={actions} />);
+      fireEvent.click(screen.getByLabelText('Back'));
+      expect(actions.onGoBack).toHaveBeenCalled();
+    });
   });
 
-  it('renders social-webview state with warning and deep links', () => {
-    render(<WalletConnectScreen vm={makeVm({ screenState: 'social-webview', fallback: 'social-webview' })} actions={noopActions} />);
-    expect(screen.getByText(/Social app browsers block wallet extensions/)).toBeTruthy();
-    expect(screen.getByText('Open in Browser')).toBeTruthy();
-    expect(screen.getByText('Open in Phantom')).toBeTruthy();
-    expect(screen.getByText('Open in Solflare')).toBeTruthy();
+  describe('loading-capabilities', () => {
+    it('renders progressbar and no wallet buttons', () => {
+      render(<WalletConnectScreen viewModel={makeVM({ kind: 'loading-capabilities' })} actions={makeActions()} />);
+      expect(screen.getByRole('progressbar')).toBeTruthy();
+      expect(screen.queryByLabelText(/Connect/i)).toBeNull();
+    });
   });
 
-  it('disables Open in Browser when socialEscapeAttempted', () => {
-    render(<WalletConnectScreen vm={makeVm({ screenState: 'social-webview', socialEscapeAttempted: true })} actions={noopActions} />);
-    expect(screen.getByText('Open in Browser').closest('button') ?? screen.getByText('Open in Browser')).toBeTruthy();
+  describe('discovering', () => {
+    it('renders detection text', () => {
+      render(<WalletConnectScreen viewModel={makeVM({ kind: 'discovering', nativeAvailable: false })} actions={makeActions()} />);
+      expect(screen.getByText('Detecting browser wallets...')).toBeTruthy();
+    });
+
+    it('renders native button when nativeAvailable=true', () => {
+      const actions = makeActions();
+      render(<WalletConnectScreen viewModel={makeVM({ kind: 'discovering', nativeAvailable: true })} actions={actions} />);
+      const btn = screen.getByLabelText('Connect Mobile Wallet');
+      fireEvent.click(btn);
+      expect(actions.onSelectNativeWallet).toHaveBeenCalled();
+    });
   });
 
-  it('renders native wallet button when available', () => {
-    render(<WalletConnectScreen vm={makeVm({ nativeWalletAvailable: true })} actions={noopActions} />);
-    expect(screen.getByText('Connect Mobile Wallet')).toBeTruthy();
+  describe('ready', () => {
+    it('renders one row per browser wallet, each invoking onSelectBrowserWallet with its id', () => {
+      const actions = makeActions();
+      render(
+        <WalletConnectScreen
+          viewModel={makeVM({ kind: 'ready', nativeAvailable: false, browserWallets: [PHANTOM, SOLFLARE] })}
+          actions={actions}
+        />,
+      );
+      fireEvent.click(screen.getByLabelText('Connect Phantom'));
+      fireEvent.click(screen.getByLabelText('Connect Solflare'));
+      expect(actions.onSelectBrowserWallet).toHaveBeenNthCalledWith(1, 'phantom');
+      expect(actions.onSelectBrowserWallet).toHaveBeenNthCalledWith(2, 'solflare');
+    });
+
+    it('renders only the native button when browserWallets is empty and nativeAvailable=true', () => {
+      render(
+        <WalletConnectScreen
+          viewModel={makeVM({ kind: 'ready', nativeAvailable: true, browserWallets: [] })}
+          actions={makeActions()}
+        />,
+      );
+      expect(screen.getByLabelText('Connect Mobile Wallet')).toBeTruthy();
+      expect(screen.queryByLabelText(/Connect Phantom/)).toBeNull();
+    });
   });
 
-  it('renders discovering state', () => {
-    render(<WalletConnectScreen vm={makeVm({ discovery: 'discovering' })} actions={noopActions} />);
-    expect(screen.getByText('Detecting browser wallets...')).toBeTruthy();
+  describe('timed-out-discovery', () => {
+    it('renders the default-browser CTA invoking onConnectDefaultBrowser', () => {
+      const actions = makeActions();
+      render(
+        <WalletConnectScreen
+          viewModel={makeVM({ kind: 'timed-out-discovery', nativeAvailable: false })}
+          actions={actions}
+        />,
+      );
+      fireEvent.click(screen.getByLabelText('Connect Browser Wallet'));
+      expect(actions.onConnectDefaultBrowser).toHaveBeenCalled();
+    });
   });
 
-  it('renders single discovered wallet button', () => {
-    render(<WalletConnectScreen vm={makeVm({ discovery: 'ready', discoveredWallets: [{ id: 'phantom', name: 'Phantom', icon: null }] })} actions={noopActions} />);
-    expect(screen.getByText('Phantom')).toBeTruthy();
+  describe('social-webview', () => {
+    it('renders warning + Open in Browser CTA wired to onOpenInExternalBrowser', () => {
+      const actions = makeActions();
+      render(
+        <WalletConnectScreen
+          viewModel={makeVM({ kind: 'social-webview', socialEscapeAttempted: false })}
+          actions={actions}
+        />,
+      );
+      expect(screen.getByText('Social app browsers block wallet extensions.')).toBeTruthy();
+      fireEvent.click(screen.getByLabelText('Open in Browser'));
+      expect(actions.onOpenInExternalBrowser).toHaveBeenCalled();
+    });
+
+    it('renders Phantom and Solflare deep-link buttons', () => {
+      const actions = makeActions();
+      render(
+        <WalletConnectScreen
+          viewModel={makeVM({ kind: 'social-webview', socialEscapeAttempted: false })}
+          actions={actions}
+        />,
+      );
+      fireEvent.click(screen.getByLabelText('Open in Phantom'));
+      expect(actions.onOpenInPhantom).toHaveBeenCalled();
+      fireEvent.click(screen.getByLabelText('Open in Solflare'));
+      expect(actions.onOpenInSolflare).toHaveBeenCalled();
+    });
+
+    it('disables Open in Browser when socialEscapeAttempted=true', () => {
+      const actions = makeActions();
+      render(
+        <WalletConnectScreen
+          viewModel={makeVM({ kind: 'social-webview', socialEscapeAttempted: true })}
+          actions={actions}
+        />,
+      );
+      const btn = screen.getByLabelText('Open in Browser');
+      fireEvent.click(btn);
+      expect(actions.onOpenInExternalBrowser).not.toHaveBeenCalled();
+    });
   });
 
-  it('renders timed-out state with Connect Browser Wallet button', () => {
-    render(<WalletConnectScreen vm={makeVm({ discovery: 'timed-out' })} actions={noopActions} />);
-    expect(screen.getByText('Connect Browser Wallet')).toBeTruthy();
+  describe('wallet-fallback', () => {
+    it('renders no-wallet warning + Phantom/Solflare deep links', () => {
+      render(
+        <WalletConnectScreen
+          viewModel={makeVM({ kind: 'wallet-fallback', nativeAvailable: false })}
+          actions={makeActions()}
+        />,
+      );
+      expect(screen.getByText('No wallet extension detected in this browser.')).toBeTruthy();
+      expect(screen.getByLabelText('Open in Phantom')).toBeTruthy();
+      expect(screen.getByLabelText('Open in Solflare')).toBeTruthy();
+    });
   });
 
-  it('renders wallet-fallback with deep links', () => {
-    render(<WalletConnectScreen vm={makeVm({ fallback: 'wallet-fallback' })} actions={noopActions} />);
-    expect(screen.getByText(/No wallet extension detected/)).toBeTruthy();
-    expect(screen.getByText('Open in Phantom')).toBeTruthy();
+  describe('desktop-no-wallet', () => {
+    it('renders install copy and no wallet buttons', () => {
+      render(
+        <WalletConnectScreen
+          viewModel={makeVM({ kind: 'desktop-no-wallet' })}
+          actions={makeActions()}
+        />,
+      );
+      expect(screen.getByText(/Install a Solana wallet extension/i)).toBeTruthy();
+      expect(screen.queryByLabelText(/Connect Mobile Wallet/)).toBeNull();
+    });
   });
 
-  it('renders desktop-no-wallet with install guidance', () => {
-    render(<WalletConnectScreen vm={makeVm({ fallback: 'desktop-no-wallet' })} actions={noopActions} />);
-    expect(screen.getByText(/No wallet extension detected/)).toBeTruthy();
-    expect(screen.getByText(/Install a Solana wallet extension/)).toBeTruthy();
+  describe('outcome banner', () => {
+    it('renders Connection Failed for failed outcome', () => {
+      render(
+        <WalletConnectScreen
+          viewModel={makeVM({ kind: 'discovering', nativeAvailable: false }, {
+            outcome: { title: 'Connection Failed', detail: 'reason: x', severity: 'error' },
+          })}
+          actions={makeActions()}
+        />,
+      );
+      expect(screen.getByText('Connection Failed')).toBeTruthy();
+    });
+
+    it('renders nothing when outcome is null', () => {
+      render(
+        <WalletConnectScreen
+          viewModel={makeVM({ kind: 'discovering', nativeAvailable: false })}
+          actions={makeActions()}
+        />,
+      );
+      expect(screen.queryByText('Connection Failed')).toBeNull();
+    });
   });
 
-  it('renders outcome banner on error', () => {
-    render(<WalletConnectScreen vm={makeVm({ outcomeDisplay: { title: 'Connection Failed', detail: 'Could not connect', severity: 'error' } })} actions={noopActions} />);
-    expect(screen.getByText('Connection Failed')).toBeTruthy();
-  });
-
-  it('renders Connecting... when isConnecting', () => {
-    render(<WalletConnectScreen vm={makeVm({ isConnecting: true })} actions={noopActions} />);
-    expect(screen.getByText('Connecting...')).toBeTruthy();
-  });
-
-  it('calls onSelectNative when native wallet button pressed', () => {
-    const actions = { ...noopActions, onSelectNative: vi.fn() };
-    render(<WalletConnectScreen vm={makeVm({ nativeWalletAvailable: true })} actions={actions} />);
-    fireEvent.click(screen.getByText('Connect Mobile Wallet'));
-    expect(actions.onSelectNative).toHaveBeenCalled();
-  });
-
-  it('calls onGoBack when Go Back pressed', () => {
-    const actions = { ...noopActions, onGoBack: vi.fn() };
-    render(<WalletConnectScreen vm={makeVm()} actions={actions} />);
-    fireEvent.click(screen.getByText('Go Back'));
-    expect(actions.onGoBack).toHaveBeenCalled();
-  });
-
-  it('calls onSelectDiscoveredWallet when a discovered wallet button is pressed', () => {
-    const actions = { ...noopActions, onSelectDiscoveredWallet: vi.fn() };
-    render(<WalletConnectScreen vm={makeVm({ discovery: 'ready', discoveredWallets: [{ id: 'phantom', name: 'Phantom', icon: null }] })} actions={actions} />);
-    fireEvent.click(screen.getByText('Phantom'));
-    expect(actions.onSelectDiscoveredWallet).toHaveBeenCalledWith('phantom');
-  });
-
-  it('calls onConnectDefaultBrowser when timed-out button pressed', () => {
-    const actions = { ...noopActions, onConnectDefaultBrowser: vi.fn() };
-    render(<WalletConnectScreen vm={makeVm({ discovery: 'timed-out' })} actions={actions} />);
-    fireEvent.click(screen.getByText('Connect Browser Wallet'));
-    expect(actions.onConnectDefaultBrowser).toHaveBeenCalled();
-  });
-
-  it('calls onOpenPhantom and onOpenSolflare for deep link buttons', () => {
-    const actions = { ...noopActions, onOpenPhantom: vi.fn(), onOpenSolflare: vi.fn() };
-    render(<WalletConnectScreen vm={makeVm({ fallback: 'wallet-fallback' })} actions={actions} />);
-    fireEvent.click(screen.getByText('Open in Phantom'));
-    expect(actions.onOpenPhantom).toHaveBeenCalled();
-    fireEvent.click(screen.getByText('Open in Solflare'));
-    expect(actions.onOpenSolflare).toHaveBeenCalled();
-  });
-
-  it('renders platform notice', () => {
-    render(<WalletConnectScreen vm={makeVm({ platformNotice: { message: 'No wallet detected', severity: 'error' } })} actions={noopActions} />);
-    expect(screen.getByText('No wallet detected')).toBeTruthy();
+  describe('isConnecting', () => {
+    it('renders Connecting... when isConnecting=true', () => {
+      render(
+        <WalletConnectScreen
+          viewModel={makeVM({ kind: 'discovering', nativeAvailable: true }, { isConnecting: true })}
+          actions={makeActions()}
+        />,
+      );
+      expect(screen.getByText('Connecting...')).toBeTruthy();
+    });
   });
 });
 ```
 
-- [ ] **Step 2: Run tests**
+- [ ] **Step 2: Run tests to verify they fail**
 
-Run: `pnpm --filter @clmm/ui test -- --run`
-Expected: ALL PASS
+Run: `pnpm --filter @clmm/ui test -- WalletConnectScreen`
+Expected: FAIL — old props removed, new props missing.
 
-- [ ] **Step 3: Commit**
+- [ ] **Step 3: Rewrite `WalletConnectScreen.tsx`**
 
-```bash
-git add packages/ui/src/screens/WalletConnectScreen.test.tsx
-git commit -m "test(ui): rewrite WalletConnectScreen tests for view model + actions props"
+Replace `packages/ui/src/screens/WalletConnectScreen.tsx` entirely with the state-driven implementation:
+
+```tsx
+import { useEffect, useRef } from 'react';
+import {
+  View,
+  Text,
+  TouchableOpacity,
+  ActivityIndicator,
+  ScrollView,
+  Animated,
+  StyleSheet,
+} from 'react-native';
+import { colors, typography } from '../design-system/index.js';
+import { Icon } from '../components/Icon.js';
+import { ConnectWalletPicker } from '../components/ConnectWalletPicker.js';
+import { ConnectFallbackPanel } from '../components/ConnectFallbackPanel.js';
+import { SocialWebviewEscapePanel } from '../components/SocialWebviewEscapePanel.js';
+import type {
+  ConnectScreenActions,
+  ConnectScreenState,
+} from '../components/WalletConnectionUtils.js';
+import type { ConnectScreenViewModel } from '../view-models/WalletConnectionViewModel.js';
+
+type Props = {
+  viewModel: ConnectScreenViewModel;
+  actions: ConnectScreenActions;
+};
+
+const features = [
+  { title: 'Read-only by default', description: 'We only request signatures when you approve an exit.' },
+  { title: 'Debounced breach logic', description: 'Requires sustained breach before acting, not single wicks.' },
+  { title: 'Action history', description: 'Every exit is logged with transaction details.' },
+];
+
+function HeroAnimation() {
+  const pulseAnim = useRef(new Animated.Value(0)).current;
+  useEffect(() => {
+    const animation = Animated.loop(
+      Animated.sequence([
+        Animated.timing(pulseAnim, { toValue: 1, duration: 1500, useNativeDriver: true }),
+        Animated.timing(pulseAnim, { toValue: 0, duration: 1500, useNativeDriver: true }),
+      ]),
+    );
+    animation.start();
+    return () => animation.stop();
+  }, [pulseAnim]);
+  const scale = pulseAnim.interpolate({ inputRange: [0, 1], outputRange: [1, 3.3] });
+  const opacity = pulseAnim.interpolate({ inputRange: [0, 1], outputRange: [0.35, 0] });
+  return (
+    <View style={styles.heroContainer}>
+      <View style={[styles.ring, styles.ringOuter]} />
+      <View style={[styles.ring, styles.ringMiddle]} />
+      <View style={[styles.ring, styles.ringInner]} />
+      <View style={styles.centerDot} />
+      <Animated.View style={[styles.pulseRing, { transform: [{ scale }], opacity }]} />
+    </View>
+  );
+}
+
+function FeatureRow({ title, description }: { title: string; description: string }) {
+  return (
+    <View style={styles.featureRow}>
+      <View style={styles.featureIcon}>
+        <Icon name="check" size={16} color={colors.safe} />
+      </View>
+      <View style={styles.featureText}>
+        <Text style={styles.featureTitle}>{title}</Text>
+        <Text style={styles.featureDescription}>{description}</Text>
+      </View>
+    </View>
+  );
+}
+
+function NativeWalletButton({ disabled, onPress }: { disabled: boolean; onPress: () => void }) {
+  return (
+    <TouchableOpacity
+      onPress={onPress}
+      disabled={disabled}
+      accessibilityRole="button"
+      accessibilityLabel="Connect Mobile Wallet"
+      style={styles.primaryButton}
+    >
+      <Text style={styles.primaryButtonLabel}>Connect Mobile Wallet</Text>
+      <Text style={styles.primaryButtonDetail}>Sign transactions with your mobile wallet app.</Text>
+    </TouchableOpacity>
+  );
+}
+
+function DefaultBrowserButton({ disabled, onPress }: { disabled: boolean; onPress: () => void }) {
+  return (
+    <TouchableOpacity
+      onPress={onPress}
+      disabled={disabled}
+      accessibilityRole="button"
+      accessibilityLabel="Connect Browser Wallet"
+      style={styles.primaryButton}
+    >
+      <Text style={styles.primaryButtonLabel}>Connect Browser Wallet</Text>
+      <Text style={styles.primaryButtonDetail}>Sign transactions with your browser wallet extension.</Text>
+    </TouchableOpacity>
+  );
+}
+
+function DiscoveringRow() {
+  return (
+    <View style={styles.discoveringRow}>
+      <ActivityIndicator size="small" color={colors.textFaint} />
+      <Text style={styles.discoveringText}>Detecting browser wallets...</Text>
+    </View>
+  );
+}
+
+function StateBody({ state, isConnecting, actions }: {
+  state: ConnectScreenState;
+  isConnecting: boolean;
+  actions: ConnectScreenActions;
+}) {
+  switch (state.kind) {
+    case 'loading-capabilities':
+      return <ActivityIndicator role="progressbar" color={colors.safe} />;
+    case 'social-webview':
+      return (
+        <SocialWebviewEscapePanel
+          socialEscapeAttempted={state.socialEscapeAttempted}
+          onOpenInExternalBrowser={actions.onOpenInExternalBrowser}
+          onOpenInPhantom={actions.onOpenInPhantom}
+          onOpenInSolflare={actions.onOpenInSolflare}
+        />
+      );
+    case 'discovering':
+      return (
+        <View style={styles.body}>
+          {state.nativeAvailable ? <NativeWalletButton disabled={isConnecting} onPress={actions.onSelectNativeWallet} /> : null}
+          <DiscoveringRow />
+        </View>
+      );
+    case 'ready':
+      return (
+        <View style={styles.body}>
+          {state.nativeAvailable ? <NativeWalletButton disabled={isConnecting} onPress={actions.onSelectNativeWallet} /> : null}
+          {state.browserWallets.length > 0 ? (
+            <ConnectWalletPicker
+              wallets={state.browserWallets}
+              disabled={isConnecting}
+              onSelect={actions.onSelectBrowserWallet}
+            />
+          ) : null}
+        </View>
+      );
+    case 'timed-out-discovery':
+      return (
+        <View style={styles.body}>
+          {state.nativeAvailable ? <NativeWalletButton disabled={isConnecting} onPress={actions.onSelectNativeWallet} /> : null}
+          <DefaultBrowserButton disabled={isConnecting} onPress={actions.onConnectDefaultBrowser} />
+        </View>
+      );
+    case 'wallet-fallback':
+      return (
+        <View style={styles.body}>
+          {state.nativeAvailable ? <NativeWalletButton disabled={isConnecting} onPress={actions.onSelectNativeWallet} /> : null}
+          <ConnectFallbackPanel
+            showNoWalletWarning={!state.nativeAvailable}
+            onOpenInPhantom={actions.onOpenInPhantom}
+            onOpenInSolflare={actions.onOpenInSolflare}
+          />
+        </View>
+      );
+    case 'desktop-no-wallet':
+      return (
+        <View style={styles.warning}>
+          <Text style={styles.warningTitle}>No wallet extension detected.</Text>
+          <Text style={styles.warningDetail}>
+            Install a Solana wallet extension like Phantom or Solflare, then refresh this page.
+          </Text>
+        </View>
+      );
+  }
+}
+
+export function WalletConnectScreen({ viewModel, actions }: Props): JSX.Element {
+  return (
+    <View style={styles.container}>
+      <ScrollView style={styles.scrollView} contentContainerStyle={styles.contentContainer}>
+        <TouchableOpacity onPress={actions.onGoBack} accessibilityLabel="Back" style={styles.backButton}>
+          <Icon name="chevronLeft" size={20} color={colors.textBody} />
+        </TouchableOpacity>
+
+        <HeroAnimation />
+
+        <Text style={styles.title}>Protect your Orca positions</Text>
+        <Text style={styles.subtitle}>
+          We monitor your concentrated liquidity range and prepare a safe one-click exit the moment price breaches it.
+        </Text>
+
+        {viewModel.outcome ? (
+          <View style={[styles.outcomeBanner, outcomeBorderStyle(viewModel.outcome.severity)]}>
+            <Text style={[styles.outcomeTitle, outcomeTitleStyle(viewModel.outcome.severity)]}>
+              {viewModel.outcome.title}
+            </Text>
+            {viewModel.outcome.detail ? (
+              <Text style={styles.outcomeDetail}>{viewModel.outcome.detail}</Text>
+            ) : null}
+            <TouchableOpacity onPress={actions.onDismissOutcome} accessibilityLabel="Dismiss outcome" style={styles.dismiss}>
+              <Icon name="x" size={14} color={colors.textFaint} />
+            </TouchableOpacity>
+          </View>
+        ) : null}
+
+        <StateBody state={viewModel.state} isConnecting={viewModel.isConnecting} actions={actions} />
+
+        {viewModel.isConnecting ? (
+          <View style={styles.connectingContainer}>
+            <ActivityIndicator size="large" color={colors.safe} />
+            <Text style={styles.connectingText}>Connecting...</Text>
+          </View>
+        ) : null}
+
+        <View style={styles.featuresContainer}>
+          {features.map((f) => (
+            <FeatureRow key={f.title} title={f.title} description={f.description} />
+          ))}
+        </View>
+      </ScrollView>
+    </View>
+  );
+}
+
+function outcomeBorderStyle(severity: 'success' | 'error' | 'info' | 'warning') {
+  return {
+    borderColor:
+      severity === 'error' ? colors.breachAccent
+      : severity === 'warning' ? colors.warn
+      : severity === 'success' ? colors.safe
+      : colors.border,
+  };
+}
+function outcomeTitleStyle(severity: 'success' | 'error' | 'info' | 'warning') {
+  return {
+    color:
+      severity === 'error' ? colors.breachAccent
+      : severity === 'warning' ? colors.warn
+      : severity === 'success' ? colors.safe
+      : colors.textPrimary,
+  };
+}
+
+const styles = StyleSheet.create({
+  container: { flex: 1, backgroundColor: colors.appBackground },
+  scrollView: { flex: 1 },
+  contentContainer: { paddingVertical: 40, paddingHorizontal: 20, alignItems: 'center' },
+  backButton: { position: 'absolute', top: 16, left: 16, padding: 8, zIndex: 10 },
+  heroContainer: { width: 120, height: 120, marginTop: 20, marginBottom: 24, justifyContent: 'center', alignItems: 'center' },
+  ring: { position: 'absolute', borderRadius: 999, borderWidth: 1 },
+  ringOuter: { width: 116, height: 116, borderColor: 'rgba(255,255,255,0.06)' },
+  ringMiddle: { width: 88, height: 88, borderColor: 'rgba(255,255,255,0.10)' },
+  ringInner: { width: 60, height: 60, borderColor: colors.safe, borderStyle: 'dashed', borderWidth: 1 },
+  centerDot: { width: 12, height: 12, borderRadius: 999, backgroundColor: colors.textPrimary },
+  pulseRing: { position: 'absolute', width: 12, height: 12, borderRadius: 999, backgroundColor: colors.textPrimary },
+  title: { color: colors.textPrimary, fontSize: typography.fontSize.display, fontWeight: typography.fontWeight.semibold, letterSpacing: -0.02 * 22, marginBottom: 8, textAlign: 'center' },
+  subtitle: { color: colors.textBody, fontSize: typography.fontSize.body, lineHeight: typography.fontSize.body * typography.lineHeight.normal, textAlign: 'center', maxWidth: 300, marginBottom: 28 },
+  outcomeBanner: { width: '100%', maxWidth: 320, padding: 12, paddingRight: 32, backgroundColor: colors.card, borderRadius: 12, borderWidth: 1, marginBottom: 16, position: 'relative' },
+  outcomeTitle: { fontSize: typography.fontSize.body, fontWeight: typography.fontWeight.semibold },
+  outcomeDetail: { color: colors.textBody, fontSize: typography.fontSize.caption, marginTop: 4 },
+  dismiss: { position: 'absolute', top: 8, right: 8, padding: 6 },
+  body: { width: '100%', maxWidth: 320, marginTop: 24 },
+  primaryButton: { padding: 16, backgroundColor: colors.card, borderRadius: 12, marginBottom: 12, borderWidth: 1, borderColor: colors.border },
+  primaryButtonLabel: { color: colors.textPrimary, fontSize: typography.fontSize.body, fontWeight: typography.fontWeight.semibold },
+  primaryButtonDetail: { color: colors.textBody, fontSize: typography.fontSize.caption, marginTop: 4 },
+  discoveringRow: { flexDirection: 'row', alignItems: 'center', gap: 12, padding: 16, backgroundColor: colors.card, borderRadius: 12, marginBottom: 12, borderWidth: 1, borderColor: colors.border },
+  discoveringText: { color: colors.textFaint, fontSize: typography.fontSize.caption },
+  warning: { width: '100%', maxWidth: 320, padding: 12, backgroundColor: colors.card, borderRadius: 12, borderWidth: 1, borderColor: colors.warn, marginTop: 24 },
+  warningTitle: { color: colors.warn, fontSize: typography.fontSize.body, fontWeight: typography.fontWeight.semibold },
+  warningDetail: { color: colors.textBody, fontSize: typography.fontSize.caption, marginTop: 4 },
+  connectingContainer: { marginTop: 32, alignItems: 'center' },
+  connectingText: { color: colors.textBody, marginTop: 12, fontSize: typography.fontSize.body },
+  featuresContainer: { width: '100%', maxWidth: 320, marginTop: 28, gap: 10 },
+  featureRow: { flexDirection: 'row', gap: 12, paddingVertical: 10, paddingHorizontal: 2 },
+  featureIcon: { marginTop: 2 },
+  featureText: { flex: 1 },
+  featureTitle: { fontSize: 13, fontWeight: typography.fontWeight.semibold, color: colors.textPrimary },
+  featureDescription: { fontSize: 12, color: colors.textFaint },
+});
 ```
 
----
+If `colors.x` ("the dismiss icon `Icon` name") doesn't exist, check `packages/ui/src/components/Icon.tsx` for available icons. If `'x'` is not registered, omit the dismiss icon and label the dismiss `TouchableOpacity` with text instead. Adjust the `Icon name="x"` call accordingly.
 
-### Task 5: Strip connect.tsx to thin route shell
+- [ ] **Step 4: Run screen tests**
 
-**Files:**
-- Modify: `apps/app/app/connect.tsx`
+Run: `pnpm --filter @clmm/ui test -- WalletConnectScreen`
+Expected: all tests pass.
 
-This is the boundary compliance task. The route becomes a thin orchestrator that wires hooks, builds the view model, defines action callbacks, and renders `<WalletConnectScreen vm={vm} actions={actions} />`.
+- [ ] **Step 5: Rewrite `apps/app/app/connect.tsx`**
 
-- [ ] **Step 1: Rewrite connect.tsx as thin shell**
-
-Replace the entire file. The new file should be ~70-80 lines:
+Replace `apps/app/app/connect.tsx` entirely:
 
 ```tsx
 import { useEffect, useMemo, useState } from 'react';
-import { Platform } from 'react-native';
-import { useRouter } from 'expo-router';
+import { Linking } from 'react-native';
+import { useRouter, useLocalSearchParams } from 'expo-router';
 import { useStore } from 'zustand';
-import type { PlatformCapabilityState } from '@clmm/application/public';
 import {
   WalletConnectScreen,
-  buildWalletConnectViewModel,
+  buildConnectScreenViewModel,
+  type ConnectScreenActions,
+  type WalletPickerOption,
 } from '@clmm/ui';
-import type { FallbackState, WalletDiscoveryState, DiscoveredWallet, WalletConnectActions } from '@clmm/ui';
+import type { PlatformCapabilityState } from '@clmm/application/public';
 import { platformCapabilityAdapter, walletPlatform } from '../src/composition/index';
 import { useBrowserWalletConnect } from '../src/platform/browserWallet/index';
-import { isSocialAppWebView } from '../src/platform/browserWallet/walletDeepLinks';
+import { useDiscoveryState } from '../src/platform/browserWallet/useDiscoveryState';
+import {
+  buildPhantomBrowseUrl,
+  buildSolflareBrowseUrl,
+  openInExternalBrowser,
+} from '../src/platform/browserWallet/walletDeepLinks';
+import { detectFallbackState } from '../src/platform/detectFallbackState';
 import { mapWalletErrorToOutcome } from '../src/platform/walletConnection';
 import { navigateRoute } from '../src/platform/webNavigation';
+import { parseReturnTo } from '../src/wallet-boot/parseReturnTo';
 import { walletSessionStore } from '../src/state/walletSessionStore';
 import { enrollWalletForMonitoring } from '../src/api/wallets';
 
-const NO_WALLET_MESSAGE = 'No supported browser wallet detected on this device';
-const WALLET_DISCOVERY_TIMEOUT_MS = 2000;
-
-function detectFallbackState(
-  platformCapabilities: PlatformCapabilityState | null,
-  connectError: Error | null,
-): FallbackState {
-  if (Platform.OS !== 'web') {
-    return 'none';
-  }
-
-  if (typeof navigator !== 'undefined' && isSocialAppWebView(navigator.userAgent)) {
-    return 'social-webview';
-  }
-
-  const noWalletDetected = !platformCapabilities?.browserWalletAvailable;
-  const connectThrewNoWallet = connectError?.message === NO_WALLET_MESSAGE;
-
-  if (noWalletDetected || connectThrewNoWallet) {
-    const isMobile = /Mobi|Android|iPad/i.test(typeof navigator !== 'undefined' ? navigator.userAgent : '');
-    if (isMobile) {
-      return 'wallet-fallback';
-    }
-    return 'desktop-no-wallet';
-  }
-
-  return 'none';
-}
+const FALLBACK_PLATFORM_CAPABILITIES: PlatformCapabilityState = {
+  nativePushAvailable: false,
+  browserNotificationAvailable: false,
+  nativeWalletAvailable: false,
+  browserWalletAvailable: false,
+  isMobileWeb: false,
+};
 
 export default function ConnectRoute() {
   const router = useRouter();
+  const params = useLocalSearchParams<{ returnTo?: string | string[] }>();
+  const returnTo = useMemo(() => parseReturnTo(params.returnTo), [params.returnTo]);
+
   const platformCapabilities = useStore(walletSessionStore, (s) => s.platformCapabilities);
   const connectionOutcome = useStore(walletSessionStore, (s) => s.connectionOutcome);
   const isConnecting = useStore(walletSessionStore, (s) => s.isConnecting);
@@ -607,42 +1686,38 @@ export default function ConnectRoute() {
   const markOutcome = useStore(walletSessionStore, (s) => s.markOutcome);
   const clearOutcome = useStore(walletSessionStore, (s) => s.clearOutcome);
 
-  const [socialEscapeAttempted, setSocialEscapeAttempted] = useState(false);
-  const [discoveryTimedOut, setDiscoveryTimedOut] = useState(false);
-
   const browserConnect = useBrowserWalletConnect();
-  const walletCount = browserConnect.wallets.length;
-
-  const discovery: WalletDiscoveryState = useMemo(() => {
-    if (walletCount > 0) return 'ready';
-    if (discoveryTimedOut) return 'timed-out';
-    return 'discovering';
-  }, [walletCount, discoveryTimedOut]);
-
-  useEffect(() => {
-    if (walletCount > 0 || discoveryTimedOut) return;
-    const timer = setTimeout(() => setDiscoveryTimedOut(true), WALLET_DISCOVERY_TIMEOUT_MS);
-    return () => clearTimeout(timer);
-  }, [walletCount, discoveryTimedOut]);
-
-  const fallback = useMemo(
-    () => detectFallbackState(platformCapabilities, browserConnect.error),
-    [platformCapabilities, browserConnect.error],
-  );
-
-  const discoveredWallets: DiscoveredWallet[] = useMemo(
-    () => browserConnect.wallets.map((w) => ({ id: w.id, name: w.name, icon: w.icon })),
-    [browserConnect.wallets],
-  );
+  const discoveryState = useDiscoveryState(browserConnect.wallets.length);
+  const [socialEscapeAttempted, setSocialEscapeAttempted] = useState(false);
 
   useEffect(() => {
     let active = true;
     void platformCapabilityAdapter
       .getCapabilities()
-      .then((caps) => { if (active) setPlatformCapabilities(caps); })
-      .catch(() => { if (active) setPlatformCapabilities({ nativePushAvailable: false, browserNotificationAvailable: false, nativeWalletAvailable: false, browserWalletAvailable: false, isMobileWeb: false }); });
+      .then((c) => { if (active) setPlatformCapabilities(c); })
+      .catch(() => { if (active) setPlatformCapabilities(FALLBACK_PLATFORM_CAPABILITIES); });
     return () => { active = false; };
   }, [setPlatformCapabilities]);
+
+  const fallbackState = useMemo(
+    () => detectFallbackState(platformCapabilities, browserConnect.error),
+    [platformCapabilities, browserConnect.error],
+  );
+
+  const browserWallets: WalletPickerOption[] = useMemo(
+    () => browserConnect.wallets.map((w) => ({ id: w.id, name: w.name, iconUri: w.icon || null })),
+    [browserConnect.wallets],
+  );
+
+  const viewModel = buildConnectScreenViewModel({
+    capabilities: platformCapabilities,
+    fallbackState,
+    discoveryState,
+    browserWallets,
+    connectionOutcome,
+    isConnecting,
+    socialEscapeAttempted,
+  });
 
   function handleConnectionError(error: unknown) {
     const outcome = mapWalletErrorToOutcome(error);
@@ -653,138 +1728,114 @@ export default function ConnectRoute() {
     markOutcome(outcome);
   }
 
-  const vm = buildWalletConnectViewModel({
-    platformCapabilities,
-    discovery,
-    discoveredWallets,
-    fallback,
-    socialEscapeAttempted,
-    isConnecting,
-    connectionOutcome,
-  });
+  function onConnectSuccess(walletAddress: string, kind: 'native' | 'browser') {
+    markConnected({ walletAddress, connectionKind: kind });
+    enrollWalletForMonitoring(walletAddress).catch((e) => console.warn('Wallet enrollment failed:', e));
+    navigateRoute({ router, path: returnTo, method: 'replace' });
+  }
 
-  const actions: WalletConnectActions = useMemo(() => ({
-    onSelectNative: () => {
+  const actions: ConnectScreenActions = {
+    onSelectNativeWallet: async () => {
       beginConnection();
-      void walletPlatform.connectNativeWallet()
-        .then((address) => { markConnected({ walletAddress: address, connectionKind: 'native' }); void enrollWalletForMonitoring(address); navigateRoute({ router, path: '/(tabs)/positions', method: 'replace' }); })
-        .catch(handleConnectionError);
+      try { onConnectSuccess(await walletPlatform.connectNativeWallet(), 'native'); }
+      catch (e) { handleConnectionError(e); }
     },
-    onSelectDiscoveredWallet: (walletId: string) => {
+    onSelectBrowserWallet: async (id) => {
       beginConnection();
-      void browserConnect.connect(walletId)
-        .then(({ address }) => { markConnected({ walletAddress: address, connectionKind: 'browser' }); void enrollWalletForMonitoring(address); navigateRoute({ router, path: '/(tabs)/positions', method: 'replace' }); })
-        .catch(handleConnectionError);
+      try { const { address } = await browserConnect.connect(id); onConnectSuccess(address, 'browser'); }
+      catch (e) { handleConnectionError(e); }
     },
-    onConnectDefaultBrowser: () => {
+    onConnectDefaultBrowser: async () => {
       beginConnection();
-      void browserConnect.connect()
-        .then(({ address }) => { markConnected({ walletAddress: address, connectionKind: 'browser' }); void enrollWalletForMonitoring(address); navigateRoute({ router, path: '/(tabs)/positions', method: 'replace' }); })
-        .catch(handleConnectionError);
+      try { const { address } = await browserConnect.connect(); onConnectSuccess(address, 'browser'); }
+      catch (e) { handleConnectionError(e); }
     },
-    onOpenPhantom: () => {
-      if (typeof window !== 'undefined') {
-        void import('react-native/Libraries/Linking/Linking').then(({ default: Linking }) => { Linking.openURL(`https://phantom.app/ul/browse/${encodeURIComponent(window.location.href)}?ref=${encodeURIComponent(window.location.href)}`); });
-      }
-    },
-    onOpenSolflare: () => {
-      if (typeof window !== 'undefined') {
-        void import('react-native/Libraries/Linking/Linking').then(({ default: Linking }) => { Linking.openURL(`https://solflare.com/ul/browse/${encodeURIComponent(window.location.href)}`); });
-      }
-    },
-    onOpenInBrowser: () => {
+    onOpenInExternalBrowser: () => {
       setSocialEscapeAttempted(true);
-      if (typeof window !== 'undefined') {
-        window.open(window.location.href, '_blank');
-      }
+      openInExternalBrowser(window.location.href);
     },
-    onGoBack: () => {
-      clearOutcome();
-      router.back();
-    },
-  }), [vm, browserConnect, router, beginConnection, markConnected, markOutcome, clearOutcome]);
+    onOpenInPhantom: () => void Linking.openURL(buildPhantomBrowseUrl(window.location.href)),
+    onOpenInSolflare: () => void Linking.openURL(buildSolflareBrowseUrl(window.location.href)),
+    onGoBack: () => { clearOutcome(); router.back(); },
+    onDismissOutcome: clearOutcome,
+  };
 
-  return <WalletConnectScreen vm={vm} actions={actions} />;
+  return <WalletConnectScreen viewModel={viewModel} actions={actions} />;
 }
 ```
 
-Note: The `onOpenPhantom` and `onOpenSolflare` callbacks use the deep-link URL builders from `walletDeepLinks.ts` — keep importing `buildPhantomBrowseUrl`, `buildSolflareBrowseUrl`, and `openInExternalBrowser` and use them inside the actions. The above is simplified; use the actual imports from `walletDeepLinks.ts`.
+- [ ] **Step 6: Run workspace typecheck**
 
-- [ ] **Step 2: Remove unused imports**
+Run: `pnpm typecheck`
+Expected: passes across all packages.
 
-After rewriting, remove imports that are no longer needed in `connect.tsx`: `View`, `Text`, `TouchableOpacity`, `ScrollView`, `ActivityIndicator`, `Image`, `getConnectionOutcomeDisplay`, `BrowserWalletOption`, `FALLBACK_PLATFORM_CAPABILITIES`, and any inline-rendered JSX types.
+- [ ] **Step 7: Run all UI and app tests**
 
-- [ ] **Step 3: Run typecheck and tests**
+Run: `pnpm --filter @clmm/ui test && pnpm --filter @clmm/app test`
+Expected: all tests pass. (`apps/app` has tests beyond the new ones — `useBrowserWalletConnect.test.ts`, `walletConnection.test.ts`, etc. Make sure none regressed because of the route file changes. Note: the route file itself has no test today and we are not adding one — its imports are exercised by helper unit tests.)
 
-Run: `pnpm --filter @clmm/app typecheck && pnpm --filter @clmm/app test -- --run && pnpm --filter @clmm/ui test -- --run`
-Expected: ALL PASS
+- [ ] **Step 8: Commit**
 
-- [ ] **Step 4: Run boundaries**
+```bash
+git add packages/ui/src/screens/WalletConnectScreen.tsx \
+        packages/ui/src/screens/WalletConnectScreen.test.tsx \
+        apps/app/app/connect.tsx
+git commit -m "refactor(ui,app): drive connect screen from ConnectScreenState"
+```
+
+---
+
+## Phase D — Validation
+
+### Task 10: Run full repo validation
+
+- [ ] **Step 1: Boundaries**
 
 Run: `pnpm boundaries`
-Expected: No violations
+Expected: passes — no `apps/app` → `packages/ui` violations, no new disallowed imports in `packages/ui`.
 
-- [ ] **Step 5: Commit**
+- [ ] **Step 2: Lint**
 
-```bash
-git add apps/app/app/connect.tsx
-git commit -m "refactor(app): strip connect.tsx to thin route shell, move rendering to WalletConnectScreen"
-```
+Run: `pnpm lint`
+Expected: passes.
 
----
+- [ ] **Step 3: Typecheck (workspace)**
 
-### Task 6: Update exports and final verification
+Run: `pnpm typecheck`
+Expected: passes.
 
-**Files:**
-- Modify: `packages/ui/src/index.ts`
-- Verify all existing consumers still work
+- [ ] **Step 4: Test (workspace)**
 
-- [ ] **Step 1: Verify packages/ui/src/index.ts exports**
+Run: `pnpm test`
+Expected: all packages pass.
 
-Ensure the following are exported:
-- `WalletConnectScreen` (already exported, updated component)
-- `buildWalletConnectViewModel` (already exported, updated builder)
-- `FallbackState`, `WalletDiscoveryState`, `DiscoveredWallet`, `WalletConnectActions` (added in Task 1)
-- `ConnectionOutcome`, `ConnectionOutcomeDisplay`, `PlatformNotice` (already exported)
+- [ ] **Step 5: Build (workspace)**
 
-Run: `pnpm --filter @clmm/ui typecheck && pnpm --filter @clmm/app typecheck`
-Expected: PASS
+Run: `pnpm build`
+Expected: passes.
 
-- [ ] **Step 2: Run full repo checks**
+- [ ] **Step 6: Manual smoke test on web (recommended)**
 
-Run: `pnpm build && pnpm typecheck && pnpm lint && pnpm boundaries && pnpm test`
-Expected: ALL PASS
+Start the dev server (`pnpm --filter @clmm/app dev:web`) and exercise:
+- Cold load the connect route → loading spinner → discovery → either picker rows or fallback panel.
+- Click "Connect Browser Wallet" with an extension installed → success → return to `returnTo`.
+- Trigger a connect error (e.g. reject in extension) → outcome banner appears with reason → click another wallet → banner clears.
+- Open in a social-app simulator (e.g. spoof UA) → social-webview panel renders.
+- Verify "Connecting..." shows during in-flight connect.
 
-- [ ] **Step 3: Commit any remaining changes**
+If the dev environment isn't accessible, note that explicitly in the PR description rather than claiming success.
 
-```bash
-git add -A
-git commit -m "chore: finalize connect screen extraction exports and verification"
-```
+- [ ] **Step 7: Commit any final cleanup (if needed)**
+
+If validation surfaced nothing, no commit is needed. Otherwise fix the cause and commit with a clear message.
 
 ---
 
-### Task 7: Remove dead code and verify connect.tsx line count
+## Done
 
-**Files:**
-- Verify: `apps/app/app/connect.tsx`
+The route is now a thin shell. `packages/ui` owns every visual case behind a discriminated state. `pnpm boundaries` enforces that the layering doesn't regress.
 
-- [ ] **Step 1: Verify connect.tsx is thin (~60-80 lines)**
-
-Run: `wc -l apps/app/app/connect.tsx`
-Expected: ~60-80 lines
-
-- [ ] **Step 2: Verify no `WalletOption` or `buildWalletOptions` imports remain in apps/app**
-
-Run: `rg "WalletOption|buildWalletOptions" apps/app/`
-Expected: No results
-
-- [ ] **Step 3: Verify no inline JSX rendering remains in connect.tsx beyond `<WalletConnectScreen vm={vm} actions={actions} />`**
-
-Run: `rg "TouchableOpacity|ActivityIndicator|ScrollView" apps/app/app/connect.tsx`
-Expected: No results (these render primitives should only exist in the screen component)
-
-- [ ] **Step 4: Run full checks**
-
-Run: `pnpm build && pnpm typecheck && pnpm lint && pnpm boundaries && pnpm test`
-Expected: ALL PASS
+**Out of scope (deferred per spec):**
+- Disconnect-error inline banners in `WalletSettingsScreen` (issue #37 fourth bullet, separate follow-up).
+- New application-layer port for fallback detection.
+- Visual redesign of hero/features.
