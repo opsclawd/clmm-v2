@@ -15,12 +15,7 @@ const INTERRUPTION_MATCHERS = [
   'interrupted',
   'timeout',
   'closed',
-  'not found',
-  'not ready',
-  'not available',
   'already pending',
-  'unsupported',
-  'unavailable',
 ] as const;
 
 const CANCELLATION_ERROR_NAMES = [

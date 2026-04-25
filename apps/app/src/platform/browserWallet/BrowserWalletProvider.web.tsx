@@ -21,10 +21,14 @@ function BrowserWalletSessionSync() {
   const { isConnected, account } = useConnector();
 
   useEffect(() => {
-    if (!isConnected || !account) return;
     const store = walletSessionStore.getState();
-    if (store.walletAddress === account && store.connectionKind === 'browser') return;
-    store.markConnected({ walletAddress: account, connectionKind: 'browser' });
+
+    if (isConnected && account) {
+      if (store.walletAddress === account && store.connectionKind === 'browser') return;
+      store.markConnected({ walletAddress: account, connectionKind: 'browser' });
+    } else if (store.connectionKind === 'browser' && store.walletAddress) {
+      store.disconnect();
+    }
   }, [isConnected, account]);
 
   return null;

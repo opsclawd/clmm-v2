@@ -98,28 +98,28 @@ describe('walletConnection helpers', () => {
       expect(mapWalletErrorToOutcome(new Error('Unauthorized access'))).toEqual({ kind: 'cancelled' });
     });
 
-    it('maps "wallet not found" message to interrupted', () => {
-      expect(mapWalletErrorToOutcome(new Error('Wallet not found'))).toEqual({ kind: 'interrupted' });
+    it('maps "wallet not found" message to failed', () => {
+      expect(mapWalletErrorToOutcome(new Error('Wallet not found'))).toEqual({ kind: 'failed', reason: 'Wallet not found' });
     });
 
-    it('maps "wallet not ready" message to interrupted', () => {
-      expect(mapWalletErrorToOutcome(new Error('Wallet not ready'))).toEqual({ kind: 'interrupted' });
+    it('maps "wallet not ready" message to failed', () => {
+      expect(mapWalletErrorToOutcome(new Error('Wallet not ready'))).toEqual({ kind: 'failed', reason: 'Wallet not ready' });
     });
 
-    it('maps "unsupported chain" message to interrupted', () => {
-      expect(mapWalletErrorToOutcome(new Error('Unsupported chain'))).toEqual({ kind: 'interrupted' });
+    it('maps "unsupported chain" message to failed', () => {
+      expect(mapWalletErrorToOutcome(new Error('Unsupported chain'))).toEqual({ kind: 'failed', reason: 'Unsupported chain' });
     });
 
-    it('maps "feature unsupported" message to interrupted', () => {
-      expect(mapWalletErrorToOutcome(new Error('Feature unsupported'))).toEqual({ kind: 'interrupted' });
+    it('maps "feature unsupported" message to failed', () => {
+      expect(mapWalletErrorToOutcome(new Error('Feature unsupported'))).toEqual({ kind: 'failed', reason: 'Feature unsupported' });
     });
 
     it('maps "request already pending" message to interrupted', () => {
       expect(mapWalletErrorToOutcome(new Error('Request already pending'))).toEqual({ kind: 'interrupted' });
     });
 
-    it('maps "mobile wallet unavailable" message to interrupted', () => {
-      expect(mapWalletErrorToOutcome(new Error('Mobile wallet unavailable'))).toEqual({ kind: 'interrupted' });
+    it('maps "mobile wallet unavailable" message to failed', () => {
+      expect(mapWalletErrorToOutcome(new Error('Mobile wallet unavailable'))).toEqual({ kind: 'failed', reason: 'Mobile wallet unavailable' });
     });
 
     it('maps "user closed approval sheet" message to interrupted', () => {
