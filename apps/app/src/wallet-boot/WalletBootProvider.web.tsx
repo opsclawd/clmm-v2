@@ -46,6 +46,12 @@ export function WalletBootProvider({ children }: { children: ReactNode }) {
     [hasHydrated, connectionKind, walletAddress, walletStatus, account, restoreTimedOut],
   );
 
+  useEffect(() => {
+    if (status === 'disconnected' && connectionKind === 'browser') {
+      walletSessionStore.getState().disconnect();
+    }
+  }, [status, connectionKind]);
+
   return (
     <WalletBootContext.Provider value={status}>
       {children}

@@ -135,4 +135,25 @@ describe('WalletBootProvider (web)', () => {
     render(<WalletBootProvider><Probe /></WalletBootProvider>);
     expect(screen.getByTestId('status').textContent).toBe('hydrating-storage');
   });
+
+  it('clears stale session from store when boot resolves to disconnected for browser wallet', () => {
+    walletSessionStore.setState({ walletAddress: ADDR, connectionKind: 'browser' });
+    render(<WalletBootProvider><Probe /></WalletBootProvider>);
+    act(() => {
+      setConnector({ walletStatus: { status: 'connecting', connectorId: 'phantom' as never }, account: null });
+    });
+    act(() => {
+      setConnector({ walletStatus: { status: 'disconnected' }, account: null });
+    });
+    expect(screen.getByTestId('status').textContent).toBe('disconnected');
+    expect(walletSessionStore.getState().walletAddress).toBeNull();
+    expect(walletSessionStore.getState().connectionKind).toBeNull();
+  });
+
+  it('does not clear native session when boot is disconnected (native owns its own lifecycle)', () => {
+    walletSessionStore.setState({ walletAddress: ADDR, connectionKind: 'native' });
+    render(<WalletBootProvider><Probe /></WalletBootProvider>);
+    expect(screen.getByTestId('status').textContent).toBe('connected');
+    expect(walletSessionStore.getState().walletAddress).toBe(ADDR);
+  });
 });
