@@ -15,7 +15,7 @@ export default function WalletRoute() {
   const disconnect = useStore(walletSessionStore, (state) => state.disconnect);
   const clearOutcome = useStore(walletSessionStore, (state) => state.clearOutcome);
   const browserDisconnect = useBrowserWalletDisconnect();
-  const [switchError, setSwitchError] = useState<string | null>(null);
+  const [disconnectError, setDisconnectError] = useState<string | null>(null);
 
   function handleReconnect() {
     clearOutcome();
@@ -23,12 +23,12 @@ export default function WalletRoute() {
   }
 
   async function handleSwitchWallet() {
-    setSwitchError(null);
+    setDisconnectError(null);
     if (connectionKind === 'browser') {
       try {
         await browserDisconnect.disconnect();
       } catch (err) {
-        setSwitchError(err instanceof Error ? err.message : 'Failed to disconnect wallet');
+        setDisconnectError(err instanceof Error ? err.message : 'Failed to disconnect wallet');
         return;
       }
     }
@@ -37,11 +37,13 @@ export default function WalletRoute() {
   }
 
   async function handleDisconnect() {
+    setDisconnectError(null);
     if (connectionKind === 'browser') {
       try {
         await browserDisconnect.disconnect();
-      } catch {
-        // Best-effort — user explicitly wants out, clear app state regardless.
+      } catch (err) {
+        setDisconnectError(err instanceof Error ? err.message : 'Failed to disconnect wallet');
+        return;
       }
     }
 
@@ -50,13 +52,13 @@ export default function WalletRoute() {
 
   return (
     <>
-      {switchError ? (
+      {disconnectError ? (
         <View style={{ padding: 12, backgroundColor: '#450a0a', borderRadius: 8, borderWidth: 1, borderColor: '#dc2626', margin: 16 }}>
           <Text style={{ color: '#ef4444', fontSize: 14, fontWeight: '600' }}>
             Could not disconnect wallet
           </Text>
           <Text style={{ color: '#a1a1aa', fontSize: 13, marginTop: 4 }}>
-            {switchError}. Try disconnecting instead.
+            {disconnectError}. The wallet session may still be active.
           </Text>
         </View>
       ) : null}

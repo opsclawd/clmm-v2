@@ -5,6 +5,7 @@ import type { BrowserWalletConnectResult, BrowserWalletOption } from './browserW
 const NO_WALLET_MESSAGE = 'No supported browser wallet detected on this device';
 const WALLET_POLL_INTERVAL_MS = 100;
 const WALLET_POLL_TIMEOUT_MS = 1500;
+const ACCOUNT_POLL_TIMEOUT_MS = 2000;
 const SUPPORTED_CHAINS = new Set(['solana:mainnet', 'solana:devnet']);
 
 function isSolanaBrowserWallet(connector: { id: string; chains: readonly string[] }): boolean {
@@ -66,8 +67,16 @@ export function useBrowserWalletConnect() {
 
       await adapterRef.current.connectWallet(targetWallet.id as import('@solana/connector').WalletConnectorId);
 
-      const latestAdapter = adapterRef.current;
-      const address = latestAdapter.account;
+      let address = adapterRef.current.account;
+      if (!address) {
+        const startTime = Date.now();
+        while (Date.now() - startTime < ACCOUNT_POLL_TIMEOUT_MS) {
+          await new Promise((resolve) => setTimeout(resolve, WALLET_POLL_INTERVAL_MS));
+          address = adapterRef.current.account;
+          if (address) break;
+        }
+      }
+
       if (!address) {
         throw new Error('Wallet did not return an account address');
       }
