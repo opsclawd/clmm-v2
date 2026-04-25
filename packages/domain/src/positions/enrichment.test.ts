@@ -51,6 +51,11 @@ describe('tickToPrice', () => {
     expect(tickToPrice(0, 9, 9)).toBeCloseTo(1.0, 4);
   });
 
+  it('handles inverted decimals (decimalsA < decimalsB)', () => {
+    const result = tickToPrice(0, 6, 9);
+    expect(result).toBeCloseTo(0.001, 4);
+  });
+
   it('positive tick gives price above 1 (adjusted)', () => {
     const result = tickToPrice(100, 9, 6);
     expect(result).toBeGreaterThan(1000);
@@ -87,12 +92,24 @@ describe('rangeDistancePercent', () => {
 
   it('computes correct percentage distance below lower', () => {
     const result = rangeDistancePercent(-2000, -1000, 1000);
-    expect(result.belowLowerPercent).toBeCloseTo(100, 4);
+    expect(result.belowLowerPercent).toBeCloseTo(50, 4);
   });
 
   it('computes correct percentage distance above upper', () => {
     const result = rangeDistancePercent(2000, -1000, 1000);
-    expect(result.aboveUpperPercent).toBeCloseTo(100, 4);
+    expect(result.aboveUpperPercent).toBeCloseTo(50, 4);
+  });
+
+  it('handles range with lowerTick at 0', () => {
+    const result = rangeDistancePercent(-100, 0, 1000);
+    expect(result.belowLowerPercent).toBeCloseTo(10, 4);
+    expect(result.aboveUpperPercent).toBe(0);
+  });
+
+  it('handles range with upperTick at 0', () => {
+    const result = rangeDistancePercent(100, -1000, 0);
+    expect(result.belowLowerPercent).toBe(0);
+    expect(result.aboveUpperPercent).toBeCloseTo(10, 4);
   });
 
   it('handles current equal to lower bound', () => {

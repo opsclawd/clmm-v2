@@ -29,11 +29,12 @@ export function rangeDistancePercent(
   if (currentTick >= lowerTick && currentTick <= upperTick) {
     return { belowLowerPercent: 0, aboveUpperPercent: 0 };
   }
+  const rangeWidth = upperTick - lowerTick;
   if (currentTick < lowerTick) {
-    const belowLowerPercent = (Math.abs(currentTick - lowerTick) / Math.abs(lowerTick)) * 100;
+    const belowLowerPercent = (Math.abs(currentTick - lowerTick) / rangeWidth) * 100;
     return { belowLowerPercent, aboveUpperPercent: 0 };
   }
-  const aboveUpperPercent = (Math.abs(currentTick - upperTick) / Math.abs(upperTick)) * 100;
+  const aboveUpperPercent = (Math.abs(currentTick - upperTick) / rangeWidth) * 100;
   return { belowLowerPercent: 0, aboveUpperPercent };
 }
 
