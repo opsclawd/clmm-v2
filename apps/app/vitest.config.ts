@@ -10,4 +10,7 @@ export default defineConfig({
       exclude: ['src/**/*.test.ts', 'src/**/*.test.tsx'],
     },
   },
+  resolve: {
+    extensions: ['.web.ts', '.web.tsx', '.ts', '.tsx', '.js', '.jsx', '.json'],
+  },
 });

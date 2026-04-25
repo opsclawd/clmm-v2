@@ -13,21 +13,46 @@ function isWebPlatform(): boolean {
   return typeof window !== 'undefined';
 }
 
-export function isSolanaMobileWebView(): boolean {
+type WalletLike = Record<string, unknown>;
+
+function hasConnect(wallet: unknown): boolean {
+  return wallet != null && typeof wallet === 'object' && typeof (wallet as WalletLike)['connect'] === 'function';
+}
+
+export function hasBrowserWalletPresence(): boolean {
   if (!isWebPlatform()) return false;
   try {
     const win = window as unknown as Record<string, unknown>;
+
     const solana = win['solana'];
-    const hasWalletInject =
-      solana && typeof solana === 'object' && solana !== null &&
-      typeof (solana as Record<string, unknown>)['connect'] === 'function';
-    if (!hasWalletInject) return false;
-    const ua = typeof navigator !== 'undefined' ? navigator.userAgent : '';
-    return /wv\)/.test(ua) || /iPhone/.test(ua) || /iPad/.test(ua);
+    if (hasConnect(solana)) return true;
+
+    const phantom = win['phantom'];
+    if (phantom && typeof phantom === 'object' && phantom !== null) {
+      const phantomSolana = (phantom as WalletLike)['solana'];
+      if (hasConnect(phantomSolana)) return true;
+    }
+
+    const solflare = win['solflare'];
+    if (hasConnect(solflare)) return true;
+
+    return false;
   } catch {
-    // ignore
+    return false;
   }
-  return false;
+}
+
+export function isSolanaMobileWebView(): boolean {
+  if (!isWebPlatform()) return false;
+  try {
+    if (!hasBrowserWalletPresence()) return false;
+    const ua = typeof navigator !== 'undefined' ? navigator.userAgent : '';
+    const isMobile = /wv\)/.test(ua) || /iPhone/.test(ua) || /iPad/.test(ua) || /Android.*Mobile/.test(ua);
+    const walletBrowserSignal = /Phantom|Solflare/.test(ua);
+    return isMobile || walletBrowserSignal;
+  } catch {
+    return false;
+  }
 }
 
 function hardNavigate(path: string, method: NavigationMethod): void {

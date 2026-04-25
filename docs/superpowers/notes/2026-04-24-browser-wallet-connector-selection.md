@@ -107,19 +107,14 @@ Rejected paths:
 
 ## Version Pins
 
-| Package | Version | Role |
-|---|---|---|
-| `@solana/connector` | 0.2.4 | Primary wallet connector |
-| `@solana/kit` | 6.5.0 | Transaction building/signing |
-| `@solana-mobile/wallet-standard-mobile` | 0.5.2 | MWA registration (via ConnectorKit) |
-| `@wallet-standard/base` | 1.1.0 | Type definitions (dev dependency) |
-| `@solana/connector-debugger` | 0.1.1 | Dev tooling (dev dependency) |
+| Package | Version | Type | Role |
+|---|---|---|---|
+| `@solana/connector` | 0.2.4 | prod | Primary wallet connector |
+| `@solana-mobile/wallet-standard-mobile` | 0.5.2 | prod | MWA registration (via ConnectorKit) |
+| `@wallet-standard/base` | 1.1.0 | dev | Type definitions |
+| `@solana/connector-debugger` | 0.1.1 | dev | Dev tooling |
 
-## Follow-up Risks
-
-## Version Pins
-
-_Pending spike completion._
+Note: `@solana/connector` depends on `@solana/kit@5.5.1` internally. Our `packages/adapters` uses `@solana/kit@6.5.0`. The two kit versions coexist in the dependency tree as distinct packages (ConnectorKit uses its own 5.x, adapters use 6.x). No runtime conflict because connector code uses its own kit instance and adapter code uses ours.
 
 ## Follow-up Risks
 

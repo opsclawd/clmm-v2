@@ -11,7 +11,7 @@ import {
   recordSignatureInterruption,
   submitExecution,
 } from '../../src/api/executions';
-import { signBrowserTransaction } from '../../src/platform/browserWallet';
+import { useBrowserWalletSign } from '../../src/platform/browserWallet/index';
 import { signNativeTransaction } from '../../src/platform/nativeWallet';
 import { mapWalletErrorToOutcome } from '../../src/platform/walletConnection';
 import { navigateRoute } from '../../src/platform/webNavigation';
@@ -74,6 +74,7 @@ export default function SigningRoute() {
   const walletAddress = useStore(walletSessionStore, (state) => state.walletAddress);
   const hasHydrated = useStore(walletSessionStore, (s) => s.hasHydrated);
   const connectionKind = useStore(walletSessionStore, (state) => state.connectionKind);
+  const browserSigner = useBrowserWalletSign();
 
   const [statusNotice, setStatusNotice] = useState<string | null>(null);
   const [hasStartedPendingApproval, setHasStartedPendingApproval] = useState(false);
@@ -185,10 +186,7 @@ export default function SigningRoute() {
 
         const signedPayload =
           connectionKind === 'browser'
-            ? await signBrowserTransaction({
-                browserWindow: typeof window === 'undefined' ? undefined : { solana: Reflect.get(window, 'solana') },
-                serializedPayload: signingPayload.serializedPayload,
-              })
+            ? await browserSigner.sign(signingPayload.serializedPayload)
             : await signNativeTransaction({
                 serializedPayload: signingPayload.serializedPayload,
                 walletId: walletAddress,

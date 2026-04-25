@@ -1,5 +1,51 @@
 import { describe, expect, it, vi, afterEach } from 'vitest';
-import { navigateRoute, normalizeExpoRouterRoute, isSolanaMobileWebView } from './webNavigation';
+import { navigateRoute, normalizeExpoRouterRoute, isSolanaMobileWebView, hasBrowserWalletPresence } from './webNavigation';
+
+describe('hasBrowserWalletPresence', () => {
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+
+  it('returns true when window.solana.connect exists', () => {
+    vi.stubGlobal('window', { solana: { connect: vi.fn() } });
+    expect(hasBrowserWalletPresence()).toBe(true);
+  });
+
+  it('returns true when window.phantom.solana.connect exists', () => {
+    vi.stubGlobal('window', { phantom: { solana: { connect: vi.fn() } } });
+    expect(hasBrowserWalletPresence()).toBe(true);
+  });
+
+  it('returns true when window.solflare.connect exists', () => {
+    vi.stubGlobal('window', { solflare: { connect: vi.fn() } });
+    expect(hasBrowserWalletPresence()).toBe(true);
+  });
+
+  it('returns true when window.solana.connect is present alongside phantom', () => {
+    vi.stubGlobal('window', { solana: { connect: vi.fn() }, phantom: { solana: { connect: vi.fn() } } });
+    expect(hasBrowserWalletPresence()).toBe(true);
+  });
+
+  it('returns false when window.solana has no connect function', () => {
+    vi.stubGlobal('window', { solana: { isPhantom: true } });
+    expect(hasBrowserWalletPresence()).toBe(false);
+  });
+
+  it('returns false when window.phantom exists but has no solana.connect', () => {
+    vi.stubGlobal('window', { phantom: { ethereum: {} } });
+    expect(hasBrowserWalletPresence()).toBe(false);
+  });
+
+  it('returns false when no wallet objects exist on window', () => {
+    vi.stubGlobal('window', {});
+    expect(hasBrowserWalletPresence()).toBe(false);
+  });
+
+  it('returns false when window is undefined', () => {
+    vi.stubGlobal('window', undefined);
+    expect(hasBrowserWalletPresence()).toBe(false);
+  });
+});
 
 describe('isSolanaMobileWebView', () => {
   afterEach(() => {
@@ -9,43 +55,91 @@ describe('isSolanaMobileWebView', () => {
   it('returns true on Android WebView with window.solana.connect', () => {
     vi.stubGlobal('window', { solana: { connect: vi.fn() } });
     vi.stubGlobal('navigator', { userAgent: 'Mozilla/5.0 (Linux; Android 13; Pixel 7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Mobile Safari/537.36 (wv)' });
-
     expect(isSolanaMobileWebView()).toBe(true);
   });
 
   it('returns true on iOS iPhone with window.solana.connect', () => {
     vi.stubGlobal('window', { solana: { connect: vi.fn() } });
     vi.stubGlobal('navigator', { userAgent: 'Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) AppleWebKit/605.1.15' });
-
     expect(isSolanaMobileWebView()).toBe(true);
+  });
+
+  it('returns true on iPhone with Wallet Standard wallet via phantom.solana.connect', () => {
+    vi.stubGlobal('window', { phantom: { solana: { connect: vi.fn() } } });
+    vi.stubGlobal('navigator', { userAgent: 'Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) AppleWebKit/605.1.15' });
+    expect(isSolanaMobileWebView()).toBe(true);
+  });
+
+  it('returns true on iPhone with Phantom injected provider', () => {
+    vi.stubGlobal('window', { solana: { connect: vi.fn() }, phantom: { solana: { connect: vi.fn() } } });
+    vi.stubGlobal('navigator', { userAgent: 'Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) AppleWebKit/605.1.15' });
+    expect(isSolanaMobileWebView()).toBe(true);
+  });
+
+  it('returns false on iPhone Safari with no wallet', () => {
+    vi.stubGlobal('window', {});
+    vi.stubGlobal('navigator', { userAgent: 'Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) AppleWebKit/605.1.15' });
+    expect(isSolanaMobileWebView()).toBe(false);
+  });
+
+  it('returns true on Android Phantom browser with injected provider', () => {
+    vi.stubGlobal('window', { solana: { connect: vi.fn() } });
+    vi.stubGlobal('navigator', { userAgent: 'Mozilla/5.0 (Linux; Android 13; Pixel 7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Mobile Safari/537.36 Phantom' });
+    expect(isSolanaMobileWebView()).toBe(true);
+  });
+
+  it('returns false on Android Chrome with no wallet', () => {
+    vi.stubGlobal('window', {});
+    vi.stubGlobal('navigator', { userAgent: 'Mozilla/5.0 (Linux; Android 13; Pixel 7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Mobile Safari/537.36' });
+    expect(isSolanaMobileWebView()).toBe(false);
   });
 
   it('returns false on desktop browser with window.solana.connect (e.g. Phantom extension)', () => {
     vi.stubGlobal('window', { solana: { connect: vi.fn() } });
     vi.stubGlobal('navigator', { userAgent: 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36' });
+    expect(isSolanaMobileWebView()).toBe(false);
+  });
 
+  it('returns false on desktop browser with phantom.solana.connect (e.g. Phantom extension)', () => {
+    vi.stubGlobal('window', { phantom: { solana: { connect: vi.fn() } } });
+    vi.stubGlobal('navigator', { userAgent: 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36' });
     expect(isSolanaMobileWebView()).toBe(false);
   });
 
   it('returns true on iPad WebView with window.solana.connect', () => {
     vi.stubGlobal('window', { solana: { connect: vi.fn() } });
     vi.stubGlobal('navigator', { userAgent: 'Mozilla/5.0 (iPad; CPU OS 17_0 like Mac OS X) AppleWebKit/605.1.15' });
-
     expect(isSolanaMobileWebView()).toBe(true);
   });
 
-  it('returns false on mobile user agent without window.solana (e.g. Chrome mobile)', () => {
+  it('returns false on mobile user agent without wallet (e.g. Chrome mobile)', () => {
     vi.stubGlobal('window', {});
     vi.stubGlobal('navigator', { userAgent: 'Mozilla/5.0 (Linux; Android 13) AppleWebKit/537.36 Mobile Safari/537.36 (wv)' });
-
     expect(isSolanaMobileWebView()).toBe(false);
   });
 
   it('returns false when window.solana exists but has no connect function', () => {
     vi.stubGlobal('window', { solana: { isPhantom: true } });
     vi.stubGlobal('navigator', { userAgent: 'Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) AppleWebKit/605.1.15' });
-
     expect(isSolanaMobileWebView()).toBe(false);
+  });
+
+  it('returns true when Solflare wallet browser UA signal is present with solflare inject', () => {
+    vi.stubGlobal('window', { solflare: { connect: vi.fn() } });
+    vi.stubGlobal('navigator', { userAgent: 'Mozilla/5.0 (Linux; Android 13) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Mobile Safari/537.36 Solflare' });
+    expect(isSolanaMobileWebView()).toBe(true);
+  });
+
+  it('returns false on social-app webview without wallet signal', () => {
+    vi.stubGlobal('window', {});
+    vi.stubGlobal('navigator', { userAgent: 'Mozilla/5.0 (Linux; Android 13; Pixel 7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Mobile Safari/537.36;Instagram' });
+    expect(isSolanaMobileWebView()).toBe(false);
+  });
+
+  it('returns true on Android Mobile with wallet injection', () => {
+    vi.stubGlobal('window', { solana: { connect: vi.fn() } });
+    vi.stubGlobal('navigator', { userAgent: 'Mozilla/5.0 (Linux; Android 13; SM-G991B) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Mobile Safari/537.36' });
+    expect(isSolanaMobileWebView()).toBe(true);
   });
 });
 
