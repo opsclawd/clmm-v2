@@ -96,7 +96,35 @@ git commit -m "feat(ui): add FallbackState, WalletDiscoveryState, DiscoveredWall
 - Modify: `packages/ui/src/view-models/WalletConnectionViewModel.ts`
 - Modify: `packages/ui/src/view-models/WalletConnectionViewModel.test.ts`
 
-- [ ] **Step 1: Write failing tests for the extended view model builder**
+- [ ] **Step 1: Update existing buildWalletConnectViewModel tests for the new signature**
+
+The existing tests pass `{ capabilities, connectionOutcome, isConnecting }`. Add a `baseParams` helper and update each test to include the new required fields:
+
+Add after the `makeCaps` function:
+
+```ts
+const baseExtendedParams = {
+  discovery: 'ready' as const,
+  discoveredWallets: [] as DiscoveredWallet[],
+  fallback: 'none' as const,
+  socialEscapeAttempted: false,
+};
+```
+
+Then update each call to `buildWalletConnectViewModel` in the existing `describe('buildWalletConnectViewModel')` block to spread `baseExtendedParams`:
+
+```ts
+const vm = buildWalletConnectViewModel({
+  ...baseExtendedParams,
+  capabilities: makeCaps({ nativeWalletAvailable: true, nativePushAvailable: true }),
+  connectionOutcome: null,
+  isConnecting: false,
+});
+```
+
+Add the `DiscoveredWallet` import from `'../components/WalletConnectionUtils.js'`.
+
+- [ ] **Step 2: Add new failing tests for extended view model builder**
 
 Add to `packages/ui/src/view-models/WalletConnectionViewModel.test.ts`, after the existing `describe('buildWalletConnectViewModel')` block:
 
@@ -293,50 +321,6 @@ git commit -m "feat(ui): extend WalletConnectViewModel with discovery, fallback,
 ### Task 3: Rewrite WalletConnectScreen to render from view model + actions
 
 **Files:**
-- Modify: `packages/ui/src/screens/WalletConnectScreen.tsx`
-
-This is the largest task. The screen renders all states from the view model. The existing `WalletConnectScreen` uses `onSelectWallet?: (kind: WalletOptionKind) => void` — the new version uses `vm` and `actions` props.
-
-- [ ] **Step 1: Rewrite WalletConnectScreen.tsx**
-
-The full file should export `WalletConnectScreen` accepting `{ vm: WalletConnectViewModel; actions: WalletConnectActions }` props. The component renders based on `vm.screenState`, `vm.discovery`, `vm.fallback`, and `vm.outcomeDisplay`.
-
-Key rendering rules:
-- `vm.screenState === 'loading'`: spinner with "Loading..." text
-- `vm.screenState === 'social-webview'`: warning banner ("Social app browsers block wallet extensions."), "Open in Browser" button (calls `actions.onOpenInBrowser`, disabled when `vm.socialEscapeAttempted`), Phantom and Solflare deep-link buttons
-- `vm.screenState === 'standard'`: title ("Connect Wallet"), subtitle, native wallet button (if `vm.nativeWalletAvailable`), browser wallet discovery section, fallback banners, outcome banner, connect indicator, Go Back button
-- Browser wallet discovery section renders per `vm.discovery`:
-  - `discovering`: ActivityIndicator + "Detecting browser wallets..."
-  - `ready` with 1 wallet: single named button with icon (calls `actions.onSelectDiscoveredWallet(wallet.id)`)
-  - `ready` with 2+ wallets: wallet picker list with icons (each calls `actions.onSelectDiscoveredWallet(wallet.id)`)
-  - `timed-out`: "Connect Browser Wallet" fallback button (calls `actions.onConnectDefaultBrowser`)
-- Fallback rendering per `vm.fallback`:
-  - `wallet-fallback`: "No wallet extension detected" warning + Phantom/Solflare deep links
-  - `desktop-no-wallet`: "No wallet extension detected" warning + install guidance
-  - `none`: nothing extra
-- Outcome banner from `vm.outcomeDisplay` with severity-based colors
-- "Connecting..." text when `vm.isConnecting`
-- "Go Back" button calls `actions.onGoBack`
-
-Use `colors` and `typography` from `../design-system/index.js` for styling — match the existing design system pattern used by other screens in `packages/ui`.
-
-- [ ] **Step 2: Run typecheck**
-
-Run: `pnpm --filter @clmm/ui typecheck && pnpm --filter @clmm/app typecheck`
-Expected: PASS (the route file still imports old `WalletConnectScreen` — we'll update it in Task 5, but typecheck should still pass if we export the old type alongside temporarily, or we can update the route file in the same step. For now, if typecheck fails due to the route file, update `apps/app/app/connect.tsx` to remove the old import temporarily.)
-
-- [ ] **Step 3: Commit**
-
-```bash
-git add packages/ui/src/screens/WalletConnectScreen.tsx
-git commit -m "feat(ui): rewrite WalletConnectScreen to render from view model + actions"
-```
-
----
-
-### Task 4: Write component tests for WalletConnectScreen
-
-**Files:**
 - Modify: `packages/ui/src/screens/WalletConnectScreen.test.tsx`
 
 - [ ] **Step 1: Rewrite test file for new props**
@@ -506,7 +490,7 @@ git commit -m "test(ui): rewrite WalletConnectScreen tests for view model + acti
 
 ---
 
-### Task 5: Strip connect.tsx to thin route shell
+### Task 4: Strip connect.tsx to thin route shell
 
 **Files:**
 - Modify: `apps/app/app/connect.tsx`
@@ -702,7 +686,7 @@ git commit -m "refactor(app): strip connect.tsx to thin route shell, move render
 
 ---
 
-### Task 6: Update exports and final verification
+### Task 5: Update exports and final verification
 
 **Files:**
 - Modify: `packages/ui/src/index.ts`
@@ -733,54 +717,7 @@ git commit -m "chore: finalize connect screen extraction exports and verificatio
 
 ---
 
-### Task 7: Update existing WalletConnectScreen tests that used old props
-
-**Files:**
-- Modify: `packages/ui/src/view-models/WalletConnectionViewModel.test.ts`
-
-The existing tests in `buildWalletConnectViewModel` use the old parameter shape `{ capabilities, connectionOutcome, isConnecting }`. These need updating to match the new extended builder signature.
-
-- [ ] **Step 1: Update existing buildWalletConnectViewModel tests**
-
-The old tests call `buildWalletConnectViewModel({ capabilities: makeCaps(...), connectionOutcome: null, isConnecting: false })`. Add the new required params: `discovery`, `discoveredWallets`, `fallback`, `socialEscapeAttempted`.
-
-For each existing test, add the missing fields:
-
-```ts
-const baseParams = {
-  discovery: 'ready' as const,
-  discoveredWallets: [] as DiscoveredWallet[],
-  fallback: 'none' as const,
-  socialEscapeAttempted: false,
-};
-```
-
-And update each test to spread `baseParams`:
-
-```ts
-const vm = buildWalletConnectViewModel({
-  ...baseParams,
-  capabilities: makeCaps({ nativeWalletAvailable: true, nativePushAvailable: true }),
-  connectionOutcome: null,
-  isConnecting: false,
-});
-```
-
-- [ ] **Step 2: Run tests**
-
-Run: `pnpm --filter @clmm/ui test -- --run`
-Expected: ALL PASS
-
-- [ ] **Step 3: Commit**
-
-```bash
-git add packages/ui/src/view-models/WalletConnectionViewModel.test.ts
-git commit -m "test(ui): update existing VM builder tests for extended signature"
-```
-
----
-
-### Task 8: Remove dead code and verify connect.tsx line count
+### Task 6: Remove dead code and verify connect.tsx line count
 
 **Files:**
 - Verify: `apps/app/app/connect.tsx`
