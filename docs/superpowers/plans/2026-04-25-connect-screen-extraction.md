@@ -1010,30 +1010,6 @@ export const WALLET_DISCOVERY_TIMEOUT_MS = 2000;
 export type WalletDiscoveryState = 'discovering' | 'ready' | 'timed-out';
 
 export function useDiscoveryState(walletCount: number): WalletDiscoveryState {
-  const [timedOut, setTimedOut] = useState(false);
-
-  useEffect(() => {
-    if (walletCount > 0 || timedOut) return;
-    const timer = setTimeout(() => setTimedOut(true), WALLET_DISCOVERY_TIMEOUT_MS);
-    return () => clearTimeout(timer);
-  }, [walletCount, timedOut]);
-
-  if (timedOut) return 'timed-out';
-  if (walletCount > 0) return 'ready';
-  return 'discovering';
-}
-```
-
-Sticky behavior: the `'ready'` → `'discovering'` rollback is prevented because `walletCount > 0` is the only path to `'ready'`; if it drops back to 0, the hook returns `'discovering'`. **Wait — that contradicts the test "once ready, does not return to discovering."** We need real stickiness:
-
-```ts
-import { useEffect, useState } from 'react';
-
-export const WALLET_DISCOVERY_TIMEOUT_MS = 2000;
-
-export type WalletDiscoveryState = 'discovering' | 'ready' | 'timed-out';
-
-export function useDiscoveryState(walletCount: number): WalletDiscoveryState {
   const [state, setState] = useState<WalletDiscoveryState>(
     walletCount > 0 ? 'ready' : 'discovering',
   );
@@ -1052,7 +1028,7 @@ export function useDiscoveryState(walletCount: number): WalletDiscoveryState {
 }
 ```
 
-Use this version. The earlier draft was wrong — the second draft is sticky in both directions.
+Stickiness rationale: a naive implementation that derives `'discovering'` directly from `walletCount === 0` will fail the test "once ready, does not return to discovering." The version above stores state explicitly so transitions are one-way: `'discovering'` → `'ready'` (when count goes positive) or `'discovering'` → `'timed-out'` (after the timer), and from there state never leaves.
 
 - [ ] **Step 4: Run tests to verify they pass**
 
@@ -1632,6 +1608,8 @@ If `colors.x` ("the dismiss icon `Icon` name") doesn't exist, check `packages/ui
 
 Run: `pnpm --filter @clmm/ui test -- WalletConnectScreen`
 Expected: all tests pass.
+
+Note: workspace `pnpm typecheck` will fail between Steps 3 and 5 because the old `connect.tsx` still consumes the removed prop shape — that's expected. Step 6 confirms it goes green again after the route is rewritten.
 
 - [ ] **Step 5: Rewrite `apps/app/app/connect.tsx`**
 
