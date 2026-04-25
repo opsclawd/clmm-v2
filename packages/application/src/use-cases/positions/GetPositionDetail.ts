@@ -23,7 +23,9 @@ export async function getPositionDetail(params: {
   const priceMap = new Map<string, { usdValue: number; symbol: string }>();
   try {
     const mints = [poolData.tokenPair.mintA, poolData.tokenPair.mintB];
-    const rewardMints = fees.rewardInfos.map((r) => r.mint).filter((m) => !mints.includes(m));
+    const rewardMints = fees.rewardInfos
+      .map((r) => r.mint)
+      .filter((m): m is string => m !== '' && !mints.includes(m));
     const allMints = [...mints, ...rewardMints];
     const quotes = await params.pricePort.getPrices([...new Set(allMints)]);
     for (const q of quotes) {

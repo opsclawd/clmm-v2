@@ -168,8 +168,10 @@ describe('formatFeeRateLabel', () => {
     expect(formatFeeRateLabel(100)).toBe('1 bps');
   });
 
-  it('formats fractional bps with one decimal', () => {
+  it('formats fractional bps with up to two decimals and trims trailing zeros', () => {
     expect(formatFeeRateLabel(10)).toBe('0.1 bps');
-    expect(formatFeeRateLabel(500)).toBe('5 bps');
+    expect(formatFeeRateLabel(25)).toBe('0.25 bps');
+    expect(formatFeeRateLabel(1)).toBe('0.01 bps');
+    expect(formatFeeRateLabel(5)).toBe('0.05 bps');
   });
 });

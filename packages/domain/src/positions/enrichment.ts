@@ -4,7 +4,10 @@ export function whirlpoolFeeRateToBps(feeRateHundredths: number): number {
 
 export function formatFeeRateLabel(feeRateHundredths: number): string {
   const bps = whirlpoolFeeRateToBps(feeRateHundredths);
-  return Number.isInteger(bps) ? `${bps} bps` : `${bps.toFixed(1)} bps`;
+  const formatted = Number.isInteger(bps)
+    ? String(bps)
+    : bps.toFixed(2).replace(/\.?0+$/, '');
+  return `${formatted} bps`;
 }
 
 export function priceFromSqrtPrice(
