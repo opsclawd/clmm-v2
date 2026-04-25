@@ -90,12 +90,12 @@ describe('walletConnection helpers', () => {
       expect(mapWalletErrorToOutcome(error)).toEqual({ kind: 'interrupted' });
     });
 
-    it('maps "app not authorized" message to cancelled', () => {
-      expect(mapWalletErrorToOutcome(new Error('App not authorized'))).toEqual({ kind: 'cancelled' });
+    it('maps "app not authorized" message to failed', () => {
+      expect(mapWalletErrorToOutcome(new Error('App not authorized'))).toEqual({ kind: 'failed', reason: 'App not authorized' });
     });
 
-    it('maps "unauthorized" message to cancelled', () => {
-      expect(mapWalletErrorToOutcome(new Error('Unauthorized access'))).toEqual({ kind: 'cancelled' });
+    it('maps "unauthorized" message to failed', () => {
+      expect(mapWalletErrorToOutcome(new Error('Unauthorized access'))).toEqual({ kind: 'failed', reason: 'Unauthorized access' });
     });
 
     it('maps "wallet not found" message to failed', () => {

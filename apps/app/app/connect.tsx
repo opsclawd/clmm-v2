@@ -40,7 +40,7 @@ function detectFallbackState(
   const connectThrewNoWallet = connectError?.message === NO_WALLET_MESSAGE;
 
   if (noWalletDetected || connectThrewNoWallet) {
-    const isMobile = /Mobi|Android/i.test(typeof navigator !== 'undefined' ? navigator.userAgent : '');
+    const isMobile = /Mobi|Android|iPad/i.test(typeof navigator !== 'undefined' ? navigator.userAgent : '');
     if (isMobile) {
       return 'wallet-fallback';
     }

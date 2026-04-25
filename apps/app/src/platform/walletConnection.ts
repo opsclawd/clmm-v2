@@ -6,9 +6,6 @@ const CANCELLATION_MATCHERS = [
   'declined',
   'cancelled',
   'canceled',
-  'not authorized',
-  'unauthorized',
-  'app not authorized',
 ] as const;
 
 const INTERRUPTION_MATCHERS = [
