@@ -36,15 +36,51 @@ export type SrLevelsBlock = {
 export type PositionSummaryDto = {
   positionId: PositionId;
   poolId: PoolId;
+  tokenPairLabel: string;
+  currentPrice: number;
+  currentPriceLabel: string;
+  feeRateLabel: string;
   rangeState: 'in-range' | 'below-range' | 'above-range';
+  rangeDistance: {
+    belowLowerPercent: number;
+    aboveUpperPercent: number;
+  };
   hasActionableTrigger: boolean;
   monitoringStatus: 'active' | 'degraded' | 'inactive';
+};
+
+export type TokenAmountValue = {
+  raw: bigint;
+  decimals: number;
+  symbol: string;
+  usdValue: number;
+};
+
+export type RewardAmountValue = {
+  mint: string;
+  amount: bigint;
+  decimals: number;
+  symbol: string;
+  usdValue: number;
 };
 
 export type PositionDetailDto = PositionSummaryDto & {
   lowerBound: number;
   upperBound: number;
   currentPrice: number;
+  sqrtPrice: bigint;
+  unclaimedFees: {
+    feeOwedA: TokenAmountValue;
+    feeOwedB: TokenAmountValue;
+    totalUsd: number;
+  };
+  unclaimedRewards: {
+    rewards: RewardAmountValue[];
+    totalUsd: number;
+  };
+  positionLiquidity: bigint;
+  poolLiquidity: bigint;
+  poolDepthLabel: string;
   triggerId?: ExitTriggerId;
   breachDirection?: BreachDirection;
   srLevels?: SrLevelsBlock;

@@ -1,12 +1,16 @@
 import type {
   PositionId,
   WalletId,
+  PoolId,
   BreachDirection,
   ClockTimestamp,
   TokenAmount,
 } from '@clmm/domain';
 import type {
   LiquidityPosition,
+  PositionDetail,
+  PoolData,
+  PriceQuote,
 } from '@clmm/domain';
 import type {
   ExitTrigger,
@@ -33,6 +37,14 @@ import type {
 export interface SupportedPositionReadPort {
   listSupportedPositions(walletId: WalletId): Promise<LiquidityPosition[]>;
   getPosition(walletId: WalletId, positionId: PositionId): Promise<LiquidityPosition | null>;
+  getPositionDetail(walletId: WalletId, positionId: PositionId): Promise<PositionDetail | null>;
+  getPoolData(poolId: PoolId): Promise<PoolData | null>;
+}
+
+// --- Price ports ---
+
+export interface PricePort {
+  getPrices(tokenMints: readonly string[]): Promise<readonly PriceQuote[]>;
 }
 
 export interface RangeObservationPort {
