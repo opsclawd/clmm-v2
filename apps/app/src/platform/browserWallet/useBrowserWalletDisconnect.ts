@@ -14,8 +14,8 @@ export function useBrowserWalletDisconnect() {
     setDisconnecting(true);
     try {
       await currentAdapter.disconnectWallet();
-    } catch {
-      // best-effort: swallow disconnect failures
+    } catch (err) {
+      throw err instanceof Error ? err : new Error(String(err));
     } finally {
       setDisconnecting(false);
     }

@@ -87,7 +87,7 @@ describe('useBrowserWalletDisconnect', () => {
     expect(result.current.disconnecting).toBe(false);
   });
 
-  it('does not throw on best-effort disconnect failure', async () => {
+  it('rethrows connector disconnect failure so callers can react', async () => {
     mockAdapterResult.isConnected = true;
     mockAdapterResult.disconnectWallet = vi.fn().mockRejectedValue(new Error('Already disconnected'));
 
@@ -95,7 +95,7 @@ describe('useBrowserWalletDisconnect', () => {
     const { result } = renderHook(() => useBrowserWalletDisconnect());
 
     await act(async () => {
-      await result.current.disconnect();
+      await expect(result.current.disconnect()).rejects.toThrow('Already disconnected');
     });
 
     expect(mockAdapterResult.disconnectWallet).toHaveBeenCalledTimes(1);

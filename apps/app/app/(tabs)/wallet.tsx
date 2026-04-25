@@ -1,3 +1,5 @@
+import { useState } from 'react';
+import { View, Text } from 'react-native';
 import { useRouter } from 'expo-router';
 import { WalletSettingsScreen } from '@clmm/ui';
 import { useStore } from 'zustand';
@@ -13,6 +15,7 @@ export default function WalletRoute() {
   const disconnect = useStore(walletSessionStore, (state) => state.disconnect);
   const clearOutcome = useStore(walletSessionStore, (state) => state.clearOutcome);
   const browserDisconnect = useBrowserWalletDisconnect();
+  const [switchError, setSwitchError] = useState<string | null>(null);
 
   function handleReconnect() {
     clearOutcome();
@@ -20,11 +23,13 @@ export default function WalletRoute() {
   }
 
   async function handleSwitchWallet() {
+    setSwitchError(null);
     if (connectionKind === 'browser') {
       try {
         await browserDisconnect.disconnect();
-      } catch {
-        // Best-effort connector disconnect before switching.
+      } catch (err) {
+        setSwitchError(err instanceof Error ? err.message : 'Failed to disconnect wallet');
+        return;
       }
     }
     disconnect();
@@ -36,7 +41,7 @@ export default function WalletRoute() {
       try {
         await browserDisconnect.disconnect();
       } catch {
-        // Best-effort. App session cleanup still proceeds.
+        // Best-effort — user explicitly wants out, clear app state regardless.
       }
     }
 
@@ -44,15 +49,27 @@ export default function WalletRoute() {
   }
 
   return (
-    <WalletSettingsScreen
-      walletAddress={walletAddress}
-      connectionKind={connectionKind}
-      platformCapabilities={platformCapabilities}
-      onReconnect={handleReconnect}
-      onSwitchWallet={() => { void handleSwitchWallet(); }}
-      onDisconnect={() => {
-        void handleDisconnect();
-      }}
-    />
+    <>
+      {switchError ? (
+        <View style={{ padding: 12, backgroundColor: '#450a0a', borderRadius: 8, borderWidth: 1, borderColor: '#dc2626', margin: 16 }}>
+          <Text style={{ color: '#ef4444', fontSize: 14, fontWeight: '600' }}>
+            Could not disconnect wallet
+          </Text>
+          <Text style={{ color: '#a1a1aa', fontSize: 13, marginTop: 4 }}>
+            {switchError}. Try disconnecting instead.
+          </Text>
+        </View>
+      ) : null}
+      <WalletSettingsScreen
+        walletAddress={walletAddress}
+        connectionKind={connectionKind}
+        platformCapabilities={platformCapabilities}
+        onReconnect={handleReconnect}
+        onSwitchWallet={() => { void handleSwitchWallet(); }}
+        onDisconnect={() => {
+          void handleDisconnect();
+        }}
+      />
+    </>
   );
 }
