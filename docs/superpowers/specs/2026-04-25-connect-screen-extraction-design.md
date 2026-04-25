@@ -106,6 +106,8 @@ export function buildConnectScreenViewModel(
 
 ### Decision rules
 
+Evaluated top-to-bottom; first match wins.
+
 1. `capabilities === null` → `{ kind: 'loading-capabilities' }`. `outcome` suppressed.
 2. `fallbackState === 'social-webview'` → `{ kind: 'social-webview', socialEscapeAttempted }`. Wins over everything else (extensions can't run in social webviews).
 3. `fallbackState === 'desktop-no-wallet'` → that variant.
@@ -285,7 +287,7 @@ Unchanged: `mapWalletErrorToOutcome` runs in the shell, `session.markOutcome(...
 
 ### Native-only path
 
-On iOS/Android in Expo, `fallbackState === 'none'`, `browserConnect.wallets` is always empty, and `browserConnect.error` may be `null`. `discoveryState` would land at `'timed-out'` after 2s — wrong visual: the "Connect Browser Wallet" CTA doesn't apply. Resolution: the view-model treats `nativeAvailable: true && browserWallets.length === 0` as a valid `ready` state (no browser CTA in the body). This is an explicit relaxation of the "browserWallets always non-empty in ready" rule.
+On iOS/Android in Expo, `fallbackState === 'none'` (the `social-webview`, `wallet-fallback`, and `desktop-no-wallet` variants are reachable only on web — `detectFallbackState` returns `'none'` whenever `Platform.OS !== 'web'`). `browserConnect.wallets` is always empty on native, and `browserConnect.error` may be `null`. `discoveryState` would land at `'timed-out'` after 2s — wrong visual: the "Connect Browser Wallet" CTA doesn't apply. Resolution: the view-model treats `nativeAvailable: true && browserWallets.length === 0` as a valid `ready` state (no browser CTA in the body). This is the same relaxation called out under `ConnectScreenState` above ("`browserWallets` may be empty in the `ready` state only when `nativeAvailable: true`").
 
 ## Testing
 
