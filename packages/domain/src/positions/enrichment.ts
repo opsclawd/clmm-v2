@@ -53,5 +53,9 @@ export function tokenAmountToUsd(
   usdPrice: number,
 ): number {
   if (amount === 0n) return 0;
-  return (Number(amount) / 10 ** decimals) * usdPrice;
+  const divisor = 10n ** BigInt(decimals);
+  const whole = amount / divisor;
+  const remainder = amount % divisor;
+  const humanReadable = Number(whole) + Number(remainder) / Number(divisor);
+  return humanReadable * usdPrice;
 }
