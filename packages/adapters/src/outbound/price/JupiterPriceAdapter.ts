@@ -36,7 +36,7 @@ export class JupiterPriceAdapter implements PricePort {
       const ids = uncached.join(',');
       const url = `${JUPITER_PRICE_API_BASE}?ids=${ids}`;
       const headers: Record<string, string> = {};
-      if (this.apiKey) headers['Authorization'] = this.apiKey;
+      if (this.apiKey) headers['x-api-key'] = this.apiKey;
 
       const res = await fetch(url, { headers });
 

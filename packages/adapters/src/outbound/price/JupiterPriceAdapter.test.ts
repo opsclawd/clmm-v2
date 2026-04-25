@@ -116,6 +116,23 @@ describe('JupiterPriceAdapter', () => {
     expect(secondUrl).not.toContain(SOL_MINT);
   });
 
+  it('sends x-api-key header when apiKey is provided', async () => {
+    const fetchSpy = vi.fn((_input: RequestInfo | URL, init?: RequestInit) => {
+      return jsonRes({
+        data: {
+          [SOL_MINT]: { id: SOL_MINT, symbol: 'SOL', price: 150.5 },
+        },
+      });
+    });
+    mockFetch(fetchSpy);
+
+    const adapter = new JupiterPriceAdapter({ apiKey: 'test-key' });
+    await adapter.getPrices([SOL_MINT]);
+
+    const init = fetchSpy.mock.calls[0]![1] as RequestInit | undefined;
+    expect((init?.headers as Record<string, string>)['x-api-key']).toBe('test-key');
+  });
+
   it('returns empty array for empty input', async () => {
     const adapter = new JupiterPriceAdapter();
     const quotes = await adapter.getPrices([]);
