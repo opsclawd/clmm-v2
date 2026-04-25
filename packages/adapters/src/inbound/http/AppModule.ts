@@ -18,6 +18,7 @@ import { SolanaExecutionSubmissionAdapter } from '../../outbound/swap-execution/
 import { TelemetryAdapter } from '../../outbound/observability/TelemetryAdapter.js';
 import { RegimeEngineExecutionEventAdapter } from '../../outbound/regime-engine/RegimeEngineExecutionEventAdapter.js';
 import { CurrentSrLevelsAdapter } from '../../outbound/regime-engine/CurrentSrLevelsAdapter.js';
+import { JupiterPriceAdapter } from '../../outbound/price/JupiterPriceAdapter.js';
 import type { RegimeEngineEventPort } from '../../outbound/regime-engine/types.js';
 import { createDb } from '../../outbound/storage/db.js';
 import { createPgBossProvider } from '../jobs/PgBossProvider.js';
@@ -41,6 +42,7 @@ import {
   PG_BOSS_INSTANCE,
   RECONCILIATION_JOB_PORT,
   SR_LEVELS_POOL_ALLOWLIST,
+  PRICE_PORT,
 } from './tokens.js';
 
 // boundary: process.env values are untyped at runtime; validated via env schema at deploy
@@ -75,6 +77,7 @@ const regimeEngineEventAdapter: RegimeEngineEventPort = new RegimeEngineExecutio
   telemetry,
 );
 const currentSrLevelsAdapter = new CurrentSrLevelsAdapter(regimeEngineBaseUrl, telemetry);
+const jupiterPrice = new JupiterPriceAdapter();
 const reconciliationJobPort = {
   async enqueue(attemptId: string): Promise<void> {
     await boss.send(ReconciliationJobHandler.JOB_NAME, { attemptId });
@@ -104,6 +107,7 @@ export const SR_LEVELS_POOL_ALLOWLIST_MAP = new Map<string, { symbol: string; so
     { provide: PG_BOSS_INSTANCE, useValue: boss },
     { provide: RECONCILIATION_JOB_PORT, useValue: reconciliationJobPort },
     { provide: SR_LEVELS_POOL_ALLOWLIST, useValue: SR_LEVELS_POOL_ALLOWLIST_MAP },
+    { provide: PRICE_PORT, useValue: jupiterPrice },
     PgBossLifecycle,
   ],
 })
