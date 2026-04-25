@@ -49,7 +49,7 @@ export default function WalletRoute() {
       connectionKind={connectionKind}
       platformCapabilities={platformCapabilities}
       onReconnect={handleReconnect}
-      onSwitchWallet={handleSwitchWallet}
+      onSwitchWallet={() => { void handleSwitchWallet(); }}
       onDisconnect={() => {
         void handleDisconnect();
       }}
