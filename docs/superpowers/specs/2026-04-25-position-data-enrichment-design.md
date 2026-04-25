@@ -105,7 +105,7 @@ type PriceQuote = {
 };
 ```
 
-### New port in `packages/domain/src/ports/`
+### New port in `packages/application/src/ports/`
 
 #### `PricePort`
 
@@ -115,7 +115,9 @@ interface PricePort {
 }
 ```
 
-### Extended port in `packages/application/src/ports/`
+`PricePort` lives in the application layer alongside `SupportedPositionReadPort` and `SwapQuotePort`. The domain layer has no knowledge of prices — it only provides pure computation functions (`tickToPrice`, `tokenAmountToUsd`, etc.) that the application layer calls with price data fetched through this port.
+
+### Extended port (same location)
 
 #### `SupportedPositionReadPort` (extended)
 
@@ -146,7 +148,7 @@ function tokenAmountToUsd(amount: bigint, decimals: number, usdPrice: number): n
 
 - `tickToPrice`: Converts a tick index to a human-readable price using `price = 1.0001^tick * 10^(decimalsA - decimalsB)`
 - `priceFromSqrtPrice`: Converts X64 sqrtPrice to human-readable price using `price = (sqrtPriceX64 / 2^64)^2 * 10^(decimalsA - decimalsB)`
-- `rangeDistancePercent`: Returns how far the current tick is from the lower and upper bounds as percentages. When in-range, both values are 0 or show distance to nearest bound.
+- `rangeDistancePercent`: Returns how far the current tick is from the lower and upper bounds as percentages. For out-of-range positions: `belowLowerPercent` is positive when below the lower bound, `aboveUpperPercent` is positive when above the upper bound. For in-range positions: both values are 0 (no breach).
 - `tokenAmountToUsd`: Converts raw token amount + decimals to USD using `amount / 10^decimals * usdPrice`
 
 ## Application Layer Changes
@@ -358,7 +360,7 @@ type PositionDetailViewModel = {
   };
   unclaimedRewardsLabel: string; // "$12.50 in rewards" or "No rewards"
   positionSizeLabel: string;     // "~$5,200 position" or raw liquidity
-  poolDepthLabel: string;        // "$2.4M pool depth"
+  poolDepthLabel: string;        // "$2.4M pool depth" (estimated from pool liquidity * price; shows "depth unavailable" without prices)
   hasAlert: boolean;
   alertLabel: string;
   breachDirectionLabel?: string;
