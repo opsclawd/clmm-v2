@@ -2,6 +2,7 @@ import type { ReactNode } from 'react';
 import { useEffect } from 'react';
 import { AppProvider, getDefaultConfig, getDefaultMobileConfig, useConnector } from '@solana/connector';
 import { walletSessionStore } from '../../state/walletSessionStore';
+import { WalletBootProvider } from '../../wallet-boot/WalletBootProvider.web';
 
 const connectorConfig = getDefaultConfig({
   appName: 'CLMM V2',
@@ -21,13 +22,10 @@ function BrowserWalletSessionSync() {
   const { isConnected, account } = useConnector();
 
   useEffect(() => {
-    const store = walletSessionStore.getState();
-
     if (isConnected && account) {
+      const store = walletSessionStore.getState();
       if (store.walletAddress === account && store.connectionKind === 'browser') return;
       store.markConnected({ walletAddress: account, connectionKind: 'browser' });
-    } else if (store.connectionKind === 'browser' && store.walletAddress) {
-      store.disconnect();
     }
   }, [isConnected, account]);
 
@@ -38,7 +36,7 @@ export function BrowserWalletProvider({ children }: { children: ReactNode }) {
   return (
     <AppProvider connectorConfig={connectorConfig} mobile={mobileConfig}>
       <BrowserWalletSessionSync />
-      {children}
+      <WalletBootProvider>{children}</WalletBootProvider>
     </AppProvider>
   );
 }
