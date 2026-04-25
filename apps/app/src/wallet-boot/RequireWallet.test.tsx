@@ -80,9 +80,9 @@ describe('RequireWallet', () => {
     mockSearch = { triggerId: 'xyz' };
     render(<Harness initial="disconnected" />);
     expect(navigateMock).toHaveBeenCalledTimes(1);
-    const call = navigateMock.mock.calls[0] as Array<{ path: string; method: string }>;
-    expect(call[0].method).toBe('push');
-    expect(call[0].path).toBe('/connect?returnTo=' + encodeURIComponent('/preview/abc?triggerId=xyz'));
+    const call = navigateMock.mock.calls[0]![0]! as { path: string; method: string };
+    expect(call.method).toBe('push');
+    expect(call.path).toBe('/connect?returnTo=' + encodeURIComponent('/preview/abc?triggerId=xyz'));
     expect(screen.queryByTestId('children')).toBeNull();
   });
 
