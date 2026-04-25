@@ -50,14 +50,14 @@ export async function getPositionDetail(params: {
     raw: fees.feeOwedA.toString(),
     decimals: decimalsA,
     symbol: poolData.tokenPair.symbolA,
-    usdValue: (decimalsA && priceA) ? tokenAmountToUsd(fees.feeOwedA, decimalsA, priceA.usdValue) : 0,
+    usdValue: (decimalsA !== null && priceA) ? tokenAmountToUsd(fees.feeOwedA, decimalsA, priceA.usdValue) : 0,
   };
 
   const feeOwedB: TokenAmountValue = {
     raw: fees.feeOwedB.toString(),
     decimals: decimalsB,
     symbol: poolData.tokenPair.symbolB,
-    usdValue: (decimalsB && priceB) ? tokenAmountToUsd(fees.feeOwedB, decimalsB, priceB.usdValue) : 0,
+    usdValue: (decimalsB !== null && priceB) ? tokenAmountToUsd(fees.feeOwedB, decimalsB, priceB.usdValue) : 0,
   };
 
   const totalFeesUsd = feeOwedA.usdValue + feeOwedB.usdValue;
@@ -69,7 +69,7 @@ export async function getPositionDetail(params: {
       amount: r.amountOwed.toString(),
       decimals: r.decimals,
       symbol: rPrice?.symbol ?? r.mint,
-      usdValue: (r.decimals && rPrice) ? tokenAmountToUsd(r.amountOwed, r.decimals, rPrice.usdValue) : 0,
+      usdValue: (r.decimals !== null && rPrice) ? tokenAmountToUsd(r.amountOwed, r.decimals, rPrice.usdValue) : 0,
     };
   });
 

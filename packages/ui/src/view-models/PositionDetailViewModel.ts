@@ -69,8 +69,16 @@ function toSrLevelsViewModelBlock(
 
 function formatTokenAmount(raw: string, decimals: number | null, symbol: string): string {
   if (decimals === null) return `${raw} (unknown decimals) ${symbol}`;
-  const humanReadable = Number(raw) / 10 ** decimals;
-  return `${humanReadable.toFixed(decimals > 2 ? 4 : 2)} ${symbol}`;
+  if (decimals === 0) return `${raw} ${symbol}`;
+
+  const fractionalDigits = decimals > 2 ? 4 : 2;
+
+  // String-based decimal shift — avoids Number precision loss for large u64s
+  const padded = raw.padStart(decimals + 1, '0');
+  const whole = padded.slice(0, -decimals);
+  const fraction = padded.slice(-decimals).slice(0, fractionalDigits);
+
+  return `${whole}.${fraction.padEnd(fractionalDigits, '0')} ${symbol}`;
 }
 
 function rangeDistanceLabel(distance: { belowLowerPercent: number; aboveUpperPercent: number }): string {

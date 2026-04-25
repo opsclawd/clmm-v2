@@ -27,6 +27,12 @@ import { walletPositionOwnership } from '../storage/schema/index.js';
 import { KNOWN_TOKENS } from '../price/known-tokens.js';
 
 export class OrcaPositionReadAdapter implements SupportedPositionReadPort {
+  private readonly poolDataCache = new Map<
+    string,
+    { data: PoolData | null; staleAt: number }
+  >();
+  private readonly POOL_DATA_CACHE_TTL_MS = 5_000;
+
   constructor(
     private readonly rpcUrl: string,
     private readonly snapshotReader: SolanaPositionSnapshotReader,
@@ -207,7 +213,12 @@ export class OrcaPositionReadAdapter implements SupportedPositionReadPort {
     return position;
   }
 
-  async getPoolData(poolId: PoolId): Promise<PoolData | null> {
+  private async fetchPoolData(poolId: PoolId): Promise<PoolData | null> {
+    const cached = this.poolDataCache.get(poolId);
+    if (cached && Date.now() < cached.staleAt) {
+      return cached.data;
+    }
+
     const rpc = this.getRpc();
     try {
       const whirlpoolAccount = await fetchWhirlpool(rpc, address(poolId));
@@ -216,7 +227,7 @@ export class OrcaPositionReadAdapter implements SupportedPositionReadPort {
       const mintB = w.tokenMintB.toString();
       const knownA = KNOWN_TOKENS[mintA];
       const knownB = KNOWN_TOKENS[mintB];
-      return {
+      const data: PoolData = {
         poolId,
         tokenPair: {
           mintA,
@@ -232,9 +243,16 @@ export class OrcaPositionReadAdapter implements SupportedPositionReadPort {
         liquidity: w.liquidity,
         tickCurrentIndex: w.tickCurrentIndex,
       };
+      this.poolDataCache.set(poolId, { data, staleAt: Date.now() + this.POOL_DATA_CACHE_TTL_MS });
+      return data;
     } catch {
+      this.poolDataCache.set(poolId, { data: null, staleAt: Date.now() + this.POOL_DATA_CACHE_TTL_MS });
       return null;
     }
+  }
+
+  async getPoolData(poolId: PoolId): Promise<PoolData | null> {
+    return this.fetchPoolData(poolId);
   }
 
   async getPositionDetail(walletId: WalletId, positionId: PositionId): Promise<PositionDetail | null> {
