@@ -18,7 +18,7 @@ function makePosition(overrides: Partial<PositionSummaryDto> = {}): PositionSumm
     poolId: brand<PositionSummaryDto['poolId']>('pool-1'),
     tokenPairLabel: 'SOL / USDC',
     currentPrice: 142.35,
-    currentPriceLabel: '$142.35',
+    currentPriceLabel: 'USDC 142.35',
     feeRateLabel: '10 bps',
     rangeState: 'in-range',
     rangeDistance: { belowLowerPercent: 0, aboveUpperPercent: 0 },

@@ -23,7 +23,7 @@ describe('ListSupportedPositions', () => {
     expect(result.positions).toHaveLength(1);
     expect(result.summaryDtos).toHaveLength(1);
     expect(result.summaryDtos[0]?.tokenPairLabel).toContain('SOL');
-    expect(result.summaryDtos[0]?.currentPriceLabel).toMatch(/\$/);
+    expect(result.summaryDtos[0]?.currentPriceLabel).toMatch(/USDC/);
     expect(result.summaryDtos[0]?.feeRateLabel).toBe('10 bps');
   });
 

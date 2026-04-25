@@ -84,7 +84,7 @@ describe('Solana read path efficiency integration', () => {
         sqrtPrice: 184467440737095516n,
         tokenMintA: { toString: () => 'So11111111111111111111111111111111111111112' },
         tokenMintB: { toString: () => 'EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v' },
-        feeRate: 10,
+        feeRate: 1000,
         tickSpacing: 64,
         liquidity: 2400000000n,
       },

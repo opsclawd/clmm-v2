@@ -1,7 +1,7 @@
 import type { SupportedPositionReadPort, PricePort } from '../../ports/index.js';
 import type { PositionId, WalletId, LiquidityPosition } from '@clmm/domain';
 import type { PositionDetailDto, TokenAmountValue, RewardAmountValue } from '../../dto/index.js';
-import { priceFromSqrtPrice, rangeDistancePercent, tokenAmountToUsd, tickToPrice } from '@clmm/domain';
+import { priceFromSqrtPrice, rangeDistancePercent, tokenAmountToUsd, tickToPrice, formatFeeRateLabel } from '@clmm/domain';
 
 export type GetPositionDetailResult =
   | { kind: 'found'; position: LiquidityPosition; detailDto: PositionDetailDto }
@@ -76,15 +76,15 @@ export async function getPositionDetail(params: {
   const totalRewardsUsd = rewardValues.reduce((sum, r) => sum + r.usdValue, 0);
 
   const currentPriceLabel = decimalsKnown
-    ? `$${currentPrice.toFixed(2)}`
+    ? `${poolData.tokenPair.symbolB} ${currentPrice.toFixed(2)}`
     : `tick: ${position.rangeState.currentPrice}`;
 
   const lowerBoundLabel = decimalsKnown
-    ? `$${tickToPrice(position.bounds.lowerBound, decimalsA, decimalsB).toFixed(2)}`
+    ? `${poolData.tokenPair.symbolB} ${tickToPrice(position.bounds.lowerBound, decimalsA, decimalsB).toFixed(2)}`
     : `tick ${position.bounds.lowerBound}`;
 
   const upperBoundLabel = decimalsKnown
-    ? `$${tickToPrice(position.bounds.upperBound, decimalsA, decimalsB).toFixed(2)}`
+    ? `${poolData.tokenPair.symbolB} ${tickToPrice(position.bounds.upperBound, decimalsA, decimalsB).toFixed(2)}`
     : `tick ${position.bounds.upperBound}`;
 
   const detailDto: PositionDetailDto = {
@@ -93,7 +93,7 @@ export async function getPositionDetail(params: {
     tokenPairLabel: `${poolData.tokenPair.symbolA} / ${poolData.tokenPair.symbolB}`,
     currentPrice,
     currentPriceLabel,
-    feeRateLabel: `${poolData.feeRate} bps`,
+    feeRateLabel: formatFeeRateLabel(poolData.feeRate),
     rangeState: position.rangeState.kind,
     rangeDistance: {
       belowLowerPercent: distance.belowLowerPercent,

@@ -1,3 +1,12 @@
+export function whirlpoolFeeRateToBps(feeRateHundredths: number): number {
+  return feeRateHundredths / 100;
+}
+
+export function formatFeeRateLabel(feeRateHundredths: number): string {
+  const bps = whirlpoolFeeRateToBps(feeRateHundredths);
+  return Number.isInteger(bps) ? `${bps} bps` : `${bps.toFixed(1)} bps`;
+}
+
 export function priceFromSqrtPrice(
   sqrtPriceX64: bigint,
   decimalsA: number,

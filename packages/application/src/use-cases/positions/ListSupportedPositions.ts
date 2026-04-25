@@ -1,7 +1,7 @@
 import type { SupportedPositionReadPort } from '../../ports/index.js';
 import type { WalletId, LiquidityPosition, PoolId } from '@clmm/domain';
 import type { PositionSummaryDto } from '../../dto/index.js';
-import { priceFromSqrtPrice, rangeDistancePercent } from '@clmm/domain';
+import { priceFromSqrtPrice, rangeDistancePercent, formatFeeRateLabel } from '@clmm/domain';
 
 export type ListSupportedPositionsResult = {
   positions: LiquidityPosition[];
@@ -42,9 +42,9 @@ export async function listSupportedPositions(params: {
       tokenPairLabel: poolData ? `${poolData.tokenPair.symbolA} / ${poolData.tokenPair.symbolB}` : `Pool ${p.poolId}`,
       currentPrice,
       currentPriceLabel: (poolData && decimalsKnown)
-        ? `$${currentPrice.toFixed(2)}`
+        ? `${poolData.tokenPair.symbolB} ${currentPrice.toFixed(2)}`
         : `tick: ${p.rangeState.currentPrice}`,
-      feeRateLabel: poolData ? `${poolData.feeRate} bps` : '',
+      feeRateLabel: poolData ? formatFeeRateLabel(poolData.feeRate) : '',
       rangeState: p.rangeState.kind,
       rangeDistance: {
         belowLowerPercent: distance.belowLowerPercent,

@@ -44,7 +44,7 @@ export const FIXTURE_POOL_DATA: PoolData = {
     decimalsB: 6,
   },
   sqrtPrice: 184467440737095516n,
-  feeRate: 10,
+  feeRate: 1000,
   tickSpacing: 64,
   liquidity: 2400000000n,
   tickCurrentIndex: 150,

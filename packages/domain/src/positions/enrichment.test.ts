@@ -4,6 +4,8 @@ import {
   tickToPrice,
   rangeDistancePercent,
   tokenAmountToUsd,
+  whirlpoolFeeRateToBps,
+  formatFeeRateLabel,
 } from './enrichment.js';
 
 describe('priceFromSqrtPrice', () => {
@@ -144,5 +146,30 @@ describe('tokenAmountToUsd', () => {
 
   it('handles zero price', () => {
     expect(tokenAmountToUsd(1000000000n, 9, 0)).toBe(0);
+  });
+});
+
+describe('whirlpoolFeeRateToBps', () => {
+  it('converts hundredths-of-bps to bps', () => {
+    expect(whirlpoolFeeRateToBps(1000)).toBe(10);
+    expect(whirlpoolFeeRateToBps(100)).toBe(1);
+    expect(whirlpoolFeeRateToBps(3000)).toBe(30);
+  });
+
+  it('handles fractional bps', () => {
+    expect(whirlpoolFeeRateToBps(10)).toBe(0.1);
+    expect(whirlpoolFeeRateToBps(1)).toBe(0.01);
+  });
+});
+
+describe('formatFeeRateLabel', () => {
+  it('formats whole bps without decimal', () => {
+    expect(formatFeeRateLabel(1000)).toBe('10 bps');
+    expect(formatFeeRateLabel(100)).toBe('1 bps');
+  });
+
+  it('formats fractional bps with one decimal', () => {
+    expect(formatFeeRateLabel(10)).toBe('0.1 bps');
+    expect(formatFeeRateLabel(500)).toBe('5 bps');
   });
 });

@@ -88,4 +88,6 @@ export {
   tickToPrice,
   rangeDistancePercent,
   tokenAmountToUsd,
+  whirlpoolFeeRateToBps,
+  formatFeeRateLabel,
 } from './enrichment.js';
