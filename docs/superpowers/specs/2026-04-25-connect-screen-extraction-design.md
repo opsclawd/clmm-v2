@@ -114,9 +114,11 @@ The screen is pure rendering from the view model. It renders sections based on `
 
 | `vm.screenState` | Renders |
 |---|---|
-| `loading` | Spinner + "Loading..." text |
+| `loading` | Spinner with `colors.safe` ActivityIndicator |
 | `social-webview` | Warning banner + Open in Browser button + Phantom/Solflare deep links |
-| `standard` | Title + subtitle + native wallet button (if available) + browser wallet discovery section + fallback banners + outcome banner + connecting indicator + Go Back |
+| `standard` | Hero animation + "Protect your Orca positions" title + subtitle + feature bullets + outcome banner + platform notice + native wallet button (if available) + browser wallet discovery section + fallback banners + connecting indicator + Go Back |
+
+Note: PR #35 redesigned the connect screen with a hero animation (`HeroAnimation` component), feature bullets (`FeatureRow` component with Icon), and design system tokens (`colors.*`, `typography.*`). The extraction preserves all of these visual elements. Only the props and rendering logic change — the visual identity stays.
 
 ### Browser wallet discovery rendering
 
