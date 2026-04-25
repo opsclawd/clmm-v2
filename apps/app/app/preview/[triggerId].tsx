@@ -6,22 +6,25 @@ import { useStore } from 'zustand';
 import { createPreview, refreshPreview } from '../../src/api/previews';
 import { navigateRoute } from '../../src/platform/webNavigation';
 import { walletSessionStore } from '../../src/state/walletSessionStore';
+import { RequireWallet } from '../../src/wallet-boot/RequireWallet';
 
 function readTriggerId(value: string | string[] | undefined): string | null {
   return typeof value === 'string' && value.length > 0 ? value : null;
 }
 
 export default function PreviewRoute() {
+  return (
+    <RequireWallet>
+      <PreviewRouteBody />
+    </RequireWallet>
+  );
+}
+
+function PreviewRouteBody() {
   const router = useRouter();
   const params = useLocalSearchParams<{ triggerId?: string | string[] }>();
   const triggerId = readTriggerId(params.triggerId);
   const walletAddress = useStore(walletSessionStore, (state) => state.walletAddress);
-  const hasHydrated = useStore(walletSessionStore, (s) => s.hasHydrated);
-
-  if (triggerId != null && walletAddress == null && hasHydrated) {
-    navigateRoute({ router, path: '/connect', method: 'push' });
-    return null;
-  }
 
   const createMutation = useMutation({
     mutationFn: createPreview,
@@ -37,7 +40,6 @@ export default function PreviewRoute() {
     if (triggerId == null) {
       return;
     }
-
     createMutation.mutate(triggerId);
     // Intentionally depend only on triggerId to avoid mutation-object re-render loops.
   }, [triggerId]);

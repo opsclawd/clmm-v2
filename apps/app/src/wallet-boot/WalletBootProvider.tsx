@@ -1,0 +1,1 @@
+export { WalletBootProvider } from './WalletBootProvider.native';

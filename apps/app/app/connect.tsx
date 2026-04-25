@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import { View, Text, TouchableOpacity, ScrollView, Linking, Platform, ActivityIndicator, Image } from 'react-native';
-import { useRouter } from 'expo-router';
+import { useRouter, useLocalSearchParams } from 'expo-router';
 import { useStore } from 'zustand';
 import type { PlatformCapabilityState } from '@clmm/application/public';
 import type { BrowserWalletOption } from '../src/platform/browserWallet/browserWalletTypes';
@@ -14,6 +14,7 @@ import {
 } from '../src/platform/browserWallet/walletDeepLinks';
 import { mapWalletErrorToOutcome } from '../src/platform/walletConnection';
 import { navigateRoute } from '../src/platform/webNavigation';
+import { parseReturnTo } from '../src/wallet-boot/parseReturnTo';
 import { walletSessionStore } from '../src/state/walletSessionStore';
 import { getConnectionOutcomeDisplay } from '@clmm/ui';
 import { enrollWalletForMonitoring } from '../src/api/wallets';
@@ -60,6 +61,8 @@ const FALLBACK_PLATFORM_CAPABILITIES: PlatformCapabilityState = {
 
 export default function ConnectRoute() {
   const router = useRouter();
+  const params = useLocalSearchParams<{ returnTo?: string | string[] }>();
+  const returnTo = useMemo(() => parseReturnTo(params.returnTo), [params.returnTo]);
   const platformCapabilities = useStore(walletSessionStore, (state) => state.platformCapabilities);
   const connectionOutcome = useStore(walletSessionStore, (state) => state.connectionOutcome);
   const isConnecting = useStore(walletSessionStore, (state) => state.isConnecting);
@@ -137,7 +140,7 @@ export default function ConnectRoute() {
       enrollWalletForMonitoring(address).catch((err) => {
         console.warn('Wallet enrollment failed:', err);
       });
-      navigateRoute({ router, path: '/(tabs)/positions', method: 'replace' });
+      navigateRoute({ router, path: returnTo, method: 'replace' });
     } catch (error) {
       handleConnectionError(error);
     }
@@ -152,7 +155,7 @@ export default function ConnectRoute() {
       enrollWalletForMonitoring(address).catch((err) => {
         console.warn('Wallet enrollment failed:', err);
       });
-      navigateRoute({ router, path: '/(tabs)/positions', method: 'replace' });
+      navigateRoute({ router, path: returnTo, method: 'replace' });
     } catch (error) {
       handleConnectionError(error);
     }
@@ -167,7 +170,7 @@ export default function ConnectRoute() {
       enrollWalletForMonitoring(walletAddress).catch((err) => {
         console.warn('Wallet enrollment failed:', err);
       });
-      navigateRoute({ router, path: '/(tabs)/positions', method: 'replace' });
+      navigateRoute({ router, path: returnTo, method: 'replace' });
     } catch (error) {
       handleConnectionError(error);
     }
