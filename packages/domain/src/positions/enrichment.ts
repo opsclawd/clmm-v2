@@ -53,9 +53,17 @@ export function tokenAmountToUsd(
   usdPrice: number,
 ): number {
   if (amount === 0n) return 0;
-  const divisor = 10n ** BigInt(decimals);
-  const whole = amount / divisor;
-  const remainder = amount % divisor;
-  const humanReadable = Number(whole) + Number(remainder) / Number(divisor);
-  return humanReadable * usdPrice;
+
+  const str = amount.toString();
+  const len = str.length;
+
+  if (decimals >= len) {
+    const padded = str.padStart(decimals + 1, '0');
+    const fraction = padded.slice(-decimals);
+    return parseFloat(`0.${fraction}`) * usdPrice;
+  }
+
+  const whole = str.slice(0, len - decimals);
+  const fraction = str.slice(len - decimals);
+  return parseFloat(`${whole}.${fraction}`) * usdPrice;
 }
