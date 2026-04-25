@@ -3,12 +3,21 @@ import { useQuery } from '@tanstack/react-query';
 import { ExecutionResultScreen } from '@clmm/ui';
 import { fetchExecution } from '../../src/api/executions';
 import { navigateRoute } from '../../src/platform/webNavigation';
+import { RequireWallet } from '../../src/wallet-boot/RequireWallet';
 
 function readAttemptId(value: string | string[] | undefined): string | null {
   return typeof value === 'string' && value.length > 0 ? value : null;
 }
 
 export default function ExecutionRoute() {
+  return (
+    <RequireWallet>
+      <ExecutionRouteBody />
+    </RequireWallet>
+  );
+}
+
+function ExecutionRouteBody() {
   const router = useRouter();
   const params = useLocalSearchParams<{ attemptId?: string | string[] }>();
   const attemptId = readAttemptId(params.attemptId);
