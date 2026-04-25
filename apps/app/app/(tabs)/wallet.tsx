@@ -19,7 +19,14 @@ export default function WalletRoute() {
     navigateRoute({ router, path: '/connect', method: 'push' });
   }
 
-  function handleSwitchWallet() {
+  async function handleSwitchWallet() {
+    if (connectionKind === 'browser') {
+      try {
+        await browserDisconnect.disconnect();
+      } catch {
+        // Best-effort connector disconnect before switching.
+      }
+    }
     disconnect();
     navigateRoute({ router, path: '/connect', method: 'push' });
   }
