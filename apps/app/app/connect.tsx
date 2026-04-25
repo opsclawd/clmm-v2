@@ -219,8 +219,6 @@ export default function ConnectRoute() {
   }
 
   function renderBrowserWalletSection() {
-    if (!platformCapabilities?.browserWalletAvailable) return null;
-
     switch (discoveryState) {
       case 'discovering':
         return (
