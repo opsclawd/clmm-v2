@@ -16,6 +16,7 @@ import { signNativeTransaction } from '../../src/platform/nativeWallet';
 import { mapWalletErrorToOutcome } from '../../src/platform/walletConnection';
 import { navigateRoute } from '../../src/platform/webNavigation';
 import { walletSessionStore } from '../../src/state/walletSessionStore';
+import { RequireWallet } from '../../src/wallet-boot/RequireWallet';
 import type { ExecutionAttemptDto } from '@clmm/application/public';
 
 function readAttemptId(value: string | string[] | undefined): string | null {
@@ -58,7 +59,7 @@ async function recordSigningOutcome(params: {
   }
 }
 
-export default function SigningRoute() {
+function SigningRouteBody() {
   const router = useRouter();
   const params = useLocalSearchParams<{
     attemptId?: string | string[];
@@ -72,18 +73,11 @@ export default function SigningRoute() {
   const episodeId = readEpisodeId(params.episodeId);
   const hasPendingAttemptPlaceholder = isPendingAttemptPlaceholder(params.attemptId);
   const walletAddress = useStore(walletSessionStore, (state) => state.walletAddress);
-  const hasHydrated = useStore(walletSessionStore, (s) => s.hasHydrated);
   const connectionKind = useStore(walletSessionStore, (state) => state.connectionKind);
   const browserSigner = useBrowserWalletSign();
 
   const [statusNotice, setStatusNotice] = useState<string | null>(null);
   const [hasStartedPendingApproval, setHasStartedPendingApproval] = useState(false);
-
-  useEffect(() => {
-    if (attemptId == null && walletAddress == null && hasHydrated) {
-      navigateRoute({ router, path: '/connect', method: 'push' });
-    }
-  }, [attemptId, walletAddress, hasHydrated, router]);
 
   const approveMutation = useMutation({
     mutationFn: approveExecutionPreview,
@@ -244,10 +238,6 @@ export default function SigningRoute() {
     },
   });
 
-  if (attemptId == null && walletAddress == null) {
-    return null;
-  }
-
   return (
     <SigningStatusScreen
       {...(displayedExecution != null
@@ -347,6 +337,14 @@ export default function SigningRoute() {
         signMutation.mutate();
       }}
       {...(signMutation.error instanceof Error ? { signingError: signMutation.error.message } : {})}
-    />
+     />
+  );
+}
+
+export default function SigningRoute() {
+  return (
+    <RequireWallet>
+      <SigningRouteBody />
+    </RequireWallet>
   );
 }
