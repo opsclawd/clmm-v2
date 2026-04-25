@@ -321,7 +321,54 @@ git commit -m "feat(ui): extend WalletConnectViewModel with discovery, fallback,
 ### Task 3: Rewrite WalletConnectScreen to render from view model + actions
 
 **Files:**
-- Modify: `packages/ui/src/screens/WalletConnectScreen.test.tsx`
+- Modify: `packages/ui/src/screens/WalletConnectScreen.tsx`
+
+**Important:** PR #35 redesigned this screen with a hero animation, feature bullets, and `colors`/`typography` design system tokens. The rewrite must preserve ALL of these visual elements — `HeroAnimation`, `FeatureRow`, the feature list, `StyleSheet.create(...)`, and the existing design system styling. Only the props and rendering logic change; the visual identity stays.
+
+The existing `WalletConnectScreen` accepts `{ platformCapabilities, connectionOutcome, isConnecting, onSelectWallet, onGoBack }`. The new version accepts:
+
+```ts
+type Props = {
+  vm: WalletConnectViewModel;
+  actions: WalletConnectActions;
+};
+```
+
+- [ ] **Step 1: Rewrite WalletConnectScreen.tsx**
+
+The new component:
+
+1. Keeps `HeroAnimation` and `FeatureRow` components unchanged
+2. Keeps the `features` array and `StyleSheet` unchanged
+3. Changes props from the old flat shape to `{ vm, actions }`
+4. Replaces the `buildWalletConnectViewModel` call inside the component with the passed-in `vm`
+5. Replaces `onSelectWallet?.(kind)` with the new callbacks:
+   - `vm.nativeWalletAvailable` → `actions.onSelectNative` for native wallet button
+   - Discovery state rendering calls `actions.onSelectDiscoveredWallet(wallet.id)` or `actions.onConnectDefaultBrowser`
+   - `vm.screenState === 'social-webview'` renders the social webview fallback with `actions.onOpenInBrowser`, `actions.onOpenPhantom`, `actions.onOpenSolflare`
+   - `vm.fallback` renders fallback banners with deep link buttons calling `actions.onOpenPhantom`/`actions.onOpenSolflare`
+   - `actions.onGoBack` for the back button
+6. `vm.screenState === 'loading'` renders the `<ActivityIndicator>` (same as current null-platformCapabilities handling)
+7. Outcome banner renders from `vm.outcomeDisplay` using existing severity color logic
+8. Connecting indicator renders when `vm.isConnecting`
+
+The screen keeps its existing visual structure: `<View style={styles.container}>` → `<ScrollView>` → back button (if `actions.onGoBack`) → `<HeroAnimation />` → title → subtitle → outcome banner → platform notice → wallet discovery / fallback sections → feature list.
+
+- [ ] **Step 2: Run typecheck**
+
+Run: `pnpm --filter @clmm/ui typecheck && pnpm --filter @clmm/app typecheck`
+Expected: PASS
+
+- [ ] **Step 3: Commit**
+
+```bash
+git add packages/ui/src/screens/WalletConnectScreen.tsx
+git commit -m "feat(ui): rewrite WalletConnectScreen to render from view model + actions"
+```
+
+---
+
+### Task 4: Rewrite WalletConnectScreen component tests
 
 - [ ] **Step 1: Rewrite test file for new props**
 
@@ -490,7 +537,7 @@ git commit -m "test(ui): rewrite WalletConnectScreen tests for view model + acti
 
 ---
 
-### Task 4: Strip connect.tsx to thin route shell
+### Task 5: Strip connect.tsx to thin route shell
 
 **Files:**
 - Modify: `apps/app/app/connect.tsx`
@@ -686,7 +733,7 @@ git commit -m "refactor(app): strip connect.tsx to thin route shell, move render
 
 ---
 
-### Task 5: Update exports and final verification
+### Task 6: Update exports and final verification
 
 **Files:**
 - Modify: `packages/ui/src/index.ts`
@@ -717,7 +764,7 @@ git commit -m "chore: finalize connect screen extraction exports and verificatio
 
 ---
 
-### Task 6: Remove dead code and verify connect.tsx line count
+### Task 7: Remove dead code and verify connect.tsx line count
 
 **Files:**
 - Verify: `apps/app/app/connect.tsx`
