@@ -37,11 +37,11 @@ describe('JupiterPriceAdapter', () => {
     const quotes = await adapter.getPrices([SOL_MINT, USDC_MINT]);
 
     expect(quotes).toHaveLength(2);
-    expect(quotes[0].usdValue).toBe(150.5);
-    expect(quotes[0].symbol).toBe('SOL');
-    expect(quotes[1].usdValue).toBe(1.0);
-    expect(quotes[1].symbol).toBe('USDC');
-    expect(quotes[0].quotedAt).toBeTypeOf('number');
+    expect(quotes[0]!.usdValue).toBe(150.5);
+    expect(quotes[0]!.symbol).toBe('SOL');
+    expect(quotes[1]!.usdValue).toBe(1.0);
+    expect(quotes[1]!.symbol).toBe('USDC');
+    expect(quotes[0]!.quotedAt).toBeTypeOf('number');
 
     expect(fetchSpy).toHaveBeenCalledOnce();
     const calledUrl = (fetchSpy.mock.calls[0] as unknown[])[0] as string;
@@ -107,11 +107,11 @@ describe('JupiterPriceAdapter', () => {
 
     const quotes = await adapter.getPrices([SOL_MINT, USDC_MINT]);
     expect(quotes).toHaveLength(2);
-    expect(quotes[0].usdValue).toBe(150.5);
-    expect(quotes[1].usdValue).toBe(1.0);
+    expect(quotes[0]!.usdValue).toBe(150.5);
+    expect(quotes[1]!.usdValue).toBe(1.0);
     expect(fetchSpy).toHaveBeenCalledTimes(2);
 
-    const secondUrl = fetchSpy.mock.calls[1][0] as string;
+    const secondUrl = fetchSpy.mock.calls[1]![0] as string;
     expect(secondUrl).toContain(USDC_MINT);
     expect(secondUrl).not.toContain(SOL_MINT);
   });

@@ -16,7 +16,12 @@ function makePosition(overrides: Partial<PositionSummaryDto> = {}): PositionSumm
   return {
     positionId: brand<PositionSummaryDto['positionId']>('position-1'),
     poolId: brand<PositionSummaryDto['poolId']>('pool-1'),
+    tokenPairLabel: 'SOL / USDC',
+    currentPrice: 142.35,
+    currentPriceLabel: '$142.35',
+    feeRateLabel: '10 bps',
     rangeState: 'in-range',
+    rangeDistance: { belowLowerPercent: 0, aboveUpperPercent: 0 },
     hasActionableTrigger: false,
     monitoringStatus: 'active',
     ...overrides,
@@ -58,7 +63,7 @@ describe('PositionsListScreen', () => {
       />,
     );
 
-    expect(screen.getByText('Pool pool-1')).toBeTruthy();
+    expect(screen.getByText('SOL / USDC')).toBeTruthy();
     expect(screen.queryByText('Could not load supported positions')).toBeNull();
   });
 
@@ -115,7 +120,7 @@ describe('PositionsListScreen', () => {
       />,
     );
 
-    fireEvent.click(screen.getByText('Pool pool-tap-test'));
+    fireEvent.click(screen.getByText('SOL / USDC'));
     expect(onSelectPosition).toHaveBeenCalledWith('pos-tap-test');
   });
 

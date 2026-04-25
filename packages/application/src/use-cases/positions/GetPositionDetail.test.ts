@@ -11,7 +11,7 @@ import {
   FIXTURE_SOL_PRICE_QUOTE,
   FIXTURE_USDC_PRICE_QUOTE,
 } from '@clmm/testing';
-import { makePositionId, makeWalletId } from '@clmm/domain';
+import { makePositionId } from '@clmm/domain';
 import type { PricePort } from '@clmm/application';
 
 describe('GetPositionDetail', () => {

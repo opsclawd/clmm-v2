@@ -1,5 +1,5 @@
 import type { SupportedPositionReadPort, PricePort } from '../../ports/index.js';
-import type { WalletId, LiquidityPosition, PoolId, PriceQuote } from '@clmm/domain';
+import type { WalletId, LiquidityPosition, PoolId } from '@clmm/domain';
 import type { PositionSummaryDto } from '../../dto/index.js';
 import { priceFromSqrtPrice, rangeDistancePercent } from '@clmm/domain';
 

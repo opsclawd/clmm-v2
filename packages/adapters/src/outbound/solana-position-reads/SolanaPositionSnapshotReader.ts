@@ -10,7 +10,7 @@
 import { createSolanaRpc, address } from '@solana/kit';
 import { getPositionAddress, fetchPosition, fetchWhirlpool } from '@orca-so/whirlpools-client';
 
-import type { LiquidityPosition, WalletId, PositionId, PoolData, PositionFees, PositionRewardInfo, PositionDetail } from '@clmm/domain';
+import type { LiquidityPosition, WalletId, PositionId, PoolData, PositionFees, PositionRewardInfo } from '@clmm/domain';
 import { makePoolId, makeClockTimestamp, evaluateRangeState } from '@clmm/domain';
 import { KNOWN_TOKENS } from '../price/known-tokens.js';
 
