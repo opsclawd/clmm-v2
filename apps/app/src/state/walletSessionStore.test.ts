@@ -123,7 +123,7 @@ describe('walletSessionStore', () => {
     expect(store.getState().isConnecting).toBe(false);
   });
 
-  it('does not persist browser wallet sessions across rehydration', async () => {
+  it('persists browser wallet sessions across rehydration', async () => {
     const store1 = createWalletSessionStore();
 
     store1.getState().setPlatformCapabilities(caps);
@@ -138,9 +138,50 @@ describe('walletSessionStore', () => {
     const store2 = createWalletSessionStore();
     await store2.persist.rehydrate();
 
-    expect(store2.getState().walletAddress).toBeNull();
-    expect(store2.getState().connectionKind).toBeNull();
+    expect(store2.getState().walletAddress).toBe('DemoWallet1111111111111111111111111111111111');
+    expect(store2.getState().connectionKind).toBe('browser');
     expect(store2.getState().platformCapabilities).toEqual(caps);
+  });
+
+  it('records lastConnectedAt when markConnected is called', () => {
+    const store = createWalletSessionStore();
+    const before = Date.now();
+
+    store.getState().markConnected({
+      walletAddress: 'DemoWallet1111111111111111111111111111111111',
+      connectionKind: 'browser',
+    });
+
+    const after = Date.now();
+    const ts = store.getState().lastConnectedAt;
+    expect(ts).not.toBeNull();
+    expect(ts!).toBeGreaterThanOrEqual(before);
+    expect(ts!).toBeLessThanOrEqual(after);
+  });
+
+  it('persists lastConnectedAt across rehydration', async () => {
+    const store1 = createWalletSessionStore();
+    store1.getState().markConnected({
+      walletAddress: 'DemoWallet1111111111111111111111111111111111',
+      connectionKind: 'browser',
+    });
+    const ts = store1.getState().lastConnectedAt;
+    await Promise.resolve();
+
+    const store2 = createWalletSessionStore();
+    await store2.persist.rehydrate();
+    expect(store2.getState().lastConnectedAt).toBe(ts);
+  });
+
+  it('clears lastConnectedAt on disconnect', () => {
+    const store = createWalletSessionStore();
+    store.getState().markConnected({
+      walletAddress: 'DemoWallet1111111111111111111111111111111111',
+      connectionKind: 'browser',
+    });
+    expect(store.getState().lastConnectedAt).not.toBeNull();
+    store.getState().disconnect();
+    expect(store.getState().lastConnectedAt).toBeNull();
   });
 
   it('persists native wallet sessions across rehydration', async () => {

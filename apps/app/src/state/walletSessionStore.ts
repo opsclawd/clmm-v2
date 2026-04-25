@@ -27,6 +27,7 @@ export type WalletSessionState = {
   platformCapabilities: PlatformCapabilityState | null;
   isConnecting: boolean;
   hasHydrated: boolean;
+  lastConnectedAt: number | null;
   setPlatformCapabilities: (capabilities: PlatformCapabilityState) => void;
   beginConnection: () => void;
   markConnected: (params: {
@@ -48,6 +49,7 @@ export function createWalletSessionStore() {
         platformCapabilities: null,
         isConnecting: false,
         hasHydrated: false,
+        lastConnectedAt: null,
         setPlatformCapabilities: (platformCapabilities) => set({ platformCapabilities }),
         beginConnection: () =>
           set({
@@ -62,6 +64,7 @@ export function createWalletSessionStore() {
             connectionKind,
             connectionOutcome: { kind: 'connected' },
             isConnecting: false,
+            lastConnectedAt: Date.now(),
           }),
         markOutcome: (connectionOutcome) =>
           set({
@@ -76,8 +79,8 @@ export function createWalletSessionStore() {
             connectionKind: null,
             connectionOutcome: null,
             isConnecting: false,
+            lastConnectedAt: null,
           });
-          // Also clear persisted storage so nothing survives across sessions
           store.persist.clearStorage();
         },
         clearOutcome: () => set({ connectionOutcome: null }),
@@ -85,20 +88,12 @@ export function createWalletSessionStore() {
       {
         name: 'wallet-session',
         storage: safeStorageFactory(),
-        partialize: (state) => {
-          if (state.connectionKind === 'browser') {
-            return {
-              walletAddress: null,
-              connectionKind: null,
-              platformCapabilities: state.platformCapabilities,
-            };
-          }
-          return {
-            walletAddress: state.walletAddress,
-            connectionKind: state.connectionKind,
-            platformCapabilities: state.platformCapabilities,
-          };
-        },
+        partialize: (state) => ({
+          walletAddress: state.walletAddress,
+          connectionKind: state.connectionKind,
+          platformCapabilities: state.platformCapabilities,
+          lastConnectedAt: state.lastConnectedAt,
+        }),
         onRehydrateStorage: () => (_state, _error) => {
           if (typeof window !== 'undefined') {
             store.setState({ hasHydrated: true });
