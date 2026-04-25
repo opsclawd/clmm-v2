@@ -12,6 +12,7 @@ function input(partial: Partial<DeriveWalletBootStatusInput>): DeriveWalletBootS
     hasHydrated: true,
     connectionKind: null,
     walletAddress: null,
+    browserRestoreAddress: null,
     connectorStatus: { status: 'disconnected' },
     connectorAccount: null,
     hasSeenConnectorInflight: false,
@@ -27,6 +28,7 @@ describe('deriveWalletBootStatus', () => {
         hasHydrated: false,
         connectionKind: 'browser',
         walletAddress: ADDR,
+        browserRestoreAddress: ADDR,
         connectorStatus: { status: 'connected', session: {} as never },
         connectorAccount: ADDR,
         hasSeenConnectorInflight: true,
@@ -57,7 +59,7 @@ describe('deriveWalletBootStatus', () => {
       deriveWalletBootStatus(
         input({
           connectionKind: 'browser',
-          walletAddress: ADDR,
+          browserRestoreAddress: ADDR,
           connectorStatus: { status: 'disconnected' },
           hasSeenConnectorInflight: false,
           restoreTimedOut: false,
@@ -71,7 +73,7 @@ describe('deriveWalletBootStatus', () => {
       deriveWalletBootStatus(
         input({
           connectionKind: 'browser',
-          walletAddress: ADDR,
+          browserRestoreAddress: ADDR,
           connectorStatus: { status: 'connecting', connectorId: 'phantom' as never },
           hasSeenConnectorInflight: true,
           restoreTimedOut: false,
@@ -85,7 +87,7 @@ describe('deriveWalletBootStatus', () => {
       deriveWalletBootStatus(
         input({
           connectionKind: 'browser',
-          walletAddress: ADDR,
+          browserRestoreAddress: ADDR,
           connectorStatus: { status: 'connected', session: {} as never },
           connectorAccount: ADDR,
           hasSeenConnectorInflight: true,
@@ -99,7 +101,7 @@ describe('deriveWalletBootStatus', () => {
       deriveWalletBootStatus(
         input({
           connectionKind: 'browser',
-          walletAddress: ADDR,
+          browserRestoreAddress: ADDR,
           connectorStatus: { status: 'connected', session: {} as never },
           connectorAccount: null,
           hasSeenConnectorInflight: true,
@@ -108,12 +110,12 @@ describe('deriveWalletBootStatus', () => {
     ).toBe('checking-browser-wallet');
   });
 
-  it('returns disconnected when connector account does not match persisted wallet address', () => {
+  it('returns disconnected when connector account does not match persisted browser restore address', () => {
     expect(
       deriveWalletBootStatus(
         input({
           connectionKind: 'browser',
-          walletAddress: ADDR,
+          browserRestoreAddress: ADDR,
           connectorStatus: { status: 'connected', session: {} as never },
           connectorAccount: 'AnotherWallet1111111111111111111111111111111',
           hasSeenConnectorInflight: true,
@@ -127,7 +129,7 @@ describe('deriveWalletBootStatus', () => {
       deriveWalletBootStatus(
         input({
           connectionKind: 'browser',
-          walletAddress: ADDR,
+          browserRestoreAddress: ADDR,
           connectorStatus: { status: 'error', error: new Error('x'), recoverable: false },
           hasSeenConnectorInflight: true,
         }),
@@ -140,7 +142,7 @@ describe('deriveWalletBootStatus', () => {
       deriveWalletBootStatus(
         input({
           connectionKind: 'browser',
-          walletAddress: ADDR,
+          browserRestoreAddress: ADDR,
           connectorStatus: { status: 'disconnected' },
           hasSeenConnectorInflight: true,
         }),
@@ -153,7 +155,7 @@ describe('deriveWalletBootStatus', () => {
       deriveWalletBootStatus(
         input({
           connectionKind: 'browser',
-          walletAddress: ADDR,
+          browserRestoreAddress: ADDR,
           connectorStatus: { status: 'connecting', connectorId: 'phantom' as never },
           hasSeenConnectorInflight: true,
           restoreTimedOut: true,
@@ -165,15 +167,15 @@ describe('deriveWalletBootStatus', () => {
   it('returns disconnected when there is no restore candidate and no native session', () => {
     expect(
       deriveWalletBootStatus(
-        input({ connectionKind: null, walletAddress: null }),
+        input({ connectionKind: null, walletAddress: null, browserRestoreAddress: null }),
       ),
     ).toBe('disconnected');
   });
 
-  it('returns disconnected when browser kind has no walletAddress (no candidate)', () => {
+  it('returns disconnected when browser kind has no browserRestoreAddress (no candidate)', () => {
     expect(
       deriveWalletBootStatus(
-        input({ connectionKind: 'browser', walletAddress: null }),
+        input({ connectionKind: 'browser', browserRestoreAddress: null }),
       ),
     ).toBe('disconnected');
   });

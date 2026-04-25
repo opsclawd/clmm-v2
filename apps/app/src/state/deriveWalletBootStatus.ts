@@ -11,6 +11,7 @@ export type DeriveWalletBootStatusInput = {
   hasHydrated: boolean;
   connectionKind: WalletConnectionKind | null;
   walletAddress: string | null;
+  browserRestoreAddress: string | null;
   connectorStatus: WalletStatus;
   connectorAccount: string | null;
   hasSeenConnectorInflight: boolean;
@@ -25,19 +26,19 @@ export function deriveWalletBootStatus(input: DeriveWalletBootStatusInput): Wall
   }
 
   const hasBrowserRestoreCandidate =
-    input.connectionKind === 'browser' && input.walletAddress != null;
+    input.connectionKind === 'browser' && input.browserRestoreAddress != null;
 
   if (hasBrowserRestoreCandidate) {
     if (
       input.connectorStatus.status === 'connected' &&
-      input.connectorAccount === input.walletAddress
+      input.connectorAccount === input.browserRestoreAddress
     ) {
       return 'connected';
     }
     if (
       input.connectorStatus.status === 'connected' &&
       input.connectorAccount != null &&
-      input.connectorAccount !== input.walletAddress
+      input.connectorAccount !== input.browserRestoreAddress
     ) {
       return 'disconnected';
     }

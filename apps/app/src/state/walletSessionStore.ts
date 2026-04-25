@@ -23,6 +23,7 @@ type NonSuccessConnectionOutcome = Exclude<ConnectionOutcome, { kind: 'connected
 export type WalletSessionState = {
   walletAddress: string | null;
   connectionKind: WalletConnectionKind | null;
+  browserRestoreAddress: string | null;
   connectionOutcome: ConnectionOutcome | null;
   platformCapabilities: PlatformCapabilityState | null;
   isConnecting: boolean;
@@ -45,6 +46,7 @@ export function createWalletSessionStore() {
       (set, _get, store) => ({
         walletAddress: null,
         connectionKind: null,
+        browserRestoreAddress: null,
         connectionOutcome: null,
         platformCapabilities: null,
         isConnecting: false,
@@ -57,11 +59,13 @@ export function createWalletSessionStore() {
             connectionOutcome: null,
             walletAddress: null,
             connectionKind: null,
+            browserRestoreAddress: null,
           }),
         markConnected: ({ walletAddress, connectionKind }) =>
           set({
             walletAddress,
             connectionKind,
+            browserRestoreAddress: connectionKind === 'browser' ? walletAddress : null,
             connectionOutcome: { kind: 'connected' },
             isConnecting: false,
             lastConnectedAt: Date.now(),
@@ -72,11 +76,13 @@ export function createWalletSessionStore() {
             isConnecting: false,
             walletAddress: null,
             connectionKind: null,
+            browserRestoreAddress: null,
           }),
         disconnect: () => {
           set({
             walletAddress: null,
             connectionKind: null,
+            browserRestoreAddress: null,
             connectionOutcome: null,
             isConnecting: false,
             lastConnectedAt: null,
@@ -88,12 +94,24 @@ export function createWalletSessionStore() {
       {
         name: 'wallet-session',
         storage: safeStorageFactory(),
-        partialize: (state) => ({
-          walletAddress: state.walletAddress,
-          connectionKind: state.connectionKind,
-          platformCapabilities: state.platformCapabilities,
-          lastConnectedAt: state.lastConnectedAt,
-        }),
+        partialize: (state) => {
+          if (state.connectionKind === 'browser') {
+            return {
+              walletAddress: null,
+              connectionKind: state.connectionKind,
+              browserRestoreAddress: state.browserRestoreAddress,
+              platformCapabilities: state.platformCapabilities,
+              lastConnectedAt: state.lastConnectedAt,
+            };
+          }
+          return {
+            walletAddress: state.walletAddress,
+            connectionKind: state.connectionKind,
+            browserRestoreAddress: null,
+            platformCapabilities: state.platformCapabilities,
+            lastConnectedAt: state.lastConnectedAt,
+          };
+        },
         onRehydrateStorage: () => (_state, _error) => {
           if (typeof window !== 'undefined') {
             store.setState({ hasHydrated: true });

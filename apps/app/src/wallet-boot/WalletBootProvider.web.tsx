@@ -12,9 +12,10 @@ export function WalletBootProvider({ children }: { children: ReactNode }) {
   const hasHydrated = useStore(walletSessionStore, (s) => s.hasHydrated);
   const connectionKind = useStore(walletSessionStore, (s) => s.connectionKind);
   const walletAddress = useStore(walletSessionStore, (s) => s.walletAddress);
+  const browserRestoreAddress = useStore(walletSessionStore, (s) => s.browserRestoreAddress);
 
   const hasBrowserRestoreCandidate =
-    connectionKind === 'browser' && walletAddress != null;
+    connectionKind === 'browser' && browserRestoreAddress != null;
 
   const hasSeenInflightRef = useRef(false);
   if (walletStatus.status === 'connecting' || walletStatus.status === 'connected') {
@@ -38,13 +39,23 @@ export function WalletBootProvider({ children }: { children: ReactNode }) {
         hasHydrated,
         connectionKind,
         walletAddress,
+        browserRestoreAddress,
         connectorStatus: walletStatus,
         connectorAccount: account,
         hasSeenConnectorInflight: hasSeenInflightRef.current,
         restoreTimedOut,
       }),
-    [hasHydrated, connectionKind, walletAddress, walletStatus, account, restoreTimedOut],
+    [hasHydrated, connectionKind, walletAddress, browserRestoreAddress, walletStatus, account, restoreTimedOut],
   );
+
+  useEffect(() => {
+    if (status === 'connected' && connectionKind === 'browser' && walletAddress == null) {
+      walletSessionStore.getState().markConnected({
+        walletAddress: browserRestoreAddress!,
+        connectionKind: 'browser',
+      });
+    }
+  }, [status, connectionKind, walletAddress, browserRestoreAddress]);
 
   useEffect(() => {
     if (status === 'disconnected' && connectionKind === 'browser') {

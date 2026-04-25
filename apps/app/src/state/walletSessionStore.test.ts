@@ -61,8 +61,22 @@ describe('walletSessionStore', () => {
 
     expect(store.getState().walletAddress).toBe('DemoWallet1111111111111111111111111111111111');
     expect(store.getState().connectionKind).toBe('browser');
+    expect(store.getState().browserRestoreAddress).toBe('DemoWallet1111111111111111111111111111111111');
     expect(store.getState().connectionOutcome).toEqual({ kind: 'connected' });
     expect(store.getState().isConnecting).toBe(false);
+  });
+
+  it('marks a native connection without setting browserRestoreAddress', () => {
+    const store = createWalletSessionStore();
+
+    store.getState().markConnected({
+      walletAddress: 'DemoWallet1111111111111111111111111111111111',
+      connectionKind: 'native',
+    });
+
+    expect(store.getState().walletAddress).toBe('DemoWallet1111111111111111111111111111111111');
+    expect(store.getState().connectionKind).toBe('native');
+    expect(store.getState().browserRestoreAddress).toBeNull();
   });
 
   it('beginConnection clears stale session fields and stale outcome', () => {
@@ -71,6 +85,7 @@ describe('walletSessionStore', () => {
     store.setState({
       walletAddress: 'DemoWallet1111111111111111111111111111111111',
       connectionKind: 'browser' satisfies WalletConnectionKind,
+      browserRestoreAddress: 'DemoWallet1111111111111111111111111111111111',
       connectionOutcome: { kind: 'failed', reason: 'stale' },
     });
 
@@ -79,6 +94,7 @@ describe('walletSessionStore', () => {
     expect(store.getState().isConnecting).toBe(true);
     expect(store.getState().walletAddress).toBeNull();
     expect(store.getState().connectionKind).toBeNull();
+    expect(store.getState().browserRestoreAddress).toBeNull();
     expect(store.getState().connectionOutcome).toBeNull();
   });
 
@@ -102,7 +118,7 @@ describe('walletSessionStore', () => {
     expect(store.getState().connectionKind).toBeNull();
   });
 
-  it('disconnect clears address, kind, and connecting state, and clears persisted storage', async () => {
+  it('disconnect clears address, kind, browserRestoreAddress, and connecting state, and clears persisted storage', async () => {
     const store = createWalletSessionStore();
 
     store.getState().markConnected({
@@ -120,10 +136,11 @@ describe('walletSessionStore', () => {
 
     expect(store.getState().walletAddress).toBeNull();
     expect(store.getState().connectionKind).toBeNull();
+    expect(store.getState().browserRestoreAddress).toBeNull();
     expect(store.getState().isConnecting).toBe(false);
   });
 
-  it('persists browser wallet sessions across rehydration', async () => {
+  it('persists browser wallet sessions across rehydration but keeps walletAddress null until boot confirms', async () => {
     const store1 = createWalletSessionStore();
 
     store1.getState().setPlatformCapabilities(caps);
@@ -138,8 +155,9 @@ describe('walletSessionStore', () => {
     const store2 = createWalletSessionStore();
     await store2.persist.rehydrate();
 
-    expect(store2.getState().walletAddress).toBe('DemoWallet1111111111111111111111111111111111');
+    expect(store2.getState().walletAddress).toBeNull();
     expect(store2.getState().connectionKind).toBe('browser');
+    expect(store2.getState().browserRestoreAddress).toBe('DemoWallet1111111111111111111111111111111111');
     expect(store2.getState().platformCapabilities).toEqual(caps);
   });
 
