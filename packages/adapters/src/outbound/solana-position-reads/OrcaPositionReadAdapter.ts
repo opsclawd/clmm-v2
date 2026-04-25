@@ -186,6 +186,31 @@ export class OrcaPositionReadAdapter implements SupportedPositionReadPort {
         });
     }
 
+    for (const [poolIdStr, w] of whirlpoolMap) {
+      const poolId = makePoolId(poolIdStr);
+      const mintA = w.tokenMintA;
+      const mintB = w.tokenMintB;
+      const knownA = KNOWN_TOKENS[mintA];
+      const knownB = KNOWN_TOKENS[mintB];
+      const data: PoolData = {
+        poolId,
+        tokenPair: {
+          mintA,
+          mintB,
+          symbolA: knownA?.symbol ?? mintA,
+          symbolB: knownB?.symbol ?? mintB,
+          decimalsA: knownA?.decimals ?? null,
+          decimalsB: knownB?.decimals ?? null,
+        },
+        sqrtPrice: w.sqrtPrice,
+        feeRate: w.feeRate,
+        tickSpacing: w.tickSpacing,
+        liquidity: w.liquidity,
+        tickCurrentIndex: w.tickCurrentIndex,
+      };
+      this.poolDataCache.set(poolId, { data, staleAt: Date.now() + this.POOL_DATA_CACHE_TTL_MS });
+    }
+
     return liquidityPositions;
   }
 

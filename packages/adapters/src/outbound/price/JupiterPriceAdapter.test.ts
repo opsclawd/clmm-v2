@@ -22,13 +22,11 @@ describe('JupiterPriceAdapter', () => {
     globalThis.fetch = originalFetch;
   });
 
-  it('fetches prices for known token mints', async () => {
+  it('fetches prices from Jupiter Price API v3', async () => {
     const fetchSpy = vi.fn(() =>
       jsonRes({
-        data: {
-          [SOL_MINT]: { id: SOL_MINT, symbol: 'SOL', price: 150.5 },
-          [USDC_MINT]: { id: USDC_MINT, symbol: 'USDC', price: 1.0 },
-        },
+        [SOL_MINT]: { usdPrice: 150.5, symbol: 'SOL', decimals: 9 },
+        [USDC_MINT]: { usdPrice: 1.0, symbol: 'USDC', decimals: 6 },
       }),
     );
     mockFetch(fetchSpy);
@@ -45,7 +43,7 @@ describe('JupiterPriceAdapter', () => {
 
     expect(fetchSpy).toHaveBeenCalledOnce();
     const calledUrl = (fetchSpy.mock.calls[0] as unknown[])[0] as string;
-    expect(calledUrl).toContain('price-api.jup.ag/v6/price');
+    expect(calledUrl).toContain('api.jup.ag/price/v3');
     expect(calledUrl).toContain(SOL_MINT);
     expect(calledUrl).toContain(USDC_MINT);
   });
@@ -53,9 +51,7 @@ describe('JupiterPriceAdapter', () => {
   it('uses cache on second call within TTL', async () => {
     const fetchSpy = vi.fn(() =>
       jsonRes({
-        data: {
-          [SOL_MINT]: { id: SOL_MINT, symbol: 'SOL', price: 150.5 },
-        },
+        [SOL_MINT]: { usdPrice: 150.5, symbol: 'SOL', decimals: 9 },
       }),
     );
     mockFetch(fetchSpy);
@@ -89,15 +85,11 @@ describe('JupiterPriceAdapter', () => {
     const fetchSpy = vi.fn((_input: RequestInfo | URL, _init?: RequestInit) => {
       if (fetchSpy.mock.calls.length === 1) {
         return jsonRes({
-          data: {
-            [SOL_MINT]: { id: SOL_MINT, symbol: 'SOL', price: 150.5 },
-          },
+          [SOL_MINT]: { usdPrice: 150.5, symbol: 'SOL', decimals: 9 },
         });
       }
       return jsonRes({
-        data: {
-          [USDC_MINT]: { id: USDC_MINT, symbol: 'USDC', price: 1.0 },
-        },
+        [USDC_MINT]: { usdPrice: 1.0, symbol: 'USDC', decimals: 6 },
       });
     });
     mockFetch(fetchSpy);
@@ -119,9 +111,7 @@ describe('JupiterPriceAdapter', () => {
   it('sends x-api-key header when apiKey is provided', async () => {
     const fetchSpy = vi.fn((_input: RequestInfo | URL, _init?: RequestInit) => {
       return jsonRes({
-        data: {
-          [SOL_MINT]: { id: SOL_MINT, symbol: 'SOL', price: 150.5 },
-        },
+        [SOL_MINT]: { usdPrice: 150.5, symbol: 'SOL', decimals: 9 },
       });
     });
     mockFetch(fetchSpy);
