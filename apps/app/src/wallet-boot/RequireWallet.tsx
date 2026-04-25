@@ -16,7 +16,7 @@ export function RequireWallet({ children }: { children: ReactNode }) {
     const fullPath = buildReturnToPath(pathname, search);
     const target = `/connect?returnTo=${encodeURIComponent(fullPath)}`;
     navigateRoute({ router, path: target, method: 'push' });
-  }, [status]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [status]);
 
   if (status === 'hydrating-storage' || status === 'checking-browser-wallet') {
     return <BootScreen status={status} />;

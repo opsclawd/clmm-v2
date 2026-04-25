@@ -6,23 +6,19 @@ import { WalletBootContext } from './walletBootContext';
 
 const navigateMock = vi.fn();
 vi.mock('../platform/webNavigation', () => ({
-  navigateRoute: (...args: unknown[]) => navigateMock(...args),
+  // eslint-disable-next-line @typescript-eslint/no-unsafe-return, @typescript-eslint/no-explicit-any, @typescript-eslint/no-unsafe-argument
+  navigateRoute: (...args: any[]) => navigateMock(...args),
 }));
 
-vi.mock('react-native', () => ({
-  ActivityIndicator: ({ size, color }: { size: string; color: string }) => {
-    const React = require('react');
-    return React.createElement('ActivityIndicator', { size, color });
-  },
-  Text: ({ children, style }: { children: React.ReactNode; style?: unknown }) => {
-    const React = require('react');
-    return React.createElement('span', { style }, children);
-  },
-  View: ({ children, style }: { children: React.ReactNode; style?: unknown }) => {
-    const React = require('react');
-    return React.createElement('div', { style }, children);
-  },
-}));
+/* eslint-disable @typescript-eslint/no-var-requires, @typescript-eslint/no-unsafe-return, @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-explicit-any */
+vi.mock('react-native', () => {
+  const R = require('react');
+  return {
+    ActivityIndicator: (_props: any) => R.createElement('span', { 'data-testid': 'activity-indicator' }),
+    Text: (props: any) => R.createElement('span', null, props.children),
+    View: (props: any) => R.createElement('div', null, props.children),
+  };
+});
 
 vi.mock('expo-router', () => ({
   useRouter: () => ({ push: vi.fn(), replace: vi.fn() }),
@@ -84,9 +80,9 @@ describe('RequireWallet', () => {
     mockSearch = { triggerId: 'xyz' };
     render(<Harness initial="disconnected" />);
     expect(navigateMock).toHaveBeenCalledTimes(1);
-    const call = navigateMock.mock.calls[0]![0] as { path: string; method: string };
-    expect(call.method).toBe('push');
-    expect(call.path).toBe('/connect?returnTo=' + encodeURIComponent('/preview/abc?triggerId=xyz'));
+    const call = navigateMock.mock.calls[0] as Array<{ path: string; method: string }>;
+    expect(call[0].method).toBe('push');
+    expect(call[0].path).toBe('/connect?returnTo=' + encodeURIComponent('/preview/abc?triggerId=xyz'));
     expect(screen.queryByTestId('children')).toBeNull();
   });
 

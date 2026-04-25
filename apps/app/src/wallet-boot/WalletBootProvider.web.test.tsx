@@ -24,6 +24,7 @@ function setConnector(next: { walletStatus: WalletStatus; account: string | null
   connectorListeners.forEach((l) => l());
 }
 
+/* eslint-disable @typescript-eslint/no-var-requires, @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-return, @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-member-access */
 vi.mock('@solana/connector', () => {
   const { useSyncExternalStore } = require('react');
   return {
