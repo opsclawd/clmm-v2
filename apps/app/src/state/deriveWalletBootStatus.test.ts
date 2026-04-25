@@ -108,6 +108,20 @@ describe('deriveWalletBootStatus', () => {
     ).toBe('checking-browser-wallet');
   });
 
+  it('returns disconnected when connector account does not match persisted wallet address', () => {
+    expect(
+      deriveWalletBootStatus(
+        input({
+          connectionKind: 'browser',
+          walletAddress: ADDR,
+          connectorStatus: { status: 'connected', session: {} as never },
+          connectorAccount: 'AnotherWallet1111111111111111111111111111111',
+          hasSeenConnectorInflight: true,
+        }),
+      ),
+    ).toBe('disconnected');
+  });
+
   it('returns disconnected when connector reaches error state', () => {
     expect(
       deriveWalletBootStatus(

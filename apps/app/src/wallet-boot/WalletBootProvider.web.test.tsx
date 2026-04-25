@@ -107,6 +107,18 @@ describe('WalletBootProvider (web)', () => {
     expect(screen.getByTestId('status').textContent).toBe('disconnected');
   });
 
+  it('resolves to disconnected when connector connects with a different account', () => {
+    walletSessionStore.setState({ walletAddress: ADDR, connectionKind: 'browser' });
+    render(<WalletBootProvider><Probe /></WalletBootProvider>);
+    act(() => {
+      setConnector({ walletStatus: { status: 'connecting', connectorId: 'phantom' as never }, account: null });
+    });
+    act(() => {
+      setConnector({ walletStatus: { status: 'connected', session: {} as never }, account: 'AnotherWallet1111111111111111111111111111111' });
+    });
+    expect(screen.getByTestId('status').textContent).toBe('disconnected');
+  });
+
   it('returns connected for a persisted native session with no connector activity', () => {
     walletSessionStore.setState({ walletAddress: ADDR, connectionKind: 'native' });
     render(<WalletBootProvider><Probe /></WalletBootProvider>);

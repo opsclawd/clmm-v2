@@ -30,9 +30,16 @@ export function deriveWalletBootStatus(input: DeriveWalletBootStatusInput): Wall
   if (hasBrowserRestoreCandidate) {
     if (
       input.connectorStatus.status === 'connected' &&
-      input.connectorAccount != null
+      input.connectorAccount === input.walletAddress
     ) {
       return 'connected';
+    }
+    if (
+      input.connectorStatus.status === 'connected' &&
+      input.connectorAccount != null &&
+      input.connectorAccount !== input.walletAddress
+    ) {
+      return 'disconnected';
     }
     if (input.connectorStatus.status === 'error') {
       return 'disconnected';
