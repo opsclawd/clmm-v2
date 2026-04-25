@@ -79,7 +79,15 @@ describe('Solana read path efficiency integration', () => {
 
     // Batched whirlpool fetch - returns once for shared pool
     vi.mocked(fetchWhirlpool).mockResolvedValue({
-      data: { tickCurrentIndex: -18130 },
+      data: {
+        tickCurrentIndex: -18130,
+        sqrtPrice: 184467440737095516n,
+        tokenMintA: { toString: () => 'So11111111111111111111111111111111111111112' },
+        tokenMintB: { toString: () => 'EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v' },
+        feeRate: 10,
+        tickSpacing: 64,
+        liquidity: 2400000000n,
+      },
     } as unknown as Awaited<ReturnType<typeof fetchWhirlpool>>);
 
     // Direct position lookup for getPosition()

@@ -208,7 +208,15 @@ describe('SolanaPositionSnapshotReader', () => {
       ];
 
       vi.mocked(fetchWhirlpool).mockResolvedValue({
-        data: { tickCurrentIndex: -18130 },
+        data: {
+          tickCurrentIndex: -18130,
+          sqrtPrice: 184467440737095516n,
+          tokenMintA: { toString: () => 'So11111111111111111111111111111111111111112' },
+          tokenMintB: { toString: () => 'EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v' },
+          feeRate: 10,
+          tickSpacing: 64,
+          liquidity: 2400000000n,
+        },
       } as unknown as Awaited<ReturnType<typeof fetchWhirlpool>>);
 
       const reader = new SolanaPositionSnapshotReader(mockRpcUrl);
@@ -229,7 +237,15 @@ describe('SolanaPositionSnapshotReader', () => {
         if (addr.toString() === pool2) {
           throw new Error('Failed to fetch');
         }
-        return { data: { tickCurrentIndex: -18130 } } as unknown as Awaited<ReturnType<typeof fetchWhirlpool>>;
+        return { data: {
+          tickCurrentIndex: -18130,
+          sqrtPrice: 184467440737095516n,
+          tokenMintA: { toString: () => 'So11111111111111111111111111111111111111112' },
+          tokenMintB: { toString: () => 'EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v' },
+          feeRate: 10,
+          tickSpacing: 64,
+          liquidity: 2400000000n,
+        } } as unknown as Awaited<ReturnType<typeof fetchWhirlpool>>;
       });
 
       const reader = new SolanaPositionSnapshotReader(mockRpcUrl);
@@ -264,7 +280,15 @@ describe('SolanaPositionSnapshotReader', () => {
 
         inFlight -= 1;
         return {
-          data: { tickCurrentIndex: Number(addr.toString().slice(-1)) },
+          data: {
+            tickCurrentIndex: Number(addr.toString().slice(-1)),
+            sqrtPrice: 184467440737095516n,
+            tokenMintA: { toString: () => 'So11111111111111111111111111111111111111112' },
+            tokenMintB: { toString: () => 'EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v' },
+            feeRate: 10,
+            tickSpacing: 64,
+            liquidity: 2400000000n,
+          },
         } as never;
       });
 
