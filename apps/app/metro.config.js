@@ -6,6 +6,7 @@ const projectRoot = __dirname;
 const workspaceRoot = path.resolve(projectRoot, '../..');
 
 const config = getDefaultConfig(projectRoot);
+config.resolver.unstable_enablePackageExports = false;
 
 const defaultWatchFolders = config.watchFolders || [];
 const defaultSourceExts = config.resolver?.sourceExts || [];
