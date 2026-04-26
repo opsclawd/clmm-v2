@@ -1,5 +1,5 @@
 import { View, Text, ScrollView, TouchableOpacity } from 'react-native';
-import { useState, useEffect } from 'react';
+import { useRef } from 'react';
 import type { PositionDetailDto } from '@clmm/application/public';
 import { colors } from '../design-system/index.js';
 import { typography } from '../design-system/index.js';
@@ -51,9 +51,8 @@ const srStyles = {
 };
 
 export function PositionDetailScreen({ position, onViewPreview, now: nowProp }: Props): JSX.Element {
-  const [mountedNow, setMountedNow] = useState(0);
-  useEffect(() => { setMountedNow(Date.now()); }, []);
-  const now = nowProp ?? mountedNow;
+  const mountedNowRef = useRef(Date.now());
+  const now = nowProp ?? mountedNowRef.current;
   if (!position) {
     return (
       <View style={{ flex: 1, backgroundColor: colors.background, padding: 16 }}>
