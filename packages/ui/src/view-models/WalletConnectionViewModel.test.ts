@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import { buildWalletConnectViewModel, buildWalletSettingsViewModel } from './WalletConnectionViewModel.js';
 import type { PlatformCapabilities } from '../components/DegradedCapabilityBannerUtils.js';
-import type { ConnectionOutcome } from '../components/WalletConnectionUtils.js';
+import type { DiscoveredWallet } from '../components/WalletConnectionUtils.js';
 
 function makeCaps(overrides: Partial<PlatformCapabilities> = {}): PlatformCapabilities {
   return {
@@ -14,60 +14,155 @@ function makeCaps(overrides: Partial<PlatformCapabilities> = {}): PlatformCapabi
   };
 }
 
-describe('buildWalletConnectViewModel', () => {
-  it('shows native wallet option on React Native mobile', () => {
+const baseExtendedParams = {
+  discovery: 'ready' as const,
+  discoveredWallets: [] as DiscoveredWallet[],
+  fallback: 'none' as const,
+  socialEscapeAttempted: false,
+};
+
+describe('buildWalletConnectViewModel (extended)', () => {
+  it('returns loading screenState when platformCapabilities is null', () => {
     const vm = buildWalletConnectViewModel({
-      capabilities: makeCaps({ nativeWalletAvailable: true, nativePushAvailable: true }),
-      connectionOutcome: null,
+      platformCapabilities: null,
+      discovery: 'discovering',
+      discoveredWallets: [],
+      fallback: 'none',
+      socialEscapeAttempted: false,
       isConnecting: false,
+      connectionOutcome: null,
     });
-    expect(vm.walletOptions).toHaveLength(1);
-    expect(vm.walletOptions[0]!.kind).toBe('native');
+    expect(vm.screenState).toBe('loading');
+  });
+
+  it('returns social-webview screenState when fallback is social-webview', () => {
+    const vm = buildWalletConnectViewModel({
+      platformCapabilities: makeCaps(),
+      discovery: 'timed-out',
+      discoveredWallets: [],
+      fallback: 'social-webview',
+      socialEscapeAttempted: false,
+      isConnecting: false,
+      connectionOutcome: null,
+    });
+    expect(vm.screenState).toBe('social-webview');
+  });
+
+  it('returns standard screenState for normal wallet flow', () => {
+    const vm = buildWalletConnectViewModel({
+      platformCapabilities: makeCaps({ nativeWalletAvailable: true }),
+      discovery: 'ready',
+      discoveredWallets: [{ id: 'phantom', name: 'Phantom', icon: 'https://example.com/icon.png' }],
+      fallback: 'none',
+      socialEscapeAttempted: false,
+      isConnecting: false,
+      connectionOutcome: null,
+    });
+    expect(vm.screenState).toBe('standard');
+    expect(vm.nativeWalletAvailable).toBe(true);
+    expect(vm.discoveredWallets).toHaveLength(1);
+    expect(vm.discovery).toBe('ready');
+  });
+
+  it('passes through discovery and fallback states', () => {
+    const vm = buildWalletConnectViewModel({
+      platformCapabilities: makeCaps(),
+      discovery: 'discovering',
+      discoveredWallets: [],
+      fallback: 'desktop-no-wallet',
+      socialEscapeAttempted: false,
+      isConnecting: false,
+      connectionOutcome: null,
+    });
+    expect(vm.discovery).toBe('discovering');
+    expect(vm.fallback).toBe('desktop-no-wallet');
+  });
+
+  it('passes through socialEscapeAttempted', () => {
+    const vm = buildWalletConnectViewModel({
+      platformCapabilities: makeCaps(),
+      discovery: 'timed-out',
+      discoveredWallets: [],
+      fallback: 'social-webview',
+      socialEscapeAttempted: true,
+      isConnecting: false,
+      connectionOutcome: null,
+    });
+    expect(vm.socialEscapeAttempted).toBe(true);
+  });
+
+  it('maps connection outcome to outcome display', () => {
+    const vm = buildWalletConnectViewModel({
+      platformCapabilities: makeCaps({ nativeWalletAvailable: true }),
+      discovery: 'ready',
+      discoveredWallets: [],
+      fallback: 'none',
+      socialEscapeAttempted: false,
+      isConnecting: false,
+      connectionOutcome: { kind: 'failed', reason: 'timeout' },
+    });
+    expect(vm.outcomeDisplay).not.toBeNull();
+    expect(vm.outcomeDisplay!.severity).toBe('error');
+  });
+
+  it('computes platform notice', () => {
+    const vm = buildWalletConnectViewModel({
+      platformCapabilities: makeCaps({ isMobileWeb: true }),
+      discovery: 'timed-out',
+      discoveredWallets: [],
+      fallback: 'none',
+      socialEscapeAttempted: false,
+      isConnecting: false,
+      connectionOutcome: null,
+    });
+    expect(vm.platformNotice).not.toBeNull();
+    expect(vm.platformNotice!.message).toContain('mobile web');
+  });
+
+  it('shows native wallet as available when capability is set', () => {
+    const vm = buildWalletConnectViewModel({
+      ...baseExtendedParams,
+      platformCapabilities: makeCaps({ nativeWalletAvailable: true, nativePushAvailable: true }),
+      isConnecting: false,
+      connectionOutcome: null,
+    });
+    expect(vm.nativeWalletAvailable).toBe(true);
     expect(vm.platformNotice).toBeNull();
     expect(vm.outcomeDisplay).toBeNull();
     expect(vm.isConnecting).toBe(false);
   });
 
-  it('shows browser wallet option on desktop PWA', () => {
-    const vm = buildWalletConnectViewModel({
-      capabilities: makeCaps({ browserWalletAvailable: true, browserNotificationAvailable: true }),
-      connectionOutcome: null,
-      isConnecting: false,
-    });
-    expect(vm.walletOptions).toHaveLength(1);
-    expect(vm.walletOptions[0]!.kind).toBe('browser');
-  });
-
-  it('shows degraded notice for mobile web', () => {
-    const vm = buildWalletConnectViewModel({
-      capabilities: makeCaps({ isMobileWeb: true }),
-      connectionOutcome: null,
-      isConnecting: false,
-    });
-    expect(vm.walletOptions).toHaveLength(0);
-    expect(vm.platformNotice).not.toBeNull();
-    expect(vm.platformNotice!.message).toContain('mobile web');
-  });
-
-  it('includes connection outcome display when outcome provided', () => {
-    const outcome: ConnectionOutcome = { kind: 'failed', reason: 'timeout' };
-    const vm = buildWalletConnectViewModel({
-      capabilities: makeCaps({ nativeWalletAvailable: true }),
-      connectionOutcome: outcome,
-      isConnecting: false,
-    });
-    expect(vm.outcomeDisplay).not.toBeNull();
-    expect(vm.outcomeDisplay!.severity).toBe('error');
-    expect(vm.outcomeDisplay!.title).toBe('Connection Failed');
-  });
-
   it('passes through isConnecting state', () => {
     const vm = buildWalletConnectViewModel({
-      capabilities: makeCaps({ nativeWalletAvailable: true }),
-      connectionOutcome: null,
+      ...baseExtendedParams,
+      platformCapabilities: makeCaps({ nativeWalletAvailable: true }),
       isConnecting: true,
+      connectionOutcome: null,
     });
     expect(vm.isConnecting).toBe(true);
+  });
+
+  it('passes through browserWalletAvailable from capabilities', () => {
+    const vm = buildWalletConnectViewModel({
+      ...baseExtendedParams,
+      platformCapabilities: makeCaps({ browserWalletAvailable: true }),
+      isConnecting: false,
+      connectionOutcome: null,
+    });
+    expect(vm.browserWalletAvailable).toBe(true);
+  });
+
+  it('defaults browserWalletAvailable to false when capabilities is null', () => {
+    const vm = buildWalletConnectViewModel({
+      platformCapabilities: null,
+      discovery: 'discovering',
+      discoveredWallets: [],
+      fallback: 'none',
+      socialEscapeAttempted: false,
+      isConnecting: false,
+      connectionOutcome: null,
+    });
+    expect(vm.browserWalletAvailable).toBe(false);
   });
 });
 

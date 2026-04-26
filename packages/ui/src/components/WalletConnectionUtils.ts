@@ -119,3 +119,30 @@ export function buildPlatformNotice(caps: PlatformCapabilities): PlatformNotice 
     severity: 'error',
   };
 }
+
+export type FallbackState =
+  | 'none'
+  | 'wallet-fallback'
+  | 'desktop-no-wallet'
+  | 'social-webview';
+
+export type WalletDiscoveryState =
+  | 'discovering'
+  | 'ready'
+  | 'timed-out';
+
+export type DiscoveredWallet = {
+  id: string;
+  name: string;
+  icon: string | null;
+};
+
+export type WalletConnectActions = {
+  onSelectNative: () => void;
+  onSelectDiscoveredWallet: (walletId: string) => void;
+  onConnectDefaultBrowser: () => void;
+  onOpenPhantom: () => void;
+  onOpenSolflare: () => void;
+  onOpenInBrowser: () => void;
+  onGoBack: () => void;
+};
