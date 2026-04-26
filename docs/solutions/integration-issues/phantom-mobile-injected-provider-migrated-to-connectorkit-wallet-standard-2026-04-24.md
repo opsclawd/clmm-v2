@@ -76,5 +76,5 @@ Use a ConnectorKit-first, Wallet Standard-aligned abstraction:
 ## Related Issues
 
 - `docs/solutions/integration-issues/connectorkit-wallet-probe-metro-package-exports-hydration-failure-2026-04-24.md`
-- `docs/solutions/integration-issues/phantom-webview-expo-router-navigation-silent-failure-2026-04-15.md`
+- `docs/solutions/integration-issues/expo-sdk54-phantom-webview-soft-navigation-restored-2026-04-26.md`
 - `docs/solutions/integration-issues/phantom-injected-v0-signtransaction-requires-versionedtransaction-2026-04-23.md`
