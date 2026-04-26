@@ -1,9 +1,13 @@
 import { useEffect, useMemo, useState } from 'react';
-import { View, Text, TouchableOpacity, ScrollView, Linking, Platform, ActivityIndicator, Image } from 'react-native';
+import { Platform, Linking } from 'react-native';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import { useStore } from 'zustand';
 import type { PlatformCapabilityState } from '@clmm/application/public';
-import type { BrowserWalletOption } from '../src/platform/browserWallet/browserWalletTypes';
+import {
+  WalletConnectScreen,
+  buildWalletConnectViewModel,
+} from '@clmm/ui';
+import type { FallbackState, WalletDiscoveryState, DiscoveredWallet, WalletConnectActions } from '@clmm/ui';
 import { platformCapabilityAdapter, walletPlatform } from '../src/composition/index';
 import { useBrowserWalletConnect } from '../src/platform/browserWallet/index';
 import {
@@ -16,14 +20,10 @@ import { mapWalletErrorToOutcome } from '../src/platform/walletConnection';
 import { navigateRoute } from '../src/platform/webNavigation';
 import { parseReturnTo } from '../src/wallet-boot/parseReturnTo';
 import { walletSessionStore } from '../src/state/walletSessionStore';
-import { getConnectionOutcomeDisplay } from '@clmm/ui';
 import { enrollWalletForMonitoring } from '../src/api/wallets';
 
 const NO_WALLET_MESSAGE = 'No supported browser wallet detected on this device';
 const WALLET_DISCOVERY_TIMEOUT_MS = 2000;
-
-type FallbackState = 'none' | 'wallet-fallback' | 'desktop-no-wallet' | 'social-webview';
-type WalletDiscoveryState = 'discovering' | 'ready' | 'timed-out';
 
 function detectFallbackState(
   platformCapabilities: PlatformCapabilityState | null,
@@ -51,26 +51,18 @@ function detectFallbackState(
   return 'none';
 }
 
-const FALLBACK_PLATFORM_CAPABILITIES: PlatformCapabilityState = {
-  nativePushAvailable: false,
-  browserNotificationAvailable: false,
-  nativeWalletAvailable: false,
-  browserWalletAvailable: false,
-  isMobileWeb: false,
-};
-
 export default function ConnectRoute() {
   const router = useRouter();
   const params = useLocalSearchParams<{ returnTo?: string | string[] }>();
   const returnTo = useMemo(() => parseReturnTo(params.returnTo), [params.returnTo]);
-  const platformCapabilities = useStore(walletSessionStore, (state) => state.platformCapabilities);
-  const connectionOutcome = useStore(walletSessionStore, (state) => state.connectionOutcome);
-  const isConnecting = useStore(walletSessionStore, (state) => state.isConnecting);
-  const setPlatformCapabilities = useStore(walletSessionStore, (state) => state.setPlatformCapabilities);
-  const beginConnection = useStore(walletSessionStore, (state) => state.beginConnection);
-  const markConnected = useStore(walletSessionStore, (state) => state.markConnected);
-  const markOutcome = useStore(walletSessionStore, (state) => state.markOutcome);
-  const clearOutcome = useStore(walletSessionStore, (state) => state.clearOutcome);
+  const platformCapabilities = useStore(walletSessionStore, (s) => s.platformCapabilities);
+  const connectionOutcome = useStore(walletSessionStore, (s) => s.connectionOutcome);
+  const isConnecting = useStore(walletSessionStore, (s) => s.isConnecting);
+  const setPlatformCapabilities = useStore(walletSessionStore, (s) => s.setPlatformCapabilities);
+  const beginConnection = useStore(walletSessionStore, (s) => s.beginConnection);
+  const markConnected = useStore(walletSessionStore, (s) => s.markConnected);
+  const markOutcome = useStore(walletSessionStore, (s) => s.markOutcome);
+  const clearOutcome = useStore(walletSessionStore, (s) => s.clearOutcome);
 
   const [socialEscapeAttempted, setSocialEscapeAttempted] = useState(false);
   const [discoveryTimedOut, setDiscoveryTimedOut] = useState(false);
@@ -78,7 +70,7 @@ export default function ConnectRoute() {
   const browserConnect = useBrowserWalletConnect();
   const walletCount = browserConnect.wallets.length;
 
-  const discoveryState: WalletDiscoveryState = useMemo(() => {
+  const discovery: WalletDiscoveryState = useMemo(() => {
     if (walletCount > 0) return 'ready';
     if (discoveryTimedOut) return 'timed-out';
     return 'discovering';
@@ -90,10 +82,32 @@ export default function ConnectRoute() {
     return () => clearTimeout(timer);
   }, [walletCount, discoveryTimedOut]);
 
-  const fallbackState = useMemo(
+  const fallback = useMemo(
     () => detectFallbackState(platformCapabilities, browserConnect.error),
     [platformCapabilities, browserConnect.error],
   );
+
+  const discoveredWallets: DiscoveredWallet[] = useMemo(
+    () => browserConnect.wallets.map((w) => ({ id: w.id, name: w.name, icon: w.icon })),
+    [browserConnect.wallets],
+  );
+
+  useEffect(() => {
+    let active = true;
+    void platformCapabilityAdapter
+      .getCapabilities()
+      .then((caps) => { if (active) setPlatformCapabilities(caps); })
+      .catch(() => {
+        if (active) setPlatformCapabilities({
+          nativePushAvailable: false,
+          browserNotificationAvailable: false,
+          nativeWalletAvailable: false,
+          browserWalletAvailable: false,
+          isMobileWeb: false,
+        });
+      });
+    return () => { active = false; };
+  }, [setPlatformCapabilities]);
 
   function handleConnectionError(error: unknown) {
     const outcome = mapWalletErrorToOutcome(error);
@@ -101,422 +115,73 @@ export default function ConnectRoute() {
       markOutcome({ kind: 'failed', reason: 'Unexpected connected error outcome' });
       return;
     }
-
     markOutcome(outcome);
   }
 
-  useEffect(() => {
-    let active = true;
+  const vm = buildWalletConnectViewModel({
+    platformCapabilities,
+    discovery,
+    discoveredWallets,
+    fallback,
+    socialEscapeAttempted,
+    isConnecting,
+    connectionOutcome,
+  });
 
-    void platformCapabilityAdapter
-      .getCapabilities()
-      .then((capabilities) => {
-        if (!active) {
-          return;
-        }
+  const actions: WalletConnectActions = useMemo(() => ({
+    onSelectNative: () => {
+      beginConnection();
+      void walletPlatform.connectNativeWallet()
+        .then((address) => {
+          markConnected({ walletAddress: address, connectionKind: 'native' });
+          void enrollWalletForMonitoring(address);
+          navigateRoute({ router, path: returnTo, method: 'replace' });
+        })
+        .catch(handleConnectionError);
+    },
+    onSelectDiscoveredWallet: (walletId: string) => {
+      beginConnection();
+      void browserConnect.connect(walletId)
+        .then(({ address }) => {
+          markConnected({ walletAddress: address, connectionKind: 'browser' });
+          void enrollWalletForMonitoring(address);
+          navigateRoute({ router, path: returnTo, method: 'replace' });
+        })
+        .catch(handleConnectionError);
+    },
+    onConnectDefaultBrowser: () => {
+      beginConnection();
+      void browserConnect.connect()
+        .then(({ address }) => {
+          markConnected({ walletAddress: address, connectionKind: 'browser' });
+          void enrollWalletForMonitoring(address);
+          navigateRoute({ router, path: returnTo, method: 'replace' });
+        })
+        .catch(handleConnectionError);
+    },
+    onOpenPhantom: () => {
+      if (typeof window !== 'undefined') {
+        const url = buildPhantomBrowseUrl(window.location.href);
+        void Linking.openURL(url);
+      }
+    },
+    onOpenSolflare: () => {
+      if (typeof window !== 'undefined') {
+        const url = buildSolflareBrowseUrl(window.location.href);
+        void Linking.openURL(url);
+      }
+    },
+    onOpenInBrowser: () => {
+      setSocialEscapeAttempted(true);
+      if (typeof window !== 'undefined') {
+        openInExternalBrowser(window.location.href);
+      }
+    },
+    onGoBack: () => {
+      clearOutcome();
+      router.back();
+    },
+  }), [router, returnTo, browserConnect, beginConnection, markConnected, markOutcome, clearOutcome, platformCapabilities, discovery, discoveredWallets, fallback, socialEscapeAttempted, isConnecting, connectionOutcome]);
 
-        setPlatformCapabilities(capabilities);
-      })
-      .catch((error) => {
-        if (!active) {
-          return;
-        }
-
-        setPlatformCapabilities(FALLBACK_PLATFORM_CAPABILITIES);
-        handleConnectionError(error);
-      });
-
-    return () => {
-      active = false;
-    };
-  }, [markOutcome, setPlatformCapabilities]);
-
-  async function handleSelectBrowserWallet(walletId: string) {
-    beginConnection();
-
-    try {
-      const { address } = await browserConnect.connect(walletId);
-      markConnected({ walletAddress: address, connectionKind: 'browser' });
-      enrollWalletForMonitoring(address).catch((err) => {
-        console.warn('Wallet enrollment failed:', err);
-      });
-      navigateRoute({ router, path: returnTo, method: 'replace' });
-    } catch (error) {
-      handleConnectionError(error);
-    }
-  }
-
-  async function handleConnectDefaultBrowser() {
-    beginConnection();
-
-    try {
-      const { address } = await browserConnect.connect();
-      markConnected({ walletAddress: address, connectionKind: 'browser' });
-      enrollWalletForMonitoring(address).catch((err) => {
-        console.warn('Wallet enrollment failed:', err);
-      });
-      navigateRoute({ router, path: returnTo, method: 'replace' });
-    } catch (error) {
-      handleConnectionError(error);
-    }
-  }
-
-  async function handleConnectNative() {
-    beginConnection();
-
-    try {
-      const walletAddress = await walletPlatform.connectNativeWallet();
-      markConnected({ walletAddress, connectionKind: 'native' });
-      enrollWalletForMonitoring(walletAddress).catch((err) => {
-        console.warn('Wallet enrollment failed:', err);
-      });
-      navigateRoute({ router, path: returnTo, method: 'replace' });
-    } catch (error) {
-      handleConnectionError(error);
-    }
-  }
-
-  function handleOpenPhantom() {
-    const url = buildPhantomBrowseUrl(window.location.href);
-    void Linking.openURL(url);
-  }
-
-  function handleOpenSolflare() {
-    const url = buildSolflareBrowseUrl(window.location.href);
-    void Linking.openURL(url);
-  }
-
-  function handleOpenInBrowser() {
-    setSocialEscapeAttempted(true);
-    openInExternalBrowser(window.location.href);
-  }
-
-  function renderWalletPicker(wallets: BrowserWalletOption[]) {
-    return wallets.map((wallet) => (
-      <TouchableOpacity
-        key={wallet.id}
-        onPress={() => void handleSelectBrowserWallet(wallet.id)}
-        disabled={isConnecting}
-        style={{
-          padding: 16,
-          backgroundColor: '#18181b',
-          borderRadius: 8,
-          marginBottom: 12,
-          borderWidth: 1,
-          borderColor: '#3f3f46',
-          flexDirection: 'row',
-          alignItems: 'center',
-          gap: 12,
-        }}
-      >
-        {wallet.icon ? (
-          <Image source={{ uri: wallet.icon }} style={{ width: 24, height: 24 }} />
-        ) : null}
-        <View style={{ flex: 1 }}>
-          <Text style={{ color: '#f4f4f5', fontSize: 16, fontWeight: '600' }}>
-            {wallet.name}
-          </Text>
-        </View>
-      </TouchableOpacity>
-    ));
-  }
-
-  function renderBrowserWalletSection() {
-    if (Platform.OS !== 'web') return null;
-
-    switch (discoveryState) {
-      case 'discovering':
-        return (
-          <View style={{ padding: 16, backgroundColor: '#18181b', borderRadius: 8, marginBottom: 12, borderWidth: 1, borderColor: '#3f3f46', flexDirection: 'row', alignItems: 'center', gap: 12 }}>
-            <ActivityIndicator size="small" color="#a1a1aa" />
-            <Text style={{ color: '#a1a1aa', fontSize: 14 }}>
-              Detecting browser wallets...
-            </Text>
-          </View>
-        );
-      case 'ready':
-        if (walletCount === 1) {
-          const wallet = browserConnect.wallets[0]!;
-          return (
-            <TouchableOpacity
-              onPress={() => void handleSelectBrowserWallet(wallet.id)}
-              disabled={isConnecting}
-              style={{
-                padding: 16,
-                backgroundColor: '#18181b',
-                borderRadius: 8,
-                marginBottom: 12,
-                borderWidth: 1,
-                borderColor: '#3f3f46',
-                flexDirection: 'row',
-                alignItems: 'center',
-                gap: 12,
-              }}
-            >
-              {wallet.icon ? (
-                <Image source={{ uri: wallet.icon }} style={{ width: 24, height: 24 }} />
-              ) : null}
-              <View style={{ flex: 1 }}>
-                <Text style={{ color: '#f4f4f5', fontSize: 16, fontWeight: '600' }}>
-                  {wallet.name}
-                </Text>
-              </View>
-            </TouchableOpacity>
-          );
-        }
-        return renderWalletPicker(browserConnect.wallets);
-      case 'timed-out':
-        return (
-          <TouchableOpacity
-            onPress={() => void handleConnectDefaultBrowser()}
-            disabled={isConnecting}
-            style={{
-              padding: 16,
-              backgroundColor: '#18181b',
-              borderRadius: 8,
-              marginBottom: 12,
-              borderWidth: 1,
-              borderColor: '#3f3f46',
-            }}
-          >
-            <Text style={{ color: '#f4f4f5', fontSize: 16, fontWeight: '600' }}>
-              Connect Browser Wallet
-            </Text>
-            <Text style={{ color: '#a1a1aa', fontSize: 13, marginTop: 4 }}>
-              Sign transactions with your browser wallet extension.
-            </Text>
-          </TouchableOpacity>
-        );
-    }
-  }
-
-  if (!platformCapabilities) {
-    return (
-      <View style={{ flex: 1, backgroundColor: '#0a0a0a', justifyContent: 'center', alignItems: 'center' }}>
-        <Text style={{ color: '#a1a1aa' }}>Loading...</Text>
-      </View>
-    );
-  }
-
-  return (
-    <ScrollView style={{ flex: 1, backgroundColor: '#0a0a0a' }} contentContainerStyle={{ padding: 16 }}>
-      <Text style={{ color: '#f4f4f5', fontSize: 24, fontWeight: '700' }}>
-        Connect Wallet
-      </Text>
-      <Text style={{ color: '#a1a1aa', fontSize: 16, marginTop: 8 }}>
-        Choose a wallet to connect. Only supported wallet options for this device are shown.
-      </Text>
-
-      {fallbackState === 'social-webview' ? (
-        <View style={{ marginTop: 24 }}>
-          <View style={{
-            padding: 12,
-            backgroundColor: '#422006',
-            borderRadius: 8,
-            borderWidth: 1,
-            borderColor: '#f59e0b',
-            marginBottom: 16,
-          }}>
-            <Text style={{ color: '#f59e0b', fontSize: 14, fontWeight: '600' }}>
-              Social app browsers block wallet extensions.
-            </Text>
-            <Text style={{ color: '#a1a1aa', fontSize: 13, marginTop: 4 }}>
-              Open this page in Safari or Chrome to connect your wallet, or use Phantom / Solflare directly below.
-            </Text>
-          </View>
-
-          <TouchableOpacity
-            onPress={() => void handleOpenInBrowser()}
-            disabled={socialEscapeAttempted}
-            style={{
-              padding: 16,
-              backgroundColor: socialEscapeAttempted ? '#27272a' : '#18181b',
-              borderRadius: 8,
-              marginBottom: 12,
-              borderWidth: 1,
-              borderColor: socialEscapeAttempted ? '#3f3f46' : '#3b82f6',
-            }}
-          >
-            <Text style={{
-              color: socialEscapeAttempted ? '#71717a' : '#3b82f6',
-              fontSize: 16,
-              fontWeight: '600',
-            }}>
-              Open in Browser
-            </Text>
-            <Text style={{ color: '#a1a1aa', fontSize: 13, marginTop: 4 }}>
-              Opens this page in your default browser where wallet extensions work.
-            </Text>
-          </TouchableOpacity>
-
-          <View style={{ marginTop: 8 }}>
-            <Text style={{ color: '#71717a', fontSize: 13, marginBottom: 8 }}>
-              Or open in a wallet browser:
-            </Text>
-            <TouchableOpacity
-              onPress={() => handleOpenPhantom()}
-              style={{
-                padding: 12,
-                backgroundColor: '#18181b',
-                borderRadius: 8,
-                marginBottom: 8,
-                borderWidth: 1,
-                borderColor: '#3f3f46',
-              }}
-            >
-              <Text style={{ color: '#ab9ff2', fontSize: 15, fontWeight: '600' }}>Open in Phantom</Text>
-            </TouchableOpacity>
-            <TouchableOpacity
-              onPress={() => handleOpenSolflare()}
-              style={{
-                padding: 12,
-                backgroundColor: '#18181b',
-                borderRadius: 8,
-                borderWidth: 1,
-                borderColor: '#3f3f46',
-              }}
-            >
-              <Text style={{ color: '#fc8748', fontSize: 15, fontWeight: '600' }}>Open in Solflare</Text>
-            </TouchableOpacity>
-          </View>
-        </View>
-      ) : (
-        <>
-          {(platformCapabilities.nativeWalletAvailable || platformCapabilities.browserWalletAvailable) && (
-            <View style={{ marginTop: 24 }}>
-              {platformCapabilities.nativeWalletAvailable && (
-                <TouchableOpacity
-                  onPress={() => void handleConnectNative()}
-                  disabled={isConnecting}
-                  style={{
-                    padding: 16,
-                    backgroundColor: '#18181b',
-                    borderRadius: 8,
-                    marginBottom: 12,
-                    borderWidth: 1,
-                    borderColor: '#3f3f46',
-                  }}
-                >
-                  <Text style={{ color: '#f4f4f5', fontSize: 16, fontWeight: '600' }}>
-                    Connect Mobile Wallet
-                  </Text>
-                  <Text style={{ color: '#a1a1aa', fontSize: 13, marginTop: 4 }}>
-                    Sign transactions with your mobile wallet app.
-                  </Text>
-                </TouchableOpacity>
-              )}
-              {renderBrowserWalletSection()}
-            </View>
-          )}
-
-          {fallbackState === 'wallet-fallback' && (
-            <View style={{ marginTop: 16 }}>
-              {!platformCapabilities.nativeWalletAvailable && !platformCapabilities.browserWalletAvailable && (
-                <View style={{
-                  padding: 12,
-                  backgroundColor: '#422006',
-                  borderRadius: 8,
-                  borderWidth: 1,
-                  borderColor: '#f59e0b',
-                  marginBottom: 12,
-                }}>
-                  <Text style={{ color: '#f59e0b', fontSize: 14, fontWeight: '600' }}>
-                    No wallet extension detected in this browser.
-                  </Text>
-                  <Text style={{ color: '#a1a1aa', fontSize: 13, marginTop: 4 }}>
-                    You can open this page directly in a wallet browser, or switch to a desktop browser with an installed extension.
-                  </Text>
-                </View>
-              )}
-              <Text style={{ color: '#71717a', fontSize: 13, marginBottom: 8 }}>
-                Open in a wallet browser:
-              </Text>
-              <TouchableOpacity
-                onPress={() => handleOpenPhantom()}
-                style={{
-                  padding: 12,
-                  backgroundColor: '#18181b',
-                  borderRadius: 8,
-                  marginBottom: 8,
-                  borderWidth: 1,
-                  borderColor: '#3f3f46',
-                }}
-              >
-                <Text style={{ color: '#ab9ff2', fontSize: 15, fontWeight: '600' }}>Open in Phantom</Text>
-              </TouchableOpacity>
-              <TouchableOpacity
-                onPress={() => handleOpenSolflare()}
-                style={{
-                  padding: 12,
-                  backgroundColor: '#18181b',
-                  borderRadius: 8,
-                  borderWidth: 1,
-                  borderColor: '#3f3f46',
-                }}
-              >
-                <Text style={{ color: '#fc8748', fontSize: 15, fontWeight: '600' }}>Open in Solflare</Text>
-              </TouchableOpacity>
-            </View>
-          )}
-
-          {fallbackState === 'desktop-no-wallet' && (
-            <View style={{ marginTop: 24 }}>
-              <View style={{
-                padding: 12,
-                backgroundColor: '#422006',
-                borderRadius: 8,
-                borderWidth: 1,
-                borderColor: '#f59e0b',
-                marginBottom: 12,
-              }}>
-                <Text style={{ color: '#f59e0b', fontSize: 14, fontWeight: '600' }}>
-                  No wallet extension detected.
-                </Text>
-                <Text style={{ color: '#a1a1aa', fontSize: 13, marginTop: 4 }}>
-                  Install a Solana wallet extension like Phantom or Solflare, then refresh this page.
-                </Text>
-              </View>
-            </View>
-          )}
-        </>
-      )}
-
-      {isConnecting && (
-        <View style={{ marginTop: 24 }}>
-          <Text style={{ color: '#a1a1aa', fontSize: 14 }}>Connecting...</Text>
-        </View>
-      )}
-
-      {connectionOutcome && connectionOutcome.kind !== 'connected' && (() => {
-        const display = getConnectionOutcomeDisplay(connectionOutcome);
-        const severityColor = display.severity === 'error' ? '#ef4444' : display.severity === 'warning' ? '#f59e0b' : '#a1a1aa';
-        const severityBg = display.severity === 'error' ? '#450a0a' : display.severity === 'warning' ? '#422006' : '#18181b';
-        const severityBorder = display.severity === 'error' ? '#dc2626' : display.severity === 'warning' ? '#f59e0b' : '#3f3f46';
-        return (
-          <View style={{
-            marginTop: 16,
-            padding: 12,
-            backgroundColor: severityBg,
-            borderRadius: 8,
-            borderWidth: 1,
-            borderColor: severityBorder,
-          }}>
-            <Text style={{ color: severityColor, fontSize: 14, fontWeight: '600' }}>
-              {display.title}
-            </Text>
-            <Text style={{ color: '#a1a1aa', fontSize: 13, marginTop: 4 }}>
-              {display.detail}
-            </Text>
-          </View>
-        );
-      })()}
-
-      <TouchableOpacity
-        onPress={() => { clearOutcome(); router.back(); }}
-        style={{ marginTop: 16, alignSelf: 'center', padding: 8 }}
-      >
-        <Text style={{ color: '#71717a', fontSize: 14 }}>Go Back</Text>
-      </TouchableOpacity>
-    </ScrollView>
-  );
+  return <WalletConnectScreen vm={vm} actions={actions} />;
 }
