@@ -16,6 +16,7 @@ function makeVm(overrides: Partial<WalletConnectViewModel> = {}): WalletConnectV
   return {
     screenState: 'standard',
     nativeWalletAvailable: false,
+    browserWalletAvailable: true,
     discovery: 'ready',
     discoveredWallets: [],
     fallback: 'none',
@@ -248,5 +249,25 @@ describe('WalletConnectScreen', () => {
     const lastButton = goBackButtons[goBackButtons.length - 1]!;
     fireEvent.click(lastButton);
     expect(onGoBack).toHaveBeenCalled();
+  });
+
+  it('hides browser wallet discovery when browserWalletAvailable is false', () => {
+    render(
+      <WalletConnectScreen
+        vm={makeVm({ browserWalletAvailable: false, discovery: 'discovering' })}
+        actions={makeActions()}
+      />,
+    );
+    expect(screen.queryByText('Detecting browser wallets...')).toBeNull();
+  });
+
+  it('hides timed-out browser wallet CTA when browserWalletAvailable is false', () => {
+    render(
+      <WalletConnectScreen
+        vm={makeVm({ browserWalletAvailable: false, discovery: 'timed-out' })}
+        actions={makeActions()}
+      />,
+    );
+    expect(screen.queryByText('Connect Browser Wallet')).toBeNull();
   });
 });

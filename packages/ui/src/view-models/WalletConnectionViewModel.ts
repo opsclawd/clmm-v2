@@ -20,6 +20,7 @@ import type {
 export type WalletConnectViewModel = {
   screenState: 'loading' | 'social-webview' | 'standard';
   nativeWalletAvailable: boolean;
+  browserWalletAvailable: boolean;
   discovery: WalletDiscoveryState;
   discoveredWallets: DiscoveredWallet[];
   fallback: FallbackState;
@@ -54,6 +55,7 @@ export function buildWalletConnectViewModel(params: {
   return {
     screenState,
     nativeWalletAvailable: caps.nativeWalletAvailable,
+    browserWalletAvailable: caps.browserWalletAvailable,
     discovery: params.discovery,
     discoveredWallets: params.discoveredWallets,
     fallback: params.fallback,

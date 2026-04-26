@@ -237,14 +237,14 @@ function renderStandard(vm: WalletConnectViewModel, actions: WalletConnectAction
           </TouchableOpacity>
         ) : null}
 
-        {!vm.isConnecting && vm.discovery === 'discovering' ? (
+        {!vm.isConnecting && vm.browserWalletAvailable && vm.discovery === 'discovering' ? (
           <View style={styles.discoveryContainer}>
             <ActivityIndicator size="small" color={colors.safe} />
             <Text style={styles.discoveryText}>Detecting browser wallets...</Text>
           </View>
         ) : null}
 
-        {!vm.isConnecting && vm.discovery === 'ready' && vm.discoveredWallets.length > 0
+        {!vm.isConnecting && vm.browserWalletAvailable && vm.discovery === 'ready' && vm.discoveredWallets.length > 0
           ? vm.discoveredWallets.map((wallet) => (
               <TouchableOpacity
                 key={wallet.id}
@@ -257,7 +257,7 @@ function renderStandard(vm: WalletConnectViewModel, actions: WalletConnectAction
             ))
           : null}
 
-        {!vm.isConnecting && vm.discovery === 'timed-out' ? (
+        {!vm.isConnecting && vm.browserWalletAvailable && vm.discovery === 'timed-out' ? (
           <TouchableOpacity
             onPress={actions.onConnectDefaultBrowser}
             style={styles.walletOptionButton}

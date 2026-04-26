@@ -141,6 +141,29 @@ describe('buildWalletConnectViewModel (extended)', () => {
     });
     expect(vm.isConnecting).toBe(true);
   });
+
+  it('passes through browserWalletAvailable from capabilities', () => {
+    const vm = buildWalletConnectViewModel({
+      ...baseExtendedParams,
+      platformCapabilities: makeCaps({ browserWalletAvailable: true }),
+      isConnecting: false,
+      connectionOutcome: null,
+    });
+    expect(vm.browserWalletAvailable).toBe(true);
+  });
+
+  it('defaults browserWalletAvailable to false when capabilities is null', () => {
+    const vm = buildWalletConnectViewModel({
+      platformCapabilities: null,
+      discovery: 'discovering',
+      discoveredWallets: [],
+      fallback: 'none',
+      socialEscapeAttempted: false,
+      isConnecting: false,
+      connectionOutcome: null,
+    });
+    expect(vm.browserWalletAvailable).toBe(false);
+  });
 });
 
 describe('buildWalletSettingsViewModel', () => {
