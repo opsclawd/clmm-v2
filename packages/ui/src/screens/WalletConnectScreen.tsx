@@ -9,17 +9,13 @@ import {
   StyleSheet,
 } from 'react-native';
 import { colors, typography } from '../design-system/index.js';
-import { buildWalletConnectViewModel } from '../view-models/WalletConnectionViewModel.js';
+import type { WalletConnectViewModel } from '../view-models/WalletConnectionViewModel.js';
+import type { WalletConnectActions, DiscoveredWallet } from '../components/WalletConnectionUtils.js';
 import { Icon } from '../components/Icon.js';
-import type { PlatformCapabilities } from '../components/DegradedCapabilityBannerUtils.js';
-import type { ConnectionOutcome, WalletOptionKind } from '../components/WalletConnectionUtils.js';
 
 type Props = {
-  platformCapabilities?: PlatformCapabilities | null;
-  connectionOutcome?: ConnectionOutcome | null;
-  isConnecting?: boolean;
-  onSelectWallet?: (kind: WalletOptionKind) => void;
-  onGoBack?: () => void;
+  vm: WalletConnectViewModel;
+  actions: WalletConnectActions;
 };
 
 function HeroAnimation() {
@@ -102,38 +98,83 @@ function FeatureRow({ title, description }: { title: string; description: string
   );
 }
 
-export function WalletConnectScreen({
-  platformCapabilities,
-  connectionOutcome,
-  isConnecting,
-  onSelectWallet,
-  onGoBack,
-}: Props): JSX.Element {
-  if (!platformCapabilities) {
-    return (
-      <View style={styles.loadingContainer}>
-        <ActivityIndicator color={colors.safe} />
-      </View>
-    );
+function severityBorderColor(severity: string) {
+  switch (severity) {
+    case 'error': return colors.breachAccent;
+    case 'warning': return colors.warn;
+    case 'success': return colors.safe;
+    default: return colors.border;
   }
+}
 
-  const vm = buildWalletConnectViewModel({
-    capabilities: platformCapabilities,
-    connectionOutcome: connectionOutcome ?? null,
-    isConnecting: isConnecting ?? false,
-  });
+function severityTextColor(severity: string) {
+  switch (severity) {
+    case 'error': return colors.breachAccent;
+    case 'warning': return colors.warn;
+    case 'success': return colors.safe;
+    default: return colors.textPrimary;
+  }
+}
 
+function renderSocialWebview(vm: WalletConnectViewModel, actions: WalletConnectActions) {
+  return (
+    <View style={styles.container}>
+      <View style={styles.contentContainer}>
+        <View style={styles.socialWarningBanner}>
+          <Text style={styles.socialWarningTitle}>
+            Social app browsers block wallet extensions.
+          </Text>
+          <Text style={styles.socialWarningText}>
+            Open this page in Safari or Chrome to connect your wallet.
+          </Text>
+        </View>
+
+        <TouchableOpacity
+          onPress={actions.onOpenInBrowser}
+          disabled={vm.socialEscapeAttempted}
+          style={[
+            styles.walletOptionButton,
+            { maxWidth: 320, width: '100%' },
+            vm.socialEscapeAttempted && { opacity: 0.4 },
+          ]}
+        >
+          <Text style={styles.walletOptionLabel}>Open in Browser</Text>
+        </TouchableOpacity>
+
+        <Text style={styles.deepLinkLabel}>Or open in a wallet browser:</Text>
+
+        <TouchableOpacity
+          onPress={actions.onOpenPhantom}
+          style={styles.deepLinkButton}
+        >
+          <Text style={{ color: '#ab9ff2', fontSize: 14, fontWeight: '600' }}>
+            Open in Phantom
+          </Text>
+        </TouchableOpacity>
+
+        <TouchableOpacity
+          onPress={actions.onOpenSolflare}
+          style={styles.deepLinkButton}
+        >
+          <Text style={{ color: '#fc8748', fontSize: 14, fontWeight: '600' }}>
+            Open in Solflare
+          </Text>
+        </TouchableOpacity>
+      </View>
+    </View>
+  );
+}
+
+function renderStandard(vm: WalletConnectViewModel, actions: WalletConnectActions) {
   return (
     <View style={styles.container}>
       <ScrollView
         style={styles.scrollView}
         contentContainerStyle={styles.contentContainer}
       >
-        {onGoBack ? (
-          <TouchableOpacity onPress={onGoBack} style={styles.backButton} accessibilityLabel="Back">
-            <Icon name="chevronLeft" size={20} color={colors.textBody} />
-          </TouchableOpacity>
-        ) : null}
+        <TouchableOpacity onPress={actions.onGoBack} style={styles.backButton} accessibilityLabel="Back">
+          <Icon name="chevronLeft" size={20} color={colors.textBody} />
+        </TouchableOpacity>
 
         <HeroAnimation />
 
@@ -146,31 +187,13 @@ export function WalletConnectScreen({
           <View
             style={[
               styles.outcomeBanner,
-              {
-                borderColor:
-                  vm.outcomeDisplay.severity === 'error'
-                    ? colors.breachAccent
-                    : vm.outcomeDisplay.severity === 'warning'
-                      ? colors.warn
-                      : vm.outcomeDisplay.severity === 'success'
-                        ? colors.safe
-                        : colors.border,
-              },
+              { borderColor: severityBorderColor(vm.outcomeDisplay.severity) },
             ]}
           >
             <Text
               style={[
                 styles.outcomeTitle,
-                {
-                  color:
-                    vm.outcomeDisplay.severity === 'error'
-                      ? colors.breachAccent
-                      : vm.outcomeDisplay.severity === 'warning'
-                        ? colors.warn
-                        : vm.outcomeDisplay.severity === 'success'
-                          ? colors.safe
-                          : colors.textPrimary,
-                },
+                { color: severityTextColor(vm.outcomeDisplay.severity) },
               ]}
             >
               {vm.outcomeDisplay.title}
@@ -185,27 +208,100 @@ export function WalletConnectScreen({
           <View
             style={[
               styles.outcomeBanner,
-              {
-                borderColor:
-                  vm.platformNotice.severity === 'warning'
-                    ? colors.warn
-                    : colors.breachAccent,
-              },
+              { borderColor: vm.platformNotice.severity === 'warning' ? colors.warn : colors.breachAccent },
             ]}
           >
             <Text
               style={[
                 styles.outcomeTitle,
-                {
-                  color:
-                    vm.platformNotice.severity === 'warning'
-                      ? colors.warn
-                      : colors.breachAccent,
-                },
+                { color: vm.platformNotice.severity === 'warning' ? colors.warn : colors.breachAccent },
               ]}
             >
               {vm.platformNotice.message}
             </Text>
+          </View>
+        ) : null}
+
+        {vm.nativeWalletAvailable && !vm.isConnecting ? (
+          <TouchableOpacity
+            onPress={actions.onSelectNative}
+            style={styles.walletOptionButton}
+          >
+            <Icon name="wallet" size={20} color={colors.textPrimary} />
+            <View style={styles.walletOptionText}>
+              <Text style={styles.walletOptionLabel}>Connect Mobile Wallet</Text>
+              <Text style={styles.walletOptionDescription}>
+                Sign transactions with your mobile wallet app.
+              </Text>
+            </View>
+          </TouchableOpacity>
+        ) : null}
+
+        {!vm.isConnecting && vm.discovery === 'discovering' ? (
+          <View style={styles.discoveryContainer}>
+            <ActivityIndicator size="small" color={colors.safe} />
+            <Text style={styles.discoveryText}>Detecting browser wallets...</Text>
+          </View>
+        ) : null}
+
+        {!vm.isConnecting && vm.discovery === 'ready' && vm.discoveredWallets.length > 0
+          ? vm.discoveredWallets.map((wallet) => (
+              <TouchableOpacity
+                key={wallet.id}
+                onPress={() => actions.onSelectDiscoveredWallet(wallet.id)}
+                style={styles.discoveredWalletButton}
+              >
+                <Icon name="wallet" size={20} color={colors.textPrimary} />
+                <Text style={styles.walletOptionLabel}>{wallet.name}</Text>
+              </TouchableOpacity>
+            ))
+          : null}
+
+        {!vm.isConnecting && vm.discovery === 'timed-out' ? (
+          <TouchableOpacity
+            onPress={actions.onConnectDefaultBrowser}
+            style={styles.walletOptionButton}
+          >
+            <Icon name="wallet" size={20} color={colors.textPrimary} />
+            <View style={styles.walletOptionText}>
+              <Text style={styles.walletOptionLabel}>Connect Browser Wallet</Text>
+              <Text style={styles.walletOptionDescription}>
+                Sign transactions with your browser wallet extension.
+              </Text>
+            </View>
+          </TouchableOpacity>
+        ) : null}
+
+        {!vm.isConnecting && vm.fallback === 'wallet-fallback' ? (
+          <View style={styles.fallbackContainer}>
+            <View style={[styles.outcomeBanner, { borderColor: colors.warn }]}>
+              <Text style={[styles.outcomeTitle, { color: colors.warn }]}>
+                No wallet extension detected in this browser.
+              </Text>
+            </View>
+            <TouchableOpacity onPress={actions.onOpenPhantom} style={styles.deepLinkButton}>
+              <Text style={{ color: '#ab9ff2', fontSize: 14, fontWeight: '600' }}>
+                Open in Phantom
+              </Text>
+            </TouchableOpacity>
+            <TouchableOpacity onPress={actions.onOpenSolflare} style={styles.deepLinkButton}>
+              <Text style={{ color: '#fc8748', fontSize: 14, fontWeight: '600' }}>
+                Open in Solflare
+              </Text>
+            </TouchableOpacity>
+          </View>
+        ) : null}
+
+        {!vm.isConnecting && vm.fallback === 'desktop-no-wallet' ? (
+          <View style={styles.fallbackContainer}>
+            <View style={[styles.outcomeBanner, { borderColor: colors.warn }]}>
+              <Text style={[styles.outcomeTitle, { color: colors.warn }]}>
+                No wallet extension detected.
+              </Text>
+              <Text style={styles.outcomeDetail}>
+                Install a Solana wallet extension like Phantom or Solflare, then refresh this page.
+              </Text>
+            </View>
           </View>
         ) : null}
 
@@ -214,34 +310,36 @@ export function WalletConnectScreen({
             <ActivityIndicator size="large" color={colors.safe} />
             <Text style={styles.connectingText}>Connecting...</Text>
           </View>
-        ) : (
-          <View style={styles.walletOptions}>
-            {vm.walletOptions.map((option) => (
-              <TouchableOpacity
-                key={option.kind}
-                onPress={() => onSelectWallet?.(option.kind)}
-                style={styles.walletOptionButton}
-              >
-                <Icon name="wallet" size={20} color={colors.textPrimary} />
-                <View style={styles.walletOptionText}>
-                  <Text style={styles.walletOptionLabel}>{option.label}</Text>
-                  <Text style={styles.walletOptionDescription}>
-                    {option.description}
-                  </Text>
-                </View>
-              </TouchableOpacity>
-            ))}
-          </View>
-        )}
+        ) : null}
 
         <View style={styles.featuresContainer}>
           {features.map((f) => (
             <FeatureRow key={f.title} title={f.title} description={f.description} />
           ))}
         </View>
+
+        <TouchableOpacity onPress={actions.onGoBack} style={{ marginTop: 16, padding: 12 }}>
+          <Text style={styles.goBackText}>Go Back</Text>
+        </TouchableOpacity>
       </ScrollView>
     </View>
   );
+}
+
+export function WalletConnectScreen({ vm, actions }: Props): JSX.Element {
+  switch (vm.screenState) {
+    case 'loading':
+      return (
+        <View style={styles.loadingContainer}>
+          <ActivityIndicator color={colors.safe} />
+          <Text style={{ color: colors.textBody }}>Loading...</Text>
+        </View>
+      );
+    case 'social-webview':
+      return renderSocialWebview(vm, actions);
+    case 'standard':
+      return renderStandard(vm, actions);
+  }
 }
 
 const styles = StyleSheet.create({
@@ -411,5 +509,77 @@ const styles = StyleSheet.create({
   featureDescription: {
     fontSize: 12,
     color: colors.textFaint,
+  },
+  socialWarningBanner: {
+    width: '100%',
+    maxWidth: 320,
+    padding: 12,
+    backgroundColor: '#422006',
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: colors.warn,
+    marginBottom: 16,
+  },
+  socialWarningTitle: {
+    color: colors.warn,
+    fontSize: 14,
+    fontWeight: '600',
+  },
+  socialWarningText: {
+    color: colors.textBody,
+    fontSize: 13,
+    marginTop: 4,
+  },
+  deepLinkButton: {
+    padding: 12,
+    backgroundColor: colors.card,
+    borderRadius: 8,
+    marginBottom: 8,
+    borderWidth: 1,
+    borderColor: colors.border,
+  },
+  deepLinkLabel: {
+    color: colors.textFaint,
+    fontSize: 13,
+    marginBottom: 8,
+  },
+  discoveryContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    width: '100%',
+    maxWidth: 320,
+    padding: 16,
+    backgroundColor: colors.card,
+    borderRadius: 8,
+    marginBottom: 12,
+    borderWidth: 1,
+    borderColor: colors.border,
+  },
+  discoveryText: {
+    color: colors.textBody,
+    fontSize: 14,
+  },
+  discoveredWalletButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    width: '100%',
+    maxWidth: 320,
+    padding: 16,
+    backgroundColor: colors.card,
+    borderRadius: 8,
+    marginBottom: 12,
+    borderWidth: 1,
+    borderColor: colors.border,
+  },
+  fallbackContainer: {
+    width: '100%',
+    maxWidth: 320,
+    marginTop: 16,
+  },
+  goBackText: {
+    color: colors.textFaint,
+    fontSize: 14,
   },
 });
