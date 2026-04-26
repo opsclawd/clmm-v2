@@ -17,6 +17,12 @@ export async function getPositionDetail(params: {
   if (!detail) return { kind: 'not-found' };
 
   const { position, poolData, fees, positionLiquidity } = detail;
+
+  // Identity check: verify the returned record matches the request
+  if (position.positionId !== params.positionId || position.walletId !== params.walletId) {
+    return { kind: 'not-found' };
+  }
+
   const { decimalsA, decimalsB } = poolData.tokenPair;
   const decimalsKnown = decimalsA !== null && decimalsB !== null;
 
@@ -64,16 +70,18 @@ export async function getPositionDetail(params: {
 
   const totalFeesUsd = feeOwedA.usdValue + feeOwedB.usdValue;
 
-  const rewardValues: RewardAmountValue[] = fees.rewardInfos.map((r) => {
-    const rPrice = priceMap.get(r.mint);
-    return {
-      mint: r.mint,
-      amount: r.amountOwed.toString(),
-      decimals: r.decimals,
-      symbol: rPrice?.symbol ?? r.mint,
-      usdValue: (r.decimals !== null && rPrice) ? tokenAmountToUsd(r.amountOwed, r.decimals, rPrice.usdValue) : 0,
-    };
-  });
+  const rewardValues: RewardAmountValue[] = fees.rewardInfos
+    .filter((r) => r.mint !== '' && r.amountOwed !== 0n)
+    .map((r) => {
+      const rPrice = priceMap.get(r.mint);
+      return {
+        mint: r.mint,
+        amount: r.amountOwed.toString(),
+        decimals: r.decimals,
+        symbol: rPrice?.symbol ?? r.mint,
+        usdValue: (r.decimals !== null && rPrice) ? tokenAmountToUsd(r.amountOwed, r.decimals, rPrice.usdValue) : 0,
+      };
+    });
 
   const totalRewardsUsd = rewardValues.reduce((sum, r) => sum + r.usdValue, 0);
 
