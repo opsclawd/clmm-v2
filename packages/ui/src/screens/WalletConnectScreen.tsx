@@ -6,6 +6,7 @@ import {
   ActivityIndicator,
   ScrollView,
   Animated,
+  Image,
   StyleSheet,
 } from 'react-native';
 import { colors, typography } from '../design-system/index.js';
@@ -120,6 +121,31 @@ function renderSocialWebview(vm: WalletConnectViewModel, actions: WalletConnectA
   return (
     <View style={styles.container}>
       <View style={styles.contentContainer}>
+        <TouchableOpacity onPress={actions.onGoBack} style={styles.backButton} accessibilityLabel="Back">
+          <Icon name="chevronLeft" size={20} color={colors.textBody} />
+        </TouchableOpacity>
+
+        {vm.outcomeDisplay ? (
+          <View
+            style={[
+              styles.outcomeBanner,
+              { borderColor: severityBorderColor(vm.outcomeDisplay.severity) },
+            ]}
+          >
+            <Text
+              style={[
+                styles.outcomeTitle,
+                { color: severityTextColor(vm.outcomeDisplay.severity) },
+              ]}
+            >
+              {vm.outcomeDisplay.title}
+            </Text>
+            {vm.outcomeDisplay.detail ? (
+              <Text style={styles.outcomeDetail}>{vm.outcomeDisplay.detail}</Text>
+            ) : null}
+          </View>
+        ) : null}
+
         <View style={styles.socialWarningBanner}>
           <Text style={styles.socialWarningTitle}>
             Social app browsers block wallet extensions.
@@ -159,6 +185,10 @@ function renderSocialWebview(vm: WalletConnectViewModel, actions: WalletConnectA
           <Text style={{ color: '#fc8748', fontSize: 14, fontWeight: '600' }}>
             Open in Solflare
           </Text>
+        </TouchableOpacity>
+
+        <TouchableOpacity onPress={actions.onGoBack} style={{ marginTop: 16, padding: 12 }}>
+          <Text style={styles.goBackText}>Go Back</Text>
         </TouchableOpacity>
       </View>
     </View>
@@ -237,27 +267,31 @@ function renderStandard(vm: WalletConnectViewModel, actions: WalletConnectAction
           </TouchableOpacity>
         ) : null}
 
-        {!vm.isConnecting && vm.discovery === 'discovering' ? (
+        {!vm.isConnecting && vm.browserWalletAvailable && vm.discovery === 'discovering' ? (
           <View style={styles.discoveryContainer}>
             <ActivityIndicator size="small" color={colors.safe} />
             <Text style={styles.discoveryText}>Detecting browser wallets...</Text>
           </View>
         ) : null}
 
-        {!vm.isConnecting && vm.discovery === 'ready' && vm.discoveredWallets.length > 0
+        {!vm.isConnecting && vm.browserWalletAvailable && vm.discovery === 'ready' && vm.discoveredWallets.length > 0
           ? vm.discoveredWallets.map((wallet) => (
               <TouchableOpacity
                 key={wallet.id}
                 onPress={() => actions.onSelectDiscoveredWallet(wallet.id)}
                 style={styles.discoveredWalletButton}
               >
-                <Icon name="wallet" size={20} color={colors.textPrimary} />
+                {wallet.icon ? (
+                  <Image source={{ uri: wallet.icon }} style={styles.walletIcon} />
+                ) : (
+                  <Icon name="wallet" size={20} color={colors.textPrimary} />
+                )}
                 <Text style={styles.walletOptionLabel}>{wallet.name}</Text>
               </TouchableOpacity>
             ))
           : null}
 
-        {!vm.isConnecting && vm.discovery === 'timed-out' ? (
+        {!vm.isConnecting && vm.browserWalletAvailable && vm.discovery === 'timed-out' ? (
           <TouchableOpacity
             onPress={actions.onConnectDefaultBrowser}
             style={styles.walletOptionButton}
@@ -572,6 +606,10 @@ const styles = StyleSheet.create({
     marginBottom: 12,
     borderWidth: 1,
     borderColor: colors.border,
+  },
+  walletIcon: {
+    width: 24,
+    height: 24,
   },
   fallbackContainer: {
     width: '100%',

@@ -16,6 +16,7 @@ function makeVm(overrides: Partial<WalletConnectViewModel> = {}): WalletConnectV
   return {
     screenState: 'standard',
     nativeWalletAvailable: false,
+    browserWalletAvailable: true,
     discovery: 'ready',
     discoveredWallets: [],
     fallback: 'none',
@@ -219,6 +220,34 @@ describe('WalletConnectScreen', () => {
     expect(screen.getByText('Open in Browser')).toBeTruthy();
     expect(screen.getByText('Open in Phantom')).toBeTruthy();
     expect(screen.getByText('Open in Solflare')).toBeTruthy();
+    expect(screen.getByText('Go Back')).toBeTruthy();
+  });
+
+  it('shows outcome banner in social-webview state', () => {
+    render(
+      <WalletConnectScreen
+        vm={makeVm({
+          screenState: 'social-webview',
+          outcomeDisplay: { title: 'Connection Failed', detail: 'Capability probe failed', severity: 'error' },
+        })}
+        actions={makeActions()}
+      />,
+    );
+    expect(screen.getByText('Connection Failed')).toBeTruthy();
+    expect(screen.getByText('Social app browsers block wallet extensions.')).toBeTruthy();
+  });
+
+  it('calls onGoBack from social-webview state', () => {
+    const onGoBack = vi.fn();
+    render(
+      <WalletConnectScreen
+        vm={makeVm({ screenState: 'social-webview' })}
+        actions={makeActions({ onGoBack })}
+      />,
+    );
+    const goBackButtons = screen.getAllByText('Go Back');
+    fireEvent.click(goBackButtons[0]!);
+    expect(onGoBack).toHaveBeenCalled();
   });
 
   it('renders wallet fallback with deep links', () => {
@@ -248,5 +277,25 @@ describe('WalletConnectScreen', () => {
     const lastButton = goBackButtons[goBackButtons.length - 1]!;
     fireEvent.click(lastButton);
     expect(onGoBack).toHaveBeenCalled();
+  });
+
+  it('hides browser wallet discovery when browserWalletAvailable is false', () => {
+    render(
+      <WalletConnectScreen
+        vm={makeVm({ browserWalletAvailable: false, discovery: 'discovering' })}
+        actions={makeActions()}
+      />,
+    );
+    expect(screen.queryByText('Detecting browser wallets...')).toBeNull();
+  });
+
+  it('hides timed-out browser wallet CTA when browserWalletAvailable is false', () => {
+    render(
+      <WalletConnectScreen
+        vm={makeVm({ browserWalletAvailable: false, discovery: 'timed-out' })}
+        actions={makeActions()}
+      />,
+    );
+    expect(screen.queryByText('Connect Browser Wallet')).toBeNull();
   });
 });

@@ -97,14 +97,16 @@ export default function ConnectRoute() {
     void platformCapabilityAdapter
       .getCapabilities()
       .then((caps) => { if (active) setPlatformCapabilities(caps); })
-      .catch(() => {
-        if (active) setPlatformCapabilities({
+      .catch((error) => {
+        if (!active) return;
+        setPlatformCapabilities({
           nativePushAvailable: false,
           browserNotificationAvailable: false,
           nativeWalletAvailable: false,
           browserWalletAvailable: false,
           isMobileWeb: false,
         });
+        handleConnectionError(error);
       });
     return () => { active = false; };
   }, [setPlatformCapabilities]);
@@ -134,7 +136,7 @@ export default function ConnectRoute() {
       void walletPlatform.connectNativeWallet()
         .then((address) => {
           markConnected({ walletAddress: address, connectionKind: 'native' });
-          void enrollWalletForMonitoring(address);
+          void enrollWalletForMonitoring(address).catch(() => {});
           navigateRoute({ router, path: returnTo, method: 'replace' });
         })
         .catch(handleConnectionError);
@@ -144,7 +146,7 @@ export default function ConnectRoute() {
       void browserConnect.connect(walletId)
         .then(({ address }) => {
           markConnected({ walletAddress: address, connectionKind: 'browser' });
-          void enrollWalletForMonitoring(address);
+          void enrollWalletForMonitoring(address).catch(() => {});
           navigateRoute({ router, path: returnTo, method: 'replace' });
         })
         .catch(handleConnectionError);
@@ -154,7 +156,7 @@ export default function ConnectRoute() {
       void browserConnect.connect()
         .then(({ address }) => {
           markConnected({ walletAddress: address, connectionKind: 'browser' });
-          void enrollWalletForMonitoring(address);
+          void enrollWalletForMonitoring(address).catch(() => {});
           navigateRoute({ router, path: returnTo, method: 'replace' });
         })
         .catch(handleConnectionError);
