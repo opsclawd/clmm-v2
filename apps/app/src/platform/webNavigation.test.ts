@@ -5,6 +5,7 @@ import {
   isSolanaMobileWebView,
   hasBrowserWalletPresence,
   WALLET_WEBVIEW_NAVIGATION_STRATEGY,
+  _setStrategyForTesting,
 } from './webNavigation';
 
 describe('hasBrowserWalletPresence', () => {
@@ -240,6 +241,90 @@ describe('navigateRoute', () => {
     expect(router.replace).not.toHaveBeenCalled();
 
     vi.unstubAllGlobals();
+  });
+});
+
+describe('navigateRoute strategy dispatch', () => {
+  afterEach(() => {
+    vi.unstubAllGlobals();
+    _setStrategyForTesting('hard-fallback');
+  });
+
+  it("under 'soft-preferred', desktop browser with extension uses Expo Router soft navigation", () => {
+    _setStrategyForTesting('soft-preferred');
+
+    vi.stubGlobal('window', { phantom: { solana: { connect: vi.fn() } } });
+    vi.stubGlobal('navigator', {
+      userAgent:
+        'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+    });
+
+    const router = { push: vi.fn(), replace: vi.fn() };
+    navigateRoute({ router, path: '/positions', method: 'push' });
+
+    expect(router.push).toHaveBeenCalledWith('/positions');
+  });
+
+  it("under 'soft-preferred', Solana mobile WebView still falls back to hard navigation", () => {
+    _setStrategyForTesting('soft-preferred');
+
+    const replaceFn = vi.fn();
+    vi.stubGlobal('window', {
+      solana: { connect: vi.fn() },
+      location: { origin: 'https://app.example.com', replace: replaceFn, href: '' },
+    });
+    vi.stubGlobal('navigator', {
+      userAgent: 'Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) AppleWebKit/605.1.15',
+    });
+
+    const router = { push: vi.fn(), replace: vi.fn() };
+    navigateRoute({ router, path: '/positions', method: 'replace' });
+
+    expect(replaceFn).toHaveBeenCalledWith('https://app.example.com/positions');
+    expect(router.replace).not.toHaveBeenCalled();
+  });
+
+  it("under 'hard-fallback', Solana mobile WebView uses window.location (current default)", () => {
+    _setStrategyForTesting('hard-fallback');
+
+    const replaceFn = vi.fn();
+    vi.stubGlobal('window', {
+      solana: { connect: vi.fn() },
+      location: { origin: 'https://app.example.com', replace: replaceFn, href: '' },
+    });
+    vi.stubGlobal('navigator', {
+      userAgent: 'Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) AppleWebKit/605.1.15',
+    });
+
+    const router = { push: vi.fn(), replace: vi.fn() };
+    navigateRoute({ router, path: '/positions', method: 'replace' });
+
+    expect(replaceFn).toHaveBeenCalledWith('https://app.example.com/positions');
+    expect(router.replace).not.toHaveBeenCalled();
+  });
+
+  it("under 'capability-driven', warns and falls back to hard-fallback behavior", () => {
+    _setStrategyForTesting('capability-driven');
+
+    const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    const replaceFn = vi.fn();
+    vi.stubGlobal('window', {
+      solana: { connect: vi.fn() },
+      location: { origin: 'https://app.example.com', replace: replaceFn, href: '' },
+    });
+    vi.stubGlobal('navigator', {
+      userAgent: 'Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) AppleWebKit/605.1.15',
+    });
+
+    const router = { push: vi.fn(), replace: vi.fn() };
+    navigateRoute({ router, path: '/positions', method: 'replace' });
+
+    expect(warnSpy).toHaveBeenCalled();
+    expect(warnSpy.mock.calls[0][0]).toContain("'capability-driven'");
+    expect(replaceFn).toHaveBeenCalledWith('https://app.example.com/positions');
+    expect(router.replace).not.toHaveBeenCalled();
+
+    warnSpy.mockRestore();
   });
 });
 
