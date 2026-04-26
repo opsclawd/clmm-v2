@@ -5,6 +5,18 @@ type RouterLike = {
 
 type NavigationMethod = 'push' | 'replace';
 
+/**
+ * Active wallet WebView navigation strategy. The reasoning, validation
+ * evidence, and selected outcome live in:
+ *   docs/decisions/0001-wallet-webview-navigation.md
+ *
+ * Any change to this constant MUST update or supersede that ADR.
+ */
+export const WALLET_WEBVIEW_NAVIGATION_STRATEGY:
+  | 'soft-preferred'
+  | 'hard-fallback'
+  | 'capability-driven' = 'hard-fallback';
+
 export function normalizeExpoRouterRoute(path: string): string {
   return path.startsWith('/(tabs)/') ? path.replace('/(tabs)', '') : path;
 }

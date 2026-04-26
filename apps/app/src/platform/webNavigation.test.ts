@@ -1,5 +1,11 @@
 import { describe, expect, it, vi, afterEach } from 'vitest';
-import { navigateRoute, normalizeExpoRouterRoute, isSolanaMobileWebView, hasBrowserWalletPresence } from './webNavigation';
+import {
+  navigateRoute,
+  normalizeExpoRouterRoute,
+  isSolanaMobileWebView,
+  hasBrowserWalletPresence,
+  WALLET_WEBVIEW_NAVIGATION_STRATEGY,
+} from './webNavigation';
 
 describe('hasBrowserWalletPresence', () => {
   afterEach(() => {
@@ -234,5 +240,17 @@ describe('navigateRoute', () => {
     expect(router.replace).not.toHaveBeenCalled();
 
     vi.unstubAllGlobals();
+  });
+});
+
+describe('WALLET_WEBVIEW_NAVIGATION_STRATEGY', () => {
+  it('is one of the three allowed values', () => {
+    expect(['soft-preferred', 'hard-fallback', 'capability-driven']).toContain(
+      WALLET_WEBVIEW_NAVIGATION_STRATEGY,
+    );
+  });
+
+  it('defaults to hard-fallback before any outcome is applied', () => {
+    expect(WALLET_WEBVIEW_NAVIGATION_STRATEGY).toBe('hard-fallback');
   });
 });
