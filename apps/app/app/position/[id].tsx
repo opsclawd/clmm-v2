@@ -52,9 +52,12 @@ function PositionDetailRouteBody() {
 
   const position = positionQuery.data;
 
+  const positionNow = Date.now();
+
   return (
     <PositionDetailScreen
       {...(position ? { position } : {})}
+      now={positionNow}
       onViewPreview={(resolvedTriggerId: string) =>
         navigateRoute({
           router,

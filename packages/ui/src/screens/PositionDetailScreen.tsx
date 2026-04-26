@@ -1,4 +1,5 @@
 import { View, Text, ScrollView, TouchableOpacity } from 'react-native';
+import { useState, useEffect } from 'react';
 import type { PositionDetailDto } from '@clmm/application/public';
 import { colors } from '../design-system/index.js';
 import { typography } from '../design-system/index.js';
@@ -9,6 +10,7 @@ import { DirectionalPolicyCard } from '../components/DirectionalPolicyCard.js';
 type Props = {
   position?: PositionDetailDto;
   onViewPreview?: (triggerId: string) => void;
+  now?: number;
 };
 
 const srStyles = {
@@ -48,7 +50,10 @@ const srStyles = {
   },
 };
 
-export function PositionDetailScreen({ position, onViewPreview }: Props): JSX.Element {
+export function PositionDetailScreen({ position, onViewPreview, now: nowProp }: Props): JSX.Element {
+  const [mountedNow, setMountedNow] = useState(0);
+  useEffect(() => { setMountedNow(Date.now()); }, []);
+  const now = nowProp ?? mountedNow;
   if (!position) {
     return (
       <View style={{ flex: 1, backgroundColor: colors.background, padding: 16 }}>
@@ -62,7 +67,7 @@ export function PositionDetailScreen({ position, onViewPreview }: Props): JSX.El
     );
   }
 
-  const presentation = presentPositionDetail({ position, now: Date.now() });
+  const presentation = presentPositionDetail({ position, now });
   const vm = presentation.position;
   const breachDirection = position.breachDirection;
   const triggerId = position.triggerId;

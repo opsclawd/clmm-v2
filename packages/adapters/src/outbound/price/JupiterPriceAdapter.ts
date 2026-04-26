@@ -38,15 +38,19 @@ export class JupiterPriceAdapter implements PricePort {
     }
 
     const quotedAt = makeClockTimestamp(Date.now());
-    return tokenMints.map((mint) => {
-      const entry = this.cache.get(mint)!;
-      return {
-        tokenMint: mint,
-        usdValue: entry.price,
-        symbol: entry.symbol,
-        quotedAt,
-      };
-    });
+    const results: PriceQuote[] = [];
+    for (const mint of tokenMints) {
+      const entry = this.cache.get(mint);
+      if (entry) {
+        results.push({
+          tokenMint: mint,
+          usdValue: entry.price,
+          symbol: entry.symbol,
+          quotedAt,
+        });
+      }
+    }
+    return results;
   }
 
   private async fetchBatched(uncached: readonly string[]): Promise<void> {
@@ -71,12 +75,14 @@ export class JupiterPriceAdapter implements PricePort {
 
       for (const mint of batch) {
         const data = body[mint];
-        const known = KNOWN_TOKENS[mint];
-        this.cache.set(mint, {
-          price: data?.usdPrice ?? 0,
-          symbol: known?.symbol ?? data?.symbol ?? 'UNKNOWN',
-          fetchedAt: now,
-        });
+        if (data?.usdPrice != null) {
+          const known = KNOWN_TOKENS[mint];
+          this.cache.set(mint, {
+            price: data.usdPrice,
+            symbol: known?.symbol ?? data.symbol ?? 'UNKNOWN',
+            fetchedAt: now,
+          });
+        }
       }
     }
   }
