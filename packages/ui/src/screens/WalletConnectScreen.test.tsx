@@ -222,6 +222,20 @@ describe('WalletConnectScreen', () => {
     expect(screen.getByText('Open in Solflare')).toBeTruthy();
   });
 
+  it('shows outcome banner in social-webview state', () => {
+    render(
+      <WalletConnectScreen
+        vm={makeVm({
+          screenState: 'social-webview',
+          outcomeDisplay: { title: 'Connection Failed', detail: 'Capability probe failed', severity: 'error' },
+        })}
+        actions={makeActions()}
+      />,
+    );
+    expect(screen.getByText('Connection Failed')).toBeTruthy();
+    expect(screen.getByText('Social app browsers block wallet extensions.')).toBeTruthy();
+  });
+
   it('renders wallet fallback with deep links', () => {
     render(
       <WalletConnectScreen

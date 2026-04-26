@@ -120,6 +120,27 @@ function renderSocialWebview(vm: WalletConnectViewModel, actions: WalletConnectA
   return (
     <View style={styles.container}>
       <View style={styles.contentContainer}>
+        {vm.outcomeDisplay ? (
+          <View
+            style={[
+              styles.outcomeBanner,
+              { borderColor: severityBorderColor(vm.outcomeDisplay.severity) },
+            ]}
+          >
+            <Text
+              style={[
+                styles.outcomeTitle,
+                { color: severityTextColor(vm.outcomeDisplay.severity) },
+              ]}
+            >
+              {vm.outcomeDisplay.title}
+            </Text>
+            {vm.outcomeDisplay.detail ? (
+              <Text style={styles.outcomeDetail}>{vm.outcomeDisplay.detail}</Text>
+            ) : null}
+          </View>
+        ) : null}
+
         <View style={styles.socialWarningBanner}>
           <Text style={styles.socialWarningTitle}>
             Social app browsers block wallet extensions.
