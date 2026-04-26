@@ -159,5 +159,5 @@ No `import.meta` references appear in the connector dist, so the Zustand hydrati
 
 ## Related Issues
 
-- Adjacent wallet WebView runtime failure: `docs/solutions/integration-issues/phantom-webview-expo-router-navigation-silent-failure-2026-04-15.md`
+- Adjacent wallet WebView navigation (superseded by SDK 54 fix): `docs/solutions/integration-issues/expo-sdk54-phantom-webview-soft-navigation-restored-2026-04-26.md`
 - Adjacent Phantom browser signing interop issue: `docs/solutions/integration-issues/phantom-injected-v0-signtransaction-requires-versionedtransaction-2026-04-23.md`

@@ -5,6 +5,30 @@ type RouterLike = {
 
 type NavigationMethod = 'push' | 'replace';
 
+type NavigationStrategy = 'soft-preferred' | 'hard-fallback' | 'capability-driven';
+
+/**
+ * Active wallet WebView navigation strategy. The reasoning, validation
+ * evidence, and selected outcome live in:
+ *   docs/decisions/0001-wallet-webview-navigation.md
+ *
+ * Any change to this constant MUST update or supersede that ADR.
+ */
+const WALLET_WEBVIEW_NAVIGATION_STRATEGY: NavigationStrategy = 'soft-preferred';
+
+let _activeStrategy: NavigationStrategy = WALLET_WEBVIEW_NAVIGATION_STRATEGY;
+
+function getStrategy(): NavigationStrategy {
+  return _activeStrategy;
+}
+
+export { WALLET_WEBVIEW_NAVIGATION_STRATEGY };
+
+/** @internal Test-only hook to override the active strategy per-test. */
+export function _setStrategyForTesting(strategy: NavigationStrategy): void {
+  _activeStrategy = strategy;
+}
+
 export function normalizeExpoRouterRoute(path: string): string {
   return path.startsWith('/(tabs)/') ? path.replace('/(tabs)', '') : path;
 }
@@ -71,15 +95,45 @@ export function navigateRoute(params: {
 }): void {
   const canonicalPath = normalizeExpoRouterRoute(params.path);
 
+  switch (getStrategy()) {
+    case 'soft-preferred':
+      navigateSoftPreferred(params.router, canonicalPath, params.method);
+      return;
+    case 'hard-fallback':
+      navigateHardFallback(params.router, canonicalPath, params.method);
+      return;
+    case 'capability-driven':
+      navigateCapabilityDriven(params.router, canonicalPath, params.method);
+      return;
+  }
+}
+
+function navigateSoftPreferred(router: RouterLike, canonicalPath: string, method: NavigationMethod): void {
+  if (method === 'replace') {
+    router.replace(canonicalPath);
+    return;
+  }
+  router.push(canonicalPath);
+}
+
+function navigateHardFallback(router: RouterLike, canonicalPath: string, method: NavigationMethod): void {
   if (isWebPlatform() && isSolanaMobileWebView()) {
-    hardNavigate(canonicalPath, params.method);
+    hardNavigate(canonicalPath, method);
     return;
   }
-
-  if (params.method === 'replace') {
-    params.router.replace(canonicalPath);
+  if (method === 'replace') {
+    router.replace(canonicalPath);
     return;
   }
+  router.push(canonicalPath);
+}
 
-  params.router.push(canonicalPath);
+function navigateCapabilityDriven(router: RouterLike, canonicalPath: string, method: NavigationMethod): void {
+  if (typeof console !== 'undefined' && typeof console.warn === 'function') {
+    console.warn(
+      "[webNavigation] strategy 'capability-driven' is a stub; falling back to 'hard-fallback' behavior. " +
+        'See docs/decisions/0001-wallet-webview-navigation.md.',
+    );
+  }
+  navigateHardFallback(router, canonicalPath, method);
 }
