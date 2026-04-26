@@ -97,14 +97,16 @@ export default function ConnectRoute() {
     void platformCapabilityAdapter
       .getCapabilities()
       .then((caps) => { if (active) setPlatformCapabilities(caps); })
-      .catch(() => {
-        if (active) setPlatformCapabilities({
+      .catch((error) => {
+        if (!active) return;
+        setPlatformCapabilities({
           nativePushAvailable: false,
           browserNotificationAvailable: false,
           nativeWalletAvailable: false,
           browserWalletAvailable: false,
           isMobileWeb: false,
         });
+        handleConnectionError(error);
       });
     return () => { active = false; };
   }, [setPlatformCapabilities]);
