@@ -55,18 +55,21 @@ export function tokenAmountToUsd(
   decimals: number,
   usdPrice: number,
 ): number {
-  if (amount === 0n) return 0;
+  if (amount === 0n || usdPrice === 0) return 0;
 
-  const str = amount.toString();
-  const len = str.length;
+  const priceScale = 100_000_000; // 8 decimal places for usdPrice
+  const scaledPrice = Math.round(usdPrice * priceScale);
 
-  if (decimals >= len) {
-    const padded = str.padStart(decimals + 1, '0');
-    const fraction = padded.slice(-decimals);
-    return parseFloat(`0.${fraction}`) * usdPrice;
-  }
+  const product = amount * BigInt(scaledPrice);
+  const divisor = 10n ** BigInt(decimals) * BigInt(priceScale);
 
-  const whole = str.slice(0, len - decimals);
-  const fraction = str.slice(len - decimals);
-  return parseFloat(`${whole}.${fraction}`) * usdPrice;
+  const resultWhole = product / divisor;
+  const resultRem = product % divisor;
+
+  const remStr = resultRem.toString().padStart(8, '0');
+
+  // Never convert a BigInt to Number — build a string and parseFloat only
+  // at the final boundary. parseFloat may round for >15-digit integers,
+  // but that is JS Number's limit and is acceptable for USD display.
+  return parseFloat(`${resultWhole}.${remStr}`);
 }

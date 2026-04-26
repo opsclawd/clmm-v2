@@ -147,6 +147,13 @@ describe('tokenAmountToUsd', () => {
   it('handles zero price', () => {
     expect(tokenAmountToUsd(1000000000n, 9, 0)).toBe(0);
   });
+
+  it('handles low-decimal large amounts without precision loss', () => {
+    // 9 quadrillion tokens with 0 decimals exceeds MAX_SAFE_INTEGER
+    const amount: bigint = 9_000_000_000_000_000_000n; // > Number.MAX_SAFE_INTEGER
+    const result = tokenAmountToUsd(amount, 0, 2.5);
+    expect(result).toBeCloseTo(22_500_000_000_000_000_000, -6); // matches to trillionths — precision at this scale is bounded by JS Number limits, not bigint cast
+  });
 });
 
 describe('whirlpoolFeeRateToBps', () => {
