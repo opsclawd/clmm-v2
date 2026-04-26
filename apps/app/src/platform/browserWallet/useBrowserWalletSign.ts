@@ -1,26 +1,31 @@
-import { useCallback, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { useConnectorKitAdapter } from './connectorKitAdapter';
 import { base64ToBytes, bytesToBase64 } from './base64Bytes';
 
 export function useBrowserWalletSign() {
   const adapter = useConnectorKitAdapter();
   const [signing, setSigning] = useState(false);
+  const adapterRef = useRef(adapter);
+  useEffect(() => {
+    adapterRef.current = adapter;
+  }, [adapter]);
 
   const sign = useCallback(
     async (serializedPayloadBase64: string): Promise<string> => {
-      if (!adapter.isConnected) {
+      const current = adapterRef.current;
+      if (!current.isConnected) {
         throw new Error('No wallet account is connected');
       }
       setSigning(true);
       try {
         const payloadBytes = base64ToBytes(serializedPayloadBase64);
-        const signedBytes = await adapter.signTransactionBytes(payloadBytes);
+        const signedBytes = await current.signTransactionBytes(payloadBytes);
         return bytesToBase64(signedBytes);
       } finally {
         setSigning(false);
       }
     },
-    [adapter],
+    [],
   );
 
   return {

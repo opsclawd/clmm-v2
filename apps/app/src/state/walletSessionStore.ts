@@ -114,7 +114,9 @@ export function createWalletSessionStore() {
         },
         onRehydrateStorage: () => (_state, _error) => {
           if (typeof window !== 'undefined') {
-            store.setState({ hasHydrated: true });
+            queueMicrotask(() => {
+              store.setState({ hasHydrated: true });
+            });
           }
         },
       }

@@ -1,3 +1,4 @@
+import { useCallback, useMemo } from 'react';
 import { useConnector, useTransactionSigner } from '@solana/connector/react';
 import type { ConnectOptions, WalletConnectorId, WalletStatus } from '@solana/connector';
 
@@ -24,16 +25,8 @@ export function useConnectorKitAdapter(): ConnectorKitAdapterResult {
   const snapshot = useConnector();
   const { signer } = useTransactionSigner();
 
-  return {
-    connectors: snapshot.connectors,
-    connectWallet: snapshot.connectWallet,
-    disconnectWallet: snapshot.disconnectWallet,
-    isConnected: snapshot.isConnected,
-    isConnecting: snapshot.isConnecting,
-    account: snapshot.account,
-    walletError: snapshot.walletError,
-    walletStatus: snapshot.walletStatus,
-    signTransactionBytes: async (payload: Uint8Array): Promise<Uint8Array> => {
+  const signTransactionBytes = useCallback(
+    async (payload: Uint8Array): Promise<Uint8Array> => {
       if (!signer) {
         throw new Error('No wallet account is connected');
       }
@@ -52,5 +45,31 @@ export function useConnectorKitAdapter(): ConnectorKitAdapterResult {
       }
       throw new Error('Signer returned unsupported transaction format');
     },
-  };
+    [signer],
+  );
+
+  return useMemo(
+    () => ({
+      connectors: snapshot.connectors,
+      connectWallet: snapshot.connectWallet,
+      disconnectWallet: snapshot.disconnectWallet,
+      isConnected: snapshot.isConnected,
+      isConnecting: snapshot.isConnecting,
+      account: snapshot.account,
+      walletError: snapshot.walletError,
+      walletStatus: snapshot.walletStatus,
+      signTransactionBytes,
+    }),
+    [
+      snapshot.connectors,
+      snapshot.connectWallet,
+      snapshot.disconnectWallet,
+      snapshot.isConnected,
+      snapshot.isConnecting,
+      snapshot.account,
+      snapshot.walletError,
+      snapshot.walletStatus,
+      signTransactionBytes,
+    ],
+  );
 }

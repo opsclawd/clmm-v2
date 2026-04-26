@@ -25,6 +25,14 @@ import { enrollWalletForMonitoring } from '../src/api/wallets';
 const NO_WALLET_MESSAGE = 'No supported browser wallet detected on this device';
 const WALLET_DISCOVERY_TIMEOUT_MS = 2000;
 
+const FALLBACK_PLATFORM_CAPABILITIES: PlatformCapabilityState = {
+  nativePushAvailable: false,
+  browserNotificationAvailable: false,
+  nativeWalletAvailable: false,
+  browserWalletAvailable: false,
+  isMobileWeb: false,
+};
+
 function detectFallbackState(
   platformCapabilities: PlatformCapabilityState | null,
   connectError: Error | null,
@@ -58,7 +66,6 @@ export default function ConnectRoute() {
   const platformCapabilities = useStore(walletSessionStore, (s) => s.platformCapabilities);
   const connectionOutcome = useStore(walletSessionStore, (s) => s.connectionOutcome);
   const isConnecting = useStore(walletSessionStore, (s) => s.isConnecting);
-  const setPlatformCapabilities = useStore(walletSessionStore, (s) => s.setPlatformCapabilities);
   const beginConnection = useStore(walletSessionStore, (s) => s.beginConnection);
   const markConnected = useStore(walletSessionStore, (s) => s.markConnected);
   const markOutcome = useStore(walletSessionStore, (s) => s.markOutcome);
@@ -96,20 +103,14 @@ export default function ConnectRoute() {
     let active = true;
     void platformCapabilityAdapter
       .getCapabilities()
-      .then((caps) => { if (active) setPlatformCapabilities(caps); })
+      .then((caps) => { if (active) walletSessionStore.getState().setPlatformCapabilities(caps); })
       .catch((error) => {
         if (!active) return;
-        setPlatformCapabilities({
-          nativePushAvailable: false,
-          browserNotificationAvailable: false,
-          nativeWalletAvailable: false,
-          browserWalletAvailable: false,
-          isMobileWeb: false,
-        });
+        walletSessionStore.getState().setPlatformCapabilities(FALLBACK_PLATFORM_CAPABILITIES);
         handleConnectionError(error);
       });
     return () => { active = false; };
-  }, [setPlatformCapabilities]);
+  }, []);
 
   function handleConnectionError(error: unknown) {
     const outcome = mapWalletErrorToOutcome(error);
