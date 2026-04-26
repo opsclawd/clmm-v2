@@ -1,4 +1,4 @@
-import { useCallback, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useConnectorKitAdapter } from './connectorKitAdapter';
 import type { BrowserWalletConnectResult, BrowserWalletOption } from './browserWalletTypes';
 
@@ -25,7 +25,9 @@ export function useBrowserWalletConnect() {
   const [connecting, setConnecting] = useState(false);
   const [error, setError] = useState<Error | null>(null);
   const adapterRef = useRef(adapter);
-  adapterRef.current = adapter;
+  useEffect(() => {
+    adapterRef.current = adapter;
+  }, [adapter]);
 
   const wallets = useMemo(
     () => getSupportedWallets(adapter.connectors),

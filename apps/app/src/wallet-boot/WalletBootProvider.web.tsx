@@ -18,9 +18,11 @@ export function WalletBootProvider({ children }: { children: ReactNode }) {
     connectionKind === 'browser' && browserRestoreAddress != null;
 
   const hasSeenInflightRef = useRef(false);
-  if (walletStatus.status === 'connecting' || walletStatus.status === 'connected') {
-    hasSeenInflightRef.current = true;
-  }
+  useEffect(() => {
+    if (walletStatus.status === 'connecting' || walletStatus.status === 'connected') {
+      hasSeenInflightRef.current = true;
+    }
+  }, [walletStatus.status]);
 
   const [restoreTimedOut, setRestoreTimedOut] = useState(false);
 
