@@ -1,9 +1,15 @@
 import type { PositionDetailDto } from '@clmm/application/public';
 import { getRangeStatusBadgeProps } from '../components/RangeStatusBadgeUtils.js';
 
+export type SrLevelViewModel = {
+  kind: 'support' | 'resistance';
+  priceLabel: string;
+  note: string;
+  tone: 'safe' | 'warn' | 'breach';
+};
+
 export type SrLevelsViewModelBlock = {
-  supportsSorted: Array<{ priceLabel: string; rankLabel?: string }>;
-  resistancesSorted: Array<{ priceLabel: string; rankLabel?: string }>;
+  levels: SrLevelViewModel[];
   freshnessLabel: string;
   isStale: boolean;
 };
@@ -31,40 +37,92 @@ export type PositionDetailViewModel = {
   srLevels?: SrLevelsViewModelBlock;
 };
 
+const BOUND_EPSILON = 0.01;
+const PROXIMITY_THRESHOLD = 0.05; // 5%
+
+function isNearBound(price: number, bound: number): boolean {
+  return Math.abs(price - bound) <= BOUND_EPSILON;
+}
+
+function isWithinProximity(currentPrice: number, levelPrice: number): boolean {
+  if (levelPrice === 0) return false;
+  return Math.abs(currentPrice - levelPrice) / levelPrice <= PROXIMITY_THRESHOLD;
+}
+
+function computeLevelTone(
+  kind: 'support' | 'resistance',
+  levelPrice: number,
+  currentPrice: number,
+  lowerBound: number,
+  upperBound: number,
+): 'safe' | 'warn' | 'breach' {
+  if (kind === 'resistance') {
+    if (currentPrice > levelPrice) return 'breach';
+    if (isNearBound(levelPrice, upperBound)) return 'warn';
+    if (isWithinProximity(currentPrice, levelPrice)) return 'warn';
+    return 'safe';
+  }
+  // support
+  if (currentPrice < levelPrice) return 'breach';
+  if (isNearBound(levelPrice, lowerBound)) return 'warn';
+  if (isWithinProximity(currentPrice, levelPrice)) return 'warn';
+  return 'safe';
+}
+
+function computeLevelNote(
+  level: { price: number; rank?: string; notes?: string },
+  lowerBound: number,
+  upperBound: number,
+): string {
+  if (level.notes) return level.notes;
+  if (isNearBound(level.price, lowerBound)) return 'Range lower · your position';
+  if (isNearBound(level.price, upperBound)) return 'Range upper · your position';
+  if (level.rank) return level.rank;
+  return '';
+}
+
 function computeFreshness(capturedAtUnixMs: number, now: number): { freshnessLabel: string; isStale: boolean } {
   const ageMs = now - capturedAtUnixMs;
   if (ageMs < 3600000) {
     const minutes = Math.max(1, Math.round(ageMs / 60000));
-    return { freshnessLabel: `captured ${minutes}m ago`, isStale: false };
+    return { freshnessLabel: `AI · MCO · ${minutes}m ago`, isStale: false };
   }
   const hours = Math.round(ageMs / 3600000);
   if (ageMs < 172800000) {
-    return { freshnessLabel: `captured ${hours}h ago`, isStale: false };
+    return { freshnessLabel: `AI · MCO · ${hours}h ago`, isStale: false };
   }
-  return { freshnessLabel: `captured ${hours}h ago · stale`, isStale: true };
+  return { freshnessLabel: `AI · MCO · ${hours}h ago · stale`, isStale: true };
 }
 
 function toSrLevelsViewModelBlock(
   block: NonNullable<PositionDetailDto['srLevels']>,
+  currentPrice: number,
+  lowerBound: number,
+  upperBound: number,
   now: number,
 ): SrLevelsViewModelBlock {
   const { freshnessLabel, isStale } = computeFreshness(block.capturedAtUnixMs, now);
 
-  const supportsSorted = [...block.supports]
-    .sort((a, b) => a.price - b.price)
-    .map((s) => ({
-      priceLabel: `$${s.price.toFixed(2)}`,
-      ...(s.rank ? { rankLabel: s.rank } : {}),
-    }));
+  const supportLevels: SrLevelViewModel[] = block.supports.map((s) => ({
+    kind: 'support',
+    priceLabel: `$${s.price.toFixed(2)}`,
+    note: computeLevelNote(s, lowerBound, upperBound),
+    tone: computeLevelTone('support', s.price, currentPrice, lowerBound, upperBound),
+  }));
 
-  const resistancesSorted = [...block.resistances]
-    .sort((a, b) => a.price - b.price)
-    .map((r) => ({
-      priceLabel: `$${r.price.toFixed(2)}`,
-      ...(r.rank ? { rankLabel: r.rank } : {}),
-    }));
+  const resistanceLevels: SrLevelViewModel[] = block.resistances.map((r) => ({
+    kind: 'resistance',
+    priceLabel: `$${r.price.toFixed(2)}`,
+    note: computeLevelNote(r, lowerBound, upperBound),
+    tone: computeLevelTone('resistance', r.price, currentPrice, lowerBound, upperBound),
+  }));
 
-  return { supportsSorted, resistancesSorted, freshnessLabel, isStale };
+  // Sort all levels by price ascending
+  const levels = [...supportLevels, ...resistanceLevels].sort(
+    (a, b) => parseFloat(a.priceLabel.slice(1)) - parseFloat(b.priceLabel.slice(1)),
+  );
+
+  return { levels, freshnessLabel, isStale };
 }
 
 function formatTokenAmount(raw: string, decimals: number | null, symbol: string): string {
@@ -126,7 +184,7 @@ export function buildPositionDetailViewModel(dto: PositionDetailDto, now: number
   };
 
   const srLevelsVm = dto.srLevels
-    ? toSrLevelsViewModelBlock(dto.srLevels, now)
+    ? toSrLevelsViewModelBlock(dto.srLevels, dto.currentPrice, dto.lowerBound, dto.upperBound, now)
     : undefined;
 
   if (dto.breachDirection) {

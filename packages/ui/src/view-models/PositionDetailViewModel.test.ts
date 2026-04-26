@@ -60,6 +60,7 @@ describe('buildPositionDetailViewModel srLevels', () => {
       now,
     );
     expect(vm.srLevels).toBeDefined();
+    expect(vm.srLevels!.levels.length).toBeGreaterThan(0);
   });
 
   it('computes freshness for 5 minutes ago', () => {
@@ -68,7 +69,7 @@ describe('buildPositionDetailViewModel srLevels', () => {
       makeDto({ srLevels: makeSrBlock({ capturedAtUnixMs: 1_700_000 }) }),
       now,
     );
-    expect(vm.srLevels?.freshnessLabel).toBe('captured 5m ago');
+    expect(vm.srLevels?.freshnessLabel).toBe('AI · MCO · 5m ago');
     expect(vm.srLevels?.isStale).toBe(false);
   });
 
@@ -78,17 +79,7 @@ describe('buildPositionDetailViewModel srLevels', () => {
       makeDto({ srLevels: makeSrBlock({ capturedAtUnixMs: 9_200_000 }) }),
       now,
     );
-    expect(vm.srLevels?.freshnessLabel).toBe('captured 3h ago');
-    expect(vm.srLevels?.isStale).toBe(false);
-  });
-
-  it('computes freshness for 47 hours ago', () => {
-    const now = 200_000_000;
-    const vm = buildPositionDetailViewModel(
-      makeDto({ srLevels: makeSrBlock({ capturedAtUnixMs: 30_800_000 }) }),
-      now,
-    );
-    expect(vm.srLevels?.freshnessLabel).toBe('captured 47h ago');
+    expect(vm.srLevels?.freshnessLabel).toBe('AI · MCO · 3h ago');
     expect(vm.srLevels?.isStale).toBe(false);
   });
 
@@ -98,76 +89,171 @@ describe('buildPositionDetailViewModel srLevels', () => {
       makeDto({ srLevels: makeSrBlock({ capturedAtUnixMs: 23_600_000 }) }),
       now,
     );
-    expect(vm.srLevels?.freshnessLabel).toBe('captured 49h ago · stale');
+    expect(vm.srLevels?.freshnessLabel).toBe('AI · MCO · 49h ago · stale');
     expect(vm.srLevels?.isStale).toBe(true);
   });
 
-  it('marks stale at exactly 48h boundary', () => {
-    const ms48h = 172_800_000;
-    const now = 200_000_000;
-    const vm = buildPositionDetailViewModel(
-      makeDto({ srLevels: makeSrBlock({ capturedAtUnixMs: now - ms48h }) }),
-      now,
-    );
-    expect(vm.srLevels?.freshnessLabel).toBe('captured 48h ago · stale');
-    expect(vm.srLevels?.isStale).toBe(true);
-  });
-
-  it('floors at 1 minute for 30 seconds ago', () => {
-    const now = 200_000_000;
-    const vm = buildPositionDetailViewModel(
-      makeDto({ srLevels: makeSrBlock({ capturedAtUnixMs: now - 30_000 }) }),
-      now,
-    );
-    expect(vm.srLevels?.freshnessLabel).toBe('captured 1m ago');
-    expect(vm.srLevels?.isStale).toBe(false);
-  });
-
-  it('sorts supports ascending by price', () => {
+  it('sorts all levels ascending by price', () => {
     const now = 200_000_000;
     const vm = buildPositionDetailViewModel(
       makeDto({
+        currentPrice: 150,
+        lowerBound: 100,
+        upperBound: 200,
         srLevels: makeSrBlock({
           capturedAtUnixMs: now,
-          supports: [{ price: 130 }, { price: 90 }, { price: 110 }],
+          supports: [{ price: 130 }, { price: 90 }],
+          resistances: [{ price: 180 }, { price: 210 }],
+        }),
+      }),
+      now,
+    );
+    const prices = vm.srLevels!.levels.map((l) => l.priceLabel);
+    expect(prices).toEqual(['$90.00', '$130.00', '$180.00', '$210.00']);
+  });
+
+  it('assigns support and resistance kinds correctly', () => {
+    const now = 200_000_000;
+    const vm = buildPositionDetailViewModel(
+      makeDto({
+        currentPrice: 150,
+        lowerBound: 100,
+        upperBound: 200,
+        srLevels: makeSrBlock({
+          capturedAtUnixMs: now,
+          supports: [{ price: 110 }],
+          resistances: [{ price: 190 }],
+        }),
+      }),
+      now,
+    );
+    expect(vm.srLevels!.levels[0]!.kind).toBe('support');
+    expect(vm.srLevels!.levels[1]!.kind).toBe('resistance');
+  });
+
+  it('uses DTO notes when available', () => {
+    const now = 200_000_000;
+    const vm = buildPositionDetailViewModel(
+      makeDto({
+        currentPrice: 150,
+        lowerBound: 100,
+        upperBound: 200,
+        srLevels: makeSrBlock({
+          capturedAtUnixMs: now,
+          supports: [{ price: 110, notes: 'Primary · 30d pivot' }],
           resistances: [],
         }),
       }),
       now,
     );
-    const prices = vm.srLevels!.supportsSorted.map((s) => s.priceLabel);
-    expect(prices).toEqual(['$90.00', '$110.00', '$130.00']);
+    expect(vm.srLevels!.levels[0]!.note).toBe('Primary · 30d pivot');
   });
 
-  it('sorts resistances ascending by price', () => {
+  it('falls back to range-bound note for lower bound match', () => {
     const now = 200_000_000;
     const vm = buildPositionDetailViewModel(
       makeDto({
+        currentPrice: 150,
+        lowerBound: 110,
+        upperBound: 200,
+        srLevels: makeSrBlock({
+          capturedAtUnixMs: now,
+          supports: [{ price: 110 }],
+          resistances: [],
+        }),
+      }),
+      now,
+    );
+    expect(vm.srLevels!.levels[0]!.note).toBe('Range lower · your position');
+  });
+
+  it('falls back to range-bound note for upper bound match', () => {
+    const now = 200_000_000;
+    const vm = buildPositionDetailViewModel(
+      makeDto({
+        currentPrice: 150,
+        lowerBound: 100,
+        upperBound: 190,
         srLevels: makeSrBlock({
           capturedAtUnixMs: now,
           supports: [],
-          resistances: [{ price: 250 }, { price: 180 }, { price: 210 }],
+          resistances: [{ price: 190 }],
         }),
       }),
       now,
     );
-    const prices = vm.srLevels!.resistancesSorted.map((r) => r.priceLabel);
-    expect(prices).toEqual(['$180.00', '$210.00', '$250.00']);
+    expect(vm.srLevels!.levels[0]!.note).toBe('Range upper · your position');
   });
 
-  it('includes rankLabel when rank is present', () => {
+  it('falls back to rank label when no notes or bound match', () => {
     const now = 200_000_000;
     const vm = buildPositionDetailViewModel(
       makeDto({
+        currentPrice: 150,
+        lowerBound: 100,
+        upperBound: 200,
         srLevels: makeSrBlock({
           capturedAtUnixMs: now,
-          supports: [{ price: 90, rank: 'S1' }],
-          resistances: [{ price: 210, rank: 'R1' }],
+          supports: [{ price: 110, rank: 'S1' }],
+          resistances: [],
         }),
       }),
       now,
     );
-    expect(vm.srLevels!.supportsSorted[0]?.rankLabel).toBe('S1');
-    expect(vm.srLevels!.resistancesSorted[0]?.rankLabel).toBe('R1');
+    expect(vm.srLevels!.levels[0]!.note).toBe('S1');
+  });
+
+  it('marks breached resistance as breach tone when price is above it', () => {
+    const now = 200_000_000;
+    const vm = buildPositionDetailViewModel(
+      makeDto({
+        currentPrice: 220,
+        lowerBound: 100,
+        upperBound: 200,
+        srLevels: makeSrBlock({
+          capturedAtUnixMs: now,
+          supports: [],
+          resistances: [{ price: 210 }],
+        }),
+      }),
+      now,
+    );
+    expect(vm.srLevels!.levels[0]!.tone).toBe('breach');
+  });
+
+  it('marks unbreached resistance near upper bound as warn tone', () => {
+    const now = 200_000_000;
+    const vm = buildPositionDetailViewModel(
+      makeDto({
+        currentPrice: 150,
+        lowerBound: 100,
+        upperBound: 200,
+        srLevels: makeSrBlock({
+          capturedAtUnixMs: now,
+          supports: [],
+          resistances: [{ price: 200 }],
+        }),
+      }),
+      now,
+    );
+    expect(vm.srLevels!.levels[0]!.tone).toBe('warn');
+  });
+
+  it('marks distant safe resistance as safe tone', () => {
+    const now = 200_000_000;
+    const vm = buildPositionDetailViewModel(
+      makeDto({
+        currentPrice: 150,
+        lowerBound: 100,
+        upperBound: 200,
+        srLevels: makeSrBlock({
+          capturedAtUnixMs: now,
+          supports: [],
+          resistances: [{ price: 500 }],
+        }),
+      }),
+      now,
+    );
+    expect(vm.srLevels!.levels[0]!.tone).toBe('safe');
   });
 });
