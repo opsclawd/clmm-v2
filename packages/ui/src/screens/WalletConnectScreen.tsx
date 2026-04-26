@@ -121,6 +121,10 @@ function renderSocialWebview(vm: WalletConnectViewModel, actions: WalletConnectA
   return (
     <View style={styles.container}>
       <View style={styles.contentContainer}>
+        <TouchableOpacity onPress={actions.onGoBack} style={styles.backButton} accessibilityLabel="Back">
+          <Icon name="chevronLeft" size={20} color={colors.textBody} />
+        </TouchableOpacity>
+
         {vm.outcomeDisplay ? (
           <View
             style={[
@@ -181,6 +185,10 @@ function renderSocialWebview(vm: WalletConnectViewModel, actions: WalletConnectA
           <Text style={{ color: '#fc8748', fontSize: 14, fontWeight: '600' }}>
             Open in Solflare
           </Text>
+        </TouchableOpacity>
+
+        <TouchableOpacity onPress={actions.onGoBack} style={{ marginTop: 16, padding: 12 }}>
+          <Text style={styles.goBackText}>Go Back</Text>
         </TouchableOpacity>
       </View>
     </View>

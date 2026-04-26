@@ -220,6 +220,7 @@ describe('WalletConnectScreen', () => {
     expect(screen.getByText('Open in Browser')).toBeTruthy();
     expect(screen.getByText('Open in Phantom')).toBeTruthy();
     expect(screen.getByText('Open in Solflare')).toBeTruthy();
+    expect(screen.getByText('Go Back')).toBeTruthy();
   });
 
   it('shows outcome banner in social-webview state', () => {
@@ -234,6 +235,19 @@ describe('WalletConnectScreen', () => {
     );
     expect(screen.getByText('Connection Failed')).toBeTruthy();
     expect(screen.getByText('Social app browsers block wallet extensions.')).toBeTruthy();
+  });
+
+  it('calls onGoBack from social-webview state', () => {
+    const onGoBack = vi.fn();
+    render(
+      <WalletConnectScreen
+        vm={makeVm({ screenState: 'social-webview' })}
+        actions={makeActions({ onGoBack })}
+      />,
+    );
+    const goBackButtons = screen.getAllByText('Go Back');
+    fireEvent.click(goBackButtons[0]!);
+    expect(onGoBack).toHaveBeenCalled();
   });
 
   it('renders wallet fallback with deep links', () => {
