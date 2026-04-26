@@ -256,4 +256,98 @@ describe('buildPositionDetailViewModel srLevels', () => {
     );
     expect(vm.srLevels!.levels[0]!.tone).toBe('safe');
   });
+
+  it('marks breached support as breach tone when price is below it', () => {
+    const now = 200_000_000;
+    const vm = buildPositionDetailViewModel(
+      makeDto({
+        currentPrice: 80,
+        lowerBound: 100,
+        upperBound: 200,
+        srLevels: makeSrBlock({
+          capturedAtUnixMs: now,
+          supports: [{ price: 90 }],
+          resistances: [],
+        }),
+      }),
+      now,
+    );
+    expect(vm.srLevels!.levels[0]!.tone).toBe('breach');
+  });
+
+  it('marks unbreached support near lower bound as warn tone', () => {
+    const now = 200_000_000;
+    const vm = buildPositionDetailViewModel(
+      makeDto({
+        currentPrice: 150,
+        lowerBound: 100,
+        upperBound: 200,
+        srLevels: makeSrBlock({
+          capturedAtUnixMs: now,
+          supports: [{ price: 100 }],
+          resistances: [],
+        }),
+      }),
+      now,
+    );
+    expect(vm.srLevels!.levels[0]!.tone).toBe('warn');
+  });
+
+  it('marks distant safe support as safe tone', () => {
+    const now = 200_000_000;
+    const vm = buildPositionDetailViewModel(
+      makeDto({
+        currentPrice: 150,
+        lowerBound: 100,
+        upperBound: 200,
+        srLevels: makeSrBlock({
+          capturedAtUnixMs: now,
+          supports: [{ price: 10 }],
+          resistances: [],
+        }),
+      }),
+      now,
+    );
+    expect(vm.srLevels!.levels[0]!.tone).toBe('safe');
+  });
+
+  it('marks level as warn when within 5% proximity of current price', () => {
+    const now = 200_000_000;
+    // currentPrice 150, resistance at 155 = 3.3% above -> warn
+    const vm = buildPositionDetailViewModel(
+      makeDto({
+        currentPrice: 150,
+        lowerBound: 100,
+        upperBound: 200,
+        srLevels: makeSrBlock({
+          capturedAtUnixMs: now,
+          supports: [],
+          resistances: [{ price: 155 }],
+        }),
+      }),
+      now,
+    );
+    expect(vm.srLevels!.levels[0]!.tone).toBe('warn');
+  });
+
+  it('floors freshness at 1 minute for sub-minute age', () => {
+    const now = 200_000_000;
+    const vm = buildPositionDetailViewModel(
+      makeDto({ srLevels: makeSrBlock({ capturedAtUnixMs: now - 30_000 }) }),
+      now,
+    );
+    expect(vm.srLevels?.freshnessLabel).toBe('AI · MCO · 1m ago');
+    expect(vm.srLevels?.isStale).toBe(false);
+  });
+
+  it('marks stale at exactly 48h boundary', () => {
+    const ms48h = 172_800_000;
+    const now = 200_000_000;
+    const vm = buildPositionDetailViewModel(
+      makeDto({ srLevels: makeSrBlock({ capturedAtUnixMs: now - ms48h }) }),
+      now,
+    );
+    expect(vm.srLevels?.freshnessLabel).toBe('AI · MCO · 48h ago · stale');
+    expect(vm.srLevels?.isStale).toBe(true);
+  });
 });

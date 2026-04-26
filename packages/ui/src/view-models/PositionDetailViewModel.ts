@@ -3,6 +3,7 @@ import { getRangeStatusBadgeProps } from '../components/RangeStatusBadgeUtils.js
 
 export type SrLevelViewModel = {
   kind: 'support' | 'resistance';
+  rawPrice: number; // for sorting
   priceLabel: string;
   note: string;
   tone: 'safe' | 'warn' | 'breach';
@@ -37,6 +38,11 @@ export type PositionDetailViewModel = {
   srLevels?: SrLevelsViewModelBlock;
 };
 
+const MS_PER_MINUTE = 60_000;
+const MS_PER_HOUR = 3_600_000;
+const STALE_THRESHOLD_MS = 48 * MS_PER_HOUR; // 48 hours
+
+// Consider a level "near" a bound if within 1 cent — prevents floating-point mismatch
 const BOUND_EPSILON = 0.01;
 const PROXIMITY_THRESHOLD = 0.05; // 5%
 
@@ -49,6 +55,12 @@ function isWithinProximity(currentPrice: number, levelPrice: number): boolean {
   return Math.abs(currentPrice - levelPrice) / levelPrice <= PROXIMITY_THRESHOLD;
 }
 
+/**
+ * Compute the semantic tone for an S/R level.
+ * - `breach`: Price has crossed the level (above resistance / below support)
+ * - `warn`: Level is near the position's bound OR within 5% of current price
+ * - `safe`: Everything else
+ */
 function computeLevelTone(
   kind: 'support' | 'resistance',
   levelPrice: number,
@@ -83,12 +95,12 @@ function computeLevelNote(
 
 function computeFreshness(capturedAtUnixMs: number, now: number): { freshnessLabel: string; isStale: boolean } {
   const ageMs = now - capturedAtUnixMs;
-  if (ageMs < 3600000) {
-    const minutes = Math.max(1, Math.round(ageMs / 60000));
+  if (ageMs < MS_PER_HOUR) {
+    const minutes = Math.max(1, Math.round(ageMs / MS_PER_MINUTE));
     return { freshnessLabel: `AI · MCO · ${minutes}m ago`, isStale: false };
   }
-  const hours = Math.round(ageMs / 3600000);
-  if (ageMs < 172800000) {
+  const hours = Math.round(ageMs / MS_PER_HOUR);
+  if (ageMs < STALE_THRESHOLD_MS) {
     return { freshnessLabel: `AI · MCO · ${hours}h ago`, isStale: false };
   }
   return { freshnessLabel: `AI · MCO · ${hours}h ago · stale`, isStale: true };
@@ -105,6 +117,7 @@ function toSrLevelsViewModelBlock(
 
   const supportLevels: SrLevelViewModel[] = block.supports.map((s) => ({
     kind: 'support',
+    rawPrice: s.price,
     priceLabel: `$${s.price.toFixed(2)}`,
     note: computeLevelNote(s, lowerBound, upperBound),
     tone: computeLevelTone('support', s.price, currentPrice, lowerBound, upperBound),
@@ -112,6 +125,7 @@ function toSrLevelsViewModelBlock(
 
   const resistanceLevels: SrLevelViewModel[] = block.resistances.map((r) => ({
     kind: 'resistance',
+    rawPrice: r.price,
     priceLabel: `$${r.price.toFixed(2)}`,
     note: computeLevelNote(r, lowerBound, upperBound),
     tone: computeLevelTone('resistance', r.price, currentPrice, lowerBound, upperBound),
@@ -119,7 +133,7 @@ function toSrLevelsViewModelBlock(
 
   // Sort all levels by price ascending
   const levels = [...supportLevels, ...resistanceLevels].sort(
-    (a, b) => parseFloat(a.priceLabel.slice(1)) - parseFloat(b.priceLabel.slice(1)),
+    (a, b) => a.rawPrice - b.rawPrice,
   );
 
   return { levels, freshnessLabel, isStale };
