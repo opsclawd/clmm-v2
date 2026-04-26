@@ -66,7 +66,7 @@ export function tokenAmountToUsd(
   const resultWhole = product / divisor;
   const resultRem = product % divisor;
 
-  const remStr = resultRem.toString().padStart(8, '0');
+  const remStr = resultRem.toString().padStart(decimals + 8, '0');
 
   // Never convert a BigInt to Number — build a string and parseFloat only
   // at the final boundary. parseFloat may round for >15-digit integers,
