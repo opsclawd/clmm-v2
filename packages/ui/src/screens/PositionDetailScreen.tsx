@@ -7,47 +7,16 @@ import { presentPositionDetail } from '../presenters/PositionDetailPresenter.js'
 import { RangeStatusBadge } from '../components/RangeStatusBadge.js';
 import { DirectionalPolicyCard } from '../components/DirectionalPolicyCard.js';
 
+const toneColors = {
+  safe: { text: colors.safe, border: 'rgba(158,236,209,0.30)' },
+  warn: { text: colors.warn, border: 'rgba(244,201,122,0.30)' },
+  breach: { text: colors.breachAccent, border: 'rgba(245,148,132,0.30)' },
+} as const;
+
 type Props = {
   position?: PositionDetailDto;
   onViewPreview?: (triggerId: string) => void;
   now?: number;
-};
-
-const srStyles = {
-  sectionTitle: {
-    color: colors.text,
-    fontSize: typography.fontSize.base,
-    fontWeight: typography.fontWeight.semibold,
-    marginTop: 20,
-    marginBottom: 8,
-  },
-  subsectionTitle: {
-    color: colors.textSecondary,
-    fontSize: typography.fontSize.sm,
-    fontWeight: typography.fontWeight.medium,
-    marginTop: 8,
-    marginBottom: 4,
-  },
-  levelRow: {
-    color: colors.text,
-    fontSize: typography.fontSize.sm,
-    marginTop: 2,
-  },
-  freshnessLabel: {
-    color: colors.textSecondary,
-    fontSize: typography.fontSize.xs,
-    marginTop: 8,
-  },
-  staleLabel: {
-    color: '#f59e0b',
-    fontSize: typography.fontSize.xs,
-    marginTop: 8,
-  },
-  muted: {
-    color: colors.textSecondary,
-    fontSize: typography.fontSize.sm,
-    marginTop: 16,
-  },
 };
 
 export function PositionDetailScreen({ position, onViewPreview, now: nowProp }: Props): JSX.Element {
@@ -295,28 +264,99 @@ export function PositionDetailScreen({ position, onViewPreview, now: nowProp }: 
         </View>
 
         {vm.srLevels ? (
-          <View style={{ marginTop: 4 }}>
-            <Text style={srStyles.sectionTitle}>
-              Support & Resistance (MCO)
-            </Text>
-            <Text style={srStyles.subsectionTitle}>Support</Text>
-            {vm.srLevels.supportsSorted.map((s, i) => (
-              <Text key={`s-${i}`} testID={`sr-support-${i}`} style={srStyles.levelRow}>
-                {s.priceLabel}{s.rankLabel ? ` (${s.rankLabel})` : ''}
+          <View style={{
+            marginTop: 14,
+            padding: 16,
+            backgroundColor: colors.surface,
+            borderRadius: 8,
+            borderWidth: 1,
+            borderColor: colors.border,
+          }}>
+            <View style={{
+              flexDirection: 'row',
+              justifyContent: 'space-between',
+              alignItems: 'center',
+              marginBottom: 10,
+            }}>
+              <Text style={{
+                color: colors.textSecondary,
+                fontSize: typography.fontSize.sm,
+                fontWeight: typography.fontWeight.medium,
+              }}>
+                Support & Resistance
               </Text>
-            ))}
-            <Text style={srStyles.subsectionTitle}>Resistance</Text>
-            {vm.srLevels.resistancesSorted.map((r, i) => (
-              <Text key={`r-${i}`} testID={`sr-resistance-${i}`} style={srStyles.levelRow}>
-                {r.priceLabel}{r.rankLabel ? ` (${r.rankLabel})` : ''}
+              <Text style={{
+                fontSize: typography.fontSize.micro,
+                color: colors.textMuted,
+              }}>
+                {vm.srLevels.freshnessLabel}
               </Text>
-            ))}
-            <Text testID="sr-freshness" style={vm.srLevels.isStale ? srStyles.staleLabel : srStyles.freshnessLabel}>
-              {vm.srLevels.freshnessLabel}
-            </Text>
+            </View>
+
+            {vm.srLevels.levels.map((level, i) => {
+              const tone = toneColors[level.tone];
+              return (
+                <View
+                  key={`sr-level-${i}`}
+                  testID={`sr-level-${i}`}
+                  style={{
+                    flexDirection: 'row',
+                    alignItems: 'center',
+                    justifyContent: 'space-between',
+                    paddingVertical: 10,
+                    borderTopWidth: i === 0 ? 0 : 1,
+                    borderTopColor: colors.border,
+                  }}
+                >
+                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
+                    <View style={{
+                      height: 22,
+                      paddingHorizontal: 8,
+                      borderRadius: 999,
+                      borderWidth: 1,
+                      borderColor: tone.border,
+                      justifyContent: 'center',
+                      alignItems: 'center',
+                    }}>
+                      <Text style={{
+                        fontSize: typography.fontSize.micro,
+                        color: tone.text,
+                        fontWeight: typography.fontWeight.semibold,
+                      }}>
+                        {level.kind === 'resistance' ? 'Resist' : 'Support'}
+                      </Text>
+                    </View>
+                    <Text style={{
+                      fontFamily: typography.fontFamily.mono,
+                      fontSize: typography.fontSize.sm,
+                      fontWeight: typography.fontWeight.semibold,
+                      color: colors.text,
+                    }}>
+                      {level.priceLabel}
+                    </Text>
+                  </View>
+                  {level.note ? (
+                    <Text style={{
+                      fontSize: typography.fontSize.micro,
+                      color: colors.textMuted,
+                      textAlign: 'right',
+                      maxWidth: 150,
+                    }}>
+                      {level.note}
+                    </Text>
+                  ) : null}
+                </View>
+              );
+            })}
           </View>
         ) : (
-          <Text style={srStyles.muted}>No current MCO levels available</Text>
+          <Text style={{
+            color: colors.textSecondary,
+            fontSize: typography.fontSize.sm,
+            marginTop: 16,
+          }}>
+            No current MCO levels available
+          </Text>
         )}
       </View>
     </ScrollView>
