@@ -4,7 +4,7 @@
  */
 import { describe, it, expect } from 'vitest';
 import type { SupportedPositionReadPort } from '@clmm/application';
-import { makeWalletId } from '@clmm/domain';
+import { makeWalletId, makePositionId, makePoolId } from '@clmm/domain';
 
 export function runPositionReadPortContract(
   factory: () => SupportedPositionReadPort,
@@ -33,6 +33,18 @@ export function runPositionReadPortContract(
       for (const pos of positions) {
         expect(['in-range', 'below-range', 'above-range']).toContain(pos.rangeState.kind);
       }
+    });
+
+    it('implements getPositionDetail returning PositionDetail or null', async () => {
+      const port = factory();
+      const result = await port.getPositionDetail(makeWalletId('test-wallet'), makePositionId('test-pos'));
+      expect(result === null || (typeof result === 'object' && 'position' in result && 'poolData' in result && 'fees' in result)).toBe(true);
+    });
+
+    it('implements getPoolData returning PoolData or null', async () => {
+      const port = factory();
+      const result = await port.getPoolData(makePoolId('test-pool'));
+      expect(result === null || (typeof result === 'object' && 'tokenPair' in result && 'sqrtPrice' in result)).toBe(true);
     });
   });
 }

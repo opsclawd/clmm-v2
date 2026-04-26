@@ -1,4 +1,5 @@
 import { View, Text, ScrollView, TouchableOpacity } from 'react-native';
+import { useState, useEffect } from 'react';
 import type { PositionDetailDto } from '@clmm/application/public';
 import { colors } from '../design-system/index.js';
 import { typography } from '../design-system/index.js';
@@ -9,6 +10,7 @@ import { DirectionalPolicyCard } from '../components/DirectionalPolicyCard.js';
 type Props = {
   position?: PositionDetailDto;
   onViewPreview?: (triggerId: string) => void;
+  now?: number;
 };
 
 const srStyles = {
@@ -48,7 +50,10 @@ const srStyles = {
   },
 };
 
-export function PositionDetailScreen({ position, onViewPreview }: Props): JSX.Element {
+export function PositionDetailScreen({ position, onViewPreview, now: nowProp }: Props): JSX.Element {
+  const [mountedNow, setMountedNow] = useState(0);
+  useEffect(() => { setMountedNow(Date.now()); }, []);
+  const now = nowProp ?? mountedNow;
   if (!position) {
     return (
       <View style={{ flex: 1, backgroundColor: colors.background, padding: 16 }}>
@@ -62,7 +67,7 @@ export function PositionDetailScreen({ position, onViewPreview }: Props): JSX.El
     );
   }
 
-  const presentation = presentPositionDetail({ position, now: Date.now() });
+  const presentation = presentPositionDetail({ position, now });
   const vm = presentation.position;
   const breachDirection = position.breachDirection;
   const triggerId = position.triggerId;
@@ -81,6 +86,16 @@ export function PositionDetailScreen({ position, onViewPreview }: Props): JSX.El
           </Text>
           <RangeStatusBadge rangeStateKind={position.rangeState} />
         </View>
+
+        {vm.feeRateLabel ? (
+          <Text style={{
+            color: colors.textSecondary,
+            fontSize: typography.fontSize.sm,
+            marginTop: 4,
+          }}>
+            {vm.feeRateLabel}
+          </Text>
+        ) : null}
 
         <View style={{
           marginTop: 16,
@@ -110,6 +125,13 @@ export function PositionDetailScreen({ position, onViewPreview }: Props): JSX.El
             marginTop: 8,
           }}>
             {vm.currentPriceLabel}
+          </Text>
+          <Text style={{
+            color: colors.textSecondary,
+            fontSize: typography.fontSize.sm,
+            marginTop: 4,
+          }}>
+            {vm.rangeDistanceLabel}
           </Text>
         </View>
 
@@ -154,6 +176,109 @@ export function PositionDetailScreen({ position, onViewPreview }: Props): JSX.El
             </TouchableOpacity>
           </View>
         ) : null}
+
+        <View style={{
+          marginTop: 16,
+          padding: 16,
+          backgroundColor: colors.surface,
+          borderRadius: 8,
+          borderWidth: 1,
+          borderColor: colors.border,
+        }}>
+          <Text style={{
+            color: colors.textSecondary,
+            fontSize: typography.fontSize.sm,
+          }}>
+            Unclaimed Fees
+          </Text>
+          <Text style={{
+            color: colors.text,
+            fontSize: typography.fontSize.base,
+            fontWeight: typography.fontWeight.semibold,
+            marginTop: 4,
+          }}>
+            {vm.unclaimedFeesLabel}
+          </Text>
+          <Text style={{
+            color: colors.textSecondary,
+            fontSize: typography.fontSize.sm,
+            marginTop: 2,
+          }}>
+            {vm.unclaimedFeesBreakdown.feeA} + {vm.unclaimedFeesBreakdown.feeB}
+          </Text>
+        </View>
+
+        <View style={{
+          marginTop: 8,
+          padding: 16,
+          backgroundColor: colors.surface,
+          borderRadius: 8,
+          borderWidth: 1,
+          borderColor: colors.border,
+        }}>
+          <Text style={{
+            color: colors.textSecondary,
+            fontSize: typography.fontSize.sm,
+          }}>
+            Rewards
+          </Text>
+          <Text style={{
+            color: colors.text,
+            fontSize: typography.fontSize.base,
+            fontWeight: typography.fontWeight.semibold,
+            marginTop: 4,
+          }}>
+            {vm.unclaimedRewardsLabel}
+          </Text>
+        </View>
+
+        <View style={{
+          marginTop: 8,
+          padding: 16,
+          backgroundColor: colors.surface,
+          borderRadius: 8,
+          borderWidth: 1,
+          borderColor: colors.border,
+        }}>
+          <Text style={{
+            color: colors.textSecondary,
+            fontSize: typography.fontSize.sm,
+          }}>
+            Position Size
+          </Text>
+          <Text style={{
+            color: colors.text,
+            fontSize: typography.fontSize.base,
+            fontWeight: typography.fontWeight.semibold,
+            marginTop: 4,
+          }}>
+            {vm.positionSizeLabel}
+          </Text>
+        </View>
+
+        <View style={{
+          marginTop: 8,
+          padding: 16,
+          backgroundColor: colors.surface,
+          borderRadius: 8,
+          borderWidth: 1,
+          borderColor: colors.border,
+        }}>
+          <Text style={{
+            color: colors.textSecondary,
+            fontSize: typography.fontSize.sm,
+          }}>
+            Pool Depth
+          </Text>
+          <Text style={{
+            color: colors.text,
+            fontSize: typography.fontSize.base,
+            fontWeight: typography.fontWeight.semibold,
+            marginTop: 4,
+          }}>
+            {vm.poolDepthLabel}
+          </Text>
+        </View>
 
         <View style={{
           marginTop: 16,

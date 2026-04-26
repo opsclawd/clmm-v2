@@ -6,12 +6,31 @@ function makeDto(overrides: Partial<PositionDetailDto> = {}): PositionDetailDto 
   return {
     positionId: 'pos-1' as PositionDetailDto['positionId'],
     poolId: 'pool-1' as PositionDetailDto['poolId'],
+    tokenPairLabel: 'SOL / USDC',
+    currentPrice: 142.35,
+    currentPriceLabel: 'USDC 142.35',
+    feeRateLabel: '10 bps',
     rangeState: 'in-range',
+    rangeDistance: { belowLowerPercent: 0, aboveUpperPercent: 0 },
     hasActionableTrigger: false,
     monitoringStatus: 'active',
     lowerBound: 100,
     upperBound: 200,
-    currentPrice: 150,
+    lowerBoundLabel: 'USDC 1.01',
+    upperBoundLabel: 'USDC 1.22',
+    sqrtPrice: '184467440737095516',
+    unclaimedFees: {
+      feeOwedA: { raw: '120000000', decimals: 9, symbol: 'SOL', usdValue: 18 },
+      feeOwedB: { raw: '47230000', decimals: 6, symbol: 'USDC', usdValue: 47.23 },
+      totalUsd: 65.23,
+    },
+    unclaimedRewards: {
+      rewards: [],
+      totalUsd: 0,
+    },
+    positionLiquidity: '5000000000',
+    poolLiquidity: '2400000000',
+    poolDepthLabel: 'depth unavailable',
     ...overrides,
   };
 }

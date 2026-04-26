@@ -10,8 +10,19 @@
 import { createSolanaRpc, address } from '@solana/kit';
 import { getPositionAddress, fetchPosition, fetchWhirlpool } from '@orca-so/whirlpools-client';
 
-import type { LiquidityPosition, WalletId, PositionId } from '@clmm/domain';
+import type { LiquidityPosition, WalletId, PositionId, PoolData, PositionFees, PositionRewardInfo } from '@clmm/domain';
 import { makePoolId, makeClockTimestamp, evaluateRangeState } from '@clmm/domain';
+import { KNOWN_TOKENS } from '../price/known-tokens.js';
+
+export type WhirlpoolData = {
+  tickCurrentIndex: number;
+  sqrtPrice: bigint;
+  tokenMintA: string;
+  tokenMintB: string;
+  feeRate: number;
+  tickSpacing: number;
+  liquidity: bigint;
+};
 
 export class SolanaPositionSnapshotReader {
   constructor(private readonly rpcUrl: string) {}
@@ -90,9 +101,9 @@ export class SolanaPositionSnapshotReader {
   async fetchWhirlpoolsBatched(
     rpc: ReturnType<typeof createSolanaRpc>,
     whirlpoolAddresses: string[],
-  ): Promise<Map<string, { tickCurrentIndex: number }>> {
+  ): Promise<Map<string, WhirlpoolData>> {
     const uniqueAddresses = [...new Set(whirlpoolAddresses)];
-    const results = new Map<string, { tickCurrentIndex: number }>();
+    const results = new Map<string, WhirlpoolData>();
 
     if (uniqueAddresses.length === 0) {
       return results;
@@ -106,7 +117,16 @@ export class SolanaPositionSnapshotReader {
       await Promise.all(batch.map(async (addr) => {
         try {
           const whirlpoolAccount = await fetchWhirlpool(rpc, address(addr));
-          results.set(addr, { tickCurrentIndex: whirlpoolAccount.data.tickCurrentIndex });
+          const w = whirlpoolAccount.data;
+          results.set(addr, {
+            tickCurrentIndex: w.tickCurrentIndex,
+            sqrtPrice: w.sqrtPrice,
+            tokenMintA: w.tokenMintA.toString(),
+            tokenMintB: w.tokenMintB.toString(),
+            feeRate: w.feeRate,
+            tickSpacing: w.tickSpacing,
+            liquidity: w.liquidity,
+          });
         } catch {
           // Skip failed fetches — positions referencing this pool will be excluded.
         }
@@ -114,5 +134,98 @@ export class SolanaPositionSnapshotReader {
     }
 
     return results;
+  }
+
+  async fetchPositionDetail(
+    rpc: ReturnType<typeof createSolanaRpc>,
+    positionId: PositionId,
+    walletId: WalletId,
+  ): Promise<{
+    position: LiquidityPosition;
+    poolData: PoolData;
+    fees: PositionFees;
+    positionLiquidity: bigint;
+  } | null> {
+    try {
+      const positionMint = address(positionId);
+      const [positionAddress] = await getPositionAddress(positionMint);
+      const positionAccount = await fetchPosition(rpc, positionAddress);
+      const pos = positionAccount.data;
+
+      const isOwner = await this.verifyOwnership(rpc, walletId, positionId);
+      if (!isOwner) {
+        return null;
+      }
+
+      const whirlpoolAddress = pos.whirlpool;
+      const whirlpoolAccount = await fetchWhirlpool(rpc, whirlpoolAddress);
+      const w = whirlpoolAccount.data;
+
+      const poolIdStr = whirlpoolAddress.toString();
+      const mintA = w.tokenMintA.toString();
+      const mintB = w.tokenMintB.toString();
+      const knownA = KNOWN_TOKENS[mintA];
+      const knownB = KNOWN_TOKENS[mintB];
+
+      const poolData: PoolData = {
+        poolId: makePoolId(poolIdStr),
+        tokenPair: {
+          mintA,
+          mintB,
+          symbolA: knownA?.symbol ?? mintA,
+          symbolB: knownB?.symbol ?? mintB,
+          decimalsA: knownA?.decimals ?? null,
+          decimalsB: knownB?.decimals ?? null,
+        },
+        sqrtPrice: w.sqrtPrice,
+        feeRate: w.feeRate,
+        tickSpacing: w.tickSpacing,
+        liquidity: w.liquidity,
+        tickCurrentIndex: w.tickCurrentIndex,
+      };
+
+      const rewardInfos: PositionRewardInfo[] = pos.rewardInfos.map((ri, idx) => {
+        const poolReward = w.rewardInfos[idx];
+        const rewardMint = poolReward?.mint?.toString() ?? '';
+        const known = KNOWN_TOKENS[rewardMint];
+        return {
+          mint: rewardMint,
+          amountOwed: ri.amountOwed,
+          decimals: known?.decimals ?? null,
+        };
+      });
+
+      const fees: PositionFees = {
+        feeOwedA: pos.feeOwedA,
+        feeOwedB: pos.feeOwedB,
+        rewardInfos,
+      };
+
+      const bounds = {
+        lowerBound: pos.tickLowerIndex,
+        upperBound: pos.tickUpperIndex,
+      };
+
+      const rangeState = evaluateRangeState(bounds, w.tickCurrentIndex);
+
+      const position: LiquidityPosition = {
+        positionId,
+        walletId,
+        poolId: makePoolId(poolIdStr),
+        bounds,
+        lastObservedAt: makeClockTimestamp(Date.now()),
+        rangeState,
+        monitoringReadiness: { kind: 'active' },
+      };
+
+      return {
+        position,
+        poolData,
+        fees,
+        positionLiquidity: pos.liquidity,
+      };
+    } catch {
+      return null;
+    }
   }
 }

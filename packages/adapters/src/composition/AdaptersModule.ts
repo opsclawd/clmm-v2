@@ -13,6 +13,7 @@ import { DurableNotificationEventAdapter } from '../outbound/notifications/Durab
 import { TelemetryAdapter } from '../outbound/observability/TelemetryAdapter.js';
 import { RegimeEngineExecutionEventAdapter } from '../outbound/regime-engine/RegimeEngineExecutionEventAdapter.js';
 import { CurrentSrLevelsAdapter } from '../outbound/regime-engine/CurrentSrLevelsAdapter.js';
+import { JupiterPriceAdapter } from '../outbound/price/JupiterPriceAdapter.js';
 import type { RegimeEngineEventPort } from '../outbound/regime-engine/types.js';
 import { createDb } from '../outbound/storage/db.js';
 import type { ClockPort, IdGeneratorPort } from '@clmm/application';
@@ -35,6 +36,7 @@ import {
   ID_GENERATOR_PORT,
   REGIME_ENGINE_EVENT_PORT,
   CURRENT_SR_LEVELS_PORT,
+  PRICE_PORT,
 } from '../inbound/jobs/tokens.js';
 
 // boundary: process.env values are untyped at runtime; validated via env schema at deploy
@@ -71,6 +73,7 @@ const regimeEngineEventAdapter: RegimeEngineEventPort = new RegimeEngineExecutio
   telemetry,
 );
 const currentSrLevelsAdapter = new CurrentSrLevelsAdapter(regimeEngineBaseUrl, telemetry);
+const jupiterPrice = new JupiterPriceAdapter();
 
 const sharedProviders = [
   { provide: MONITORED_WALLET_REPOSITORY, useValue: monitoredWalletStorage },
@@ -89,6 +92,7 @@ const sharedProviders = [
   { provide: ID_GENERATOR_PORT, useValue: systemIds },
   { provide: REGIME_ENGINE_EVENT_PORT, useValue: regimeEngineEventAdapter },
   { provide: CURRENT_SR_LEVELS_PORT, useValue: currentSrLevelsAdapter },
+  { provide: PRICE_PORT, useValue: jupiterPrice },
 ];
 
 @Module({
