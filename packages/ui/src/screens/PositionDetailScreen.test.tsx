@@ -115,6 +115,21 @@ describe('PositionDetailScreen', () => {
     vi.restoreAllMocks();
   });
 
+  it('renders enriched position detail fields', () => {
+    render(
+      <PositionDetailScreen
+        position={makePosition()}
+      />,
+    );
+
+    expect(screen.getByText('10 bps')).toBeTruthy();
+    expect(screen.getByText('$45.00 in unclaimed fees')).toBeTruthy();
+    expect(screen.getByText('No rewards')).toBeTruthy();
+    expect(screen.getByText('5000000000 liquidity units')).toBeTruthy();
+    expect(screen.getByText('depth unavailable')).toBeTruthy();
+    expect(screen.getByText('20.0% below lower bound')).toBeTruthy();
+  });
+
   it('renders no MCO levels message when srLevels is absent', () => {
     render(
       <PositionDetailScreen
