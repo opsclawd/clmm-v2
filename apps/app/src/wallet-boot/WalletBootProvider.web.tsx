@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
+import { useEffect, useMemo, useState, type ReactNode } from 'react';
 import { useStore } from 'zustand';
 import { useConnector } from '@solana/connector';
 import { walletSessionStore } from '../state/walletSessionStore';
@@ -17,10 +17,12 @@ export function WalletBootProvider({ children }: { children: ReactNode }) {
   const hasBrowserRestoreCandidate =
     connectionKind === 'browser' && browserRestoreAddress != null;
 
-  const hasSeenInflightRef = useRef(false);
-  if (walletStatus.status === 'connecting' || walletStatus.status === 'connected') {
-    hasSeenInflightRef.current = true;
-  }
+  const [hasSeenInflight, setSeenInflight] = useState(false);
+  useEffect(() => {
+    if (walletStatus.status === 'connecting' || walletStatus.status === 'connected') {
+      setSeenInflight(true);
+    }
+  }, [walletStatus.status]);
 
   const [restoreTimedOut, setRestoreTimedOut] = useState(false);
 
@@ -42,10 +44,10 @@ export function WalletBootProvider({ children }: { children: ReactNode }) {
         browserRestoreAddress,
         connectorStatus: walletStatus,
         connectorAccount: account,
-        hasSeenConnectorInflight: hasSeenInflightRef.current,
+        hasSeenConnectorInflight: hasSeenInflight,
         restoreTimedOut,
       }),
-    [hasHydrated, connectionKind, walletAddress, browserRestoreAddress, walletStatus, account, restoreTimedOut],
+    [hasHydrated, connectionKind, walletAddress, browserRestoreAddress, walletStatus, account, hasSeenInflight, restoreTimedOut],
   );
 
   useEffect(() => {

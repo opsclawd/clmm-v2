@@ -29,7 +29,7 @@ export function RequireWallet({ children }: { children: ReactNode }) {
     const fullPath = buildReturnToPath(pathname, search, pathParamKeys);
     const target = `/connect?returnTo=${encodeURIComponent(fullPath)}`;
     navigateRoute({ router, path: target, method: 'push' });
-  }, [status]);
+  }, [status, pathname, search, pathParamKeys, router]);
 
   if (status === 'hydrating-storage' || status === 'checking-browser-wallet') {
     return <BootScreen status={status} />;
