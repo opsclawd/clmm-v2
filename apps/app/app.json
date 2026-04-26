@@ -9,6 +9,7 @@
       "android",
       "web"
     ],
+    "newArchEnabled": false,
     "web": {
       "bundler": "metro",
       "output": "static",
