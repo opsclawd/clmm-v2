@@ -6,6 +6,7 @@ import {
   ActivityIndicator,
   ScrollView,
   Animated,
+  Image,
   StyleSheet,
 } from 'react-native';
 import { colors, typography } from '../design-system/index.js';
@@ -272,7 +273,11 @@ function renderStandard(vm: WalletConnectViewModel, actions: WalletConnectAction
                 onPress={() => actions.onSelectDiscoveredWallet(wallet.id)}
                 style={styles.discoveredWalletButton}
               >
-                <Icon name="wallet" size={20} color={colors.textPrimary} />
+                {wallet.icon ? (
+                  <Image source={{ uri: wallet.icon }} style={styles.walletIcon} />
+                ) : (
+                  <Icon name="wallet" size={20} color={colors.textPrimary} />
+                )}
                 <Text style={styles.walletOptionLabel}>{wallet.name}</Text>
               </TouchableOpacity>
             ))
@@ -593,6 +598,10 @@ const styles = StyleSheet.create({
     marginBottom: 12,
     borderWidth: 1,
     borderColor: colors.border,
+  },
+  walletIcon: {
+    width: 24,
+    height: 24,
   },
   fallbackContainer: {
     width: '100%',
