@@ -44,6 +44,10 @@ export type {
   ConnectionOutcomeDisplay,
   PlatformNotice,
   ConnectedWalletSummary,
+  FallbackState,
+  WalletDiscoveryState,
+  DiscoveredWallet,
+  WalletConnectActions,
 } from './components/WalletConnectionUtils.js';
 
 // View models — for testing and screen composition
