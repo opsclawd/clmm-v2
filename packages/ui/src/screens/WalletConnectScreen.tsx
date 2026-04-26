@@ -10,7 +10,7 @@ import {
 } from 'react-native';
 import { colors, typography } from '../design-system/index.js';
 import type { WalletConnectViewModel } from '../view-models/WalletConnectionViewModel.js';
-import type { WalletConnectActions, DiscoveredWallet } from '../components/WalletConnectionUtils.js';
+import type { WalletConnectActions } from '../components/WalletConnectionUtils.js';
 import { Icon } from '../components/Icon.js';
 
 type Props = {

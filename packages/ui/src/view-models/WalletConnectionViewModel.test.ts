@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import { buildWalletConnectViewModel, buildWalletSettingsViewModel } from './WalletConnectionViewModel.js';
 import type { PlatformCapabilities } from '../components/DegradedCapabilityBannerUtils.js';
-import type { ConnectionOutcome, DiscoveredWallet } from '../components/WalletConnectionUtils.js';
+import type { DiscoveredWallet } from '../components/WalletConnectionUtils.js';
 
 function makeCaps(overrides: Partial<PlatformCapabilities> = {}): PlatformCapabilities {
   return {
