@@ -320,7 +320,7 @@ describe('navigateRoute strategy dispatch', () => {
     navigateRoute({ router, path: '/positions', method: 'replace' });
 
     expect(warnSpy).toHaveBeenCalled();
-    expect(warnSpy.mock.calls[0][0]).toContain("'capability-driven'");
+    expect(warnSpy.mock.calls?.[0]?.[0]).toContain("'capability-driven'");
     expect(replaceFn).toHaveBeenCalledWith('https://app.example.com/positions');
     expect(router.replace).not.toHaveBeenCalled();
 
