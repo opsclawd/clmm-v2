@@ -19,3 +19,4 @@ export { DurableNotificationEventAdapter } from './outbound/notifications/Durabl
 export { OperationalStorageAdapter } from './outbound/storage/OperationalStorageAdapter';
 export { OffChainHistoryStorageAdapter } from './outbound/storage/OffChainHistoryStorageAdapter';
 export { TelemetryAdapter } from './outbound/observability/TelemetryAdapter';
+export { JupiterPriceAdapter } from './outbound/price/JupiterPriceAdapter';

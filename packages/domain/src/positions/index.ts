@@ -37,3 +37,57 @@ export type LiquidityPosition = {
   readonly rangeState: RangeState;
   readonly monitoringReadiness: MonitoringReadiness;
 };
+
+export type TokenPair = {
+  readonly mintA: string;
+  readonly mintB: string;
+  readonly symbolA: string;
+  readonly symbolB: string;
+  readonly decimalsA: number | null;
+  readonly decimalsB: number | null;
+};
+
+export type PoolData = {
+  readonly poolId: PoolId;
+  readonly tokenPair: TokenPair;
+  readonly sqrtPrice: bigint;
+  readonly feeRate: number;
+  readonly tickSpacing: number;
+  readonly liquidity: bigint;
+  readonly tickCurrentIndex: number;
+};
+
+export type PositionFees = {
+  readonly feeOwedA: bigint;
+  readonly feeOwedB: bigint;
+  readonly rewardInfos: readonly PositionRewardInfo[];
+};
+
+export type PositionRewardInfo = {
+  readonly mint: string;
+  readonly amountOwed: bigint;
+  readonly decimals: number | null;
+};
+
+export type PositionDetail = {
+  readonly position: LiquidityPosition;
+  readonly poolData: PoolData;
+  readonly fees: PositionFees;
+  readonly positionLiquidity: bigint;
+};
+
+export type PriceQuote = {
+  readonly tokenMint: string;
+  readonly usdValue: number;
+  readonly symbol: string;
+  readonly quotedAt: ClockTimestamp;
+};
+
+export {
+  priceFromSqrtPrice,
+  tickToPrice,
+  rangeDistancePercent,
+  tokenAmountToUsd,
+  whirlpoolFeeRateToBps,
+  formatFeeRateLabel,
+} from './enrichment.js';

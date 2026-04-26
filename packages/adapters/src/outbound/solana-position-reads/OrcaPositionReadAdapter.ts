@@ -10,9 +10,10 @@
 import { createSolanaRpc, address } from '@solana/kit';
 import type { Address } from '@solana/kit';
 import { fetchPositionsForOwner } from '@orca-so/whirlpools';
+import { fetchWhirlpool } from '@orca-so/whirlpools-client';
 
 import type { SupportedPositionReadPort } from '@clmm/application';
-import type { LiquidityPosition, WalletId, PositionId } from '@clmm/domain';
+import type { LiquidityPosition, WalletId, PositionId, PoolId, PoolData, PositionDetail } from '@clmm/domain';
 import {
   makePositionId,
   makePoolId,
@@ -23,8 +24,15 @@ import {
 import { SolanaPositionSnapshotReader } from './SolanaPositionSnapshotReader.js';
 import type { Db } from '../storage/db.js';
 import { walletPositionOwnership } from '../storage/schema/index.js';
+import { KNOWN_TOKENS } from '../price/known-tokens.js';
 
 export class OrcaPositionReadAdapter implements SupportedPositionReadPort {
+  private readonly poolDataCache = new Map<
+    string,
+    { data: PoolData | null; staleAt: number }
+  >();
+  private readonly POOL_DATA_CACHE_TTL_MS = 5_000;
+
   constructor(
     private readonly rpcUrl: string,
     private readonly snapshotReader: SolanaPositionSnapshotReader,
@@ -178,6 +186,31 @@ export class OrcaPositionReadAdapter implements SupportedPositionReadPort {
         });
     }
 
+    for (const [poolIdStr, w] of whirlpoolMap) {
+      const poolId = makePoolId(poolIdStr);
+      const mintA = w.tokenMintA;
+      const mintB = w.tokenMintB;
+      const knownA = KNOWN_TOKENS[mintA];
+      const knownB = KNOWN_TOKENS[mintB];
+      const data: PoolData = {
+        poolId,
+        tokenPair: {
+          mintA,
+          mintB,
+          symbolA: knownA?.symbol ?? mintA,
+          symbolB: knownB?.symbol ?? mintB,
+          decimalsA: knownA?.decimals ?? null,
+          decimalsB: knownB?.decimals ?? null,
+        },
+        sqrtPrice: w.sqrtPrice,
+        feeRate: w.feeRate,
+        tickSpacing: w.tickSpacing,
+        liquidity: w.liquidity,
+        tickCurrentIndex: w.tickCurrentIndex,
+      };
+      this.poolDataCache.set(poolId, { data, staleAt: Date.now() + this.POOL_DATA_CACHE_TTL_MS });
+    }
+
     return liquidityPositions;
   }
 
@@ -203,5 +236,67 @@ export class OrcaPositionReadAdapter implements SupportedPositionReadPort {
       });
 
     return position;
+  }
+
+  private async fetchPoolData(poolId: PoolId): Promise<PoolData | null> {
+    const cached = this.poolDataCache.get(poolId);
+    if (cached && Date.now() < cached.staleAt) {
+      return cached.data;
+    }
+
+    const rpc = this.getRpc();
+    try {
+      const whirlpoolAccount = await fetchWhirlpool(rpc, address(poolId));
+      const w = whirlpoolAccount.data;
+      const mintA = w.tokenMintA.toString();
+      const mintB = w.tokenMintB.toString();
+      const knownA = KNOWN_TOKENS[mintA];
+      const knownB = KNOWN_TOKENS[mintB];
+      const data: PoolData = {
+        poolId,
+        tokenPair: {
+          mintA,
+          mintB,
+          symbolA: knownA?.symbol ?? mintA,
+          symbolB: knownB?.symbol ?? mintB,
+          decimalsA: knownA?.decimals ?? null,
+          decimalsB: knownB?.decimals ?? null,
+        },
+        sqrtPrice: w.sqrtPrice,
+        feeRate: w.feeRate,
+        tickSpacing: w.tickSpacing,
+        liquidity: w.liquidity,
+        tickCurrentIndex: w.tickCurrentIndex,
+      };
+      this.poolDataCache.set(poolId, { data, staleAt: Date.now() + this.POOL_DATA_CACHE_TTL_MS });
+      return data;
+    } catch {
+      this.poolDataCache.set(poolId, { data: null, staleAt: Date.now() + this.POOL_DATA_CACHE_TTL_MS });
+      return null;
+    }
+  }
+
+  async getPoolData(poolId: PoolId): Promise<PoolData | null> {
+    return this.fetchPoolData(poolId);
+  }
+
+  async getPositionDetail(walletId: WalletId, positionId: PositionId): Promise<PositionDetail | null> {
+    const rpc = this.getRpc();
+    const detail = await this.snapshotReader.fetchPositionDetail(rpc, positionId, walletId);
+    if (!detail) return null;
+    const now = Date.now();
+    await this.db
+      .insert(walletPositionOwnership)
+      .values({
+        walletId,
+        positionId,
+        firstSeenAt: now,
+        lastSeenAt: now,
+      })
+      .onConflictDoUpdate({
+        target: [walletPositionOwnership.walletId, walletPositionOwnership.positionId],
+        set: { lastSeenAt: now },
+      });
+    return detail;
   }
 }

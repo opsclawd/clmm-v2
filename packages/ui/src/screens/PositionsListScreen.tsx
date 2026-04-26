@@ -159,7 +159,10 @@ function ConnectedPositionsList({
       renderItem={({ item }) => (
         <PositionCard
           poolLabel={item.poolLabel}
+          currentPriceLabel={item.currentPriceLabel}
+          feeRateLabel={item.feeRateLabel}
           rangeStatusKind={item.rangeStatusKind}
+          rangeDistanceLabel={item.rangeDistanceLabel}
           hasAlert={item.hasAlert}
           monitoringLabel={item.monitoringLabel}
           onPress={() => onSelectPosition?.(item.positionId)}

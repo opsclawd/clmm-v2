@@ -4,7 +4,10 @@ import { Chip } from './Chip.js';
 
 type Props = {
   poolLabel: string;
+  currentPriceLabel: string;
+  feeRateLabel: string;
   rangeStatusKind: 'in-range' | 'below-range' | 'above-range';
+  rangeDistanceLabel: string;
   hasAlert: boolean;
   monitoringLabel: string;
   onPress?: () => void;
@@ -40,7 +43,10 @@ function getMonitoringText(status: string): string {
 
 export function PositionCard({
   poolLabel,
+  currentPriceLabel,
+  feeRateLabel,
   rangeStatusKind,
+  rangeDistanceLabel,
   hasAlert,
   monitoringLabel,
   onPress,
@@ -94,7 +100,7 @@ export function PositionCard({
         </View>
       </View>
 
-      {/* Row 2: pool id */}
+      {/* Row 2: pool pair label */}
       <Text
         style={{
           fontSize: typography.fontSize.body,
@@ -106,16 +112,44 @@ export function PositionCard({
         {poolLabel}
       </Text>
 
-      {/* Row 3: monitoring label */}
+      {/* Row 3: current price */}
       <Text
         style={{
-          fontSize: typography.fontSize.caption,
-          color: colors.textTertiary,
+          fontSize: typography.fontSize.body,
+          color: colors.textSecondary,
           marginTop: 4,
         }}
       >
-        {monitoringLabel}
+        {currentPriceLabel}
       </Text>
+
+      {/* Row 4: fee rate + range distance */}
+      <View
+        style={{
+          flexDirection: 'row',
+          justifyContent: 'space-between',
+          marginTop: 6,
+        }}
+      >
+        <Text
+          style={{
+            fontSize: typography.fontSize.caption,
+            color: colors.textTertiary,
+          }}
+        >
+          {feeRateLabel}
+        </Text>
+        {rangeDistanceLabel ? (
+          <Text
+            style={{
+              fontSize: typography.fontSize.caption,
+              color: rangeStatusKind === 'in-range' ? colors.textTertiary : colors.warn,
+            }}
+          >
+            {rangeDistanceLabel}
+          </Text>
+        ) : null}
+      </View>
 
       {/* Alert dot */}
       {hasAlert ? (

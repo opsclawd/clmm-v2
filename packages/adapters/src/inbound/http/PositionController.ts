@@ -1,35 +1,36 @@
 import { Controller, Get, Param, Inject, NotFoundException } from '@nestjs/common';
 import type {
   SupportedPositionReadPort,
+  PricePort,
   TriggerRepository,
   PositionSummaryDto,
   PositionDetailDto,
 } from '@clmm/application';
 import type { SrLevelsBlock as DtoSrLevelsBlock } from '@clmm/application';
 import { listSupportedPositions, getPositionDetail } from '@clmm/application';
-import type { LiquidityPosition, ExitTrigger } from '@clmm/domain';
+import type { ExitTrigger } from '@clmm/domain';
 import { makeWalletId, makePositionId } from '@clmm/domain';
-import { SUPPORTED_POSITION_READ_PORT, TRIGGER_REPOSITORY, CURRENT_SR_LEVELS_PORT, SR_LEVELS_POOL_ALLOWLIST } from './tokens.js';
+import { SUPPORTED_POSITION_READ_PORT, TRIGGER_REPOSITORY, CURRENT_SR_LEVELS_PORT, SR_LEVELS_POOL_ALLOWLIST, PRICE_PORT } from './tokens.js';
 import type { CurrentSrLevelsPort } from '../../outbound/regime-engine/types.js';
 import { isTransientPositionReadFailure } from './transient-errors.js';
 
-function toPositionSummaryDto(p: LiquidityPosition, hasActionableTrigger = false): PositionSummaryDto {
+function toPositionSummaryDto(
+  dto: PositionSummaryDto,
+  hasActionableTrigger = false,
+): PositionSummaryDto {
   return {
-    positionId: p.positionId,
-    poolId: p.poolId,
-    rangeState: p.rangeState.kind,
+    ...dto,
     hasActionableTrigger,
-    monitoringStatus: p.monitoringReadiness.kind,
   };
 }
 
-function toPositionDetailDto(p: LiquidityPosition, trigger: ExitTrigger | null): PositionDetailDto {
+function toPositionDetailDto(
+  dto: PositionDetailDto,
+  trigger: ExitTrigger | null,
+): PositionDetailDto {
   return {
-    ...toPositionSummaryDto(p),
+    ...dto,
     hasActionableTrigger: trigger !== null,
-    lowerBound: p.bounds.lowerBound,
-    upperBound: p.bounds.upperBound,
-    currentPrice: p.rangeState.currentPrice,
     ...(trigger
       ? {
           triggerId: trigger.triggerId,
@@ -50,6 +51,8 @@ export class PositionController {
     private readonly srLevelsPort: CurrentSrLevelsPort,
     @Inject(SR_LEVELS_POOL_ALLOWLIST)
     private readonly srLevelsAllowlist: Map<string, { symbol: string; source: string }>,
+    @Inject(PRICE_PORT)
+    private readonly pricePort: PricePort,
   ) {}
 
   @Get(':walletId/:positionId')
@@ -62,6 +65,7 @@ export class PositionController {
       walletId: wallet,
       positionId: makePositionId(positionId),
       positionReadPort: this.positionReadPort,
+      pricePort: this.pricePort,
     });
 
     if (result.kind === 'not-found') {
@@ -116,7 +120,7 @@ export class PositionController {
 
     return {
       position: {
-        ...toPositionDetailDto(result.position, trigger),
+        ...toPositionDetailDto(result.detailDto, trigger),
         ...(srLevels ? { srLevels } : {}),
       },
       ...(triggerError ? { error: triggerError } : {}),
@@ -127,12 +131,13 @@ export class PositionController {
   async listPositions(@Param('walletId') walletId: string) {
     const wallet = makeWalletId(walletId);
 
-    let positions: LiquidityPosition[];
+    let summaryDtos: PositionSummaryDto[];
     try {
-      ({ positions } = await listSupportedPositions({
+      const result = await listSupportedPositions({
         walletId: wallet,
         positionReadPort: this.positionReadPort,
-      }));
+      });
+      summaryDtos = result.summaryDtos;
     } catch (error: unknown) {
       if (!isTransientPositionReadFailure(error)) {
         throw error;
@@ -157,7 +162,7 @@ export class PositionController {
     }
 
     return {
-      positions: positions.map((p) => toPositionSummaryDto(p, triggerPositionIds.has(p.positionId))),
+      positions: summaryDtos.map((dto) => toPositionSummaryDto(dto, triggerPositionIds.has(dto.positionId))),
       ...(triggerError ? { error: triggerError } : {}),
     };
   }
