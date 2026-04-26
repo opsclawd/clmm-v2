@@ -225,7 +225,9 @@ describe('navigateRoute', () => {
     expect(router.push).toHaveBeenCalledWith('/signing/attempt-123?previewId=prev-456&triggerId=trig-789');
   });
 
-  it('uses window.location hard navigation in Solana mobile WebView', () => {
+  it('uses soft navigation in Solana mobile WebView under soft-preferred strategy', () => {
+    _setStrategyForTesting('soft-preferred');
+
     const replaceFn = vi.fn();
     vi.stubGlobal('window', {
       solana: { connect: vi.fn() },
@@ -237,8 +239,8 @@ describe('navigateRoute', () => {
 
     navigateRoute({ router, path: '/positions', method: 'replace' });
 
-    expect(replaceFn).toHaveBeenCalledWith('https://app.example.com/positions');
-    expect(router.replace).not.toHaveBeenCalled();
+    expect(router.replace).toHaveBeenCalledWith('/positions');
+    expect(replaceFn).not.toHaveBeenCalled();
 
     vi.unstubAllGlobals();
   });
@@ -265,7 +267,7 @@ describe('navigateRoute strategy dispatch', () => {
     expect(router.push).toHaveBeenCalledWith('/positions');
   });
 
-  it("under 'soft-preferred', Solana mobile WebView still falls back to hard navigation", () => {
+  it("under 'soft-preferred', Solana mobile WebView uses Expo Router soft navigation", () => {
     _setStrategyForTesting('soft-preferred');
 
     const replaceFn = vi.fn();
@@ -280,8 +282,8 @@ describe('navigateRoute strategy dispatch', () => {
     const router = { push: vi.fn(), replace: vi.fn() };
     navigateRoute({ router, path: '/positions', method: 'replace' });
 
-    expect(replaceFn).toHaveBeenCalledWith('https://app.example.com/positions');
-    expect(router.replace).not.toHaveBeenCalled();
+    expect(router.replace).toHaveBeenCalledWith('/positions');
+    expect(replaceFn).not.toHaveBeenCalled();
   });
 
   it("under 'hard-fallback', Solana mobile WebView uses window.location (current default)", () => {
@@ -335,7 +337,7 @@ describe('WALLET_WEBVIEW_NAVIGATION_STRATEGY', () => {
     );
   });
 
-  it('defaults to hard-fallback before any outcome is applied', () => {
-    expect(WALLET_WEBVIEW_NAVIGATION_STRATEGY).toBe('hard-fallback');
+  it("active value reflects the recorded ADR decision ('soft-preferred')", () => {
+    expect(WALLET_WEBVIEW_NAVIGATION_STRATEGY).toBe('soft-preferred');
   });
 });

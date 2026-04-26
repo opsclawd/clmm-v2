@@ -14,7 +14,7 @@ type NavigationStrategy = 'soft-preferred' | 'hard-fallback' | 'capability-drive
  *
  * Any change to this constant MUST update or supersede that ADR.
  */
-const WALLET_WEBVIEW_NAVIGATION_STRATEGY: NavigationStrategy = 'hard-fallback';
+const WALLET_WEBVIEW_NAVIGATION_STRATEGY: NavigationStrategy = 'soft-preferred';
 
 let _activeStrategy: NavigationStrategy = WALLET_WEBVIEW_NAVIGATION_STRATEGY;
 
@@ -109,10 +109,6 @@ export function navigateRoute(params: {
 }
 
 function navigateSoftPreferred(router: RouterLike, canonicalPath: string, method: NavigationMethod): void {
-  if (isWebPlatform() && isSolanaMobileWebView()) {
-    hardNavigate(canonicalPath, method);
-    return;
-  }
   if (method === 'replace') {
     router.replace(canonicalPath);
     return;
