@@ -1,12 +1,16 @@
 import { readFileSync } from 'node:fs';
+import { join, dirname } from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
 
 type AppPackageJson = {
   dependencies?: Record<string, string>;
 };
 
+const __dirname = dirname(fileURLToPath(import.meta.url));
+
 function readText(relativePath: string): string {
-  return readFileSync(new URL(relativePath, import.meta.url), 'utf8');
+  return readFileSync(join(__dirname, relativePath), 'utf8');
 }
 
 function readAppPackageJson(): AppPackageJson {

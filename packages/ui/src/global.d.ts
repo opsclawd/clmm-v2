@@ -1,0 +1,13 @@
+import type { JSX as ReactJSX } from 'react';
+
+declare global {
+  namespace JSX {
+    type Element = ReactJSX.Element;
+    type IntrinsicElements = ReactJSX.IntrinsicElements;
+    type ElementClass = ReactJSX.ElementClass;
+    type ElementAttributesProperty = ReactJSX.ElementAttributesProperty;
+    type ElementChildrenAttribute = ReactJSX.ElementChildrenAttribute;
+  }
+}
+
+export {};

@@ -7,16 +7,20 @@ const workspaceRoot = path.resolve(projectRoot, '../..');
 
 const config = getDefaultConfig(projectRoot);
 
-// Watch all packages in the monorepo
-config.watchFolders = [workspaceRoot];
+const defaultWatchFolders = config.watchFolders || [];
+const defaultSourceExts = config.resolver?.sourceExts || [];
+const defaultAssetExts = config.resolver?.assetExts || [];
 
-// Resolve packages from both the app and the monorepo root
+config.watchFolders = [...defaultWatchFolders, workspaceRoot];
+
 config.resolver.nodeModulesPaths = [
   path.resolve(projectRoot, 'node_modules'),
   path.resolve(workspaceRoot, 'node_modules'),
 ];
 
-config.resolver.sourceExts = ['ts', 'tsx', 'js', 'jsx', 'json', 'cjs', 'mjs'];
+const customSourceExts = ['ts', 'tsx', 'mjs', 'cjs'];
+config.resolver.sourceExts = [...new Set([...defaultSourceExts, ...customSourceExts])];
+config.resolver.assetExts = defaultAssetExts;
 
 const connectorsPackageRoot = path.resolve(
   path.dirname(
