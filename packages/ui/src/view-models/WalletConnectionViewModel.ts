@@ -1,40 +1,68 @@
 import type { PlatformCapabilities } from '../components/DegradedCapabilityBannerUtils.js';
 import {
-  buildWalletOptions,
   getConnectionOutcomeDisplay,
   buildConnectedWalletSummary,
   buildPlatformNotice,
 } from '../components/WalletConnectionUtils.js';
 import type {
-  WalletOption,
   ConnectionOutcome,
   ConnectionOutcomeDisplay,
   PlatformNotice,
   ConnectedWalletSummary,
   WalletOptionKind,
+  FallbackState,
+  WalletDiscoveryState,
+  DiscoveredWallet,
 } from '../components/WalletConnectionUtils.js';
 
 // --- Wallet Connect Screen ViewModel ---
 
 export type WalletConnectViewModel = {
-  walletOptions: WalletOption[];
-  platformNotice: PlatformNotice | null;
-  outcomeDisplay: ConnectionOutcomeDisplay | null;
+  screenState: 'loading' | 'social-webview' | 'standard';
+  nativeWalletAvailable: boolean;
+  discovery: WalletDiscoveryState;
+  discoveredWallets: DiscoveredWallet[];
+  fallback: FallbackState;
+  socialEscapeAttempted: boolean;
   isConnecting: boolean;
+  outcomeDisplay: ConnectionOutcomeDisplay | null;
+  platformNotice: PlatformNotice | null;
 };
 
 export function buildWalletConnectViewModel(params: {
-  capabilities: PlatformCapabilities;
-  connectionOutcome: ConnectionOutcome | null;
+  platformCapabilities: PlatformCapabilities | null;
+  discovery: WalletDiscoveryState;
+  discoveredWallets: DiscoveredWallet[];
+  fallback: FallbackState;
+  socialEscapeAttempted: boolean;
   isConnecting: boolean;
+  connectionOutcome: ConnectionOutcome | null;
 }): WalletConnectViewModel {
+  const caps = params.platformCapabilities ?? {
+    nativePushAvailable: false,
+    browserNotificationAvailable: false,
+    nativeWalletAvailable: false,
+    browserWalletAvailable: false,
+    isMobileWeb: false,
+  };
+
+  const screenState: WalletConnectViewModel['screenState'] =
+    !params.platformCapabilities ? 'loading'
+    : params.fallback === 'social-webview' ? 'social-webview'
+    : 'standard';
+
   return {
-    walletOptions: buildWalletOptions(params.capabilities),
-    platformNotice: buildPlatformNotice(params.capabilities),
+    screenState,
+    nativeWalletAvailable: caps.nativeWalletAvailable,
+    discovery: params.discovery,
+    discoveredWallets: params.discoveredWallets,
+    fallback: params.fallback,
+    socialEscapeAttempted: params.socialEscapeAttempted,
+    isConnecting: params.isConnecting,
     outcomeDisplay: params.connectionOutcome
       ? getConnectionOutcomeDisplay(params.connectionOutcome)
       : null,
-    isConnecting: params.isConnecting,
+    platformNotice: buildPlatformNotice(caps),
   };
 }
 
