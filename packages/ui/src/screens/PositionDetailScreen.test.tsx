@@ -73,6 +73,48 @@ describe('PositionDetailScreen', () => {
     expect(onViewPreview).toHaveBeenCalledWith('trigger-1');
   });
 
+  it('renders Market Thesis card when summary is present', () => {
+    const now = Date.now();
+    vi.spyOn(Date, 'now').mockReturnValue(now);
+
+    render(
+      <PositionDetailScreen
+        position={makePosition({
+          srLevels: {
+            briefId: 'brief-1',
+            sourceRecordedAtIso: null,
+            summary: 'Bearish swing, trend continuation.',
+            capturedAtUnixMs: now,
+            supports: [{ price: 90 }],
+            resistances: [],
+          },
+        })}
+      />,
+    );
+
+    expect(screen.getByText('Market Thesis')).toBeTruthy();
+    expect(screen.getByText('Bearish swing, trend continuation.')).toBeTruthy();
+
+    vi.restoreAllMocks();
+  });
+
+  it('does not render Market Thesis card when summary is absent', () => {
+    const now = Date.now();
+    vi.spyOn(Date, 'now').mockReturnValue(now);
+
+    render(
+      <PositionDetailScreen
+        position={makePosition({
+          srLevels: makeSrBlock(now),
+        })}
+      />,
+    );
+
+    expect(screen.queryByText('Market Thesis')).toBeNull();
+
+    vi.restoreAllMocks();
+  });
+
   it('renders support and resistance section as a card when srLevels is present', () => {
     const now = Date.now();
     vi.spyOn(Date, 'now').mockReturnValue(now);
@@ -87,8 +129,7 @@ describe('PositionDetailScreen', () => {
 
     expect(screen.getByText('Support & Resistance')).toBeTruthy();
     expect(screen.getByText('AI · MCO · 1m ago')).toBeTruthy();
-    expect(screen.getByTestId('sr-level-0')).toBeTruthy();
-    expect(screen.getByTestId('sr-level-1')).toBeTruthy();
+    expect(screen.getByTestId('sr-group-0')).toBeTruthy();
 
     vi.restoreAllMocks();
   });
@@ -216,7 +257,7 @@ describe('PositionDetailScreen', () => {
     vi.restoreAllMocks();
   });
 
-  it('renders empty levels message when both supports and resistances are empty', () => {
+  it('renders empty groups message when both supports and resistances are empty', () => {
     const now = Date.now();
     vi.spyOn(Date, 'now').mockReturnValue(now);
 
@@ -236,7 +277,7 @@ describe('PositionDetailScreen', () => {
     );
 
     expect(screen.getByText('Support & Resistance')).toBeTruthy();
-    expect(screen.queryByTestId('sr-level-0')).toBeNull();
+    expect(screen.queryByTestId('sr-group-0')).toBeNull();
 
     vi.restoreAllMocks();
   });
