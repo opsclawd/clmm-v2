@@ -6,6 +6,7 @@ import { AlertController } from './AlertController.js';
 import { PreviewController } from './PreviewController.js';
 import { ExecutionController } from './ExecutionController.js';
 import { WalletController } from './WalletController.js';
+import { SrLevelsController } from './SrLevelsController.js';
 import { PgBossLifecycle } from './PgBossLifecycle.js';
 import { OperationalStorageAdapter } from '../../outbound/storage/OperationalStorageAdapter.js';
 import { OffChainHistoryStorageAdapter } from '../../outbound/storage/OffChainHistoryStorageAdapter.js';
@@ -89,7 +90,7 @@ export const SR_LEVELS_POOL_ALLOWLIST_MAP = new Map<string, { symbol: string; so
 ]);
 
 @Module({
-  controllers: [HealthController, PositionController, AlertController, PreviewController, ExecutionController, WalletController],
+  controllers: [HealthController, PositionController, SrLevelsController, AlertController, PreviewController, ExecutionController, WalletController],
   providers: [
     { provide: TRIGGER_REPOSITORY, useValue: operationalStorage },
     { provide: EXECUTION_REPOSITORY, useValue: operationalStorage },
