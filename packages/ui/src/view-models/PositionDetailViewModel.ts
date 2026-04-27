@@ -201,7 +201,7 @@ function toSrLevelsViewModelBlock(
       tone: item.kind === 'resistance' ? ('breach' as const) : ('safe' as const),
     }));
 
-    levels.sort((a, b) => a.rawPrice - b.rawPrice);
+    levels.sort((a, b) => b.rawPrice - a.rawPrice);
 
     groups.push({
       levels,
