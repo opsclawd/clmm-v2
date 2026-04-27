@@ -3,14 +3,25 @@ import { getRangeStatusBadgeProps } from '../components/RangeStatusBadgeUtils.js
 
 export type SrLevelViewModel = {
   kind: 'support' | 'resistance';
-  rawPrice: number; // for sorting
+  rawPrice: number;
   priceLabel: string;
-  note: string;
   tone: 'safe' | 'warn' | 'breach';
 };
 
-export type SrLevelsViewModelBlock = {
+export type SrLevelGroupViewModel = {
   levels: SrLevelViewModel[];
+  note: string;
+  source?: string;
+  timeframe?: string;
+  bias?: string;
+  setupType?: string;
+  trigger?: string;
+  invalidation?: string;
+};
+
+export type SrLevelsViewModelBlock = {
+  summary?: string;
+  groups: SrLevelGroupViewModel[];
   freshnessLabel: string;
   isStale: boolean;
 };
@@ -40,58 +51,7 @@ export type PositionDetailViewModel = {
 
 const MS_PER_MINUTE = 60_000;
 const MS_PER_HOUR = 3_600_000;
-const STALE_THRESHOLD_MS = 48 * MS_PER_HOUR; // 48 hours
-
-// Consider a level "near" a bound if within 1 cent — prevents floating-point mismatch
-const BOUND_EPSILON = 0.01;
-const PROXIMITY_THRESHOLD = 0.05; // 5%
-
-function isNearBound(price: number, bound: number): boolean {
-  return Math.abs(price - bound) <= BOUND_EPSILON;
-}
-
-function isWithinProximity(currentPrice: number, levelPrice: number): boolean {
-  if (levelPrice === 0) return false;
-  return Math.abs(currentPrice - levelPrice) / levelPrice <= PROXIMITY_THRESHOLD;
-}
-
-/**
- * Compute the semantic tone for an S/R level.
- * - `breach`: Price has crossed the level (above resistance / below support)
- * - `warn`: Level is near the position's bound OR within 5% of current price
- * - `safe`: Everything else
- */
-function computeLevelTone(
-  kind: 'support' | 'resistance',
-  levelPrice: number,
-  currentPrice: number,
-  lowerBound: number,
-  upperBound: number,
-): 'safe' | 'warn' | 'breach' {
-  if (kind === 'resistance') {
-    if (currentPrice > levelPrice) return 'breach';
-    if (isNearBound(levelPrice, upperBound)) return 'warn';
-    if (isWithinProximity(currentPrice, levelPrice)) return 'warn';
-    return 'safe';
-  }
-  // support
-  if (currentPrice < levelPrice) return 'breach';
-  if (isNearBound(levelPrice, lowerBound)) return 'warn';
-  if (isWithinProximity(currentPrice, levelPrice)) return 'warn';
-  return 'safe';
-}
-
-function computeLevelNote(
-  level: { price: number; rank?: string; notes?: string },
-  lowerBound: number,
-  upperBound: number,
-): string {
-  if (level.notes) return level.notes;
-  if (isNearBound(level.price, lowerBound)) return 'Range lower · your position';
-  if (isNearBound(level.price, upperBound)) return 'Range upper · your position';
-  if (level.rank) return level.rank;
-  return '';
-}
+const STALE_THRESHOLD_MS = 48 * MS_PER_HOUR;
 
 function computeFreshness(capturedAtUnixMs: number, now: number): { freshnessLabel: string; isStale: boolean } {
   const ageMs = now - capturedAtUnixMs;
@@ -106,37 +66,154 @@ function computeFreshness(capturedAtUnixMs: number, now: number): { freshnessLab
   return { freshnessLabel: `AI · MCO · ${hours}h ago · stale`, isStale: true };
 }
 
+function parseNotes(notes: string | undefined): {
+  source?: string;
+  timeframe?: string;
+  bias?: string;
+  setupType?: string;
+  trigger?: string;
+  invalidation?: string;
+  remaining: string;
+} {
+  if (!notes) {
+    return { remaining: '' };
+  }
+
+  const parts = notes.split('|').map((s) => s.trim()).filter(Boolean);
+  if (parts.length === 0) {
+    return { remaining: '' };
+  }
+  if (parts.length === 1) {
+    return { remaining: parts[0] };
+  }
+
+  // Parse metadata from first section
+  const firstSection = parts[0];
+  const lastDotIndex = firstSection.lastIndexOf('.');
+  let source: string | undefined;
+  let timeframe: string | undefined;
+  let bias: string | undefined;
+  let setupType: string | undefined;
+
+  if (lastDotIndex > -1) {
+    setupType = firstSection.slice(lastDotIndex + 1).trim();
+    const beforeDot = firstSection.slice(0, lastDotIndex).trim();
+    const commaParts = beforeDot.split(',').map((s) => s.trim());
+    if (commaParts.length >= 2) {
+      bias = commaParts[commaParts.length - 1];
+      const sourceTimeframe = commaParts.slice(0, -1).join(',').trim();
+      const spaceParts = sourceTimeframe.split(/\s+/);
+      if (spaceParts.length >= 2) {
+        source = spaceParts[0];
+        timeframe = spaceParts.slice(1).join(' ');
+      } else {
+        source = sourceTimeframe;
+      }
+    } else {
+      const spaceParts = beforeDot.split(/\s+/);
+      if (spaceParts.length >= 2) {
+        source = spaceParts[0];
+        timeframe = spaceParts.slice(1).join(' ');
+      } else {
+        source = beforeDot;
+      }
+    }
+  } else {
+    return { remaining: notes.trim() };
+  }
+
+  // Parse trigger and invalidation from remaining sections
+  let trigger: string | undefined;
+  let invalidation: string | undefined;
+  const noteParts: string[] = [];
+
+  for (let i = 1; i < parts.length; i++) {
+    const part = parts[i];
+    const lower = part.toLowerCase();
+    if (lower.startsWith('trigger:')) {
+      trigger = part.slice('trigger:'.length).trim();
+    } else if (lower.startsWith('invalidation:')) {
+      invalidation = part.slice('invalidation:'.length).trim();
+    } else {
+      noteParts.push(part);
+    }
+  }
+
+  return {
+    ...(source ? { source } : {}),
+    ...(timeframe ? { timeframe } : {}),
+    ...(bias ? { bias } : {}),
+    ...(setupType ? { setupType } : {}),
+    ...(trigger ? { trigger } : {}),
+    ...(invalidation ? { invalidation } : {}),
+    remaining: noteParts.join('\n'),
+  };
+}
+
 function toSrLevelsViewModelBlock(
   block: NonNullable<PositionDetailDto['srLevels']>,
-  currentPrice: number,
-  lowerBound: number,
-  upperBound: number,
+  _currentPrice: number,
+  _lowerBound: number,
+  _upperBound: number,
   now: number,
 ): SrLevelsViewModelBlock {
   const { freshnessLabel, isStale } = computeFreshness(block.capturedAtUnixMs, now);
 
-  const supportLevels: SrLevelViewModel[] = block.supports.map((s) => ({
-    kind: 'support',
-    rawPrice: s.price,
-    priceLabel: `$${s.price.toFixed(2)}`,
-    note: computeLevelNote(s, lowerBound, upperBound),
-    tone: computeLevelTone('support', s.price, currentPrice, lowerBound, upperBound),
-  }));
+  // Group raw levels by identical metadata (rank + timeframe + notes)
+  type RawItem = (typeof block.supports)[number] & { kind: 'support' | 'resistance' };
+  const rawGroups = new Map<string, RawItem[]>();
 
-  const resistanceLevels: SrLevelViewModel[] = block.resistances.map((r) => ({
-    kind: 'resistance',
-    rawPrice: r.price,
-    priceLabel: `$${r.price.toFixed(2)}`,
-    note: computeLevelNote(r, lowerBound, upperBound),
-    tone: computeLevelTone('resistance', r.price, currentPrice, lowerBound, upperBound),
-  }));
+  const addItems = (kind: 'support' | 'resistance', items: typeof block.supports) => {
+    for (const item of items) {
+      const key = `${item.rank ?? ''}:${item.timeframe ?? ''}:${item.notes ?? ''}`;
+      const existing = rawGroups.get(key);
+      const itemWithKind = { ...item, kind };
+      if (existing) {
+        existing.push(itemWithKind);
+      } else {
+        rawGroups.set(key, [itemWithKind]);
+      }
+    }
+  };
 
-  // Sort all levels by price ascending
-  const levels = [...supportLevels, ...resistanceLevels].sort(
-    (a, b) => a.rawPrice - b.rawPrice,
-  );
+  addItems('support', block.supports);
+  addItems('resistance', block.resistances);
 
-  return { levels, freshnessLabel, isStale };
+  const groups: SrLevelGroupViewModel[] = [];
+
+  for (const [, items] of rawGroups) {
+    const first = items[0];
+    const parsed = parseNotes(first.notes);
+
+    const levels = items.map((item) => ({
+      kind: item.kind,
+      rawPrice: item.price,
+      priceLabel: `$${item.price.toFixed(2)}`,
+      tone: item.kind === 'resistance' ? ('breach' as const) : ('safe' as const),
+    }));
+
+    levels.sort((a, b) => a.rawPrice - b.rawPrice);
+
+    groups.push({
+      levels,
+      note: parsed.remaining,
+      ...(parsed.source ? { source: parsed.source } : {}),
+      ...(parsed.timeframe ? { timeframe: parsed.timeframe } : {}),
+      ...(parsed.bias ? { bias: parsed.bias } : {}),
+      ...(parsed.setupType ? { setupType: parsed.setupType } : {}),
+      ...(parsed.trigger ? { trigger: parsed.trigger } : {}),
+      ...(parsed.invalidation ? { invalidation: parsed.invalidation } : {}),
+    });
+  }
+
+  groups.sort((a, b) => a.levels[0].rawPrice - b.levels[0].rawPrice);
+
+  return {
+    summary: block.summary ?? undefined,
+    groups,
+    freshnessLabel,
+    isStale,
+  };
 }
 
 function formatTokenAmount(raw: string, decimals: number | null, symbol: string): string {
@@ -145,7 +222,6 @@ function formatTokenAmount(raw: string, decimals: number | null, symbol: string)
 
   const fractionalDigits = decimals > 2 ? 4 : 2;
 
-  // String-based decimal shift — avoids Number precision loss for large u64s
   const padded = raw.padStart(decimals + 1, '0');
   const whole = padded.slice(0, -decimals);
   const fraction = padded.slice(-decimals).slice(0, fractionalDigits);
