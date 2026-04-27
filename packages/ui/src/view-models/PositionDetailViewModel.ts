@@ -20,7 +20,7 @@ export type SrLevelGroupViewModel = {
 };
 
 export type SrLevelsViewModelBlock = {
-  summary?: string;
+  summary?: string | undefined;
   groups: SrLevelGroupViewModel[];
   freshnessLabel: string;
   isStale: boolean;
@@ -84,11 +84,11 @@ function parseNotes(notes: string | undefined): {
     return { remaining: '' };
   }
   if (parts.length === 1) {
-    return { remaining: parts[0] };
+    return { remaining: parts[0] ?? '' };
   }
 
   // Parse metadata from first section
-  const firstSection = parts[0];
+  const firstSection = parts[0]!;
   const lastDotIndex = firstSection.lastIndexOf('.');
   let source: string | undefined;
   let timeframe: string | undefined;
@@ -128,7 +128,7 @@ function parseNotes(notes: string | undefined): {
   const noteParts: string[] = [];
 
   for (let i = 1; i < parts.length; i++) {
-    const part = parts[i];
+    const part = parts[i]!;
     const lower = part.toLowerCase();
     if (lower.startsWith('trigger:')) {
       trigger = part.slice('trigger:'.length).trim();
@@ -182,7 +182,8 @@ function toSrLevelsViewModelBlock(
   const groups: SrLevelGroupViewModel[] = [];
 
   for (const [, items] of rawGroups) {
-    const first = items[0];
+    if (items.length === 0) continue;
+    const first = items[0]!;
     const parsed = parseNotes(first.notes);
 
     const levels = items.map((item) => ({
@@ -206,7 +207,11 @@ function toSrLevelsViewModelBlock(
     });
   }
 
-  groups.sort((a, b) => a.levels[0].rawPrice - b.levels[0].rawPrice);
+  groups.sort((a, b) => {
+    const aPrice = a.levels[0]?.rawPrice ?? 0;
+    const bPrice = b.levels[0]?.rawPrice ?? 0;
+    return aPrice - bPrice;
+  });
 
   return {
     summary: block.summary ?? undefined,
