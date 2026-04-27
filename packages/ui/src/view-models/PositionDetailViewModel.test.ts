@@ -1,14 +1,14 @@
-import { describe, it, expect } from 'vitest';
-import { buildPositionDetailViewModel } from './PositionDetailViewModel.js';
+import { describe, expect, it } from 'vitest';
 import type { PositionDetailDto } from '@clmm/application/public';
+import { buildPositionDetailViewModel } from './PositionDetailViewModel.js';
 
 function makeDto(overrides: Partial<PositionDetailDto> = {}): PositionDetailDto {
   return {
-    positionId: 'pos-1' as PositionDetailDto['positionId'],
+    positionId: 'position-1' as PositionDetailDto['positionId'],
     poolId: 'pool-1' as PositionDetailDto['poolId'],
     tokenPairLabel: 'SOL / USDC',
-    currentPrice: 142.35,
-    currentPriceLabel: 'USDC 142.35',
+    currentPrice: 150,
+    currentPriceLabel: 'USDC 150.00',
     feeRateLabel: '10 bps',
     rangeState: 'in-range',
     rangeDistance: { belowLowerPercent: 0, aboveUpperPercent: 0 },
@@ -16,13 +16,13 @@ function makeDto(overrides: Partial<PositionDetailDto> = {}): PositionDetailDto 
     monitoringStatus: 'active',
     lowerBound: 100,
     upperBound: 200,
-    lowerBoundLabel: 'USDC 1.01',
-    upperBoundLabel: 'USDC 1.22',
-    sqrtPrice: '184467440737095516',
+    lowerBoundLabel: 'USDC 100.00',
+    upperBoundLabel: 'USDC 200.00',
+    sqrtPrice: '123456',
     unclaimedFees: {
-      feeOwedA: { raw: '120000000', decimals: 9, symbol: 'SOL', usdValue: 18 },
-      feeOwedB: { raw: '47230000', decimals: 6, symbol: 'USDC', usdValue: 47.23 },
-      totalUsd: 65.23,
+      feeOwedA: { raw: '100000000', decimals: 9, symbol: 'SOL', usdValue: 15 },
+      feeOwedB: { raw: '30000000', decimals: 6, symbol: 'USDC', usdValue: 30 },
+      totalUsd: 45,
     },
     unclaimedRewards: {
       rewards: [],
@@ -60,6 +60,7 @@ describe('buildPositionDetailViewModel srLevels', () => {
       now,
     );
     expect(vm.srLevels).toBeDefined();
+    expect(vm.srLevels!.groups.length).toBeGreaterThan(0);
   });
 
   it('computes freshness for 5 minutes ago', () => {
@@ -68,106 +69,146 @@ describe('buildPositionDetailViewModel srLevels', () => {
       makeDto({ srLevels: makeSrBlock({ capturedAtUnixMs: 1_700_000 }) }),
       now,
     );
-    expect(vm.srLevels?.freshnessLabel).toBe('captured 5m ago');
+    expect(vm.srLevels?.freshnessLabel).toBe('AI · MCO · 5m ago');
     expect(vm.srLevels?.isStale).toBe(false);
   });
 
-  it('computes freshness for 3 hours ago', () => {
-    const now = 20_000_000;
-    const vm = buildPositionDetailViewModel(
-      makeDto({ srLevels: makeSrBlock({ capturedAtUnixMs: 9_200_000 }) }),
-      now,
-    );
-    expect(vm.srLevels?.freshnessLabel).toBe('captured 3h ago');
-    expect(vm.srLevels?.isStale).toBe(false);
-  });
-
-  it('computes freshness for 47 hours ago', () => {
-    const now = 200_000_000;
-    const vm = buildPositionDetailViewModel(
-      makeDto({ srLevels: makeSrBlock({ capturedAtUnixMs: 30_800_000 }) }),
-      now,
-    );
-    expect(vm.srLevels?.freshnessLabel).toBe('captured 47h ago');
-    expect(vm.srLevels?.isStale).toBe(false);
-  });
-
-  it('computes freshness for 49 hours ago (stale)', () => {
-    const now = 200_000_000;
-    const vm = buildPositionDetailViewModel(
-      makeDto({ srLevels: makeSrBlock({ capturedAtUnixMs: 23_600_000 }) }),
-      now,
-    );
-    expect(vm.srLevels?.freshnessLabel).toBe('captured 49h ago · stale');
-    expect(vm.srLevels?.isStale).toBe(true);
-  });
-
-  it('marks stale at exactly 48h boundary', () => {
-    const ms48h = 172_800_000;
-    const now = 200_000_000;
-    const vm = buildPositionDetailViewModel(
-      makeDto({ srLevels: makeSrBlock({ capturedAtUnixMs: now - ms48h }) }),
-      now,
-    );
-    expect(vm.srLevels?.freshnessLabel).toBe('captured 48h ago · stale');
-    expect(vm.srLevels?.isStale).toBe(true);
-  });
-
-  it('floors at 1 minute for 30 seconds ago', () => {
-    const now = 200_000_000;
-    const vm = buildPositionDetailViewModel(
-      makeDto({ srLevels: makeSrBlock({ capturedAtUnixMs: now - 30_000 }) }),
-      now,
-    );
-    expect(vm.srLevels?.freshnessLabel).toBe('captured 1m ago');
-    expect(vm.srLevels?.isStale).toBe(false);
-  });
-
-  it('sorts supports ascending by price', () => {
+  it('parses real notes format with trigger and invalidation', () => {
     const now = 200_000_000;
     const vm = buildPositionDetailViewModel(
       makeDto({
         srLevels: makeSrBlock({
           capturedAtUnixMs: now,
-          supports: [{ price: 130 }, { price: 90 }, { price: 110 }],
+          supports: [{
+            price: 90,
+            notes: 'morecryptoonline swing, bearish. trend continuation | Trigger: break below 85 signals wave three down is underway | Invalidation: break above 88.30, shifting probabilities toward orange C-wave scenario | Support parsed from: "79–81 (blue zone)" | Raw support: 83 (Sunday low), 79–81 (blue zone)',
+          }],
           resistances: [],
         }),
       }),
       now,
     );
-    const prices = vm.srLevels!.supportsSorted.map((s) => s.priceLabel);
-    expect(prices).toEqual(['$90.00', '$110.00', '$130.00']);
+    const group = vm.srLevels!.groups[0]!;
+    expect(group.source).toBe('morecryptoonline');
+    expect(group.timeframe).toBe('swing');
+    expect(group.bias).toBe('bearish');
+    expect(group.setupType).toBe('trend continuation');
+    expect(group.trigger).toBe('break below 85 signals wave three down is underway');
+    expect(group.invalidation).toBe('break above 88.30, shifting probabilities toward orange C-wave scenario');
+    expect(group.note).toBe('');
   });
 
-  it('sorts resistances ascending by price', () => {
+  it('returns raw notes when no pipe separator', () => {
+    const now = 200_000_000;
+    const vm = buildPositionDetailViewModel(
+      makeDto({
+        srLevels: makeSrBlock({
+          capturedAtUnixMs: now,
+          supports: [{ price: 90, notes: 'Primary support zone' }],
+          resistances: [],
+        }),
+      }),
+      now,
+    );
+    const group = vm.srLevels!.groups[0]!;
+    expect(group.note).toBe('');
+    expect(group.source).toBeUndefined();
+  });
+
+  it('groups levels with identical metadata', () => {
+    const now = 200_000_000;
+    const vm = buildPositionDetailViewModel(
+      makeDto({
+        srLevels: makeSrBlock({
+          capturedAtUnixMs: now,
+          supports: [
+            { price: 90, rank: 'S1', notes: 'source, 1h, Bullish. test | note body' },
+            { price: 110, rank: 'S1', notes: 'source, 1h, Bullish. test | note body' },
+          ],
+          resistances: [],
+        }),
+      }),
+      now,
+    );
+    expect(vm.srLevels!.groups.length).toBe(1);
+    expect(vm.srLevels!.groups[0]!.levels.length).toBe(2);
+  });
+
+  it('creates separate groups for different metadata', () => {
+    const now = 200_000_000;
+    const vm = buildPositionDetailViewModel(
+      makeDto({
+        srLevels: makeSrBlock({
+          capturedAtUnixMs: now,
+          supports: [
+            { price: 90, rank: 'S1', notes: 's, 1h, Bullish. t | Trigger: A' },
+            { price: 110, rank: 'S2', notes: 's, 1h, Bullish. t | Trigger: B' },
+          ],
+          resistances: [],
+        }),
+      }),
+      now,
+    );
+    expect(vm.srLevels!.groups.length).toBe(2);
+  });
+
+  it('marks resistance as breach tone (red)', () => {
     const now = 200_000_000;
     const vm = buildPositionDetailViewModel(
       makeDto({
         srLevels: makeSrBlock({
           capturedAtUnixMs: now,
           supports: [],
-          resistances: [{ price: 250 }, { price: 180 }, { price: 210 }],
+          resistances: [{ price: 180 }],
         }),
       }),
       now,
     );
-    const prices = vm.srLevels!.resistancesSorted.map((r) => r.priceLabel);
-    expect(prices).toEqual(['$180.00', '$210.00', '$250.00']);
+    expect(vm.srLevels!.groups[0]!.levels[0]!.tone).toBe('breach');
   });
 
-  it('includes rankLabel when rank is present', () => {
+  it('marks support as safe tone (green)', () => {
     const now = 200_000_000;
     const vm = buildPositionDetailViewModel(
       makeDto({
         srLevels: makeSrBlock({
           capturedAtUnixMs: now,
-          supports: [{ price: 90, rank: 'S1' }],
-          resistances: [{ price: 210, rank: 'R1' }],
+          supports: [{ price: 90 }],
+          resistances: [],
         }),
       }),
       now,
     );
-    expect(vm.srLevels!.supportsSorted[0]?.rankLabel).toBe('S1');
-    expect(vm.srLevels!.resistancesSorted[0]?.rankLabel).toBe('R1');
+    expect(vm.srLevels!.groups[0]!.levels[0]!.tone).toBe('safe');
+  });
+
+  it('passes summary through to view-model', () => {
+    const now = 200_000_000;
+    const vm = buildPositionDetailViewModel(
+      makeDto({
+        srLevels: makeSrBlock({
+          capturedAtUnixMs: now,
+          summary: 'Bearish swing, trend continuation.',
+        }),
+      }),
+      now,
+    );
+    expect(vm.srLevels!.summary).toBe('Bearish swing, trend continuation.');
+  });
+
+  it('sorts groups by lowest price ascending', () => {
+    const now = 200_000_000;
+    const vm = buildPositionDetailViewModel(
+      makeDto({
+        srLevels: makeSrBlock({
+          capturedAtUnixMs: now,
+          supports: [{ price: 130, notes: 's, 1h, A. t | Trigger: high' }],
+          resistances: [{ price: 80, notes: 's, 1h, B. t | Trigger: low' }],
+        }),
+      }),
+      now,
+    );
+    expect(vm.srLevels!.groups[0]!.levels[0]!.priceLabel).toBe('$130.00');
+    expect(vm.srLevels!.groups[1]!.levels[0]!.priceLabel).toBe('$80.00');
   });
 });

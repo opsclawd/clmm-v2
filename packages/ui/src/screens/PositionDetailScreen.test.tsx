@@ -73,7 +73,32 @@ describe('PositionDetailScreen', () => {
     expect(onViewPreview).toHaveBeenCalledWith('trigger-1');
   });
 
-  it('renders support and resistance section when srLevels is present', () => {
+  it('renders Market Thesis card when summary is present', () => {
+    const now = Date.now();
+    vi.spyOn(Date, 'now').mockReturnValue(now);
+
+    render(
+      <PositionDetailScreen
+        position={makePosition({
+          srLevels: {
+            briefId: 'brief-1',
+            sourceRecordedAtIso: null,
+            summary: 'Bearish swing, trend continuation.',
+            capturedAtUnixMs: now,
+            supports: [{ price: 90 }],
+            resistances: [],
+          },
+        })}
+      />,
+    );
+
+    expect(screen.getByText('Market Thesis')).toBeTruthy();
+    expect(screen.getByText('Bearish swing, trend continuation.')).toBeTruthy();
+
+    vi.restoreAllMocks();
+  });
+
+  it('does not render Market Thesis card when summary is absent', () => {
     const now = Date.now();
     vi.spyOn(Date, 'now').mockReturnValue(now);
 
@@ -85,19 +110,58 @@ describe('PositionDetailScreen', () => {
       />,
     );
 
-    expect(screen.getByText('Support & Resistance (MCO)')).toBeTruthy();
-    expect(screen.getByText('Support')).toBeTruthy();
-    expect(screen.getByText('Resistance')).toBeTruthy();
-    expect(screen.getByText('$90.00')).toBeTruthy();
-    expect(screen.getByText('$110.00 (S1)')).toBeTruthy();
-    expect(screen.getByText('$180.00')).toBeTruthy();
-    expect(screen.getByText('$210.00')).toBeTruthy();
-    expect(screen.getByTestId('sr-freshness')).toBeTruthy();
+    expect(screen.queryByText('Market Thesis')).toBeNull();
 
     vi.restoreAllMocks();
   });
 
-  it('renders stale freshness label when isStale is true', () => {
+  it('renders support and resistance section as a card when srLevels is present', () => {
+    const now = Date.now();
+    vi.spyOn(Date, 'now').mockReturnValue(now);
+
+    render(
+      <PositionDetailScreen
+        position={makePosition({
+          srLevels: makeSrBlock(now),
+        })}
+      />,
+    );
+
+    expect(screen.getByText('Support & Resistance')).toBeTruthy();
+    expect(screen.getByText('AI · MCO · 1m ago')).toBeTruthy();
+    expect(screen.getByTestId('sr-group-0')).toBeTruthy();
+
+    vi.restoreAllMocks();
+  });
+
+  it('renders level chips with correct labels', () => {
+    const now = Date.now();
+    vi.spyOn(Date, 'now').mockReturnValue(now);
+
+    render(
+      <PositionDetailScreen
+        position={makePosition({
+          srLevels: {
+            briefId: 'brief-1',
+            sourceRecordedAtIso: null,
+            summary: null,
+            capturedAtUnixMs: now,
+            supports: [{ price: 90 }],
+            resistances: [{ price: 180 }],
+          },
+        })}
+      />,
+    );
+
+    expect(screen.getByText('Support')).toBeTruthy();
+    expect(screen.getByText('Resist')).toBeTruthy();
+    expect(screen.getByText('$90.00')).toBeTruthy();
+    expect(screen.getByText('$180.00')).toBeTruthy();
+
+    vi.restoreAllMocks();
+  });
+
+  it('renders stale freshness label in the card header when isStale is true', () => {
     const now = 200_000_000;
     vi.spyOn(Date, 'now').mockReturnValue(now);
 
@@ -109,8 +173,7 @@ describe('PositionDetailScreen', () => {
       />,
     );
 
-    const freshness = screen.getByTestId('sr-freshness');
-    expect(freshness.textContent).toContain('stale');
+    expect(screen.getByText(/stale/)).toBeTruthy();
 
     vi.restoreAllMocks();
   });
@@ -140,7 +203,7 @@ describe('PositionDetailScreen', () => {
     expect(screen.getByText('No current MCO levels available')).toBeTruthy();
   });
 
-  it('renders resistance section when supports is empty but resistances are present', () => {
+  it('renders resistance-only levels correctly', () => {
     const now = Date.now();
     vi.spyOn(Date, 'now').mockReturnValue(now);
 
@@ -159,11 +222,62 @@ describe('PositionDetailScreen', () => {
       />,
     );
 
-    expect(screen.getByText('Support & Resistance (MCO)')).toBeTruthy();
-    expect(screen.getByText('Support')).toBeTruthy();
-    expect(screen.getByText('Resistance')).toBeTruthy();
+    expect(screen.getByText('Support & Resistance')).toBeTruthy();
+    expect(screen.getAllByText('Resist')).toHaveLength(2);
     expect(screen.getByText('$180.00')).toBeTruthy();
     expect(screen.getByText('$210.00')).toBeTruthy();
+
+    vi.restoreAllMocks();
+  });
+
+  it('renders support-only levels correctly', () => {
+    const now = Date.now();
+    vi.spyOn(Date, 'now').mockReturnValue(now);
+
+    render(
+      <PositionDetailScreen
+        position={makePosition({
+          srLevels: {
+            briefId: 'brief-1',
+            sourceRecordedAtIso: null,
+            summary: null,
+            capturedAtUnixMs: now,
+            supports: [{ price: 90 }, { price: 110 }],
+            resistances: [],
+          },
+        })}
+      />,
+    );
+
+    expect(screen.getByText('Support & Resistance')).toBeTruthy();
+    expect(screen.getAllByText('Support')).toHaveLength(2);
+    expect(screen.getByText('$90.00')).toBeTruthy();
+    expect(screen.getByText('$110.00')).toBeTruthy();
+
+    vi.restoreAllMocks();
+  });
+
+  it('renders empty groups message when both supports and resistances are empty', () => {
+    const now = Date.now();
+    vi.spyOn(Date, 'now').mockReturnValue(now);
+
+    render(
+      <PositionDetailScreen
+        position={makePosition({
+          srLevels: {
+            briefId: 'brief-1',
+            sourceRecordedAtIso: null,
+            summary: null,
+            capturedAtUnixMs: now,
+            supports: [],
+            resistances: [],
+          },
+        })}
+      />,
+    );
+
+    expect(screen.getByText('Support & Resistance')).toBeTruthy();
+    expect(screen.queryByTestId('sr-group-0')).toBeNull();
 
     vi.restoreAllMocks();
   });

@@ -6,48 +6,13 @@ import { typography } from '../design-system/index.js';
 import { presentPositionDetail } from '../presenters/PositionDetailPresenter.js';
 import { RangeStatusBadge } from '../components/RangeStatusBadge.js';
 import { DirectionalPolicyCard } from '../components/DirectionalPolicyCard.js';
+import { SrLevelsCard } from '../components/SrLevelsCard.js';
+import { MarketThesisCard } from '../components/MarketThesisCard.js';
 
 type Props = {
   position?: PositionDetailDto;
   onViewPreview?: (triggerId: string) => void;
   now?: number;
-};
-
-const srStyles = {
-  sectionTitle: {
-    color: colors.text,
-    fontSize: typography.fontSize.base,
-    fontWeight: typography.fontWeight.semibold,
-    marginTop: 20,
-    marginBottom: 8,
-  },
-  subsectionTitle: {
-    color: colors.textSecondary,
-    fontSize: typography.fontSize.sm,
-    fontWeight: typography.fontWeight.medium,
-    marginTop: 8,
-    marginBottom: 4,
-  },
-  levelRow: {
-    color: colors.text,
-    fontSize: typography.fontSize.sm,
-    marginTop: 2,
-  },
-  freshnessLabel: {
-    color: colors.textSecondary,
-    fontSize: typography.fontSize.xs,
-    marginTop: 8,
-  },
-  staleLabel: {
-    color: '#f59e0b',
-    fontSize: typography.fontSize.xs,
-    marginTop: 8,
-  },
-  muted: {
-    color: colors.textSecondary,
-    fontSize: typography.fontSize.sm,
-    marginTop: 16,
-  },
 };
 
 export function PositionDetailScreen({ position, onViewPreview, now: nowProp }: Props): JSX.Element {
@@ -294,30 +259,10 @@ export function PositionDetailScreen({ position, onViewPreview, now: nowProp }: 
           </Text>
         </View>
 
-        {vm.srLevels ? (
-          <View style={{ marginTop: 4 }}>
-            <Text style={srStyles.sectionTitle}>
-              Support & Resistance (MCO)
-            </Text>
-            <Text style={srStyles.subsectionTitle}>Support</Text>
-            {vm.srLevels.supportsSorted.map((s, i) => (
-              <Text key={`s-${i}`} testID={`sr-support-${i}`} style={srStyles.levelRow}>
-                {s.priceLabel}{s.rankLabel ? ` (${s.rankLabel})` : ''}
-              </Text>
-            ))}
-            <Text style={srStyles.subsectionTitle}>Resistance</Text>
-            {vm.srLevels.resistancesSorted.map((r, i) => (
-              <Text key={`r-${i}`} testID={`sr-resistance-${i}`} style={srStyles.levelRow}>
-                {r.priceLabel}{r.rankLabel ? ` (${r.rankLabel})` : ''}
-              </Text>
-            ))}
-            <Text testID="sr-freshness" style={vm.srLevels.isStale ? srStyles.staleLabel : srStyles.freshnessLabel}>
-              {vm.srLevels.freshnessLabel}
-            </Text>
-          </View>
-        ) : (
-          <Text style={srStyles.muted}>No current MCO levels available</Text>
-        )}
+        {vm.srLevels?.summary ? (
+          <MarketThesisCard summary={vm.srLevels.summary} />
+        ) : null}
+        <SrLevelsCard srLevels={vm.srLevels} />
       </View>
     </ScrollView>
   );
