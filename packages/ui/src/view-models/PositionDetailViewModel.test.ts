@@ -208,7 +208,7 @@ describe('buildPositionDetailViewModel srLevels', () => {
       }),
       now,
     );
-    expect(vm.srLevels!.groups[0]!.levels[0]!.priceLabel).toBe('$80.00');
-    expect(vm.srLevels!.groups[1]!.levels[0]!.priceLabel).toBe('$130.00');
+    expect(vm.srLevels!.groups[0]!.levels[0]!.priceLabel).toBe('$130.00');
+    expect(vm.srLevels!.groups[1]!.levels[0]!.priceLabel).toBe('$80.00');
   });
 });

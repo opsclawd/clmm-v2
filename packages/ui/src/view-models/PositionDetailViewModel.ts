@@ -218,7 +218,7 @@ function toSrLevelsViewModelBlock(
   groups.sort((a, b) => {
     const aPrice = a.levels[0]?.rawPrice ?? 0;
     const bPrice = b.levels[0]?.rawPrice ?? 0;
-    return aPrice - bPrice;
+    return bPrice - aPrice;
   });
 
   return {
