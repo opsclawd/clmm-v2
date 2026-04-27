@@ -85,7 +85,6 @@ export type PositionDetailDto = PositionSummaryDto & {
   poolDepthLabel: string;
   triggerId?: ExitTriggerId;
   breachDirection?: BreachDirection;
-  srLevels?: SrLevelsBlock;
 };
 
 // Preview DTOs

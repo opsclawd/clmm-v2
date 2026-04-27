@@ -1,6 +1,6 @@
 import { View, Text } from 'react-native';
 import { colors, typography } from '../design-system/index.js';
-import type { SrLevelsViewModelBlock } from '../view-models/PositionDetailViewModel.js';
+import type { SrLevelsViewModelBlock } from '../view-models/SrLevelsViewModel.js';
 
 const toneColors = {
   safe: {

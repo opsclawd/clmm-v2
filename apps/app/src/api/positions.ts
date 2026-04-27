@@ -44,26 +44,6 @@ function isPositionSummaryRecord(value: Record<string, unknown>): boolean {
   );
 }
 
-function isSrLevel(value: unknown): value is { price: number; rank?: string; timeframe?: string; invalidation?: number; notes?: string } {
-  if (!isRecord(value)) {
-    return false;
-  }
-  return typeof value['price'] === 'number' && Number.isFinite(value['price']);
-}
-
-function isSrLevelsBlock(value: unknown): value is { briefId: string; sourceRecordedAtIso: string | null; summary: string | null; capturedAtUnixMs: number; supports: Array<{ price: number; rank?: string; timeframe?: string; invalidation?: number; notes?: string }>; resistances: Array<{ price: number; rank?: string; timeframe?: string; invalidation?: number; notes?: string }> } {
-  if (!isRecord(value)) {
-    return false;
-  }
-  return (
-    typeof value['briefId'] === 'string' &&
-    (value['sourceRecordedAtIso'] == null || typeof value['sourceRecordedAtIso'] === 'string') &&
-    (value['summary'] == null || typeof value['summary'] === 'string') &&
-    typeof value['capturedAtUnixMs'] === 'number' &&
-    Array.isArray(value['supports']) && (value['supports'] as unknown[]).every(isSrLevel) &&
-    Array.isArray(value['resistances']) && (value['resistances'] as unknown[]).every(isSrLevel)
-  );
-}
 
 function isPositionDetailDto(value: unknown): value is PositionDetailDto {
   if (!isRecord(value)) {
@@ -92,13 +72,6 @@ function isPositionDetailDto(value: unknown): value is PositionDetailDto {
 
   if (!baseValid) {
     return false;
-  }
-
-  const srLevels = value['srLevels'];
-  if (srLevels == null) {
-    delete value['srLevels'];
-  } else if (!isSrLevelsBlock(srLevels)) {
-    delete value['srLevels'];
   }
 
   return true;

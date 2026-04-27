@@ -6,8 +6,6 @@ import { typography } from '../design-system/index.js';
 import { presentPositionDetail } from '../presenters/PositionDetailPresenter.js';
 import { RangeStatusBadge } from '../components/RangeStatusBadge.js';
 import { DirectionalPolicyCard } from '../components/DirectionalPolicyCard.js';
-import { SrLevelsCard } from '../components/SrLevelsCard.js';
-import { MarketThesisCard } from '../components/MarketThesisCard.js';
 
 type Props = {
   position?: PositionDetailDto;
@@ -259,10 +257,7 @@ export function PositionDetailScreen({ position, onViewPreview, now: nowProp }: 
           </Text>
         </View>
 
-        {vm.srLevels?.summary ? (
-          <MarketThesisCard summary={vm.srLevels.summary} />
-        ) : null}
-        <SrLevelsCard srLevels={vm.srLevels} />
+
       </View>
     </ScrollView>
   );
