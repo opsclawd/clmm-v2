@@ -9,7 +9,7 @@ const toneColors = {
 } as const;
 
 type Props = {
-  srLevels?: SrLevelsViewModelBlock;
+  srLevels?: SrLevelsViewModelBlock | undefined;
 };
 
 export function SrLevelsCard({ srLevels }: Props): JSX.Element {
