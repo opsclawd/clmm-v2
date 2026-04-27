@@ -95,8 +95,7 @@ describe('buildPositionDetailViewModel srLevels', () => {
     expect(group.setupType).toBe('trend continuation');
     expect(group.trigger).toBe('break below 85 signals wave three down is underway');
     expect(group.invalidation).toBe('break above 88.30, shifting probabilities toward orange C-wave scenario');
-    expect(group.note).toContain('Support parsed from:');
-    expect(group.note).toContain('Raw support:');
+    expect(group.note).toBe('');
   });
 
   it('returns raw notes when no pipe separator', () => {
@@ -112,7 +111,7 @@ describe('buildPositionDetailViewModel srLevels', () => {
       now,
     );
     const group = vm.srLevels!.groups[0]!;
-    expect(group.note).toBe('Primary support zone');
+    expect(group.note).toBe('');
     expect(group.source).toBeUndefined();
   });
 
@@ -142,8 +141,8 @@ describe('buildPositionDetailViewModel srLevels', () => {
         srLevels: makeSrBlock({
           capturedAtUnixMs: now,
           supports: [
-            { price: 90, rank: 'S1', notes: 'note A' },
-            { price: 110, rank: 'S2', notes: 'note B' },
+            { price: 90, rank: 'S1', notes: 's, 1h, Bullish. t | Trigger: A' },
+            { price: 110, rank: 'S2', notes: 's, 1h, Bullish. t | Trigger: B' },
           ],
           resistances: [],
         }),
@@ -203,8 +202,8 @@ describe('buildPositionDetailViewModel srLevels', () => {
       makeDto({
         srLevels: makeSrBlock({
           capturedAtUnixMs: now,
-          supports: [{ price: 130, notes: 'high' }],
-          resistances: [{ price: 80, notes: 'low' }],
+          supports: [{ price: 130, notes: 's, 1h, A. t | Trigger: high' }],
+          resistances: [{ price: 80, notes: 's, 1h, B. t | Trigger: low' }],
         }),
       }),
       now,

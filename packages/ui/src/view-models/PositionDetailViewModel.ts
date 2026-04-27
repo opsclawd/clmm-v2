@@ -159,32 +159,40 @@ function toSrLevelsViewModelBlock(
 ): SrLevelsViewModelBlock {
   const { freshnessLabel, isStale } = computeFreshness(block.capturedAtUnixMs, now);
 
-  // Group raw levels by identical metadata (rank + timeframe + notes)
-  type RawItem = (typeof block.supports)[number] & { kind: 'support' | 'resistance' };
-  const rawGroups = new Map<string, RawItem[]>();
-
-  const addItems = (kind: 'support' | 'resistance', items: typeof block.supports) => {
-    for (const item of items) {
-      const key = `${item.rank ?? ''}:${item.timeframe ?? ''}:${item.notes ?? ''}`;
-      const existing = rawGroups.get(key);
-      const itemWithKind = { ...item, kind };
-      if (existing) {
-        existing.push(itemWithKind);
-      } else {
-        rawGroups.set(key, [itemWithKind]);
-      }
-    }
+  // Collect all levels with parsed metadata
+  type LevelWithMeta = {
+    kind: 'support' | 'resistance';
+    price: number;
+    parsed: ReturnType<typeof parseNotes>;
   };
 
-  addItems('support', block.supports);
-  addItems('resistance', block.resistances);
+  const allLevels: LevelWithMeta[] = [];
+
+  for (const item of block.supports) {
+    allLevels.push({ kind: 'support', price: item.price, parsed: parseNotes(item.notes) });
+  }
+  for (const item of block.resistances) {
+    allLevels.push({ kind: 'resistance', price: item.price, parsed: parseNotes(item.notes) });
+  }
+
+  // Group by identical parsed metadata (trigger + invalidation + bias + source + timeframe + setupType)
+  const rawGroups = new Map<string, LevelWithMeta[]>();
+
+  for (const level of allLevels) {
+    const key = `${level.parsed.bias ?? ''}:${level.parsed.source ?? ''}:${level.parsed.timeframe ?? ''}:${level.parsed.setupType ?? ''}:${level.parsed.trigger ?? ''}:${level.parsed.invalidation ?? ''}`;
+    const existing = rawGroups.get(key);
+    if (existing) {
+      existing.push(level);
+    } else {
+      rawGroups.set(key, [level]);
+    }
+  }
 
   const groups: SrLevelGroupViewModel[] = [];
 
   for (const [, items] of rawGroups) {
     if (items.length === 0) continue;
     const first = items[0]!;
-    const parsed = parseNotes(first.notes);
 
     const levels = items.map((item) => ({
       kind: item.kind,
@@ -197,13 +205,13 @@ function toSrLevelsViewModelBlock(
 
     groups.push({
       levels,
-      note: parsed.remaining,
-      ...(parsed.source ? { source: parsed.source } : {}),
-      ...(parsed.timeframe ? { timeframe: parsed.timeframe } : {}),
-      ...(parsed.bias ? { bias: parsed.bias } : {}),
-      ...(parsed.setupType ? { setupType: parsed.setupType } : {}),
-      ...(parsed.trigger ? { trigger: parsed.trigger } : {}),
-      ...(parsed.invalidation ? { invalidation: parsed.invalidation } : {}),
+      note: '',
+      ...(first.parsed.source ? { source: first.parsed.source } : {}),
+      ...(first.parsed.timeframe ? { timeframe: first.parsed.timeframe } : {}),
+      ...(first.parsed.bias ? { bias: first.parsed.bias } : {}),
+      ...(first.parsed.setupType ? { setupType: first.parsed.setupType } : {}),
+      ...(first.parsed.trigger ? { trigger: first.parsed.trigger } : {}),
+      ...(first.parsed.invalidation ? { invalidation: first.parsed.invalidation } : {}),
     });
   }
 

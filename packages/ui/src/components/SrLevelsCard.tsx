@@ -20,47 +20,6 @@ const toneColors = {
   },
 } as const;
 
-function TriggerInvalidationSection({
-  label,
-  text,
-  labelColor,
-}: {
-  label: string;
-  text: string;
-  labelColor: string;
-}): JSX.Element {
-  return (
-    <View
-      style={{
-        marginTop: 10,
-        paddingTop: 10,
-        borderTopWidth: 1,
-        borderTopColor: colors.border,
-      }}
-    >
-      <Text
-        style={{
-          fontSize: typography.fontSize.micro,
-          color: labelColor,
-          fontWeight: typography.fontWeight.semibold,
-        }}
-      >
-        {label}
-      </Text>
-      <Text
-        style={{
-          fontSize: typography.fontSize.micro,
-          color: colors.textMuted,
-          lineHeight: 16,
-          marginTop: 2,
-        }}
-      >
-        {text}
-      </Text>
-    </View>
-  );
-}
-
 type Props = {
   srLevels?: SrLevelsViewModelBlock | undefined;
 };
@@ -133,53 +92,49 @@ export function SrLevelsCard({ srLevels }: Props): JSX.Element {
             borderColor: colors.border,
           }}
         >
-          {/* Group header: bias pill + cluster label */}
-          <View
-            style={{
-              flexDirection: 'row',
-              justifyContent: 'space-between',
-              alignItems: 'center',
-              marginBottom: 10,
-            }}
-          >
-            {group.bias ? (
+          {/* Group header: bias pill */}
+          {group.bias ? (
+            <View
+              style={{
+                flexDirection: 'row',
+                alignItems: 'center',
+                marginBottom: 10,
+              }}
+            >
               <View
                 style={{
+                  flexDirection: 'row',
+                  alignItems: 'center',
                   height: 22,
                   paddingHorizontal: 10,
                   borderRadius: 999,
                   borderWidth: 1,
                   borderColor: 'rgba(244,201,122,0.30)',
-                  justifyContent: 'center',
-                  alignItems: 'center',
+                  backgroundColor: 'rgba(244,201,122,0.08)',
+                  gap: 6,
                 }}
               >
+                <View
+                  style={{
+                    width: 5,
+                    height: 5,
+                    borderRadius: 2.5,
+                    backgroundColor: colors.warn,
+                  }}
+                />
                 <Text
                   style={{
                     fontSize: typography.fontSize.micro,
                     color: colors.warn,
                     fontWeight: typography.fontWeight.semibold,
+                    textTransform: 'capitalize',
                   }}
                 >
                   {group.bias}
                 </Text>
               </View>
-            ) : (
-              <View />
-            )}
-            <Text
-              style={{
-                fontSize: typography.fontSize.micro,
-                color: colors.textMuted,
-                textTransform: 'uppercase',
-                letterSpacing: 0.06,
-              }}
-            >
-              {group.levels[0]?.kind === 'resistance'
-                ? 'Resistance Cluster'
-                : 'Support Cluster'}
-            </Text>
-          </View>
+            </View>
+          ) : null}
 
           {/* Levels */}
           {group.levels.map((lv, li) => {
@@ -241,43 +196,35 @@ export function SrLevelsCard({ srLevels }: Props): JSX.Element {
             );
           })}
 
-          {/* Trigger */}
-          {group.trigger ? (
-            <TriggerInvalidationSection
-              label="Trigger"
-              text={group.trigger}
-              labelColor={colors.breachAccent}
-            />
-          ) : null}
-
-          {/* Invalidation */}
-          {group.invalidation ? (
-            <TriggerInvalidationSection
-              label="Invalidation"
-              text={group.invalidation}
-              labelColor={colors.safe}
-            />
-          ) : null}
-
-          {/* Shared note */}
-          {group.note ? (
+          {/* Trigger / Invalidation */}
+          {(group.trigger || group.invalidation) ? (
             <View
               style={{
                 marginTop: 10,
                 paddingTop: 10,
                 borderTopWidth: 1,
                 borderTopColor: colors.border,
+                gap: 4,
               }}
             >
-              <Text
-                style={{
-                  fontSize: typography.fontSize.micro,
-                  color: colors.textMuted,
-                  lineHeight: 16,
-                }}
-              >
-                {group.note}
-              </Text>
+              {group.trigger ? (
+                <Text style={{ fontSize: typography.fontSize.xs, lineHeight: 18 }}>
+                  <Text style={{ color: colors.breachAccent, fontWeight: typography.fontWeight.semibold }}>
+                    Trigger
+                  </Text>
+                  <Text style={{ color: colors.textMuted }}> · </Text>
+                  <Text style={{ color: colors.textSecondary }}>{group.trigger}</Text>
+                </Text>
+              ) : null}
+              {group.invalidation ? (
+                <Text style={{ fontSize: typography.fontSize.xs, lineHeight: 18 }}>
+                  <Text style={{ color: colors.safe, fontWeight: typography.fontWeight.semibold }}>
+                    Invalidation
+                  </Text>
+                  <Text style={{ color: colors.textMuted }}> · </Text>
+                  <Text style={{ color: colors.textSecondary }}>{group.invalidation}</Text>
+                </Text>
+              ) : null}
             </View>
           ) : null}
 
