@@ -1,6 +1,20 @@
-# Submitted Attempt Sweep Job
+---
+title: "Submitted Attempt Sweep Job"
+date: "2026-04-23"
+category: integration-issues
+module: execution
+problem_type: integration_issue
+component: background_job
+severity: high
+symptoms:
+  - "Execution stuck in submitted state after reconciliation enqueue fails"
+  - "Orphaned attempts after worker process crash"
+root_cause: missing_workflow_step
+resolution_type: code_fix
+tags: [pg-boss, sweep-job, reconciliation, orphaned-attempts]
+---
 
-Date: 2026-04-23
+# Submitted Attempt Sweep Job
 
 ## Problem
 
