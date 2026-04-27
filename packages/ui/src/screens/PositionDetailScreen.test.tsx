@@ -188,4 +188,56 @@ describe('PositionDetailScreen', () => {
 
     vi.restoreAllMocks();
   });
+
+  it('renders support-only levels correctly', () => {
+    const now = Date.now();
+    vi.spyOn(Date, 'now').mockReturnValue(now);
+
+    render(
+      <PositionDetailScreen
+        position={makePosition({
+          srLevels: {
+            briefId: 'brief-1',
+            sourceRecordedAtIso: null,
+            summary: null,
+            capturedAtUnixMs: now,
+            supports: [{ price: 90 }, { price: 110 }],
+            resistances: [],
+          },
+        })}
+      />,
+    );
+
+    expect(screen.getByText('Support & Resistance')).toBeTruthy();
+    expect(screen.getAllByText('Support')).toHaveLength(2);
+    expect(screen.getByText('$90.00')).toBeTruthy();
+    expect(screen.getByText('$110.00')).toBeTruthy();
+
+    vi.restoreAllMocks();
+  });
+
+  it('renders empty levels message when both supports and resistances are empty', () => {
+    const now = Date.now();
+    vi.spyOn(Date, 'now').mockReturnValue(now);
+
+    render(
+      <PositionDetailScreen
+        position={makePosition({
+          srLevels: {
+            briefId: 'brief-1',
+            sourceRecordedAtIso: null,
+            summary: null,
+            capturedAtUnixMs: now,
+            supports: [],
+            resistances: [],
+          },
+        })}
+      />,
+    );
+
+    expect(screen.getByText('Support & Resistance')).toBeTruthy();
+    expect(screen.queryByTestId('sr-level-0')).toBeNull();
+
+    vi.restoreAllMocks();
+  });
 });
