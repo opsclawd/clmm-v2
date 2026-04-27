@@ -147,8 +147,8 @@ export function SrLevelsCard({ srLevels }: Props): JSX.Element {
                   flexDirection: 'row',
                   alignItems: 'center',
                   justifyContent: 'space-between',
-                  paddingVertical: li === 0 ? 0 : 8,
-                  borderTopWidth: li === 0 ? 0 : 1,
+                  paddingVertical: 8,
+                  borderTopWidth: 1,
                   borderTopColor: colors.border,
                 }}
               >
