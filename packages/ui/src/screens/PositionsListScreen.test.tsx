@@ -166,7 +166,7 @@ describe('PositionsListScreen', () => {
     expect(screen.getByText('Breach')).toBeTruthy();
   });
 
-  it('renders the market context panel above the list when positions and S/R data are available', () => {
+  it('renders the market context panel with pool label when positions and S/R data are available', () => {
     render(
       <PositionsListScreen
         walletAddress="wallet-1"
@@ -179,6 +179,7 @@ describe('PositionsListScreen', () => {
           supports: [{ price: 132 }],
           resistances: [{ price: 148 }],
         }}
+        poolLabel="SOL / USDC"
         now={1_745_712_000_000 + 5 * 60_000}
       />,
     );
@@ -222,17 +223,38 @@ describe('PositionsListScreen', () => {
     expect(screen.getByText('Active positions')).toBeTruthy();
   });
 
-  it('renders the unavailable caption when S/R errored, while positions render', () => {
+  it('renders cached S/R data with degraded message when S/R errored but data exists', () => {
     render(
       <PositionsListScreen
         walletAddress="wallet-1"
         positions={[makePosition()]}
+        srLevels={{
+          briefId: 'brief-1',
+          sourceRecordedAtIso: null,
+          summary: 'Bullish continuation.',
+          capturedAtUnixMs: 1_745_712_000_000,
+          supports: [{ price: 132 }],
+          resistances: [{ price: 148 }],
+        }}
+        srLevelsError
+      />,
+    );
+
+    expect(screen.getByText('Support & Resistance')).toBeTruthy();
+    expect(screen.getByText('Refresh failed — showing last available analysis.')).toBeTruthy();
+  });
+
+  it('renders unavailable when S/R errored with no cached data', () => {
+    render(
+      <PositionsListScreen
+        walletAddress="wallet-1"
+        positions={[makePosition()]}
+        srLevels={null}
         srLevelsError
       />,
     );
 
     expect(screen.getByText('Market context unavailable')).toBeTruthy();
-    expect(screen.getByText('Active positions')).toBeTruthy();
   });
 
   it('renders the positions list when S/R is loading (non-blocking)', () => {
@@ -245,5 +267,20 @@ describe('PositionsListScreen', () => {
     );
 
     expect(screen.getByText('Active positions')).toBeTruthy();
+  });
+
+  it('renders mixed-pools unavailable message when positions span multiple pools', () => {
+    render(
+      <PositionsListScreen
+        walletAddress="wallet-1"
+        positions={[
+          makePosition({ poolId: brand<PositionSummaryDto['poolId']>('pool-a') }),
+          makePosition({ positionId: brand('position-2'), poolId: brand<PositionSummaryDto['poolId']>('pool-b'), tokenPairLabel: 'BTC / USDC' }),
+        ]}
+        isMixedPools
+      />,
+    );
+
+    expect(screen.getByText('Market context unavailable for mixed pools')).toBeTruthy();
   });
 });

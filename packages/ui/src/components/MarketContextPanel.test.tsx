@@ -27,6 +27,8 @@ describe('MarketContextPanel', () => {
         isLoading={false}
         isError={false}
         isUnsupported={false}
+        isMixedPools={false}
+        poolLabel={null}
         now={1_745_712_000_000}
       />,
     );
@@ -41,6 +43,8 @@ describe('MarketContextPanel', () => {
         isLoading
         isError={false}
         isUnsupported={false}
+        isMixedPools={false}
+        poolLabel={null}
         now={1_745_712_000_000}
       />,
     );
@@ -55,6 +59,8 @@ describe('MarketContextPanel', () => {
         isLoading
         isError={false}
         isUnsupported={false}
+        isMixedPools={false}
+        poolLabel={null}
         now={fixtureBlock().capturedAtUnixMs + 5 * 60_000}
       />,
     );
@@ -70,6 +76,8 @@ describe('MarketContextPanel', () => {
         isLoading={false}
         isError={false}
         isUnsupported
+        isMixedPools={false}
+        poolLabel={null}
         now={1_745_712_000_000}
       />,
     );
@@ -77,18 +85,37 @@ describe('MarketContextPanel', () => {
     expect(screen.getByText('Market context unavailable')).toBeTruthy();
   });
 
-  it('renders the unavailable caption when isError', () => {
+  it('renders the unavailable caption when isError without cached data', () => {
     render(
       <MarketContextPanel
-        srLevels={undefined}
+        srLevels={null}
         isLoading={false}
         isError
         isUnsupported={false}
+        isMixedPools={false}
+        poolLabel={null}
         now={1_745_712_000_000}
       />,
     );
 
     expect(screen.getByText('Market context unavailable')).toBeTruthy();
+  });
+
+  it('renders cached data with degraded message when isError but srLevels is present', () => {
+    render(
+      <MarketContextPanel
+        srLevels={fixtureBlock()}
+        isLoading={false}
+        isError
+        isUnsupported={false}
+        isMixedPools={false}
+        poolLabel={null}
+        now={fixtureBlock().capturedAtUnixMs + 5 * 60_000}
+      />,
+    );
+
+    expect(screen.getByText('Support & Resistance')).toBeTruthy();
+    expect(screen.getByText('Refresh failed — showing last available analysis.')).toBeTruthy();
   });
 
   it('renders the unavailable caption when srLevels is null (transient regime-engine failure)', () => {
@@ -98,6 +125,8 @@ describe('MarketContextPanel', () => {
         isLoading={false}
         isError={false}
         isUnsupported={false}
+        isMixedPools={false}
+        poolLabel={null}
         now={1_745_712_000_000}
       />,
     );
@@ -112,6 +141,8 @@ describe('MarketContextPanel', () => {
         isLoading={false}
         isError={false}
         isUnsupported={false}
+        isMixedPools={false}
+        poolLabel="SOL / USDC"
         now={fixtureBlock().capturedAtUnixMs + 5 * 60_000}
       />,
     );
@@ -119,6 +150,7 @@ describe('MarketContextPanel', () => {
     expect(screen.getByText('Market Thesis')).toBeTruthy();
     expect(screen.getByText('Bullish continuation, support at $132.')).toBeTruthy();
     expect(screen.getByText('Support & Resistance')).toBeTruthy();
+    expect(screen.getByText('SOL / USDC')).toBeTruthy();
   });
 
   it('omits MarketThesisCard when the block has no summary', () => {
@@ -129,11 +161,29 @@ describe('MarketContextPanel', () => {
         isLoading={false}
         isError={false}
         isUnsupported={false}
+        isMixedPools={false}
+        poolLabel={null}
         now={block.capturedAtUnixMs + 5 * 60_000}
       />,
     );
 
     expect(screen.queryByText('Market Thesis')).toBeNull();
     expect(screen.getByText('Support & Resistance')).toBeTruthy();
+  });
+
+  it('renders mixed-pools unavailable message when isMixedPools is true', () => {
+    render(
+      <MarketContextPanel
+        srLevels={undefined}
+        isLoading={false}
+        isError={false}
+        isUnsupported={false}
+        isMixedPools
+        poolLabel={null}
+        now={1_745_712_000_000}
+      />,
+    );
+
+    expect(screen.getByText('Market context unavailable for mixed pools')).toBeTruthy();
   });
 });

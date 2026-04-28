@@ -4,7 +4,7 @@ export type SrLevelViewModel = {
   kind: 'support' | 'resistance';
   rawPrice: number;
   priceLabel: string;
-  tone: 'safe' | 'warn' | 'breach';
+  tone: 'safe' | 'breach';
 };
 
 export type SrLevelGroupViewModel = {
@@ -30,7 +30,7 @@ const MS_PER_HOUR = 3_600_000;
 const STALE_THRESHOLD_MS = 48 * MS_PER_HOUR;
 
 function computeFreshness(capturedAtUnixMs: number, now: number): { freshnessLabel: string; isStale: boolean } {
-  const ageMs = now - capturedAtUnixMs;
+  const ageMs = Math.max(0, now - capturedAtUnixMs);
   if (ageMs < MS_PER_HOUR) {
     const minutes = Math.max(1, Math.round(ageMs / MS_PER_MINUTE));
     return { freshnessLabel: `AI · MCO · ${minutes}m ago`, isStale: false };

@@ -44,8 +44,7 @@ function normalizePositionDetailDto(dto: Partial<PositionDetailDto> & Pick<Posit
 
 export function presentPositionDetail(params: {
   position: PositionDetailDto;
-  now: number;
 }): PositionDetailPresentation {
   const normalized = normalizePositionDetailDto(params.position as Partial<PositionDetailDto> & Pick<PositionDetailDto, 'positionId' | 'poolId'>);
-  return { position: buildPositionDetailViewModel(normalized, params.now) };
+  return { position: buildPositionDetailViewModel(normalized) };
 }

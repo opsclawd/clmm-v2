@@ -10,13 +10,33 @@ type Props = {
   isLoading: boolean;
   isError: boolean;
   isUnsupported: boolean;
+  isMixedPools: boolean;
+  poolLabel: string | null;
   now: number;
 };
 
-export function MarketContextPanel({ srLevels, isLoading, isError, isUnsupported, now }: Props): JSX.Element | null {
-  const showUnavailable = isError || isUnsupported || srLevels === null;
+export function MarketContextPanel({ srLevels, isLoading, isError, isUnsupported, isMixedPools, poolLabel, now }: Props): JSX.Element | null {
+  if (isMixedPools) {
+    return (
+      <View
+        style={{
+          marginHorizontal: 16,
+          marginTop: 14,
+          padding: 16,
+          backgroundColor: colors.surface,
+          borderRadius: 8,
+          borderWidth: 1,
+          borderColor: colors.border,
+        }}
+      >
+        <Text style={{ color: colors.textSecondary, fontSize: typography.fontSize.sm }}>
+          Market context unavailable for mixed pools
+        </Text>
+      </View>
+    );
+  }
 
-  if (showUnavailable && srLevels == null) {
+  if (isUnsupported && srLevels == null) {
     return (
       <View
         style={{
@@ -36,7 +56,7 @@ export function MarketContextPanel({ srLevels, isLoading, isError, isUnsupported
     );
   }
 
-  if (!isLoading && srLevels === undefined) {
+  if (!isLoading && srLevels === undefined && !isError && !isUnsupported) {
     return null;
   }
 
@@ -60,13 +80,43 @@ export function MarketContextPanel({ srLevels, isLoading, isError, isUnsupported
     );
   }
 
-  const block = srLevels as SrLevelsBlock;
-  const vm = buildSrLevelsViewModelBlock(block, now);
+  if (srLevels == null) {
+    return (
+      <View
+        style={{
+          marginHorizontal: 16,
+          marginTop: 14,
+          padding: 16,
+          backgroundColor: colors.surface,
+          borderRadius: 8,
+          borderWidth: 1,
+          borderColor: colors.border,
+        }}
+      >
+        <Text style={{ color: colors.textSecondary, fontSize: typography.fontSize.sm }}>
+          Market context unavailable
+        </Text>
+      </View>
+    );
+  }
+
+  const vm = buildSrLevelsViewModelBlock(srLevels, now);
+  const showDegraded = isError && !isUnsupported;
 
   return (
     <View style={{ marginHorizontal: 16 }}>
+      {poolLabel ? (
+        <Text style={{ color: colors.textSecondary, fontSize: typography.fontSize.xs, marginBottom: 4 }}>
+          {poolLabel}
+        </Text>
+      ) : null}
       {vm.summary ? <MarketThesisCard summary={vm.summary} /> : null}
       <SrLevelsCard srLevels={vm} />
+      {showDegraded ? (
+        <Text style={{ color: colors.warn, fontSize: typography.fontSize.xs, marginTop: 4 }}>
+          Refresh failed — showing last available analysis.
+        </Text>
+      ) : null}
     </View>
   );
 }

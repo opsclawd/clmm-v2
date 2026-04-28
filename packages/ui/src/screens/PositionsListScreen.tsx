@@ -21,6 +21,8 @@ type Props = {
   srLevelsLoading?: boolean | undefined;
   srLevelsError?: boolean | undefined;
   srLevelsUnsupported?: boolean | undefined;
+  isMixedPools?: boolean | undefined;
+  poolLabel?: string | null | undefined;
   now?: number | undefined;
 };
 
@@ -36,6 +38,8 @@ export function PositionsListScreen({
   srLevelsLoading,
   srLevelsError,
   srLevelsUnsupported,
+  isMixedPools,
+  poolLabel,
   now,
 }: Props): JSX.Element {
   const isConnected = walletAddress != null && walletAddress.length > 0;
@@ -59,6 +63,8 @@ export function PositionsListScreen({
           srLevelsLoading={srLevelsLoading}
           srLevelsError={srLevelsError}
           srLevelsUnsupported={srLevelsUnsupported}
+          isMixedPools={isMixedPools ?? false}
+          poolLabel={poolLabel ?? null}
           now={now}
         />
       ) : (
@@ -158,6 +164,8 @@ function ConnectedPositionsList({
   srLevelsLoading,
   srLevelsError,
   srLevelsUnsupported,
+  isMixedPools,
+  poolLabel,
   now,
 }: {
   positions: PositionSummaryDto[];
@@ -166,6 +174,8 @@ function ConnectedPositionsList({
   srLevelsLoading?: boolean | undefined;
   srLevelsError?: boolean | undefined;
   srLevelsUnsupported?: boolean | undefined;
+  isMixedPools: boolean;
+  poolLabel: string | null;
   now?: number | undefined;
 }) {
   const viewModel = buildPositionListViewModel(positions);
@@ -179,10 +189,12 @@ function ConnectedPositionsList({
       ListHeaderComponent={
         <View>
           <MarketContextPanel
-            srLevels={srLevels ?? undefined}
+            srLevels={srLevels}
             isLoading={srLevelsLoading ?? false}
             isError={srLevelsError ?? false}
             isUnsupported={srLevelsUnsupported ?? false}
+            isMixedPools={isMixedPools}
+            poolLabel={poolLabel}
             now={now ?? Date.now()}
           />
           <SectionHeader

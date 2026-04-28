@@ -43,6 +43,26 @@ describe('buildSrLevelsViewModelBlock', () => {
     expect(vm.freshnessLabel).toContain('stale');
   });
 
+  it('clamps negative age to 1m ago when capturedAtUnixMs is in the future', () => {
+    const now = 1_700_000;
+    const vm = buildSrLevelsViewModelBlock(
+      makeBlock({ capturedAtUnixMs: now + 300_000 }),
+      now,
+    );
+
+    expect(vm.freshnessLabel).toBe('AI · MCO · 1m ago');
+    expect(vm.isStale).toBe(false);
+  });
+
+  it('returns empty groups when both supports and resistances are empty', () => {
+    const vm = buildSrLevelsViewModelBlock(
+      makeBlock({ supports: [], resistances: [] }),
+      1_700_000_000,
+    );
+
+    expect(vm.groups).toEqual([]);
+  });
+
   it('parses metadata from the `notes` field of the first level in a group', () => {
     const vm = buildSrLevelsViewModelBlock(
       makeBlock({

@@ -37,7 +37,7 @@ function makeDto(overrides: Partial<PositionDetailDto> = {}): PositionDetailDto 
 
 describe('buildPositionDetailViewModel', () => {
   it('returns base fields without srLevels (regression)', () => {
-    const vm = buildPositionDetailViewModel(makeDto(), Date.now());
+    const vm = buildPositionDetailViewModel(makeDto());
     expect(vm).not.toHaveProperty('srLevels');
     expect(vm.poolLabel).toBe('SOL / USDC');
   });

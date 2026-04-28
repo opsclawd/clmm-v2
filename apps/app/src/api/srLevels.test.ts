@@ -114,4 +114,53 @@ describe('fetchCurrentSrLevels', () => {
     expect(error).not.toBeInstanceOf(SrLevelsUnsupportedPoolError);
     expect(isSrLevelsUnsupportedPoolError(error)).toBe(false);
   });
+
+  it('throws a timeout error when the fetch exceeds the deadline', async () => {
+    env.EXPO_PUBLIC_BFF_BASE_URL = 'https://bff.example.test';
+
+    const abortError = new DOMException('The operation was aborted.', 'AbortError');
+    globalThis.fetch = vi.fn().mockRejectedValue(abortError) as typeof fetch;
+
+    const error = await fetchCurrentSrLevels('Pool111111111111111111111111111111111111111')
+      .catch((reason: unknown) => reason);
+
+    expect(error).toBeInstanceOf(Error);
+    expect((error as Error).message).toContain('timed out');
+  });
+
+  it('rejects srLevels blocks with non-positive prices', async () => {
+    env.EXPO_PUBLIC_BFF_BASE_URL = 'https://bff.example.test';
+
+    globalThis.fetch = vi.fn().mockResolvedValue({
+      ok: true,
+      status: 200,
+      json: () => Promise.resolve({
+        srLevels: { ...fixtureBlock(), supports: [{ price: 0 }], resistances: [] },
+      }),
+    }) as typeof fetch;
+
+    const error = await fetchCurrentSrLevels('Pool111111111111111111111111111111111111111')
+      .catch((reason: unknown) => reason);
+
+    expect(error).toBeInstanceOf(Error);
+    expect((error as Error).message).toContain('malformed');
+  });
+
+  it('rejects srLevels blocks with zero capturedAtUnixMs', async () => {
+    env.EXPO_PUBLIC_BFF_BASE_URL = 'https://bff.example.test';
+
+    globalThis.fetch = vi.fn().mockResolvedValue({
+      ok: true,
+      status: 200,
+      json: () => Promise.resolve({
+        srLevels: { ...fixtureBlock(), capturedAtUnixMs: 0 },
+      }),
+    }) as typeof fetch;
+
+    const error = await fetchCurrentSrLevels('Pool111111111111111111111111111111111111111')
+      .catch((reason: unknown) => reason);
+
+    expect(error).toBeInstanceOf(Error);
+    expect((error as Error).message).toContain('malformed');
+  });
 });

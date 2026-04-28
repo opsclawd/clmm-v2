@@ -47,7 +47,7 @@ function rangeDistanceLabel(distance: { belowLowerPercent: number; aboveUpperPer
   return 'In range';
 }
 
-export function buildPositionDetailViewModel(dto: PositionDetailDto, _now: number): PositionDetailViewModel {
+export function buildPositionDetailViewModel(dto: PositionDetailDto): PositionDetailViewModel {
   const badge = getRangeStatusBadgeProps(dto.rangeState);
 
   const unclaimedFeesLabel = dto.unclaimedFees.totalUsd > 0
