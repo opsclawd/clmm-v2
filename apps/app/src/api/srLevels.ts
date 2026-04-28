@@ -18,6 +18,11 @@ export type SrLevelsResponse = {
 
 const FETCH_TIMEOUT_MS = 10_000;
 
+function isAbortError(error: unknown): boolean {
+  if (typeof error !== 'object' || error == null) return false;
+  return (error as { name?: string }).name === 'AbortError';
+}
+
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value != null;
 }
@@ -47,6 +52,19 @@ function isSrLevelsBlock(value: unknown): value is SrLevelsBlock {
   );
 }
 
+async function classifyNotFound(poolId: string, response: Response): Promise<Error> {
+  let body: unknown;
+  try {
+    body = await response.json();
+  } catch {
+    return new Error('Could not load market context: unexpected 404');
+  }
+  if (isRecord(body) && typeof body['message'] === 'string' && body['message'].includes('not supported')) {
+    return new SrLevelsUnsupportedPoolError(poolId);
+  }
+  return new Error('Could not load market context: endpoint not found');
+}
+
 export async function fetchCurrentSrLevels(poolId: string): Promise<SrLevelsResponse> {
   const controller = new AbortController();
   const timeoutId = setTimeout(() => controller.abort(), FETCH_TIMEOUT_MS);
@@ -58,7 +76,7 @@ export async function fetchCurrentSrLevels(poolId: string): Promise<SrLevelsResp
       { signal: controller.signal },
     );
   } catch (error: unknown) {
-    if (error instanceof DOMException && error.name === 'AbortError') {
+    if (isAbortError(error)) {
       throw new Error('Could not load market context: request timed out');
     }
     throw new Error(`Could not load market context: ${error instanceof Error ? error.message : 'network error'}`);
@@ -67,7 +85,7 @@ export async function fetchCurrentSrLevels(poolId: string): Promise<SrLevelsResp
   }
 
   if (response.status === 404) {
-    throw new SrLevelsUnsupportedPoolError(poolId);
+    throw await classifyNotFound(poolId, response);
   }
 
   if (!response.ok) {
