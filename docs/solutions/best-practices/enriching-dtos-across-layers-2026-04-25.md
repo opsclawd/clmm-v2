@@ -1,6 +1,7 @@
 ---
 title: "Enriching DTOs across clean-architecture layers: token labels, prices, fees, and range distance"
 date: 2026-04-25
+last_updated: 2026-04-27
 category: best-practices
 module: domain/positions, application/ports, adapters/whirlpool, ui
 problem_type: best_practice
@@ -35,7 +36,7 @@ When building a Solana CLMM position exit assistant, positions were displayed wi
 
 The challenge: where does raw → human-readable transformation live when your architecture has a pure domain layer (no SDKs, no APIs), adapter implementations, and UI view models? Adding enrichment means threading a new port through the application layer, extending DTOs across package boundaries, and handling failures in external price feeds without breaking the UI.
 
-This builds on the boundary-safe DTO extension pattern documented in [outbound-adapter-fire-and-forget-dual-seam-pattern](./outbound-adapter-fire-and-forget-dual-seam-pattern-2026-04-19.md), generalizing it from SR-levels enrichment to token labels, USD prices, fees, rewards, and range distance.
+This builds on the boundary-safe DTO extension pattern documented in [outbound-adapter-fire-and-forget-dual-seam-pattern](./outbound-adapter-fire-and-forget-dual-seam-pattern-2026-04-19.md), generalizing it to token labels, USD prices, fees, rewards, and range distance. (Note: SR-levels enrichment was subsequently extracted from the position DTO into a dedicated pool-scoped endpoint — see [S/R position-to-pool extraction](./sr-levels-position-to-pool-extraction-2026-04-27.md).)
 
 ## Guidance
 
@@ -192,5 +193,6 @@ Pool depth: depth unavailable
 
 ## Related
 
-- [Outbound adapter fire-and-forget dual-seam pattern](./outbound-adapter-fire-and-forget-dual-seam-pattern-2026-04-19.md) — prior instance of boundary-safe DTO extension for SR-levels enrichment, same pattern applied to a different enrichment domain
+- [Outbound adapter fire-and-forget dual-seam pattern](./outbound-adapter-fire-and-forget-dual-seam-pattern-2026-04-19.md) — boundary-safe DTO extension for enrichment that can fail silently
+- [S/R position-to-pool extraction](./sr-levels-position-to-pool-extraction-2026-04-27.md) — when enrichment scope doesn't match DTO scope, extraction to a dedicated endpoint is preferred over inline extension
 - GitHub Issue #43 — product-level requirements for position data display
