@@ -26,13 +26,14 @@ function makeAllowlist(entries: Array<[string, { symbol: string; source: string 
 describe('SrLevelsController', () => {
   it('returns srLevels for an allowlisted pool when the port resolves a block', async () => {
     const block = fixtureBlock();
-    const port: CurrentSrLevelsPort = { fetchCurrent: vi.fn().mockResolvedValue(block) };
+    const fetchCurrent = vi.fn().mockResolvedValue(block);
+    const port: CurrentSrLevelsPort = { fetchCurrent };
     const controller = new SrLevelsController(port, makeAllowlist());
 
     const result = await controller.getCurrent(SOL_USDC_POOL_ID);
 
     expect(result).toEqual({ srLevels: block });
-    expect(port.fetchCurrent).toHaveBeenCalledWith('SOL/USDC', 'mco');
+    expect(fetchCurrent).toHaveBeenCalledWith('SOL/USDC', 'mco');
   });
 
   it('returns srLevels: null for an allowlisted pool when the port resolves null', async () => {
@@ -45,15 +46,17 @@ describe('SrLevelsController', () => {
   });
 
   it('throws NotFoundException for a pool that is not in the allowlist', async () => {
-    const port: CurrentSrLevelsPort = { fetchCurrent: vi.fn() };
+    const fetchCurrent = vi.fn();
+    const port: CurrentSrLevelsPort = { fetchCurrent };
     const controller = new SrLevelsController(port, makeAllowlist());
 
     await expect(controller.getCurrent(UNSUPPORTED_POOL_ID)).rejects.toBeInstanceOf(NotFoundException);
-    expect(port.fetchCurrent).not.toHaveBeenCalled();
+    expect(fetchCurrent).not.toHaveBeenCalled();
   });
 
   it('resolves the (symbol, source) pair from the allowlist entry', async () => {
-    const port: CurrentSrLevelsPort = { fetchCurrent: vi.fn().mockResolvedValue(null) };
+    const fetchCurrent = vi.fn().mockResolvedValue(null);
+    const port: CurrentSrLevelsPort = { fetchCurrent };
     const customAllowlist = makeAllowlist([
       ['CustomPool11111111111111111111111111111111', { symbol: 'BTC/USDC', source: 'custom' }],
     ]);
@@ -61,6 +64,6 @@ describe('SrLevelsController', () => {
 
     await controller.getCurrent('CustomPool11111111111111111111111111111111');
 
-    expect(port.fetchCurrent).toHaveBeenCalledWith('BTC/USDC', 'custom');
+    expect(fetchCurrent).toHaveBeenCalledWith('BTC/USDC', 'custom');
   });
 });
