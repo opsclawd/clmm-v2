@@ -165,4 +165,122 @@ describe('PositionsListScreen', () => {
 
     expect(screen.getByText('Breach')).toBeTruthy();
   });
+
+  it('renders the market context panel with pool label when positions and S/R data are available', () => {
+    render(
+      <PositionsListScreen
+        walletAddress="wallet-1"
+        positions={[makePosition()]}
+        srLevels={{
+          briefId: 'brief-1',
+          sourceRecordedAtIso: null,
+          summary: 'Bullish continuation.',
+          capturedAtUnixMs: 1_745_712_000_000,
+          supports: [{ price: 132 }],
+          resistances: [{ price: 148 }],
+        }}
+        poolLabel="SOL / USDC"
+        now={1_745_712_000_000 + 5 * 60_000}
+      />,
+    );
+
+    expect(screen.getByText('Market Thesis')).toBeTruthy();
+    expect(screen.getByText('Bullish continuation.')).toBeTruthy();
+    expect(screen.getByText('Active positions')).toBeTruthy();
+  });
+
+  it('hides the market context panel when wallet is disconnected', () => {
+    render(<PositionsListScreen walletAddress={null} />);
+
+    expect(screen.queryByText('Market Thesis')).toBeNull();
+    expect(screen.queryByText('Market context unavailable')).toBeNull();
+  });
+
+  it('hides the market context panel while positions are loading', () => {
+    render(<PositionsListScreen walletAddress="wallet-1" positionsLoading />);
+
+    expect(screen.queryByText('Market Thesis')).toBeNull();
+    expect(screen.queryByText('Market context unavailable')).toBeNull();
+  });
+
+  it('hides the market context panel when there are no positions', () => {
+    render(<PositionsListScreen walletAddress="wallet-1" positions={[]} />);
+
+    expect(screen.queryByText('Market Thesis')).toBeNull();
+    expect(screen.queryByText('Market context unavailable')).toBeNull();
+  });
+
+  it('renders the unavailable caption when S/R is unsupported but positions render', () => {
+    render(
+      <PositionsListScreen
+        walletAddress="wallet-1"
+        positions={[makePosition()]}
+        srLevelsUnsupported
+      />,
+    );
+
+    expect(screen.getByText('Market context unavailable')).toBeTruthy();
+    expect(screen.getByText('Active positions')).toBeTruthy();
+  });
+
+  it('renders cached S/R data with degraded message when S/R errored but data exists', () => {
+    render(
+      <PositionsListScreen
+        walletAddress="wallet-1"
+        positions={[makePosition()]}
+        srLevels={{
+          briefId: 'brief-1',
+          sourceRecordedAtIso: null,
+          summary: 'Bullish continuation.',
+          capturedAtUnixMs: 1_745_712_000_000,
+          supports: [{ price: 132 }],
+          resistances: [{ price: 148 }],
+        }}
+        srLevelsError
+      />,
+    );
+
+    expect(screen.getByText('Support & Resistance')).toBeTruthy();
+    expect(screen.getByText('Refresh failed — showing last available analysis.')).toBeTruthy();
+  });
+
+  it('renders unavailable when S/R errored with no cached data', () => {
+    render(
+      <PositionsListScreen
+        walletAddress="wallet-1"
+        positions={[makePosition()]}
+        srLevels={null}
+        srLevelsError
+      />,
+    );
+
+    expect(screen.getByText('Market context unavailable')).toBeTruthy();
+  });
+
+  it('renders the positions list when S/R is loading (non-blocking)', () => {
+    render(
+      <PositionsListScreen
+        walletAddress="wallet-1"
+        positions={[makePosition()]}
+        srLevelsLoading
+      />,
+    );
+
+    expect(screen.getByText('Active positions')).toBeTruthy();
+  });
+
+  it('renders mixed-pools unavailable message when positions span multiple pools', () => {
+    render(
+      <PositionsListScreen
+        walletAddress="wallet-1"
+        positions={[
+          makePosition({ poolId: brand<PositionSummaryDto['poolId']>('pool-a') }),
+          makePosition({ positionId: brand('position-2'), poolId: brand<PositionSummaryDto['poolId']>('pool-b'), tokenPairLabel: 'BTC / USDC' }),
+        ]}
+        isMixedPools
+      />,
+    );
+
+    expect(screen.getByText('Market context unavailable for mixed pools')).toBeTruthy();
+  });
 });

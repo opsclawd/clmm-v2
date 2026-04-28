@@ -6,12 +6,11 @@ import type {
   PositionSummaryDto,
   PositionDetailDto,
 } from '@clmm/application';
-import type { SrLevelsBlock as DtoSrLevelsBlock } from '@clmm/application';
 import { listSupportedPositions, getPositionDetail } from '@clmm/application';
 import type { ExitTrigger } from '@clmm/domain';
 import { makeWalletId, makePositionId } from '@clmm/domain';
-import { SUPPORTED_POSITION_READ_PORT, TRIGGER_REPOSITORY, CURRENT_SR_LEVELS_PORT, SR_LEVELS_POOL_ALLOWLIST, PRICE_PORT } from './tokens.js';
-import type { CurrentSrLevelsPort } from '../../outbound/regime-engine/types.js';
+import { SUPPORTED_POSITION_READ_PORT, TRIGGER_REPOSITORY, PRICE_PORT } from './tokens.js';
+
 import { isTransientPositionReadFailure } from './transient-errors.js';
 
 function toPositionSummaryDto(
@@ -47,10 +46,6 @@ export class PositionController {
     private readonly positionReadPort: SupportedPositionReadPort,
     @Inject(TRIGGER_REPOSITORY)
     private readonly triggerRepo: TriggerRepository,
-    @Inject(CURRENT_SR_LEVELS_PORT)
-    private readonly srLevelsPort: CurrentSrLevelsPort,
-    @Inject(SR_LEVELS_POOL_ALLOWLIST)
-    private readonly srLevelsAllowlist: Map<string, { symbol: string; source: string }>,
     @Inject(PRICE_PORT)
     private readonly pricePort: PricePort,
   ) {}
@@ -78,51 +73,20 @@ export class PositionController {
 
     let trigger: import('@clmm/domain').ExitTrigger | null = null;
     let triggerError: string | undefined;
-    let srLevels: DtoSrLevelsBlock | undefined;
 
-    const allowlistEntry = this.srLevelsAllowlist.get(result.position.poolId);
-
-    if (allowlistEntry) {
-      const [triggerResult, srResult] = await Promise.all([
-        this.triggerRepo.listActionableTriggers(wallet).then(
-          (triggers) => ({ ok: true as const, triggers }),
-          (error: unknown) => ({ ok: false as const, error }),
-        ),
-        this.srLevelsPort.fetchCurrent(allowlistEntry.symbol, allowlistEntry.source).then(
-          (block) => block,
-          () => null,
-        ),
-      ]);
-
-      if (triggerResult.ok) {
-        trigger = triggerResult.triggers.find((c) => c.positionId === result.position.positionId) ?? null;
-      } else if (isTransientPositionReadFailure(triggerResult.error)) {
-        triggerError = 'Unable to fetch trigger data. Position data temporarily unavailable.';
-      } else {
-        throw triggerResult.error;
+    try {
+      const actionableTriggers = await this.triggerRepo.listActionableTriggers(wallet);
+      trigger =
+        actionableTriggers.find((candidate) => candidate.positionId === result.position.positionId) ?? null;
+    } catch (error: unknown) {
+      if (!isTransientPositionReadFailure(error)) {
+        throw error;
       }
-
-      if (srResult) {
-        srLevels = srResult;
-      }
-    } else {
-      try {
-        const actionableTriggers = await this.triggerRepo.listActionableTriggers(wallet);
-        trigger =
-          actionableTriggers.find((candidate) => candidate.positionId === result.position.positionId) ?? null;
-      } catch (error: unknown) {
-        if (!isTransientPositionReadFailure(error)) {
-          throw error;
-        }
-        triggerError = 'Unable to fetch trigger data. Position data temporarily unavailable.';
-      }
+      triggerError = 'Unable to fetch trigger data. Position data temporarily unavailable.';
     }
 
     return {
-      position: {
-        ...toPositionDetailDto(result.detailDto, trigger),
-        ...(srLevels ? { srLevels } : {}),
-      },
+      position: toPositionDetailDto(result.detailDto, trigger),
       ...(triggerError ? { error: triggerError } : {}),
     };
   }

@@ -39,14 +39,12 @@ function normalizePositionDetailDto(dto: Partial<PositionDetailDto> & Pick<Posit
     poolDepthLabel: dto.poolDepthLabel ?? 'depth unavailable',
     ...(dto.triggerId ? { triggerId: dto.triggerId } : {}),
     ...(dto.breachDirection ? { breachDirection: dto.breachDirection } : {}),
-    ...(dto.srLevels ? { srLevels: dto.srLevels } : {}),
   };
 }
 
 export function presentPositionDetail(params: {
   position: PositionDetailDto;
-  now: number;
 }): PositionDetailPresentation {
   const normalized = normalizePositionDetailDto(params.position as Partial<PositionDetailDto> & Pick<PositionDetailDto, 'positionId' | 'poolId'>);
-  return { position: buildPositionDetailViewModel(normalized, params.now) };
+  return { position: buildPositionDetailViewModel(normalized) };
 }

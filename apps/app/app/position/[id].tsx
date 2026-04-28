@@ -1,7 +1,5 @@
-import { useLocalSearchParams } from 'expo-router';
-import { useRouter } from 'expo-router';
+import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useQuery } from '@tanstack/react-query';
-import { useMemo } from 'react';
 import { PositionDetailScreen } from '@clmm/ui';
 import { Text, View } from 'react-native';
 import { useStore } from 'zustand';
@@ -53,12 +51,9 @@ function PositionDetailRouteBody() {
 
   const position = positionQuery.data;
 
-  const positionNow = useMemo(() => Date.now(), [positionQuery.dataUpdatedAt]);
-
   return (
     <PositionDetailScreen
       {...(position ? { position } : {})}
-      now={positionNow}
       onViewPreview={(resolvedTriggerId: string) =>
         navigateRoute({
           router,

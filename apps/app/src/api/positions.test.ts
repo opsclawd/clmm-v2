@@ -289,22 +289,22 @@ describe('fetchPositionDetail', () => {
     ).resolves.toEqual(detail);
   });
 
-  it('returns position detail with srLevels when populated', async () => {
+  it('forward-compat: ignores srLevels if a stale server still attaches it', async () => {
     env.EXPO_PUBLIC_BFF_BASE_URL = 'https://bff.example.test';
 
     const detail = {
       positionId: 'Position1111111111111111111111111111111111',
       poolId: 'Pool111111111111111111111111111111111111111',
-      rangeState: 'below-range',
+      rangeState: 'in-range',
       hasActionableTrigger: false,
       monitoringStatus: 'active',
       lowerBound: 100,
       upperBound: 200,
-      currentPrice: 80,
+      currentPrice: 150,
       srLevels: {
         briefId: 'brief-1',
-        sourceRecordedAtIso: '2025-01-01T00:00:00Z',
-        summary: 'test summary',
+        sourceRecordedAtIso: null,
+        summary: null,
         capturedAtUnixMs: 1_000_000,
         supports: [{ price: 90 }],
         resistances: [{ price: 210 }],
@@ -321,134 +321,6 @@ describe('fetchPositionDetail', () => {
       'Position1111111111111111111111111111111111',
     );
 
-    expect(result.srLevels).toEqual({
-      briefId: 'brief-1',
-      sourceRecordedAtIso: '2025-01-01T00:00:00Z',
-      summary: 'test summary',
-      capturedAtUnixMs: 1_000_000,
-      supports: [{ price: 90 }],
-      resistances: [{ price: 210 }],
-    });
-  });
-
-  it('returns position detail without srLevels when key is absent', async () => {
-    env.EXPO_PUBLIC_BFF_BASE_URL = 'https://bff.example.test';
-
-    const detail = {
-      positionId: 'Position1111111111111111111111111111111111',
-      poolId: 'Pool111111111111111111111111111111111111111',
-      rangeState: 'below-range',
-      hasActionableTrigger: false,
-      monitoringStatus: 'active',
-      lowerBound: 100,
-      upperBound: 200,
-      currentPrice: 80,
-    };
-
-    globalThis.fetch = vi.fn().mockResolvedValue({
-      ok: true,
-      json: () => Promise.resolve({ position: detail }),
-    }) as typeof fetch;
-
-    const result = await fetchPositionDetail(
-      'DemoWallet1111111111111111111111111111111111',
-      'Position1111111111111111111111111111111111',
-    );
-
-    expect(result.srLevels).toBeUndefined();
-  });
-
-  it('treats srLevels null as absent', async () => {
-    env.EXPO_PUBLIC_BFF_BASE_URL = 'https://bff.example.test';
-
-    const detail = {
-      positionId: 'Position1111111111111111111111111111111111',
-      poolId: 'Pool111111111111111111111111111111111111111',
-      rangeState: 'below-range',
-      hasActionableTrigger: false,
-      monitoringStatus: 'active',
-      lowerBound: 100,
-      upperBound: 200,
-      currentPrice: 80,
-      srLevels: null,
-    };
-
-    globalThis.fetch = vi.fn().mockResolvedValue({
-      ok: true,
-      json: () => Promise.resolve({ position: { ...detail } }),
-    }) as typeof fetch;
-
-    const result = await fetchPositionDetail(
-      'DemoWallet1111111111111111111111111111111111',
-      'Position1111111111111111111111111111111111',
-    );
-
-    expect(result.srLevels).toBeUndefined();
-  });
-
-  it('permissive-drops malformed srLevels', async () => {
-    env.EXPO_PUBLIC_BFF_BASE_URL = 'https://bff.example.test';
-
-    const detail = {
-      positionId: 'Position1111111111111111111111111111111111',
-      poolId: 'Pool111111111111111111111111111111111111111',
-      rangeState: 'below-range',
-      hasActionableTrigger: false,
-      monitoringStatus: 'active',
-      lowerBound: 100,
-      upperBound: 200,
-      currentPrice: 80,
-      srLevels: { briefId: 'brief-1', supports: 'not-an-array', resistances: [] },
-    };
-
-    globalThis.fetch = vi.fn().mockResolvedValue({
-      ok: true,
-      json: () => Promise.resolve({ position: { ...detail } }),
-    }) as typeof fetch;
-
-    const result = await fetchPositionDetail(
-      'DemoWallet1111111111111111111111111111111111',
-      'Position1111111111111111111111111111111111',
-    );
-
-    expect(result.srLevels).toBeUndefined();
     expect(result.positionId).toBe('Position1111111111111111111111111111111111');
-  });
-
-  it('tolerates extra unknown fields inside srLevels', async () => {
-    env.EXPO_PUBLIC_BFF_BASE_URL = 'https://bff.example.test';
-
-    const detail = {
-      positionId: 'Position1111111111111111111111111111111111',
-      poolId: 'Pool111111111111111111111111111111111111111',
-      rangeState: 'below-range',
-      hasActionableTrigger: false,
-      monitoringStatus: 'active',
-      lowerBound: 100,
-      upperBound: 200,
-      currentPrice: 80,
-      srLevels: {
-        briefId: 'brief-1',
-        sourceRecordedAtIso: null,
-        summary: null,
-        capturedAtUnixMs: 1_000_000,
-        supports: [{ price: 90, unknownField: 'ignored' }],
-        resistances: [{ price: 210 }],
-        extraTopLevel: true,
-      },
-    };
-
-    globalThis.fetch = vi.fn().mockResolvedValue({
-      ok: true,
-      json: () => Promise.resolve({ position: detail }),
-    }) as typeof fetch;
-
-    const result = await fetchPositionDetail(
-      'DemoWallet1111111111111111111111111111111111',
-      'Position1111111111111111111111111111111111',
-    );
-
-    expect(result.srLevels).toBeDefined();
-    expect(result.srLevels!.supports).toEqual([{ price: 90, unknownField: 'ignored' }]);
   });
 });

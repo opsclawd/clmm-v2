@@ -1,9 +1,9 @@
 ---
 title: "S/R Levels Card Redesign v2: Grouped View-Models, Note Parsing, and Component Extraction"
-date: 2026-04-26
+date: 2026-04-27
 category: design-patterns
 module: packages/ui
-problem_type: design_pattern
+problem_type: best_practice
 component: development_workflow
 severity: low
 applies_when:
@@ -11,6 +11,7 @@ applies_when:
   - "A screen component grows beyond ~30 lines for a single subsection"
   - "View-model data shape does not match the desired UI layout"
   - "Presentation logic (sorting, tone computation, note formatting) is mixed with rendering"
+  - "Free-text backend data contains structured metadata that the UI needs to display explicitly"
 tags:
   - ui-redesign
   - view-model
@@ -19,13 +20,16 @@ tags:
   - design-system
   - note-parsing
   - grouped-levels
+  - sr-levels
+supersedes: sr-levels-card-redesign-2026-04-26
+last_updated: 2026-04-27
 ---
 
 # S/R Levels Card Redesign v2: Grouped View-Models, Note Parsing, and Component Extraction
 
 ## Context
 
-The Position Detail screen's Support & Resistance (S/R) levels section evolved from a simple flat list (v1) to a clustered card layout (v2). The v1 design used a unified `levels` array with tone computed from live price proximity (`breach` if crossed, `warn` if near, `safe` otherwise) and a simple `note` string per level. The v2 design required:
+The S/R (Support & Resistance) levels section evolved from a simple flat list (v1) to a clustered card layout (v2). The v1 design used a unified `levels` array with tone computed from live price proximity (`breach` if crossed, `warn` if near, `safe` otherwise) and a simple `note` string per level. The v2 design required:
 
 - Parsing structured metadata (source, timeframe, bias, setup type, trigger, invalidation) from free-text notes
 - Grouping levels that share identical `(rank, timeframe, notes)` metadata into clusters
@@ -33,7 +37,7 @@ The Position Detail screen's Support & Resistance (S/R) levels section evolved f
 - A separate Market Thesis summary rendered above the clusters
 - A group-based card layout with bias chips, trigger/invalidation labels, and metadata footers
 
-This guidance captures the v2 pattern: moving note parsing and grouping into the view-model, extracting a new `MarketThesisCard` component, redesigning `SrLevelsCard` to render groups, and keeping the screen component thin.
+**Where this pattern lives now:** S/R was extracted from the position-detail endpoint into a pool-scoped BFF endpoint (see [S/R position-to-pool extraction](../best-practices/sr-levels-position-to-pool-extraction-2026-04-27.md)). The view-model logic moved from `PositionDetailViewModel` into its own `SrLevelsViewModel` module, and the UI moved from `PositionDetailScreen` to `MarketContextPanel` on the Positions list page. The design patterns below are still valid — only the file locations and screen context have changed.
 
 ## Guidance
 
@@ -41,39 +45,27 @@ This guidance captures the v2 pattern: moving note parsing and grouping into the
 
 Move note parsing into the view-model layer so components receive typed data instead of raw strings.
 
-**`parseNotes(notes)`**
+**`parseNotes(notes)`** — lives in `packages/ui/src/view-models/SrLevelsViewModel.ts`
 
 ```typescript
-function parseNotes(notes: string) {
-  const sections = notes.split('|').map(s => s.trim());
-  const first = sections[0] ?? '';
-  const sourceMatch = first.match(/^([^,]+),\s*([^\.]+)\.\s*(.+)$/);
-  const source = sourceMatch?.[1]?.trim();
-  const timeframe = sourceMatch?.[2]?.trim();
-  const bias = sourceMatch?.[3]?.trim();
-  const setupType = first.includes('.')
-    ? first.split('.').pop()?.trim()
-    : undefined;
-
-  const trigger = sections
-    .find(s => s.startsWith('Trigger:'))
-    ?.replace('Trigger:', '')
-    .trim();
-  const invalidation = sections
-    .find(s => s.startsWith('Invalidation:'))
-    ?.replace('Invalidation:', '')
-    .trim();
-
-  const note = sections
-    .filter(s => !s.startsWith('Trigger:') && !s.startsWith('Invalidation:'))
-    .slice(1)
-    .join(' | ');
-
-  return { source, timeframe, bias, setupType, trigger, invalidation, note };
+function parseNotes(notes: string | undefined): {
+  source?: string;
+  timeframe?: string;
+  bias?: string;
+  setupType?: string;
+  trigger?: string;
+  invalidation?: string;
+  remaining: string;
+} {
+  if (!notes) return { remaining: '' };
+  const parts = notes.split('|').map((s) => s.trim()).filter(Boolean);
+  // ... parse source, timeframe, bias, setupType from first section
+  // ... parse trigger and invalidation from remaining sections
+  return { source, timeframe, bias, setupType, trigger, invalidation, remaining };
 }
 ```
 
-**`SrLevelGroupViewModel`**
+**`SrLevelGroupViewModel`** — lives in `packages/ui/src/view-models/SrLevelsViewModel.ts`
 
 ```typescript
 export type SrLevelGroupViewModel = {
@@ -90,117 +82,97 @@ export type SrLevelGroupViewModel = {
 
 ### 2. Group Levels by Shared Metadata
 
-In the view-model builder, cluster levels that share identical `(rank, timeframe, notes)` metadata. Each cluster becomes one `SrLevelGroupViewModel`.
+In the view-model builder, cluster levels that share identical parsed metadata. Each cluster becomes one `SrLevelGroupViewModel`.
 
 ```typescript
-const groups = Object.values(
-  levels.reduce((acc, level) => {
-    const key = `${level.rank}|${level.timeframe}|${level.notes}`;
-    if (!acc[key]) {
-      acc[key] = { levels: [], ...parseNotes(level.notes) };
-    }
-    acc[key].levels.push(level);
-    return acc;
-  }, {} as Record<string, SrLevelGroupViewModel>)
-);
+const rawGroups = new Map<string, LevelWithMeta[]>();
+for (const level of allLevels) {
+  const key = `${level.parsed.bias ?? ''}:${level.parsed.source ?? ''}:${level.parsed.timeframe ?? ''}:${level.parsed.setupType ?? ''}:${level.parsed.trigger ?? ''}:${level.parsed.invalidation ?? ''}`;
+  const existing = rawGroups.get(key);
+  if (existing) existing.push(level);
+  else rawGroups.set(key, [level]);
+}
 ```
 
 ### 3. Override Tone Explicitly by Level Type
 
-Do not derive tone from dynamic price proximity. In v2, tone is fixed by semantic role:
+Do not derive tone from dynamic price proximity. Tone is fixed by semantic role:
 
 - **Resistance levels:** always `breach` tone (red)
 - **Support levels:** always `safe` tone (green)
 
-Apply this in the view-model builder when mapping domain DTOs to view-models.
+Apply this in `buildSrLevelsViewModelBlock()` when mapping domain DTOs to view-models.
 
 ### 4. Restructure the Top-Level Block
 
-`SrLevelsViewModelBlock` now carries grouped data and an optional market thesis summary:
+`SrLevelsViewModelBlock` carries grouped data, an optional market thesis summary, and freshness metadata:
 
 ```typescript
 export type SrLevelsViewModelBlock = {
+  summary?: string | undefined;
   groups: SrLevelGroupViewModel[];
-  summary?: string;
+  freshnessLabel: string;
+  isStale: boolean;
 };
 ```
 
-### 5. Extract Components to Keep the Screen Thin
+### 5. Extract Components Behind a MarketContextPanel Orchestrator
 
-When a subsection exceeds ~30 lines or mixes presentation logic with rendering, extract dedicated presentational components.
+When a subsection exceeds ~30 lines or mixes presentation logic with rendering, extract dedicated presentational components. S/R is now rendered via `MarketContextPanel` which handles loading, error, and unsupported states and delegates to `SrLevelsCard` and `MarketThesisCard`.
 
-**`MarketThesisCard.tsx`** (NEW)
-
-Renders the `summary` text with an info icon above the S/R card.
-
-```tsx
-export function MarketThesisCard({ summary }: { summary: string }) {
-  return (
-    <View style={styles.container}>
-      <InfoIcon />
-      <Text style={styles.text}>{summary}</Text>
-    </View>
-  );
-}
-```
-
-**`SrLevelsCard.tsx`** (redesigned)
-
-Renders `groups`, not a flat `levels` array. Each group displays:
-- Bias chip (yellow)
-- "RESISTANCE CLUSTER" or "SUPPORT CLUSTER" label
-- Trigger section with red "Trigger" label
-- Invalidation section with green "Invalidation" label
-- Shared note at the bottom of the group
-- Metadata footer: `Source · TF · Setup`
-- Group background: `surfaceRecessed` with border
+**`MarketContextPanel.tsx`** — orchestrator on the Positions list page
 
 ```tsx
 type Props = {
-  srLevels?: SrLevelsViewModelBlock | undefined;
+  srLevels: SrLevelsBlock | null | undefined;
+  isLoading: boolean;
+  isError: boolean;
+  isUnsupported: boolean;
+  now: number;
 };
 
-export function SrLevelsCard({ srLevels }: Props): JSX.Element {
-  if (!srLevels || srLevels.groups.length === 0) {
-    return <Text>No current MCO levels available</Text>;
-  }
+export function MarketContextPanel({ srLevels, isLoading, isError, isUnsupported, now }: Props) {
+  const showUnavailable = isError || isUnsupported || srLevels === null;
+  if (showUnavailable && srLevels == null) return <UnavailableCaption />;
+  if (!isLoading && srLevels === undefined) return null;  // not yet fetched
+  if (isLoading && srLevels == null) return <Skeleton />;
+  const vm = buildSrLevelsViewModelBlock(srLevels, now);
   return (
-    <View>
-      {srLevels.groups.map((group, i) => (
-        <View key={i} style={styles.group}>
-          <BiasChip bias={group.bias} />
-          <ClusterLabel kind={group.levels[0].kind} />
-          {group.trigger && <TriggerLabel text={group.trigger} />}
-          {group.invalidation && (
-            <InvalidationLabel text={group.invalidation} />
-          )}
-          <Text style={styles.note}>{group.note}</Text>
-          <MetaFooter
-            source={group.source}
-            timeframe={group.timeframe}
-            setupType={group.setupType}
-          />
-        </View>
-      ))}
-    </View>
+    <>
+      {vm.summary ? <MarketThesisCard summary={vm.summary} /> : null}
+      <SrLevelsCard srLevels={vm} />
+    </>
   );
 }
 ```
 
+**`SrLevelsCard.tsx`** — renders groups with bias chips, trigger/invalidation labels, and metadata footers.
+
+**`MarketThesisCard.tsx`** — renders the `summary` text with an info icon.
+
 ### 6. Keep the Screen Component an Orchestrator Only
 
-The screen should never transform data or contain inline presentation logic.
+The screen should never transform data or contain inline presentation logic. The positions route wires TanStack Query for S/R and passes distinct state flags:
 
 ```tsx
-// PositionDetailScreen.tsx
-{vm.srLevels ? (
-  <>
-    {vm.srLevels.summary ? (
-      <MarketThesisCard summary={vm.srLevels.summary} />
-    ) : null}
-    <SrLevelsCard srLevels={vm.srLevels} />
-  </>
-) : null}
+// apps/app/app/(tabs)/positions.tsx
+const srLevelsQuery = useQuery({
+  queryKey: ['sr-levels-current', poolId],
+  queryFn: () => fetchCurrentSrLevels(poolId!),
+  enabled: poolId != null,
+  staleTime: 5 * 60 * 1000,
+  refetchOnMount: true,
+  refetchOnWindowFocus: false,
+  retry: (failureCount, error) =>
+    !(error instanceof SrLevelsUnsupportedPoolError) && failureCount < 1,
+});
+
+<PositionsListScreen
+  srLevels={srLevelsQuery.data?.srLevels ?? null}
+  srLevelsLoading={srLevelsQuery.isLoading && srLevelsQuery.fetchStatus !== 'idle'}
+  srLevelsError={srLevelsError}
+  srLevelsUnsupported={srLevelsUnsupported}
+/>
 ```
 
 ## Why This Matters
@@ -210,6 +182,7 @@ The screen should never transform data or contain inline presentation logic.
 - **Type safety:** Structured fields (`trigger`, `invalidation`, `bias`) are typed, preventing silent breakage when note formats change.
 - **Separation of concerns:** The screen orchestrates layout order; the view-model shapes data; components render. No layer re-derives what another already computed.
 - **Design fidelity:** Grouped clusters, explicit tone overrides, and parsed metadata let the UI match complex designs without ad-hoc logic in JSX.
+- **Scope alignment:** Pool-level S/R data is fetched once per pool, not redundantly per-position. See the [extraction doc](../best-practices/sr-levels-position-to-pool-extraction-2026-04-27.md) for the endpoint and query design.
 
 ## When to Apply
 
@@ -221,9 +194,10 @@ The screen should never transform data or contain inline presentation logic.
 
 ## Examples
 
-### Before (v1 flat levels)
+### Before (v1 flat levels, embedded in PositionDetailViewModel)
 
 ```typescript
+// PositionDetailViewModel.ts — S/R logic embedded in position detail
 export type SrLevelViewModel = {
   kind: 'support' | 'resistance';
   rawPrice: number;
@@ -239,9 +213,10 @@ export type SrLevelsViewModelBlock = {
 };
 ```
 
-### After (v2 grouped levels with parsed metadata)
+### After (v2 grouped levels with parsed metadata, in SrLevelsViewModel)
 
 ```typescript
+// SrLevelsViewModel.ts — S/R logic in its own module
 export type SrLevelGroupViewModel = {
   levels: SrLevelViewModel[];
   note: string;
@@ -254,37 +229,38 @@ export type SrLevelGroupViewModel = {
 };
 
 export type SrLevelsViewModelBlock = {
+  summary?: string | undefined;
   groups: SrLevelGroupViewModel[];
-  summary?: string;
+  freshnessLabel: string;
+  isStale: boolean;
 };
 ```
 
 ### Screen: Before and After
 
-**Before (v1):**
+**Before (v1, PositionDetailScreen):**
 
 ```tsx
 <SrLevelsCard srLevels={vm.srLevels} />
 ```
 
-**After (v2):**
+**After (v2, MarketContextPanel on PositionsListScreen):**
 
 ```tsx
-{vm.srLevels ? (
-  <>
-    {vm.srLevels.summary ? (
-      <MarketThesisCard summary={vm.srLevels.summary} />
-    ) : null}
-    <SrLevelsCard srLevels={vm.srLevels} />
-  </>
-) : null}
+<MarketContextPanel
+  srLevels={srLevels}
+  isLoading={srLevelsLoading}
+  isError={srLevelsError}
+  isUnsupported={srLevelsUnsupported}
+  now={Date.now()}
+/>
 ```
 
 ## Related
 
-- `packages/ui/src/screens/PositionDetailScreen.tsx`
+- [S/R position-to-pool extraction](../best-practices/sr-levels-position-to-pool-extraction-2026-04-27.md) — the architectural decision to move S/R from position-scoped to pool-scoped
+- `packages/ui/src/view-models/SrLevelsViewModel.ts`
+- `packages/ui/src/components/MarketContextPanel.tsx`
 - `packages/ui/src/components/SrLevelsCard.tsx`
 - `packages/ui/src/components/MarketThesisCard.tsx`
-- `packages/ui/src/view-models/PositionDetailViewModel.ts`
-- `docs/architecture/repo-map.md`
-- `docs/architecture/domain-model.md`
+- `packages/adapters/src/inbound/http/SrLevelsController.ts`

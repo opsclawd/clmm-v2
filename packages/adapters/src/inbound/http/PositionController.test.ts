@@ -1,4 +1,4 @@
-import { describe, it, expect, vi } from 'vitest';
+import { describe, it, expect } from 'vitest';
 import { NotFoundException } from '@nestjs/common';
 import { PositionController } from './PositionController.js';
 import {
@@ -11,13 +11,7 @@ import {
 } from '@clmm/testing';
 import type { BreachEpisodeId, ExitTriggerId, WalletId } from '@clmm/domain';
 import { makeClockTimestamp, makeWalletId } from '@clmm/domain';
-import type { CurrentSrLevelsPort } from '../../outbound/regime-engine/types.js';
 
-const nullSrLevelsPort: CurrentSrLevelsPort = {
-  fetchCurrent: vi.fn().mockResolvedValue(null),
-};
-
-const emptyAllowlist = new Map<string, { symbol: string; source: string }>();
 const fakePricePort = new FakePricePort();
 const fixturePoolDataMap = { [FIXTURE_POOL_DATA.poolId]: FIXTURE_POOL_DATA };
 
@@ -38,8 +32,6 @@ describe('PositionController', () => {
     const controller = new PositionController(
       positionReadPort,
       triggerRepo,
-      nullSrLevelsPort,
-      emptyAllowlist,
       fakePricePort,
     );
 
@@ -60,8 +52,6 @@ describe('PositionController', () => {
     const controller = new PositionController(
       positionReadPort,
       triggerRepo,
-      nullSrLevelsPort,
-      emptyAllowlist,
       fakePricePort,
     );
 
@@ -82,8 +72,6 @@ describe('PositionController', () => {
     const controller = new PositionController(
       positionReadPort,
       triggerRepo,
-      nullSrLevelsPort,
-      emptyAllowlist,
       fakePricePort,
     );
 
@@ -95,7 +83,7 @@ describe('PositionController', () => {
   it('throws NotFoundException when wallet does not own the position', async () => {
     const positionReadPort = new FakeSupportedPositionReadPort([FIXTURE_POSITION_IN_RANGE], fixturePoolDataMap, FIXTURE_POSITION_DETAIL);
     const triggerRepo = new FakeTriggerRepository();
-    const controller = new PositionController(positionReadPort, triggerRepo, nullSrLevelsPort, emptyAllowlist, fakePricePort);
+    const controller = new PositionController(positionReadPort, triggerRepo, fakePricePort);
 
     const otherWallet: WalletId = makeWalletId('other-wallet-id');
 
@@ -107,7 +95,7 @@ describe('PositionController', () => {
   it('returns the owned position for the same wallet-position pair used by listPositions', async () => {
     const positionReadPort = new FakeSupportedPositionReadPort([FIXTURE_POSITION_IN_RANGE], fixturePoolDataMap, FIXTURE_POSITION_DETAIL);
     const triggerRepo = new FakeTriggerRepository();
-    const controller = new PositionController(positionReadPort, triggerRepo, nullSrLevelsPort, emptyAllowlist, fakePricePort);
+    const controller = new PositionController(positionReadPort, triggerRepo, fakePricePort);
 
     const listResult = await controller.listPositions(FIXTURE_POSITION_IN_RANGE.walletId);
     const positionId = listResult.positions[0]!.positionId;
@@ -126,7 +114,7 @@ describe('PositionController', () => {
     triggerRepo.listActionableTriggers = async () => {
       throw new Error('SolanaError: HTTP error (429): Too Many Requests');
     };
-    const controller = new PositionController(positionReadPort, triggerRepo, nullSrLevelsPort, emptyAllowlist, fakePricePort);
+    const controller = new PositionController(positionReadPort, triggerRepo, fakePricePort);
 
     const result = await controller.getPosition(
       FIXTURE_POSITION_IN_RANGE.walletId,
@@ -145,7 +133,7 @@ describe('PositionController', () => {
     triggerRepo.listActionableTriggers = async () => {
       throw new Error('Database connection pool exhausted');
     };
-    const controller = new PositionController(positionReadPort, triggerRepo, nullSrLevelsPort, emptyAllowlist, fakePricePort);
+    const controller = new PositionController(positionReadPort, triggerRepo, fakePricePort);
 
     await expect(
       controller.getPosition(FIXTURE_POSITION_IN_RANGE.walletId, FIXTURE_POSITION_IN_RANGE.positionId),
@@ -158,7 +146,7 @@ describe('PositionController', () => {
       throw new Error('Solana RPC timeout');
     };
     const triggerRepo = new FakeTriggerRepository();
-    const controller = new PositionController(positionReadPort, triggerRepo, nullSrLevelsPort, emptyAllowlist, fakePricePort);
+    const controller = new PositionController(positionReadPort, triggerRepo, fakePricePort);
 
     const result = await controller.listPositions(FIXTURE_POSITION_IN_RANGE.walletId);
 
@@ -174,7 +162,7 @@ describe('PositionController', () => {
       throw new Error('Invariant: unknown pool type');
     };
     const triggerRepo = new FakeTriggerRepository();
-    const controller = new PositionController(positionReadPort, triggerRepo, nullSrLevelsPort, emptyAllowlist, fakePricePort);
+    const controller = new PositionController(positionReadPort, triggerRepo, fakePricePort);
 
     await expect(
       controller.listPositions(FIXTURE_POSITION_IN_RANGE.walletId),
@@ -193,7 +181,7 @@ describe('PositionController', () => {
       confirmationEvaluatedAt: makeClockTimestamp(2_000_001),
       confirmationPassed: true,
     });
-    const controller = new PositionController(positionReadPort, triggerRepo, nullSrLevelsPort, emptyAllowlist, fakePricePort);
+    const controller = new PositionController(positionReadPort, triggerRepo, fakePricePort);
 
     const result = await controller.listPositions(FIXTURE_POSITION_IN_RANGE.walletId);
 
@@ -209,7 +197,7 @@ describe('PositionController', () => {
     triggerRepo.listActionableTriggers = async () => {
       throw new Error('SolanaError: HTTP error (429): Too Many Requests');
     };
-    const controller = new PositionController(positionReadPort, triggerRepo, nullSrLevelsPort, emptyAllowlist, fakePricePort);
+    const controller = new PositionController(positionReadPort, triggerRepo, fakePricePort);
 
     const result = await controller.listPositions(FIXTURE_POSITION_IN_RANGE.walletId);
 
@@ -225,153 +213,26 @@ describe('PositionController', () => {
     triggerRepo.listActionableTriggers = async () => {
       throw new Error('Database connection pool exhausted');
     };
-    const controller = new PositionController(positionReadPort, triggerRepo, nullSrLevelsPort, emptyAllowlist, fakePricePort);
+    const controller = new PositionController(positionReadPort, triggerRepo, fakePricePort);
 
     await expect(
       controller.listPositions(FIXTURE_POSITION_IN_RANGE.walletId),
     ).rejects.toThrow('Database connection pool exhausted');
   });
-});
-
-describe('PositionController SR-levels integration', () => {
-  const fixturePoolId = FIXTURE_POSITION_IN_RANGE.poolId as string;
-
-  function makeSrBlock(capturedAtUnixMs: number) {
-    return {
-      briefId: 'brief-1',
-      sourceRecordedAtIso: null as string | null,
-      summary: null as string | null,
-      capturedAtUnixMs,
-      supports: [{ price: 90 }, { price: 110 }],
-      resistances: [{ price: 180 }, { price: 210 }],
-    };
-  }
-
-  it('enriches PositionDetailDto with srLevels for allowlisted pool', async () => {
-    const positionReadPort = new FakeSupportedPositionReadPort([FIXTURE_POSITION_IN_RANGE], fixturePoolDataMap, FIXTURE_POSITION_DETAIL);
-    const triggerRepo = new FakeTriggerRepository();
-    const fetchCurrent = vi.fn().mockResolvedValue(makeSrBlock(1_000_000));
-    const srPort: CurrentSrLevelsPort = { fetchCurrent };
-    const allowlist = new Map<string, { symbol: string; source: string }>([
-      [fixturePoolId, { symbol: 'SOL/USDC', source: 'mco' }],
-    ]);
-
-    const controller = new PositionController(positionReadPort, triggerRepo, srPort, allowlist, fakePricePort);
-    const result = await controller.getPosition(
-      FIXTURE_POSITION_IN_RANGE.walletId,
-      FIXTURE_POSITION_IN_RANGE.positionId,
+  it('never includes srLevels on the position detail payload (S/R lives behind a dedicated endpoint)', async () => {
+    const positionReadPort = new FakeSupportedPositionReadPort(
+      [FIXTURE_POSITION_IN_RANGE],
+      fixturePoolDataMap,
+      FIXTURE_POSITION_DETAIL,
     );
-
-    expect(result.position.srLevels).toBeDefined();
-    expect(result.position.srLevels?.supports).toHaveLength(2);
-    expect(result.position.srLevels?.resistances).toHaveLength(2);
-    expect(fetchCurrent).toHaveBeenCalledWith('SOL/USDC', 'mco');
-  });
-
-  it('omits srLevels key when adapter returns null', async () => {
-    const positionReadPort = new FakeSupportedPositionReadPort([FIXTURE_POSITION_IN_RANGE], fixturePoolDataMap, FIXTURE_POSITION_DETAIL);
     const triggerRepo = new FakeTriggerRepository();
-    const fetchCurrent = vi.fn().mockResolvedValue(null);
-    const srPort: CurrentSrLevelsPort = { fetchCurrent };
-    const allowlist = new Map<string, { symbol: string; source: string }>([
-      [fixturePoolId, { symbol: 'SOL/USDC', source: 'mco' }],
-    ]);
-
-    const controller = new PositionController(positionReadPort, triggerRepo, srPort, allowlist, fakePricePort);
-    const result = await controller.getPosition(
-      FIXTURE_POSITION_IN_RANGE.walletId,
-      FIXTURE_POSITION_IN_RANGE.positionId,
-    );
-
-    expect(result.position.srLevels).toBeUndefined();
-    expect(fetchCurrent).toHaveBeenCalled();
-  });
-
-  it('does not invoke srLevels adapter for non-allowlisted pool', async () => {
-    const positionReadPort = new FakeSupportedPositionReadPort([FIXTURE_POSITION_IN_RANGE], fixturePoolDataMap, FIXTURE_POSITION_DETAIL);
-    const triggerRepo = new FakeTriggerRepository();
-    const fetchCurrent = vi.fn().mockResolvedValue(makeSrBlock(1_000_000));
-    const srPort: CurrentSrLevelsPort = { fetchCurrent };
-    const allowlist = new Map<string, { symbol: string; source: string }>();
-
-    const controller = new PositionController(positionReadPort, triggerRepo, srPort, allowlist, fakePricePort);
-    const result = await controller.getPosition(
-      FIXTURE_POSITION_IN_RANGE.walletId,
-      FIXTURE_POSITION_IN_RANGE.positionId,
-    );
-
-    expect(fetchCurrent).not.toHaveBeenCalled();
-    expect(result.position.srLevels).toBeUndefined();
-  });
-
-  it('returns base DTO when srLevels adapter throws unexpectedly', async () => {
-    const positionReadPort = new FakeSupportedPositionReadPort([FIXTURE_POSITION_IN_RANGE], fixturePoolDataMap, FIXTURE_POSITION_DETAIL);
-    const triggerRepo = new FakeTriggerRepository();
-    const fetchCurrent = vi.fn().mockRejectedValue(new Error('unexpected'));
-    const srPort: CurrentSrLevelsPort = { fetchCurrent };
-    const allowlist = new Map<string, { symbol: string; source: string }>([
-      [fixturePoolId, { symbol: 'SOL/USDC', source: 'mco' }],
-    ]);
-
-    const controller = new PositionController(positionReadPort, triggerRepo, srPort, allowlist, fakePricePort);
+    const controller = new PositionController(positionReadPort, triggerRepo, fakePricePort);
 
     const result = await controller.getPosition(
       FIXTURE_POSITION_IN_RANGE.walletId,
       FIXTURE_POSITION_IN_RANGE.positionId,
     );
 
-    expect(result.position.positionId).toBe(FIXTURE_POSITION_IN_RANGE.positionId);
-    expect(result.position.srLevels).toBeUndefined();
-  });
-
-  it('allowlisted pool triggers both trigger and SR fetches via Promise.all', async () => {
-    const positionReadPort = new FakeSupportedPositionReadPort([FIXTURE_POSITION_IN_RANGE], fixturePoolDataMap, FIXTURE_POSITION_DETAIL);
-    const triggerRepo = new FakeTriggerRepository();
-    triggerRepo.triggers.set('trigger-sr-test', {
-      triggerId: 'trigger-sr-test' as ExitTriggerId,
-      positionId: FIXTURE_POSITION_IN_RANGE.positionId,
-      episodeId: 'episode-sr-test' as BreachEpisodeId,
-      breachDirection: { kind: 'lower-bound-breach' },
-      triggeredAt: makeClockTimestamp(1_000_000),
-      confirmationEvaluatedAt: makeClockTimestamp(1_000_001),
-      confirmationPassed: true,
-    });
-    const fetchCurrent = vi.fn().mockResolvedValue(makeSrBlock(1_000_000));
-    const srPort: CurrentSrLevelsPort = { fetchCurrent };
-    const allowlist = new Map<string, { symbol: string; source: string }>([
-      [fixturePoolId, { symbol: 'SOL/USDC', source: 'mco' }],
-    ]);
-
-    const controller = new PositionController(positionReadPort, triggerRepo, srPort, allowlist, fakePricePort);
-    const result = await controller.getPosition(
-      FIXTURE_POSITION_IN_RANGE.walletId,
-      FIXTURE_POSITION_IN_RANGE.positionId,
-    );
-
-    expect(result.position.hasActionableTrigger).toBe(true);
-    expect(result.position.srLevels).toBeDefined();
-    expect(fetchCurrent).toHaveBeenCalled();
-  });
-
-  it('trigger fetch still degrades gracefully on transient error with allowlisted pool', async () => {
-    const positionReadPort = new FakeSupportedPositionReadPort([FIXTURE_POSITION_IN_RANGE], fixturePoolDataMap, FIXTURE_POSITION_DETAIL);
-    const triggerRepo = new FakeTriggerRepository();
-    triggerRepo.listActionableTriggers = async () => {
-      throw new Error('SolanaError: HTTP error (429): Too Many Requests');
-    };
-    const fetchCurrent = vi.fn().mockResolvedValue(makeSrBlock(1_000_000));
-    const srPort: CurrentSrLevelsPort = { fetchCurrent };
-    const allowlist = new Map<string, { symbol: string; source: string }>([
-      [fixturePoolId, { symbol: 'SOL/USDC', source: 'mco' }],
-    ]);
-
-    const controller = new PositionController(positionReadPort, triggerRepo, srPort, allowlist, fakePricePort);
-    const result = await controller.getPosition(
-      FIXTURE_POSITION_IN_RANGE.walletId,
-      FIXTURE_POSITION_IN_RANGE.positionId,
-    );
-
-    expect(result.position.srLevels).toBeDefined();
-    expect(result.error).toBe('Unable to fetch trigger data. Position data temporarily unavailable.');
+    expect((result.position as Record<string, unknown>)['srLevels']).toBeUndefined();
   });
 });

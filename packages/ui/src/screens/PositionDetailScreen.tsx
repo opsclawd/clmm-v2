@@ -1,23 +1,17 @@
 import { View, Text, ScrollView, TouchableOpacity } from 'react-native';
-import { useRef } from 'react';
 import type { PositionDetailDto } from '@clmm/application/public';
 import { colors } from '../design-system/index.js';
 import { typography } from '../design-system/index.js';
 import { presentPositionDetail } from '../presenters/PositionDetailPresenter.js';
 import { RangeStatusBadge } from '../components/RangeStatusBadge.js';
 import { DirectionalPolicyCard } from '../components/DirectionalPolicyCard.js';
-import { SrLevelsCard } from '../components/SrLevelsCard.js';
-import { MarketThesisCard } from '../components/MarketThesisCard.js';
 
 type Props = {
   position?: PositionDetailDto;
   onViewPreview?: (triggerId: string) => void;
-  now?: number;
 };
 
-export function PositionDetailScreen({ position, onViewPreview, now: nowProp }: Props): JSX.Element {
-  const mountedNowRef = useRef(Date.now());
-  const now = nowProp ?? mountedNowRef.current;
+export function PositionDetailScreen({ position, onViewPreview }: Props): JSX.Element {
   if (!position) {
     return (
       <View style={{ flex: 1, backgroundColor: colors.background, padding: 16 }}>
@@ -31,7 +25,7 @@ export function PositionDetailScreen({ position, onViewPreview, now: nowProp }: 
     );
   }
 
-  const presentation = presentPositionDetail({ position, now });
+  const presentation = presentPositionDetail({ position });
   const vm = presentation.position;
   const breachDirection = position.breachDirection;
   const triggerId = position.triggerId;
@@ -259,10 +253,7 @@ export function PositionDetailScreen({ position, onViewPreview, now: nowProp }: 
           </Text>
         </View>
 
-        {vm.srLevels?.summary ? (
-          <MarketThesisCard summary={vm.srLevels.summary} />
-        ) : null}
-        <SrLevelsCard srLevels={vm.srLevels} />
+
       </View>
     </ScrollView>
   );

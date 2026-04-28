@@ -1,11 +1,12 @@
 import { View, Text, FlatList, ActivityIndicator } from 'react-native';
-import type { PositionSummaryDto } from '@clmm/application/public';
+import type { PositionSummaryDto, SrLevelsBlock } from '@clmm/application/public';
 import { colors, typography } from '../design-system/index.js';
 import { buildPositionListViewModel } from '../view-models/PositionListViewModel.js';
 import { DegradedCapabilityBanner } from '../components/DegradedCapabilityBanner.js';
 import { ConnectWalletEntry } from '../components/ConnectWalletEntry.js';
 import { SectionHeader } from '../components/SectionHeader.js';
 import { PositionCard } from '../components/PositionCard.js';
+import { MarketContextPanel } from '../components/MarketContextPanel.js';
 import type { PlatformCapabilities } from '../components/DegradedCapabilityBannerUtils.js';
 
 type Props = {
@@ -16,6 +17,13 @@ type Props = {
   onSelectPosition?: (positionId: string) => void;
   onConnectWallet?: () => void;
   platformCapabilities?: PlatformCapabilities | null;
+  srLevels?: SrLevelsBlock | null | undefined;
+  srLevelsLoading?: boolean | undefined;
+  srLevelsError?: boolean | undefined;
+  srLevelsUnsupported?: boolean | undefined;
+  isMixedPools?: boolean | undefined;
+  poolLabel?: string | null | undefined;
+  now?: number | undefined;
 };
 
 export function PositionsListScreen({
@@ -26,6 +34,13 @@ export function PositionsListScreen({
   onSelectPosition,
   onConnectWallet,
   platformCapabilities,
+  srLevels,
+  srLevelsLoading,
+  srLevelsError,
+  srLevelsUnsupported,
+  isMixedPools,
+  poolLabel,
+  now,
 }: Props): JSX.Element {
   const isConnected = walletAddress != null && walletAddress.length > 0;
   const hasPositions = (positions?.length ?? 0) > 0;
@@ -44,6 +59,13 @@ export function PositionsListScreen({
         <ConnectedPositionsList
           positions={positions ?? []}
           {...(onSelectPosition != null ? { onSelectPosition } : {})}
+          srLevels={srLevels}
+          srLevelsLoading={srLevelsLoading}
+          srLevelsError={srLevelsError}
+          srLevelsUnsupported={srLevelsUnsupported}
+          isMixedPools={isMixedPools ?? false}
+          poolLabel={poolLabel ?? null}
+          now={now}
         />
       ) : (
         <EmptyState />
@@ -138,9 +160,23 @@ function EmptyState() {
 function ConnectedPositionsList({
   positions,
   onSelectPosition,
+  srLevels,
+  srLevelsLoading,
+  srLevelsError,
+  srLevelsUnsupported,
+  isMixedPools,
+  poolLabel,
+  now,
 }: {
   positions: PositionSummaryDto[];
   onSelectPosition?: (positionId: string) => void;
+  srLevels?: SrLevelsBlock | null | undefined;
+  srLevelsLoading?: boolean | undefined;
+  srLevelsError?: boolean | undefined;
+  srLevelsUnsupported?: boolean | undefined;
+  isMixedPools: boolean;
+  poolLabel: string | null;
+  now?: number | undefined;
 }) {
   const viewModel = buildPositionListViewModel(positions);
 
@@ -151,10 +187,21 @@ function ConnectedPositionsList({
       keyExtractor={(item) => item.positionId}
       removeClippedSubviews={false}
       ListHeaderComponent={
-        <SectionHeader
-          title="Active positions"
-          meta={`${positions.length} monitored`}
-        />
+        <View>
+          <MarketContextPanel
+            srLevels={srLevels}
+            isLoading={srLevelsLoading ?? false}
+            isError={srLevelsError ?? false}
+            isUnsupported={srLevelsUnsupported ?? false}
+            isMixedPools={isMixedPools}
+            poolLabel={poolLabel}
+            now={now ?? Date.now()}
+          />
+          <SectionHeader
+            title="Active positions"
+            meta={`${positions.length} monitored`}
+          />
+        </View>
       }
       renderItem={({ item }) => (
         <PositionCard
