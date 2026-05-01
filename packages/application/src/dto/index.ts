@@ -174,3 +174,140 @@ export type EntryContextDto =
   | { kind: 'execution-result'; attemptId: string }
   | { kind: 'history'; positionId: PositionId }
   | { kind: 'degraded-recovery'; reason: string };
+
+// --- Insight DTOs (SOL/USDC v1) ---
+//
+// Consumed by the external clmm-autopilot-pipeline. The pair/source literals
+// are intentional: this is an opinionated, single-pool read API. Adding more
+// pools requires explicit DTO and allowlist work — there is no generic
+// multi-pool registry in v1. See spec at
+// docs/superpowers/specs/2026-05-01-sol-usdc-insights-data-api-design.md.
+
+export type InsightDataWarning = {
+  code:
+    | 'sr_levels_unavailable'
+    | 'actionable_triggers_unavailable'
+    | 'fee_reward_usd_unavailable'
+    | 'price_distance_unavailable';
+  message: string;
+  scope?: {
+    poolId?: string;
+    positionId?: string;
+  };
+};
+
+export type InsightDataQualityDto = {
+  partial: boolean;
+  warnings: InsightDataWarning[];
+};
+
+export type SolUsdcPoolSnapshotDto = {
+  poolId: string;
+  pair: 'SOL/USDC';
+  source: 'orca';
+  observedAtUnixMs: number;
+  tokenPairLabel: string;
+  currentPrice: number;
+  currentPriceLabel: string;
+  sqrtPrice: string;
+  tickCurrentIndex: number;
+  tickSpacing: number;
+  feeRate: number;
+  feeRateLabel: string;
+  poolLiquidity: string;
+  // priceSource is NOT cache provenance — it only describes the deterministic
+  // calculation source for currentPrice.
+  priceSource: 'orca_whirlpool_sqrt_price';
+};
+
+export type SolUsdcFeeAmountDto = {
+  raw: string;
+  decimals: number | null;
+  symbol: string;
+  mint?: string;
+};
+
+export type SolUsdcRewardAmountDto = {
+  mint: string;
+  raw: string;
+  decimals: number | null;
+  symbol: string;
+};
+
+export type ExternalBreachDirection =
+  | 'lower-bound-breach'
+  | 'upper-bound-breach';
+
+export type SolUsdcPositionInsightDto = {
+  walletId: string;
+  positionId: string;
+  poolId: string;
+  pair: 'SOL/USDC';
+  source: 'orca';
+  observedAtUnixMs: number;
+  rangeState: 'in-range' | 'below-range' | 'above-range';
+  lowerTick: number;
+  upperTick: number;
+  currentTick: number;
+  lowerPriceLabel: string;
+  upperPriceLabel: string;
+  currentPrice: number;
+  currentPriceLabel: string;
+  rangeDistance: {
+    belowLowerTickPercent: number;
+    aboveUpperTickPercent: number;
+    belowLowerPricePercent?: number;
+    aboveUpperPricePercent?: number;
+  };
+  feeRateLabel: string;
+  unclaimedFees: {
+    feeOwedA: SolUsdcFeeAmountDto;
+    feeOwedB: SolUsdcFeeAmountDto;
+  };
+  unclaimedRewards: SolUsdcRewardAmountDto[];
+  // null distinguishes "valuation unavailable" from a real zero. See spec
+  // §"USD Valuation Flow" — do not collapse to 0.
+  unclaimedFeesUsd: number | null;
+  unclaimedRewardsUsd: number | null;
+  positionLiquidity: string;
+  poolLiquidity: string;
+  hasActionableTrigger: boolean;
+  triggerId?: string;
+  breachDirection?: ExternalBreachDirection;
+};
+
+export type SolUsdcPositionSnapshotDto = {
+  walletId: string;
+  positions: SolUsdcPositionInsightDto[];
+  dataQuality: InsightDataQualityDto;
+};
+
+export type SolUsdcInsightInputBundleDto = {
+  pair: 'SOL/USDC';
+  source: 'orca';
+  observedAtUnixMs: number;
+  pool: SolUsdcPoolSnapshotDto;
+  // S/R lives once at the bundle top level, never copied per position.
+  srLevels: SrLevelsBlock | null;
+  positions: SolUsdcPositionInsightDto[];
+  alerts: Array<{
+    triggerId: string;
+    positionId: string;
+    breachDirection: ExternalBreachDirection;
+    triggeredAt: number;
+  }>;
+  dataQuality: InsightDataQualityDto;
+};
+
+export type SolUsdcInsightErrorDto = {
+  code:
+    | 'pool_snapshot_unavailable'
+    | 'position_list_unavailable'
+    | 'position_detail_unavailable';
+  message: string;
+  pair: 'SOL/USDC';
+  poolId: string;
+  walletId?: string;
+  positionId?: string;
+  retryable: true;
+};
