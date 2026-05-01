@@ -20,6 +20,7 @@ import type {
   ExitTriggerId,
   PositionDetail,
 } from '@clmm/domain';
+import type { SupportedPositionReadPort, PricePort } from '../../ports/index.js';
 
 const SOL_USDC_POOL_ID = makePoolId('Czfq3xZZDmsdGdUyrNLtRhGc47cXcZtLG4crryfu44zE');
 const OTHER_POOL_ID = makePoolId('OtherPool11111111111111111111111111111111111');
@@ -262,5 +263,34 @@ describe('getSolUsdcInsightPositions', () => {
     });
 
     expect(maxInFlight).toBe(1);
+  });
+
+  it('returns ok with null fee USD and warnings when price port throws', async () => {
+    const positions = [positionInPool('pos-1', SOL_USDC_POOL_ID)];
+    const positionReadPort = {
+      listSupportedPositions: async () => positions,
+      getPosition: async () => null,
+      getPositionDetail: async () => detailFor('pos-1', SOL_USDC_POOL_ID),
+      getPoolData: async () => poolDataFor(SOL_USDC_POOL_ID),
+    } as unknown as SupportedPositionReadPort;
+    const throwingPricePort = {
+      getPrices: async () => { throw new Error('price rpc failed'); },
+    } as unknown as PricePort;
+
+    const result = await getSolUsdcInsightPositions({
+      walletId: FIXTURE_POSITION_IN_RANGE.walletId,
+      poolId: SOL_USDC_POOL_ID,
+      positionReadPort,
+      triggerRepo: new FakeTriggerRepository(),
+      pricePort: throwingPricePort,
+      now,
+    });
+
+    expect(result.kind).toBe('ok');
+    if (result.kind === 'ok') {
+      expect(result.snapshot.positions).toHaveLength(1);
+      expect(result.snapshot.positions[0]!.unclaimedFeesUsd).toBeNull();
+      expect(result.snapshot.dataQuality.warnings.find((w) => w.code === 'fee_reward_usd_unavailable')).toBeDefined();
+    }
   });
 });

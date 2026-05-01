@@ -96,4 +96,66 @@ describe('buildSolUsdcPositionInsight', () => {
     expect(result.insight.rangeDistance.aboveUpperPricePercent).toBeUndefined();
     expect(result.warnings.find((w) => w.code === 'price_distance_unavailable')).toBeDefined();
   });
+
+  it('returns price_distance_unavailable with zero-width range message when lowerBound equals upperBound', () => {
+    const detailZeroWidth = {
+      ...FIXTURE_POSITION_DETAIL,
+      position: {
+        ...FIXTURE_POSITION_DETAIL.position,
+        bounds: {
+          lowerBound: 100,
+          upperBound: 100,
+        },
+      },
+    };
+
+    const result = buildSolUsdcPositionInsight({
+      detail: detailZeroWidth,
+      observedAtUnixMs: 1_700_000_000_000,
+      priceMap: new Map([
+        ['So11111111111111111111111111111111111111112', { usdValue: 150, symbol: 'SOL' }],
+        ['EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v', { usdValue: 1, symbol: 'USDC' }],
+      ]),
+    });
+
+    const priceDistanceWarning = result.warnings.find((w) => w.code === 'price_distance_unavailable');
+    expect(priceDistanceWarning).toBeDefined();
+    expect(priceDistanceWarning?.message).toContain('zero-width range');
+  });
+
+  it('uses rangeState.currentPrice as fallback when decimals are missing', () => {
+    const detailNoDecimals = {
+      ...FIXTURE_POSITION_DETAIL,
+      poolData: {
+        ...FIXTURE_POSITION_DETAIL.poolData,
+        tokenPair: {
+          ...FIXTURE_POSITION_DETAIL.poolData.tokenPair,
+          decimalsA: null,
+          decimalsB: null,
+        },
+      },
+    };
+
+    const result = buildSolUsdcPositionInsight({
+      detail: detailNoDecimals,
+      observedAtUnixMs: 1_700_000_000_000,
+      priceMap: new Map(),
+    });
+
+    expect(result.insight.currentPrice).toBe(FIXTURE_POSITION_DETAIL.position.rangeState.currentPrice);
+    expect(result.insight.currentPriceLabel).toBeDefined();
+  });
+
+  it('returns null fee USD when only one token price is available', () => {
+    const result = buildSolUsdcPositionInsight({
+      detail: FIXTURE_POSITION_DETAIL,
+      observedAtUnixMs: 1_700_000_000_000,
+      priceMap: new Map([
+        ['So11111111111111111111111111111111111111112', { usdValue: 150, symbol: 'SOL' }],
+      ]),
+    });
+
+    expect(result.insight.unclaimedFeesUsd).toBeNull();
+    expect(result.warnings.find((w) => w.code === 'fee_reward_usd_unavailable')).toBeDefined();
+  });
 });

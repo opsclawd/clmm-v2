@@ -21,6 +21,9 @@ import { TelemetryAdapter } from '../../outbound/observability/TelemetryAdapter.
 import { RegimeEngineExecutionEventAdapter } from '../../outbound/regime-engine/RegimeEngineExecutionEventAdapter.js';
 import { CurrentSrLevelsAdapter } from '../../outbound/regime-engine/CurrentSrLevelsAdapter.js';
 import { JupiterPriceAdapter } from '../../outbound/price/JupiterPriceAdapter.js';
+// InsightsApiKeyGuard is used via @UseGuards on InsightsDataController and
+// registered as a provider here for NestJS DI to resolve its dependencies.
+import { InsightsApiKeyGuard } from './InsightsApiKeyGuard.js';
 import type { RegimeEngineEventPort } from '../../outbound/regime-engine/types.js';
 import { createDb } from '../../outbound/storage/db.js';
 import { createPgBossProvider } from '../jobs/PgBossProvider.js';
@@ -46,6 +49,7 @@ import {
   SR_LEVELS_POOL_ALLOWLIST,
   PRICE_PORT,
   SR_LEVELS_READ_PORT,
+  INSIGHTS_API_KEY,
 } from './tokens.js';
 
 // boundary: process.env values are untyped at runtime; validated via env schema at deploy
@@ -108,6 +112,7 @@ export const SR_LEVELS_POOL_ALLOWLIST_MAP = new Map<string, { symbol: string; so
     { provide: ID_GENERATOR_PORT, useValue: systemIds },
     { provide: MONITORED_WALLET_REPOSITORY, useValue: monitoredWalletStorage },
     { provide: REGIME_ENGINE_EVENT_PORT, useValue: regimeEngineEventAdapter },
+    // TODO: Remove CURRENT_SR_LEVELS_PORT once SrLevelsController migrates to SR_LEVELS_READ_PORT.
     { provide: CURRENT_SR_LEVELS_PORT, useValue: currentSrLevelsAdapter },
     { provide: SR_LEVELS_READ_PORT, useValue: currentSrLevelsAdapter },
     { provide: OBSERVABILITY_PORT, useValue: telemetry },
@@ -115,6 +120,8 @@ export const SR_LEVELS_POOL_ALLOWLIST_MAP = new Map<string, { symbol: string; so
     { provide: RECONCILIATION_JOB_PORT, useValue: reconciliationJobPort },
     { provide: SR_LEVELS_POOL_ALLOWLIST, useValue: SR_LEVELS_POOL_ALLOWLIST_MAP },
     { provide: PRICE_PORT, useValue: jupiterPrice },
+    { provide: INSIGHTS_API_KEY, useValue: (process.env as Record<string, string | undefined>)['INSIGHTS_API_KEY'] ?? '' },
+    InsightsApiKeyGuard,
     PgBossLifecycle,
   ],
 })

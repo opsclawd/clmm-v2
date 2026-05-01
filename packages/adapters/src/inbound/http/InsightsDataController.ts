@@ -5,6 +5,7 @@ import {
   HttpStatus,
   Inject,
   Param,
+  UseGuards,
 } from '@nestjs/common';
 import {
   getSolUsdcInsightPoolSnapshot,
@@ -25,11 +26,21 @@ import {
   PRICE_PORT,
   SR_LEVELS_READ_PORT,
   SR_LEVELS_POOL_ALLOWLIST,
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars -- used via @Inject
+  INSIGHTS_API_KEY,
 } from './tokens.js';
+import { InsightsApiKeyGuard } from './InsightsApiKeyGuard.js';
 
 type SrLevelsAllowlist = Map<string, { symbol: string; source: string }>;
 
+// v1 design: the insights pipeline is single-pool. Multi-pool support
+// would require a naming overhaul of SolUsdc* types and routes.
+const EXPECTED_ALLOWLIST_SIZE_V1 = 1;
+
+const BASE58_REGEX = /^[1-9A-HJ-NP-Za-km-z]{32,44}$/;
+
 @Controller('insights/sol-usdc')
+@UseGuards(InsightsApiKeyGuard)
 export class InsightsDataController {
   private readonly poolIdRaw: string;
   private readonly srLevelsLookup: { symbol: string; source: string };
@@ -47,9 +58,9 @@ export class InsightsDataController {
     private readonly srLevelsAllowlist: SrLevelsAllowlist,
     private readonly now: () => number = Date.now,
   ) {
-    if (this.srLevelsAllowlist.size !== 1) {
+    if (this.srLevelsAllowlist.size !== EXPECTED_ALLOWLIST_SIZE_V1) {
       throw new Error(
-        `InsightsDataController expects exactly one allowlist entry, found ${this.srLevelsAllowlist.size}`,
+        `InsightsDataController expects exactly ${EXPECTED_ALLOWLIST_SIZE_V1} allowlist entry, found ${this.srLevelsAllowlist.size}`,
       );
     }
     const [poolIdRaw, lookup] = this.srLevelsAllowlist.entries().next().value as [
@@ -58,6 +69,16 @@ export class InsightsDataController {
     ];
     this.poolIdRaw = poolIdRaw;
     this.srLevelsLookup = lookup;
+  }
+
+  private validateWalletId(walletIdRaw: string): string {
+    if (!BASE58_REGEX.test(walletIdRaw)) {
+      throw new HttpException(
+        { code: 'invalid_wallet_id', message: 'walletId must be a valid Solana address.', retryable: false },
+        HttpStatus.BAD_REQUEST,
+      );
+    }
+    return walletIdRaw;
   }
 
   @Get('pool')
@@ -75,6 +96,7 @@ export class InsightsDataController {
 
   @Get('positions/:walletId')
   async getPositions(@Param('walletId') walletIdRaw: string) {
+    this.validateWalletId(walletIdRaw);
     const result = await getSolUsdcInsightPositions({
       walletId: makeWalletId(walletIdRaw),
       poolId: makePoolId(this.poolIdRaw),
@@ -84,19 +106,20 @@ export class InsightsDataController {
       now: this.now,
     });
     if (result.kind === 'pool-unavailable') {
-      throw this.poolUnavailable(walletIdRaw);
+      throw this.poolUnavailable();
     }
     if (result.kind === 'position-list-unavailable') {
-      throw this.positionListUnavailable(walletIdRaw);
+      throw this.positionListUnavailable();
     }
     if (result.kind === 'position-detail-unavailable') {
-      throw this.positionDetailUnavailable(walletIdRaw, result.positionId);
+      throw this.positionDetailUnavailable();
     }
     return { snapshot: result.snapshot };
   }
 
   @Get('bundle/:walletId')
   async getBundle(@Param('walletId') walletIdRaw: string) {
+    this.validateWalletId(walletIdRaw);
     const result = await getSolUsdcInsightBundle({
       walletId: makeWalletId(walletIdRaw),
       poolId: makePoolId(this.poolIdRaw),
@@ -108,49 +131,45 @@ export class InsightsDataController {
       now: this.now,
     });
     if (result.kind === 'pool-unavailable') {
-      throw this.poolUnavailable(walletIdRaw);
+      throw this.poolUnavailable();
     }
     if (result.kind === 'position-list-unavailable') {
-      throw this.positionListUnavailable(walletIdRaw);
+      throw this.positionListUnavailable();
     }
     if (result.kind === 'position-detail-unavailable') {
-      throw this.positionDetailUnavailable(walletIdRaw, result.positionId);
+      throw this.positionDetailUnavailable();
     }
     return { bundle: result.bundle };
   }
 
-  private poolUnavailable(walletIdRaw?: string): HttpException {
+  private poolUnavailable(): HttpException {
     const body: SolUsdcInsightErrorDto = {
       code: 'pool_snapshot_unavailable',
       message: 'Unable to read SOL/USDC pool snapshot.',
       pair: 'SOL/USDC',
       poolId: this.poolIdRaw,
-      ...(walletIdRaw !== undefined ? { walletId: walletIdRaw } : {}),
       retryable: true,
     };
     return new HttpException(body, HttpStatus.SERVICE_UNAVAILABLE);
   }
 
-  private positionListUnavailable(walletIdRaw: string): HttpException {
+  private positionListUnavailable(): HttpException {
     const body: SolUsdcInsightErrorDto = {
       code: 'position_list_unavailable',
       message: 'Unable to read SOL/USDC position list.',
       pair: 'SOL/USDC',
       poolId: this.poolIdRaw,
-      walletId: walletIdRaw,
       retryable: true,
     };
     return new HttpException(body, HttpStatus.SERVICE_UNAVAILABLE);
   }
 
-  private positionDetailUnavailable(walletIdRaw: string, positionId: string): HttpException {
+  private positionDetailUnavailable(): HttpException {
     const body: SolUsdcInsightErrorDto = {
       code: 'position_detail_unavailable',
       message: 'Unable to read SOL/USDC position detail.',
       pair: 'SOL/USDC',
       poolId: this.poolIdRaw,
-      walletId: walletIdRaw,
-      positionId,
       retryable: true,
     };
     return new HttpException(body, HttpStatus.SERVICE_UNAVAILABLE);

@@ -41,6 +41,12 @@ export interface RegimeEngineEventPort {
   notifyExecutionEvent(event: ClmmExecutionEventRequest): Promise<void>;
 }
 
+/**
+ * @deprecated Use SrLevelsReadPort from @clmm/application instead.
+ * CurrentSrLevelsPort exists only for the existing SrLevelsController.
+ * Once SrLevelsController migrates to the application port, this interface
+ * and its DI token (CURRENT_SR_LEVELS_PORT) can be removed.
+ */
 export interface CurrentSrLevelsPort {
   fetchCurrent(symbol: string, source: string): Promise<SrLevelsBlock | null>;
 }

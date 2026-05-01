@@ -8,7 +8,7 @@ import type {
   ClockTimestamp,
 } from '@clmm/domain';
 import type { ExecutionLifecycleState, PreviewFreshness, TransactionReference } from '@clmm/domain';
-import type { ExitTriggerId } from '@clmm/domain';
+import type { ExitTriggerId, BreachDirection as _BreachDirection } from '@clmm/domain';
 import type { PlatformCapabilityState } from '../ports/index.js';
 
 // Drift guard: SrLevel and SrLevelsBlock are structurally duplicated in
@@ -201,6 +201,12 @@ export type InsightDataQualityDto = {
   warnings: InsightDataWarning[];
 };
 
+// Opinionated, single-pool read API — see docs for the v1 design constraint.
+// Fields typed as `string` that originate from bigint values (sqrtPrice,
+// poolLiquidity, positionLiquidity, feeOwedA/B.raw, rewardAmount.raw)
+// are decimal-string representations of on-chain 64-bit integers.
+// Consumers MUST parse them as BigInt or BigNumber, NOT Number, to avoid
+// IEEE 754 precision loss beyond 2^53.
 export type SolUsdcPoolSnapshotDto = {
   poolId: string;
   pair: 'SOL/USDC';
@@ -215,8 +221,6 @@ export type SolUsdcPoolSnapshotDto = {
   feeRate: number;
   feeRateLabel: string;
   poolLiquidity: string;
-  // priceSource is NOT cache provenance — it only describes the deterministic
-  // calculation source for currentPrice.
   priceSource: 'orca_whirlpool_sqrt_price';
 };
 
@@ -224,7 +228,7 @@ export type SolUsdcFeeAmountDto = {
   raw: string;
   decimals: number | null;
   symbol: string;
-  mint?: string;
+  mint: string;
 };
 
 export type SolUsdcRewardAmountDto = {
@@ -237,6 +241,14 @@ export type SolUsdcRewardAmountDto = {
 export type ExternalBreachDirection =
   | 'lower-bound-breach'
   | 'upper-bound-breach';
+
+// Compile-time drift guard: ExternalBreachDirection must match the kind values
+// of BreachDirection from @clmm/domain. If this type errors, the external API
+// contract has drifted from the domain invariant — update ExternalBreachDirection
+// and the toExternalBreachDirection conversion function.
+type _AssertBreachDirectionMatch = _BreachDirection['kind'] extends ExternalBreachDirection
+  ? ExternalBreachDirection extends _BreachDirection['kind'] ? true : never
+  : never;
 
 export type SolUsdcPositionInsightDto = {
   walletId: string;

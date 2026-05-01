@@ -15,6 +15,7 @@ import {
   type PriceMapEntry,
 } from './buildSolUsdcPositionInsight.js';
 import { getSolUsdcInsightPoolSnapshot } from './GetSolUsdcInsightPoolSnapshot.js';
+import { toExternalBreachDirection } from './toExternalBreachDirection.js';
 
 export type GetSolUsdcInsightPositionsResult =
   | { kind: 'ok'; snapshot: SolUsdcPositionSnapshotDto }
@@ -163,7 +164,7 @@ export async function enrichWithTriggers(params: {
     .map((t) => ({
       triggerId: t.triggerId,
       positionId: t.positionId,
-      breachDirection: t.breachDirection.kind,
+      breachDirection: toExternalBreachDirection(t.breachDirection),
       triggeredAt: t.triggeredAt,
     }));
 
