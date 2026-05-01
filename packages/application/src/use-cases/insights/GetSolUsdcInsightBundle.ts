@@ -8,13 +8,9 @@ import type {
 import type {
   SolUsdcInsightInputBundleDto,
   InsightDataWarning,
-  ExternalBreachDirection,
 } from '../../dto/index.js';
 import { getSolUsdcInsightPoolSnapshot } from './GetSolUsdcInsightPoolSnapshot.js';
-import {
-  getSolUsdcInsightPositions,
-  enrichWithTriggers,
-} from './GetSolUsdcInsightPositions.js';
+import { getSolUsdcInsightPositions } from './GetSolUsdcInsightPositions.js';
 
 export type GetSolUsdcInsightBundleResult =
   | { kind: 'ok'; bundle: SolUsdcInsightInputBundleDto }
@@ -60,7 +56,7 @@ export async function getSolUsdcInsightBundle(params: {
     return { kind: 'position-detail-unavailable', positionId: positionsResult.positionId };
   }
 
-  const { snapshot } = positionsResult;
+  const { snapshot, alerts } = positionsResult;
   const warnings: InsightDataWarning[] = [...snapshot.dataQuality.warnings];
 
   let srLevels = null;
@@ -73,26 +69,6 @@ export async function getSolUsdcInsightBundle(params: {
     });
   }
 
-  const alertPositionIds = new Set(snapshot.positions.map((p) => p.positionId));
-  const triggerEnrichment = await enrichWithTriggers({
-    walletId,
-    triggerRepo,
-    insights: snapshot.positions,
-    filteredPositionIds: alertPositionIds,
-  });
-
-  const newWarnings = triggerEnrichment.warnings.filter(
-    (w) => !warnings.some((ew) => ew.code === w.code),
-  );
-  warnings.push(...newWarnings);
-
-  const alerts = triggerEnrichment.filteredTriggers as Array<{
-    triggerId: string;
-    positionId: string;
-    breachDirection: ExternalBreachDirection;
-    triggeredAt: number;
-  }>;
-
   return {
     kind: 'ok',
     bundle: {
@@ -103,7 +79,7 @@ export async function getSolUsdcInsightBundle(params: {
         : poolResult.pool.observedAtUnixMs,
       pool: poolResult.pool,
       srLevels,
-      positions: triggerEnrichment.insights,
+      positions: snapshot.positions,
       alerts,
       dataQuality: {
         partial: warnings.length > 0,

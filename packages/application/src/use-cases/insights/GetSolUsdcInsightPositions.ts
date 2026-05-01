@@ -17,8 +17,15 @@ import {
 import { getSolUsdcInsightPoolSnapshot } from './GetSolUsdcInsightPoolSnapshot.js';
 import { toExternalBreachDirection } from './toExternalBreachDirection.js';
 
+export type PositionInsightAlert = {
+  triggerId: string;
+  positionId: string;
+  breachDirection: ExternalBreachDirection;
+  triggeredAt: number;
+};
+
 export type GetSolUsdcInsightPositionsResult =
-  | { kind: 'ok'; snapshot: SolUsdcPositionSnapshotDto }
+  | { kind: 'ok'; snapshot: SolUsdcPositionSnapshotDto; alerts: PositionInsightAlert[] }
   | { kind: 'pool-unavailable' }
   | { kind: 'position-list-unavailable' }
   | { kind: 'position-detail-unavailable'; positionId: string };
@@ -54,6 +61,7 @@ export async function getSolUsdcInsightPositions(params: {
         positions: [],
         dataQuality: { partial: false, warnings: [] },
       },
+      alerts: [],
     };
   }
 
@@ -89,6 +97,8 @@ export async function getSolUsdcInsightPositions(params: {
   });
   warnings.push(...triggerEnrichment.warnings);
 
+  const alerts = triggerEnrichment.filteredTriggers as PositionInsightAlert[];
+
   return {
     kind: 'ok',
     snapshot: {
@@ -99,6 +109,7 @@ export async function getSolUsdcInsightPositions(params: {
         warnings,
       },
     },
+    alerts,
   };
 }
 
