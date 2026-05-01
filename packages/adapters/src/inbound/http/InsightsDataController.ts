@@ -17,6 +17,7 @@ import type {
   TriggerRepository,
   PricePort,
   SrLevelsReadPort,
+  ClockPort,
   SolUsdcInsightErrorDto,
 } from '@clmm/application';
 import { makePoolId, makeWalletId } from '@clmm/domain';
@@ -26,6 +27,7 @@ import {
   PRICE_PORT,
   SR_LEVELS_READ_PORT,
   SR_LEVELS_POOL_ALLOWLIST,
+  CLOCK_PORT,
   // eslint-disable-next-line @typescript-eslint/no-unused-vars -- used via @Inject
   INSIGHTS_API_KEY,
 } from './tokens.js';
@@ -56,7 +58,8 @@ export class InsightsDataController {
     private readonly srLevelsReadPort: SrLevelsReadPort,
     @Inject(SR_LEVELS_POOL_ALLOWLIST)
     private readonly srLevelsAllowlist: SrLevelsAllowlist,
-    private readonly now: () => number = Date.now,
+    @Inject(CLOCK_PORT)
+    private readonly clock: ClockPort,
   ) {
     if (this.srLevelsAllowlist.size !== EXPECTED_ALLOWLIST_SIZE_V1) {
       throw new Error(
@@ -86,7 +89,7 @@ export class InsightsDataController {
     const result = await getSolUsdcInsightPoolSnapshot({
       poolId: makePoolId(this.poolIdRaw),
       positionReadPort: this.positionReadPort,
-      now: this.now,
+      now: () => this.clock.now(),
     });
     if (result.kind === 'pool-unavailable') {
       throw this.poolUnavailable();
@@ -103,7 +106,7 @@ export class InsightsDataController {
       positionReadPort: this.positionReadPort,
       triggerRepo: this.triggerRepo,
       pricePort: this.pricePort,
-      now: this.now,
+      now: () => this.clock.now(),
     });
     if (result.kind === 'pool-unavailable') {
       throw this.poolUnavailable();
@@ -128,7 +131,7 @@ export class InsightsDataController {
       triggerRepo: this.triggerRepo,
       pricePort: this.pricePort,
       srLevelsReadPort: this.srLevelsReadPort,
-      now: this.now,
+      now: () => this.clock.now(),
     });
     if (result.kind === 'pool-unavailable') {
       throw this.poolUnavailable();
