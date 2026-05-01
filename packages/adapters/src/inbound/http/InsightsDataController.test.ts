@@ -14,7 +14,7 @@ import {
   FIXTURE_USDC_PRICE_QUOTE,
 } from '@clmm/testing';
 import { makePoolId, makePositionId } from '@clmm/domain';
-import type { SrLevelsReadPort, SrLevelsBlock, SupportedPositionReadPort, TriggerRepository, PricePort } from '@clmm/application';
+import type { SrLevelsReadPort, SrLevelsBlock, SupportedPositionReadPort, TriggerRepository, PricePort, ClockPort } from '@clmm/application';
 import type { PositionDetail } from '@clmm/domain';
 
 const SOL_USDC_POOL_ID = 'Czfq3xZZDmsdGdUyrNLtRhGc47cXcZtLG4crryfu44zE';
@@ -54,7 +54,7 @@ const samplePort = (positions: ReturnType<typeof positionInPool>[]) =>
     getPoolData: async () => poolDataFor(SOL_USDC_POOL_ID),
   }) as unknown as SupportedPositionReadPort;
 
-const fixedClock = () => 1_700_000_000_000;
+const fixedClock: ClockPort = { now: () => 1_700_000_000_000 as any };
 
 function makeController(overrides?: {
   positions?: ReturnType<typeof positionInPool>[];
