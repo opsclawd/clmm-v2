@@ -112,7 +112,7 @@ export class InsightsDataController {
       throw this.positionListUnavailable();
     }
     if (result.kind === 'position-detail-unavailable') {
-      throw this.positionDetailUnavailable();
+      throw this.positionDetailUnavailable(result.positionId);
     }
     return { snapshot: result.snapshot };
   }
@@ -137,7 +137,7 @@ export class InsightsDataController {
       throw this.positionListUnavailable();
     }
     if (result.kind === 'position-detail-unavailable') {
-      throw this.positionDetailUnavailable();
+      throw this.positionDetailUnavailable(result.positionId);
     }
     return { bundle: result.bundle };
   }
@@ -164,12 +164,13 @@ export class InsightsDataController {
     return new HttpException(body, HttpStatus.SERVICE_UNAVAILABLE);
   }
 
-  private positionDetailUnavailable(): HttpException {
+  private positionDetailUnavailable(positionId: string): HttpException {
     const body: SolUsdcInsightErrorDto = {
       code: 'position_detail_unavailable',
       message: 'Unable to read SOL/USDC position detail.',
       pair: 'SOL/USDC',
       poolId: this.poolIdRaw,
+      positionId,
       retryable: true,
     };
     return new HttpException(body, HttpStatus.SERVICE_UNAVAILABLE);

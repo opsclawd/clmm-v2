@@ -62,6 +62,12 @@ export async function getSolUsdcInsightBundle(params: {
   let srLevels = null;
   try {
     srLevels = await srLevelsReadPort.fetchCurrent(srLevelsLookup.symbol, srLevelsLookup.source);
+    if (srLevels === null) {
+      warnings.push({
+        code: 'sr_levels_unavailable',
+        message: 'S/R levels unavailable.',
+      });
+    }
   } catch {
     warnings.push({
       code: 'sr_levels_unavailable',

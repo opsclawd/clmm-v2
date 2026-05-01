@@ -163,7 +163,7 @@ describe('getSolUsdcInsightBundle', () => {
     }
   });
 
-  it('sets srLevels=null without a warning when fetchCurrent resolves null', async () => {
+  it('sets srLevels=null and adds sr_levels_unavailable warning when fetchCurrent resolves null', async () => {
     const positions = [positionInPool('pos-1', SOL_USDC_POOL_ID)];
     const result = await getSolUsdcInsightBundle({
       walletId: FIXTURE_POSITION_IN_RANGE.walletId,
@@ -181,7 +181,7 @@ describe('getSolUsdcInsightBundle', () => {
       expect(result.bundle.srLevels).toBeNull();
       expect(
         result.bundle.dataQuality.warnings.find((w) => w.code === 'sr_levels_unavailable'),
-      ).toBeUndefined();
+      ).toBeDefined();
     }
   });
 

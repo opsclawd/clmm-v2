@@ -171,6 +171,7 @@ describe('InsightsDataController', () => {
       expect(httpErr.getResponse()).toMatchObject({
         code: 'position_detail_unavailable',
         poolId: SOL_USDC_POOL_ID,
+        positionId: 'pos-broken',
         retryable: true,
       });
     }
@@ -230,6 +231,7 @@ describe('InsightsDataController', () => {
       expect(httpErr.getResponse()).toMatchObject({
         code: 'position_detail_unavailable',
         poolId: SOL_USDC_POOL_ID,
+        positionId: 'pos-broken',
       });
     }
   });
