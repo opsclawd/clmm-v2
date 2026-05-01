@@ -56,27 +56,43 @@ Each variant carries exactly the data the controller needs: `ok` has the DTO, `p
 
 ### 2. Map discriminated union failures to HTTP 503 in the controller
 
-The controller exhaustively pattern-matches the `kind` field. Every failure variant maps to 503 Service Unavailable with a machine-readable error DTO. This is correct because all failures represent transient backend unavailability, not client errors.
+The controller exhaustively pattern-matches the `kind` field. Every failure variant maps to 503 Service Unavailable with a machine-readable error DTO. Invalid `walletId` format (not base58, 32-44 chars) returns 400 Bad Request. All endpoints require an API key via `x-insights-api-key` header.
 
 ```typescript
 // packages/adapters/src/inbound/http/InsightsDataController.ts
-@Get('positions/:walletId')
-async getPositions(@Param('walletId') walletIdRaw: string) {
-  const result = await getSolUsdcInsightPositions({ /* ... */ });
-  if (result.kind === 'pool-unavailable') {
-    throw this.poolUnavailable(walletIdRaw);
+@UseGuards(InsightsApiKeyGuard)
+@Controller('insights/sol-usdc')
+export class InsightsDataController {
+  private static readonly BASE58_REGEX = /^[1-9A-HJ-NP-Za-km-z]{32,44}$/;
+
+  @Get('positions/:walletId')
+  async getPositions(@Param('walletId') walletIdRaw: string) {
+    this.validateWalletId(walletIdRaw);
+    const result = await getSolUsdcInsightPositions({ /* ... */ });
+    if (result.kind === 'pool-unavailable') {
+      throw this.poolUnavailable();
+    }
+    if (result.kind === 'position-list-unavailable') {
+      throw this.positionListUnavailable(walletIdRaw);
+    }
+    if (result.kind === 'position-detail-unavailable') {
+      throw this.positionDetailUnavailable(walletIdRaw, result.positionId);
+    }
+    return { snapshot: result.snapshot };
   }
-  if (result.kind === 'position-list-unavailable') {
-    throw this.positionListUnavailable(walletIdRaw);
+
+  private validateWalletId(walletId: string): void {
+    if (!InsightsDataController.BASE58_REGEX.test(walletId)) {
+      throw new HttpException(
+        { code: 'invalid_wallet_id', message: 'walletId must be a valid Solana base58 address.', retryable: false },
+        HttpStatus.BAD_REQUEST,
+      );
+    }
   }
-  if (result.kind === 'position-detail-unavailable') {
-    throw this.positionDetailUnavailable(walletIdRaw, result.positionId);
-  }
-  return { snapshot: result.snapshot };
 }
 ```
 
-The error DTO (`SolUsdcInsightErrorDto`) includes `code`, `pair`, `poolId`, `retryable: true`, and optional `walletId`/`positionId` for client-side retry logic.
+The error DTO (`SolUsdcInsightErrorDto`) includes `code`, `pair`, `poolId`, and `retryable: true`. Identifiers like `walletId` and `positionId` are NOT included in error responses to prevent enumeration.
 
 ### 3. Duplicate types across adapter/application boundaries intentionally
 
@@ -92,15 +108,20 @@ The error DTO (`SolUsdcInsightErrorDto`) includes `code`, `pair`, `poolId`, `ret
 One adapter class implements both interfaces:
 
 ```typescript
+/** @deprecated Use SrLevelsReadPort from @clmm/application instead. */
+export interface CurrentSrLevelsPort {
+  fetchCurrent(symbol: string, source: string): Promise<SrLevelsBlock | null>;
+}
+
 export class CurrentSrLevelsAdapter implements CurrentSrLevelsPort, SrLevelsReadPort {
   async fetchCurrent(symbol: string, source: string): Promise<SrLevelsBlock | null> { /* ... */ }
 }
 ```
 
-In `AppModule`, both `CURRENT_SR_LEVELS_PORT` and `SR_LEVELS_READ_PORT` DI tokens point to the same instance:
+In `AppModule`, both `CURRENT_SR_LEVELS_PORT` and `SR_LEVELS_READ_PORT` DI tokens point to the same instance. The `CurrentSrLevelsPort` interface is deprecated — once `SrLevelsController` is migrated to use `SrLevelsReadPort`, both the adapter-local interface and its DI token should be removed:
 
 ```typescript
-{ provide: CURRENT_SR_LEVELS_PORT, useValue: currentSrLevelsAdapter },
+{ provide: CURRENT_SR_LEVELS_PORT, useValue: currentSrLevelsAdapter }, // TODO: remove after SrLevelsController migration
 { provide: SR_LEVELS_READ_PORT, useValue: currentSrLevelsAdapter },
 ```
 
@@ -166,17 +187,27 @@ This is the opposite of pool snapshot failure, which returns `{ kind: 'pool-unav
 
 ### 6. Filter and normalize enrichment data at the composition boundary
 
-Trigger enrichment applies a two-step filter: first fetch all triggers, then keep only those matching positions in the allowlisted pool. The `breachDirection` is normalized from the domain `BreachDirection` ADT to the application `ExternalBreachDirection` string literal:
+Trigger enrichment applies a two-step filter: first fetch all triggers, then keep only those matching positions in the allowlisted pool. The `breachDirection` is normalized from the domain `BreachDirection` ADT to the application `ExternalBreachDirection` string literal using a named conversion function that makes the invariant mapping explicit:
 
 ```typescript
-const filteredTriggers = triggers
-  .filter((t) => filteredPositionIds.has(t.positionId))
-  .map((t) => ({
-    triggerId: t.triggerId,
-    positionId: t.positionId,
-    breachDirection: t.breachDirection.kind,  // domain ADT → string literal
-    triggeredAt: t.triggeredAt,
-  }));
+// packages/application/src/use-cases/insights/toExternalBreachDirection.ts
+// The directional invariant (LowerBoundBreach -> SOL->USDC, UpperBoundBreach -> USDC->SOL)
+// lives only in DirectionalExitPolicyService. This function projects the discriminated-union
+// kind to the external string literal — it does NOT re-derive direction.
+export function toExternalBreachDirection(breachDirection: BreachDirection): ExternalBreachDirection {
+  return breachDirection.kind;
+}
+```
+
+A compile-time drift guard in `packages/application/src/dto/index.ts` ensures the string literal values stay aligned with the domain's `BreachDirection` types:
+
+```typescript
+// Drift guard: ExternalBreachDirection values must match BreachDirection.kind variants.
+// If BreachDirection adds or renames a kind, this assertion will fail at compile time.
+type _AssertBreachDirectionMatch = AssertEqual<
+  ExternalBreachDirection,
+  BreachDirection extends infer B ? (B extends { kind: infer K } ? K : never) : never
+>;
 ```
 
 This ensures the external API never leaks internal domain types and that only relevant positions receive trigger data.
@@ -207,11 +238,13 @@ const orcaPositionRead = new OrcaPositionReadAdapter(rpcUrl, snapshotReader, db,
 
 ### 8. Validate configuration at construction time, not request time
 
-The controller constructor validates the S/R allowlist has exactly one entry. If it's empty or has multiple entries, the service fails immediately on boot with a clear error message:
+The controller constructor validates the S/R allowlist has exactly one entry. The magic number is named explicitly as a v1 constraint. If it's empty or has multiple entries, the service fails immediately on boot with a clear error message:
 
 ```typescript
+private static readonly EXPECTED_ALLOWLIST_SIZE_V1 = 1;
+
 constructor(/* ... */) {
-  if (this.srLevelsAllowlist.size !== 1) {
+  if (this.srLevelsAllowlist.size !== InsightsDataController.EXPECTED_ALLOWLIST_SIZE_V1) {
     throw new Error(
       `InsightsDataController expects exactly one allowlist entry, found ${this.srLevelsAllowlist.size}`,
     );
@@ -257,27 +290,31 @@ Each warning carries a machine-readable `code`, a human-readable `message`, and 
 
 ### 10. Compose use cases from smaller use cases, don't duplicate logic
 
-`getSolUsdcInsightBundle` calls `getSolUsdcInsightPoolSnapshot` for pool data and `buildSolUsdcPositionInsight` for per-position mapping, then adds its own S/R and trigger enrichment. The position read and trigger enrichment logic is shared between `getSolUsdcInsightPositions` and `getSolUsdcInsightBundle` via `enrichWithTriggers`. No logic is duplicated across endpoints.
+`getSolUsdcInsightBundle` composes over `getSolUsdcInsightPositions` rather than duplicating position-reading and price-fetching logic. After validating the pool snapshot, Bundle calls Positions to get the filtered, enriched position list, then layers on S/R levels and alert filtering. This ensures both endpoints produce consistent behavior for the same inputs.
 
 ## Why This Matters
 
 - **Discriminated unions prevent silent failures**: Every failure mode has its own type variant. TypeScript exhaustiveness checking means adding a new failure kind to the union forces every consumer to handle it. No `null` hiding a real error.
-- **Boundary type duplication preserves architecture**: Importing from `adapters` in `application` would break the dependency rule. Structural duplication with drift guards keeps packages decoupled while sharing a single instance at runtime via DI.
+- **Boundary type duplication preserves architecture**: Importing from `adapters` in `application` would break the dependency rule. Structural duplication with drift guards keeps packages decoupled while sharing a single instance at runtime via DI. Compile-time assertion types (`AssertEqual`) enforce drift detection at build time, not just via comments.
 - **Sequential reads prevent RPC abuse**: Unbounded `Promise.all` on position details would hammer the Solana RPC and produce partial failures that are ambiguous to handle. Sequential reads are predictably safe.
 - **Fail-safe enrichment keeps primary data flowing**: S/R levels are nice-to-have. Pool data is must-have. The discriminated-union + warning pattern lets the API degrade gracefully on S/R failure while hard-failing on pool failure. Clients always get useful data when possible.
 - **Boot-time validation prevents runtime misconfiguration**: An empty or multi-entry allowlist is a deployment error, not a user request error. Surfacing it at boot time means NestJS won't start with invalid config.
 - **Safe env parsers prevent operational footguns**: A typo in `CLMM_POOL_DATA_CACHE_TTL_MS` silently falls back to 30s instead of crashing production.
 - **Explicit data quality tracking makes degradation observable**: Without `InsightDataQualityDto`, clients can't tell whether they're seeing complete or partial data. The `partial` flag and `warnings` array make degraded state machine-readable.
+- **Composition over duplication prevents behavioral divergence**: When Bundle composes over Positions instead of duplicating the logic, both endpoints produce consistent results for the same inputs. Any bug fix in Positions automatically applies to Bundle.
+- **API key auth and input validation protect read-only endpoints**: The `InsightsApiKeyGuard` and `BASE58_REGEX` walletId validation prevent unauthorized access and reject malformed input before it reaches RPC calls.
+- **Error responses avoid identifier enumeration**: Error DTOs include machine-readable codes and server-configured pool IDs, but omit user-supplied `walletId` and `positionId` to prevent enumeration attacks.
 
 ## When to Apply
 
 - Building read-only data API endpoints that compose multiple async data sources with partial-failure semantics
-- Mapping application-layer discriminated unions to HTTP status codes in a controller
+- Mapping application-layer discriminated unions to HTTP status codes in a controller, including input validation and auth guards
 - Structurally duplicating types across package boundaries to preserve dependency direction
 - Designing enrichment composition where non-critical data (S/R levels, price USD valuations) fails safely without blocking the primary response
 - Adding configurable cache TTLs or timeouts via environment variables with safe parsers
 - Validating service configuration at boot time rather than at request time
 - Tracking partial data quality explicitly in response DTOs for client-side degradation logic
+- Protecting read-only BFF endpoints with API key auth when JWT/session auth is not available
 
 ## Examples
 
@@ -291,32 +328,48 @@ export type GetSolUsdcInsightPositionsResult =
   | { kind: 'position-list-unavailable' }
   | { kind: 'position-detail-unavailable'; positionId: string };
 
-// Adapter layer — controller maps each variant to an HTTP response
-@Get('positions/:walletId')
-async getPositions(@Param('walletId') walletIdRaw: string) {
-  const result = await getSolUsdcInsightPositions({ walletId, poolId, positionReadPort, triggerRepo, pricePort, now });
-  if (result.kind === 'pool-unavailable') {
-    throw this.poolUnavailable(walletIdRaw);
-  }
-  if (result.kind === 'position-list-unavailable') {
-    throw this.positionListUnavailable(walletIdRaw);
-  }
-  if (result.kind === 'position-detail-unavailable') {
-    throw this.positionDetailUnavailable(walletIdRaw, result.positionId);
-  }
-  return { snapshot: result.snapshot };
-}
+// Adapter layer — controller validates input, applies auth, maps each variant
+@UseGuards(InsightsApiKeyGuard)
+@Controller('insights/sol-usdc')
+export class InsightsDataController {
+  private static readonly EXPECTED_ALLOWLIST_SIZE_V1 = 1;
+  private static readonly BASE58_REGEX = /^[1-9A-HJ-NP-Za-km-z]{32,44}$/;
 
-private poolUnavailable(walletIdRaw?: string): HttpException {
-  const body: SolUsdcInsightErrorDto = {
-    code: 'pool_snapshot_unavailable',
-    message: 'Unable to read SOL/USDC pool snapshot.',
-    pair: 'SOL/USDC',
-    poolId: this.poolIdRaw,
-    ...(walletIdRaw !== undefined ? { walletId: walletIdRaw } : {}),
-    retryable: true,
-  };
-  return new HttpException(body, HttpStatus.SERVICE_UNAVAILABLE);
+  @Get('positions/:walletId')
+  async getPositions(@Param('walletId') walletIdRaw: string) {
+    this.validateWalletId(walletIdRaw);
+    const result = await getSolUsdcInsightPositions({ walletId, poolId, positionReadPort, triggerRepo, pricePort, now });
+    if (result.kind === 'pool-unavailable') {
+      throw this.poolUnavailable();
+    }
+    if (result.kind === 'position-list-unavailable') {
+      throw this.positionListUnavailable(walletIdRaw);
+    }
+    if (result.kind === 'position-detail-unavailable') {
+      throw this.positionDetailUnavailable(walletIdRaw, result.positionId);
+    }
+    return { snapshot: result.snapshot };
+  }
+
+  private validateWalletId(walletId: string): void {
+    if (!InsightsDataController.BASE58_REGEX.test(walletId)) {
+      throw new HttpException(
+        { code: 'invalid_wallet_id', message: 'walletId must be a valid Solana base58 address.', retryable: false },
+        HttpStatus.BAD_REQUEST,
+      );
+    }
+  }
+
+  private poolUnavailable(walletIdRaw?: string): HttpException {
+    const body: SolUsdcInsightErrorDto = {
+      code: 'pool_snapshot_unavailable',
+      message: 'Unable to read SOL/USDC pool snapshot.',
+      pair: 'SOL/USDC',
+      poolId: this.poolIdRaw,
+      retryable: true,
+    };
+    return new HttpException(body, HttpStatus.SERVICE_UNAVAILABLE);
+  }
 }
 ```
 
@@ -391,6 +444,7 @@ expect(parsePoolDataCacheTtlMs('abc')).toBe(30_000);
 ```typescript
 @Controller('insights/sol-usdc')
 export class InsightsDataController {
+  private static readonly EXPECTED_ALLOWLIST_SIZE_V1 = 1;
   private readonly poolIdRaw: string;
   private readonly srLevelsLookup: { symbol: string; source: string };
 
@@ -402,7 +456,7 @@ export class InsightsDataController {
     @Inject(SR_LEVELS_POOL_ALLOWLIST) private readonly srLevelsAllowlist: SrLevelsAllowlist,
     private readonly now: () => number = Date.now,
   ) {
-    if (this.srLevelsAllowlist.size !== 1) {
+    if (this.srLevelsAllowlist.size !== InsightsDataController.EXPECTED_ALLOWLIST_SIZE_V1) {
       throw new Error(
         `InsightsDataController expects exactly one allowlist entry, found ${this.srLevelsAllowlist.size}`,
       );
