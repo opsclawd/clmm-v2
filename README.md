@@ -64,6 +64,18 @@ CLMM uses two separate env surfaces:
 - **App-only public** (`apps/app/.env.example`): variables prefixed `EXPO_PUBLIC_*`, shipped in the mobile/web bundle. **Only `EXPO_PUBLIC_BFF_BASE_URL` is allowed.** The app never talks to backend dependencies directly; the BFF mediates every read.
 - **Backend-only** (`packages/adapters/.env.sample`): Railway deployment secrets — DB, RPC, and cross-service credentials. Never ship these in the app bundle.
 
+### External insights pipeline (read-only consumer)
+
+The external `clmm-autopilot-pipeline` reads SOL/USDC pool, position, alert, and S/R snapshots through the CLMM BFF — never directly from Helius. Centralizing RPC behind the BFF keeps Helius credentials inside CLMM and prevents the pipeline from doing its own RPC fan-out.
+
+The pipeline points at the BFF with:
+
+```bash
+CLMM_DATA_API_BASE=http://localhost:3001
+```
+
+Use the deployed CLMM API URL in hosted environments. Endpoints are read-only and live under `/insights/sol-usdc/`. They do not sign transactions, submit swaps, withdraw or rebalance liquidity, or request wallet private keys.
+
 ### Regime engine integration (backend only)
 
 CLMM posts terminal execution events to regime-engine and reads current S/R levels back through the BFF. Two env vars wire this up on the CLMM side:
