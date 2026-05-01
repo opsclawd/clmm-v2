@@ -27,3 +27,6 @@ export * from './use-cases/execution/SubmitExecutionAttempt.js';
 export * from './use-cases/execution/RecordSignatureDecline.js';
 export * from './use-cases/execution/GetAwaitingSignaturePayload.js';
 export * from './use-cases/execution/ResumeExecutionAttempt.js';
+export * from './use-cases/insights/GetSolUsdcInsightPoolSnapshot.js';
+export * from './use-cases/insights/GetSolUsdcInsightPositions.js';
+export * from './use-cases/insights/GetSolUsdcInsightBundle.js';

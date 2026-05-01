@@ -26,18 +26,30 @@ import type { Db } from '../storage/db.js';
 import { walletPositionOwnership } from '../storage/schema/index.js';
 import { KNOWN_TOKENS } from '../price/known-tokens.js';
 
+const DEFAULT_POOL_DATA_CACHE_TTL_MS = 30_000;
+
+export function parsePoolDataCacheTtlMs(raw: string | undefined): number {
+  if (raw === undefined || raw === '') return DEFAULT_POOL_DATA_CACHE_TTL_MS;
+  const parsed = Number(raw);
+  if (!Number.isFinite(parsed) || parsed <= 0) return DEFAULT_POOL_DATA_CACHE_TTL_MS;
+  return Math.floor(parsed);
+}
+
 export class OrcaPositionReadAdapter implements SupportedPositionReadPort {
   private readonly poolDataCache = new Map<
     string,
     { data: PoolData | null; staleAt: number }
   >();
-  private readonly POOL_DATA_CACHE_TTL_MS = 5_000;
+  private readonly POOL_DATA_CACHE_TTL_MS: number;
 
   constructor(
     private readonly rpcUrl: string,
     private readonly snapshotReader: SolanaPositionSnapshotReader,
     private readonly db: Db,
-  ) {}
+    poolDataCacheTtlMs: number = DEFAULT_POOL_DATA_CACHE_TTL_MS,
+  ) {
+    this.POOL_DATA_CACHE_TTL_MS = poolDataCacheTtlMs;
+  }
 
   private isOwnedPositionEntry(value: unknown): value is {
     whirlpool: Address | string;

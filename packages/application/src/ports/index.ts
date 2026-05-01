@@ -31,6 +31,7 @@ import type {
   HistoryTimeline,
   ExecutionOutcomeSummary,
 } from '@clmm/domain';
+import type { SrLevelsBlock } from '../dto/index.js';
 
 // --- Position read ports ---
 
@@ -259,4 +260,10 @@ export interface ClockPort {
 
 export interface IdGeneratorPort {
   generateId(): string;
+}
+
+// --- S/R levels read port (application-owned; CurrentSrLevelsAdapter implements) ---
+
+export interface SrLevelsReadPort {
+  fetchCurrent(symbol: string, source: string): Promise<SrLevelsBlock | null>;
 }

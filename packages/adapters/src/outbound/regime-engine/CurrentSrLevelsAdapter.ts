@@ -1,7 +1,11 @@
-import type { CurrentSrLevelsPort, SrLevelsBlock, SrLevel } from './types.js';
-import type { ObservabilityPort } from '@clmm/application';
+import type { CurrentSrLevelsPort, SrLevel } from './types.js';
+import type { ObservabilityPort, SrLevelsReadPort, SrLevelsBlock } from '@clmm/application';
 
-export class CurrentSrLevelsAdapter implements CurrentSrLevelsPort {
+// The adapter-local SrLevelsBlock and the application SrLevelsBlock are
+// structurally identical (drift guard noted in both files). Implementing
+// both interfaces means SrLevelsController and the new insight use cases
+// can share one adapter instance.
+export class CurrentSrLevelsAdapter implements CurrentSrLevelsPort, SrLevelsReadPort {
   private hasLoggedDisabled = false;
 
   constructor(
