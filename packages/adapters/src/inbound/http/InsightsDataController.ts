@@ -89,7 +89,7 @@ export class InsightsDataController {
     const result = await getSolUsdcInsightPoolSnapshot({
       poolId: makePoolId(this.poolIdRaw),
       positionReadPort: this.positionReadPort,
-      now: this.clock.now,
+      now: () => this.clock.now(),
     });
     if (result.kind === 'pool-unavailable') {
       throw this.poolUnavailable();
@@ -106,7 +106,7 @@ export class InsightsDataController {
       positionReadPort: this.positionReadPort,
       triggerRepo: this.triggerRepo,
       pricePort: this.pricePort,
-      now: this.clock.now,
+      now: () => this.clock.now(),
     });
     if (result.kind === 'pool-unavailable') {
       throw this.poolUnavailable();
@@ -131,7 +131,7 @@ export class InsightsDataController {
       triggerRepo: this.triggerRepo,
       pricePort: this.pricePort,
       srLevelsReadPort: this.srLevelsReadPort,
-      now: this.clock.now,
+      now: () => this.clock.now(),
     });
     if (result.kind === 'pool-unavailable') {
       throw this.poolUnavailable();
