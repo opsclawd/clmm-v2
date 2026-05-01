@@ -32,7 +32,7 @@ The implementation should add:
 
 - insight DTOs in `packages/application`
 - an application-layer `SrLevelsReadPort`
-- a SOL/USDC insight input use case in `packages/application`
+- SOL/USDC insight read-model use cases in `packages/application`
 - a thin `InsightsDataController` in `packages/adapters`
 
 The controller maps HTTP params and primary failures to status codes. It does not own orchestration.
@@ -72,6 +72,8 @@ Primary snapshot failures return `503`:
 - allowlisted SOL/USDC pool snapshot unavailable
 - position list read unavailable
 - any allowlisted SOL/USDC position detail unavailable
+
+HTTP `503` responses use `SolUsdcInsightErrorDto` with stable error codes, not framework-default error payloads.
 
 Partial data is only for non-critical enrichment failures:
 
@@ -130,10 +132,21 @@ export type SolUsdcPoolSnapshotDto = {
   feeRate: number;
   feeRateLabel: string;
   poolLiquidity: string;
-  poolDepthLabel: 'depth unavailable';
-  dataQuality: {
-    priceSource: 'orca_whirlpool_sqrt_price';
-  };
+  priceSource: 'orca_whirlpool_sqrt_price';
+};
+
+export type SolUsdcFeeAmountDto = {
+  raw: string;
+  decimals: number | null;
+  symbol: string;
+  mint?: string;
+};
+
+export type SolUsdcRewardAmountDto = {
+  mint: string;
+  raw: string;
+  decimals: number | null;
+  symbol: string;
 };
 
 export type ExternalBreachDirection =
@@ -162,6 +175,11 @@ export type SolUsdcPositionInsightDto = {
     aboveUpperPricePercent?: number;
   };
   feeRateLabel: string;
+  unclaimedFees: {
+    feeOwedA: SolUsdcFeeAmountDto;
+    feeOwedB: SolUsdcFeeAmountDto;
+  };
+  unclaimedRewards: SolUsdcRewardAmountDto[];
   unclaimedFeesUsd: number | null;
   unclaimedRewardsUsd: number | null;
   positionLiquidity: string;
@@ -192,9 +210,24 @@ export type SolUsdcInsightInputBundleDto = {
   }>;
   dataQuality: InsightDataQualityDto;
 };
+
+export type SolUsdcInsightErrorDto = {
+  code:
+    | 'pool_snapshot_unavailable'
+    | 'position_list_unavailable'
+    | 'position_detail_unavailable';
+  message: string;
+  pair: 'SOL/USDC';
+  poolId: string;
+  walletId?: string;
+  positionId?: string;
+  retryable: true;
+};
 ```
 
-`SolUsdcPoolSnapshotDto.dataQuality.priceSource` is not cache provenance. It only describes the deterministic price calculation source for `currentPrice`.
+`SolUsdcPoolSnapshotDto.priceSource` is not cache provenance. It only describes the deterministic price calculation source for `currentPrice`.
+
+Pool depth is intentionally omitted from insight DTOs until there is real depth computation or a concrete pipeline consumer need. Do not carry over the existing `poolDepthLabel: 'depth unavailable'` literal.
 
 ## Application Port
 
@@ -210,13 +243,17 @@ export interface SrLevelsReadPort {
 
 ## Application Use Case
 
-Add a use case such as:
+Prefer separate use cases with clear endpoint-aligned names:
 
 ```text
-packages/application/src/use-cases/insights/GetSolUsdcInsightInputBundle.ts
+packages/application/src/use-cases/insights/GetSolUsdcInsightPoolSnapshot.ts
+packages/application/src/use-cases/insights/GetSolUsdcInsightPositions.ts
+packages/application/src/use-cases/insights/GetSolUsdcInsightBundle.ts
 ```
 
-The use case owns all orchestration for pool, position, alert, price, and S/R composition.
+Alternatively, use one clearly named `GetSolUsdcInsightReadModel` module with separate exported functions for the pool, positions, and bundle contracts. Do not put all three endpoint contracts behind a vague "Bundle" file without clear function names.
+
+The use cases own all orchestration for pool, position, alert, price, and S/R composition.
 
 Inputs:
 
@@ -260,18 +297,24 @@ The exact function names can differ, but `/positions/:walletId` and `/bundle/:wa
 
 The allowlisted SOL/USDC pool snapshot is primary data. Do not return `pool: null`.
 
-Because `currentPrice` and `currentPriceLabel` are required pool fields, missing token decimals for the allowlisted SOL/USDC pool should be treated as `pool-unavailable` rather than returning a tick-only or placeholder price.
+Because `currentPrice` and `currentPriceLabel` are required pool fields, missing token decimals for the allowlisted SOL/USDC pool should be treated as `pool-unavailable` rather than returning a tick-only or fallback price.
 
 ### Position Snapshot Flow
 
-1. Call `listSupportedPositions(walletId)`.
-2. If it fails, return `position-list-unavailable`.
-3. Filter positions to the allowlisted SOL/USDC pool.
-4. Call `getPositionDetail(walletId, positionId)` for each filtered position.
-5. If any detail is null or fails, return `position-detail-unavailable` with the failed `positionId`.
-6. Build `SolUsdcPositionInsightDto` from detail-backed data.
+This flow applies to both `/positions/:walletId` and `/bundle/:walletId`.
+
+1. Call `positionReadPort.getPoolData(poolId)` and build or validate the SOL/USDC pool snapshot first.
+2. If pool data is null, unavailable, or lacks required SOL/USDC decimals, return `pool-unavailable`.
+3. Call `listSupportedPositions(walletId)`.
+4. If it fails, return `position-list-unavailable`.
+5. Filter positions to the allowlisted SOL/USDC pool.
+6. Call `getPositionDetail(walletId, positionId)` only for filtered positions.
+7. If any detail is null or fails, return `position-detail-unavailable` with the failed `positionId`.
+8. Build `SolUsdcPositionInsightDto` from detail-backed data.
 
 Do not detail-read positions outside the allowlisted SOL/USDC pool.
+
+Detail reads for allowlisted positions must be sequential or use bounded concurrency. Do not use unbounded `Promise.all` over `getPositionDetail`.
 
 If there are no matching positions, return an empty positions array with `partial: false`.
 
@@ -281,11 +324,12 @@ Call `triggerRepo.listActionableTriggers(walletId)` as enrichment.
 
 If successful:
 
-- map triggers by `positionId`
+- filter to triggers whose `positionId` is in the filtered allowlisted SOL/USDC position set
+- map filtered triggers by `positionId`
 - set `hasActionableTrigger`
 - attach `triggerId`
 - normalize `breachDirection.kind` to `'lower-bound-breach' | 'upper-bound-breach'`
-- build bundle `alerts`
+- build bundle `alerts` from filtered triggers only
 
 If unavailable:
 
@@ -294,6 +338,8 @@ If unavailable:
 - add `actionable_triggers_unavailable`
 
 This use case must not re-derive directional exit policy or target posture.
+
+Do not return alerts for positions outside the allowlisted SOL/USDC pool in the SOL/USDC insights bundle.
 
 ### S/R Enrichment Flow
 
@@ -314,6 +360,12 @@ S/R is not included in `/positions/:walletId` responses and is not copied onto e
 
 Fee/reward raw amounts come from `getPositionDetail`.
 
+The insight DTO must include raw fee/reward data in addition to USD valuation:
+
+- `unclaimedFees.feeOwedA.raw`, `decimals`, `symbol`, and optional `mint`
+- `unclaimedFees.feeOwedB.raw`, `decimals`, `symbol`, and optional `mint`
+- `unclaimedRewards[]` entries with `mint`, `raw`, `decimals`, and `symbol`
+
 USD fields are:
 
 ```ts
@@ -324,6 +376,8 @@ unclaimedRewardsUsd: number | null;
 If all required token decimals and price quotes are available, compute known numeric values. A real zero remains `0`.
 
 If price enrichment fails or any required quote/decimals value is unavailable, set the affected USD field to `null` and add `fee_reward_usd_unavailable` scoped to the position.
+
+Do not reuse `PositionDetailDto.unclaimedFees.totalUsd` or `PositionDetailDto.unclaimedRewards.totalUsd` as insight valuation truth. Existing position DTO totals collapse unavailable valuation to `0`; the insight use case must compute valuation from raw `PositionDetail` plus `PricePort` so unavailable valuation remains distinguishable as `null`.
 
 ### Distance Flow
 
@@ -362,18 +416,29 @@ The controller injects:
 - `SR_LEVELS_POOL_ALLOWLIST`
 - clock dependency if the use case requires it
 
-The controller calls the application use case and maps primary failures to `ServiceUnavailableException`.
+The controller calls the application use case and maps primary failure unions to HTTP `503` using stable `SolUsdcInsightErrorDto` payloads, not loose Nest default payloads.
 
 Example failure payload shape:
 
 ```json
 {
-  "error": "Position detail unavailable",
-  "positionId": "..."
+  "code": "position_detail_unavailable",
+  "message": "Unable to read SOL/USDC position detail.",
+  "pair": "SOL/USDC",
+  "poolId": "Czfq3xZZDmsdGdUyrNLtRhGc47cXcZtLG4crryfu44zE",
+  "walletId": "...",
+  "positionId": "...",
+  "retryable": true
 }
 ```
 
-Exact Nest error wrapping may vary, but failed `positionId` must be present when available.
+Supported error codes:
+
+- `pool_snapshot_unavailable`
+- `position_list_unavailable`
+- `position_detail_unavailable`
+
+Every error DTO includes `message`, `pair`, `poolId`, and `retryable: true`. Include `walletId` where applicable and `positionId` for position detail failures.
 
 `CurrentSrLevelsAdapter` implements the new application `SrLevelsReadPort`. The adapter-local `CurrentSrLevelsPort` can be removed if no longer needed, or kept only if another adapter-local caller still needs it. The HTTP path should depend on the application port.
 
@@ -399,7 +464,8 @@ Implement backend-only `CLMM_POOL_DATA_CACHE_TTL_MS` in `OrcaPositionReadAdapter
 
 Rules:
 
-- default remains safe, preferably `30000` ms for read-only pool data
+- default is `30000` ms
+- parse it safely from the environment
 - invalid or non-positive values fall back to default
 - document the variable in `packages/adapters/.env.sample`
 - do not expose cache provenance in response DTOs
@@ -422,22 +488,26 @@ Application use-case tests should cover:
 
 - pool snapshot success
 - pool unavailable primary failure
+- positions and bundle validate the pool before listing positions
 - filters positions to the allowlisted SOL/USDC pool
 - no matching positions returns empty positions with `partial: false`
 - detail failure for an allowlisted position returns primary failure with `positionId`
+- raw fee/reward fields are preserved on `SolUsdcPositionInsightDto`
 - actionable trigger enrichment
 - breach direction string normalization
+- bundle alerts include only triggers for filtered allowlisted SOL/USDC positions
 - actionable trigger failure warning
 - S/R unavailable warning at bundle top level
 - price valuation unavailable yields null USD fields and warning
 - no `srLevels` on positions
+- no `poolDepthLabel` on insight DTOs
 - `/positions/:walletId` and `/bundle/:walletId` share the same position DTO shape
 
 Adapter HTTP tests should cover:
 
 - three routes return use-case payloads
-- primary failures become `ServiceUnavailableException`
-- failed `positionId` is included when detail read fails
+- primary failures return HTTP `503` with `SolUsdcInsightErrorDto`
+- failed `positionId` is included in the error DTO when detail read fails
 - existing `PositionController` S/R absence regression remains unchanged
 - existing `SrLevelsController` behavior remains unchanged
 
@@ -472,14 +542,18 @@ pnpm test
 - `GET /insights/sol-usdc/pool` returns a valid Orca SOL/USDC pool snapshot for the allowlisted pool.
 - `GET /insights/sol-usdc/positions/:walletId` returns only allowlisted SOL/USDC Orca positions for the wallet.
 - `GET /insights/sol-usdc/bundle/:walletId` returns pool, top-level S/R levels, positions, alerts, and minimal data quality in one compact payload.
-- Pool snapshot failures return `503`.
-- Allowlisted position detail failures return `503` and include the failed `positionId` when available.
+- Positions and bundle endpoints validate the pool snapshot before listing wallet positions.
+- Pool snapshot failures return `503` with `SolUsdcInsightErrorDto`.
+- Allowlisted position detail failures return `503` with `SolUsdcInsightErrorDto` and include the failed `positionId` when available.
 - Partial data warnings are used only for non-critical enrichment failures.
 - `srLevels` is top-level in the bundle and never included per position.
+- Bundle alerts include only actionable triggers for the filtered allowlisted SOL/USDC positions.
+- Raw fee/reward fields are included in `SolUsdcPositionInsightDto`.
 - Position USD valuation uses `number | null`, preserving the difference between known zero and unavailable valuation.
+- `poolDepthLabel` is not included in insight DTOs.
 - Existing position endpoint behavior remains unchanged.
 - Existing S/R endpoint behavior remains unchanged.
 - No execution, signing, liquidity mutation, swap submission, private-key, proof, attestation, or claim-verification concepts are added.
 - No fake cache/provider provenance is returned.
-- `CLMM_POOL_DATA_CACHE_TTL_MS` is implemented and documented if cache TTL configurability is included.
+- `CLMM_POOL_DATA_CACHE_TTL_MS` is implemented, safely parsed, defaults to `30000`, falls back on invalid values, and is documented.
 - Tests cover the application use case and HTTP failure mapping.
