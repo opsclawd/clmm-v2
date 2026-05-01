@@ -50,6 +50,7 @@ import {
   PRICE_PORT,
   SR_LEVELS_READ_PORT,
   INSIGHTS_API_KEY,
+  INSIGHTS_NOW_FN,
 } from './tokens.js';
 
 // boundary: process.env values are untyped at runtime; validated via env schema at deploy
@@ -121,6 +122,7 @@ export const SR_LEVELS_POOL_ALLOWLIST_MAP = new Map<string, { symbol: string; so
     { provide: SR_LEVELS_POOL_ALLOWLIST, useValue: SR_LEVELS_POOL_ALLOWLIST_MAP },
     { provide: PRICE_PORT, useValue: jupiterPrice },
     { provide: INSIGHTS_API_KEY, useValue: (process.env as Record<string, string | undefined>)['INSIGHTS_API_KEY'] ?? '' },
+    { provide: INSIGHTS_NOW_FN, useValue: Date.now },
     InsightsApiKeyGuard,
     PgBossLifecycle,
   ],

@@ -28,6 +28,7 @@ import {
   SR_LEVELS_POOL_ALLOWLIST,
   // eslint-disable-next-line @typescript-eslint/no-unused-vars -- used via @Inject
   INSIGHTS_API_KEY,
+  INSIGHTS_NOW_FN,
 } from './tokens.js';
 import { InsightsApiKeyGuard } from './InsightsApiKeyGuard.js';
 
@@ -56,7 +57,7 @@ export class InsightsDataController {
     private readonly srLevelsReadPort: SrLevelsReadPort,
     @Inject(SR_LEVELS_POOL_ALLOWLIST)
     private readonly srLevelsAllowlist: SrLevelsAllowlist,
-    private readonly now: () => number = Date.now,
+    @Inject(INSIGHTS_NOW_FN) private readonly now: () => number,
   ) {
     if (this.srLevelsAllowlist.size !== EXPECTED_ALLOWLIST_SIZE_V1) {
       throw new Error(
