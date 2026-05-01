@@ -7,12 +7,13 @@ import { PreviewController } from './PreviewController.js';
 import { ExecutionController } from './ExecutionController.js';
 import { WalletController } from './WalletController.js';
 import { SrLevelsController } from './SrLevelsController.js';
+import { InsightsDataController } from './InsightsDataController.js';
 import { PgBossLifecycle } from './PgBossLifecycle.js';
 import { OperationalStorageAdapter } from '../../outbound/storage/OperationalStorageAdapter.js';
 import { OffChainHistoryStorageAdapter } from '../../outbound/storage/OffChainHistoryStorageAdapter.js';
 import { MonitoredWalletStorageAdapter } from '../../outbound/storage/MonitoredWalletStorageAdapter.js';
 import { SolanaPositionSnapshotReader } from '../../outbound/solana-position-reads/SolanaPositionSnapshotReader.js';
-import { OrcaPositionReadAdapter } from '../../outbound/solana-position-reads/OrcaPositionReadAdapter.js';
+import { OrcaPositionReadAdapter, parsePoolDataCacheTtlMs } from '../../outbound/solana-position-reads/OrcaPositionReadAdapter.js';
 import { JupiterQuoteAdapter } from '../../outbound/swap-execution/JupiterQuoteAdapter.js';
 import { SolanaExecutionPreparationAdapter } from '../../outbound/swap-execution/SolanaExecutionPreparationAdapter.js';
 import { SolanaExecutionSubmissionAdapter } from '../../outbound/swap-execution/SolanaExecutionSubmissionAdapter.js';
@@ -44,6 +45,7 @@ import {
   RECONCILIATION_JOB_PORT,
   SR_LEVELS_POOL_ALLOWLIST,
   PRICE_PORT,
+  SR_LEVELS_READ_PORT,
 } from './tokens.js';
 
 // boundary: process.env values are untyped at runtime; validated via env schema at deploy
@@ -62,7 +64,10 @@ const systemIds: IdGeneratorPort = {
 };
 
 const snapshotReader = new SolanaPositionSnapshotReader(rpcUrl);
-const orcaPositionRead = new OrcaPositionReadAdapter(rpcUrl, snapshotReader, db);
+const poolDataCacheTtlMs = parsePoolDataCacheTtlMs(
+  (process.env as Record<string, string | undefined>)['CLMM_POOL_DATA_CACHE_TTL_MS'],
+);
+const orcaPositionRead = new OrcaPositionReadAdapter(rpcUrl, snapshotReader, db, poolDataCacheTtlMs);
 const operationalStorage = new OperationalStorageAdapter(db, systemIds);
 const historyStorage = new OffChainHistoryStorageAdapter(db);
 const jupiterQuote = new JupiterQuoteAdapter();
@@ -90,7 +95,7 @@ export const SR_LEVELS_POOL_ALLOWLIST_MAP = new Map<string, { symbol: string; so
 ]);
 
 @Module({
-  controllers: [HealthController, PositionController, SrLevelsController, AlertController, PreviewController, ExecutionController, WalletController],
+  controllers: [HealthController, PositionController, SrLevelsController, InsightsDataController, AlertController, PreviewController, ExecutionController, WalletController],
   providers: [
     { provide: TRIGGER_REPOSITORY, useValue: operationalStorage },
     { provide: EXECUTION_REPOSITORY, useValue: operationalStorage },
@@ -104,6 +109,7 @@ export const SR_LEVELS_POOL_ALLOWLIST_MAP = new Map<string, { symbol: string; so
     { provide: MONITORED_WALLET_REPOSITORY, useValue: monitoredWalletStorage },
     { provide: REGIME_ENGINE_EVENT_PORT, useValue: regimeEngineEventAdapter },
     { provide: CURRENT_SR_LEVELS_PORT, useValue: currentSrLevelsAdapter },
+    { provide: SR_LEVELS_READ_PORT, useValue: currentSrLevelsAdapter },
     { provide: OBSERVABILITY_PORT, useValue: telemetry },
     { provide: PG_BOSS_INSTANCE, useValue: boss },
     { provide: RECONCILIATION_JOB_PORT, useValue: reconciliationJobPort },
