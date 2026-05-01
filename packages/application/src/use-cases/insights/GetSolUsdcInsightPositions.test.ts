@@ -13,7 +13,6 @@ import {
 import {
   makePoolId,
   makePositionId,
-  makeWalletId,
   makeClockTimestamp,
 } from '@clmm/domain';
 import type {
