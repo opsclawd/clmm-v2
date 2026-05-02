@@ -26,6 +26,14 @@ function uint8ArrayToBase64(bytes: Uint8Array): string {
   return Buffer.from(binary, 'binary').toString('base64');
 }
 
+function base64ToUint8Array(base64: string): Uint8Array {
+  if (typeof atob === 'function') {
+    const binary = atob(base64);
+    return Uint8Array.from(binary, (char) => char.charCodeAt(0));
+  }
+  return Uint8Array.from(Buffer.from(base64, 'base64'));
+}
+
 export async function connectNativeWallet(cluster: string = 'solana:mainnet'): Promise<string> {
   const authorization = await transact(async (wallet) => {
     return wallet.authorize({
@@ -101,6 +109,12 @@ export async function signNativeMessage(params: {
       throw new Error('Native wallet did not return a signed message payload');
     }
 
-    return signedPayload;
+    const signedBytes = base64ToUint8Array(signedPayload);
+    if (signedBytes.length < 64) {
+      throw new Error('Native wallet signed payload too short to contain Ed25519 signature');
+    }
+
+    const signatureBytes = signedBytes.slice(0, 64);
+    return uint8ArrayToBase64(signatureBytes);
   });
 }
