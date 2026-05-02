@@ -8,6 +8,7 @@ import * as historySchema from './schema/history.js';
 import * as monitoredWalletsSchema from './schema/monitored-wallets.js';
 import * as notificationDedupSchema from './schema/notification-dedup.js';
 import * as notificationEventsSchema from './schema/notification-events.js';
+import * as walletChallengesSchema from './schema/wallet-challenges.js';
 
 export function createDb(connectionString: string) {
   const client = postgres(connectionString);
@@ -21,6 +22,7 @@ export function createDb(connectionString: string) {
       ...monitoredWalletsSchema,
       ...notificationDedupSchema,
       ...notificationEventsSchema,
+      ...walletChallengesSchema,
     },
   });
 }

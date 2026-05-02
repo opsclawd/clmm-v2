@@ -50,6 +50,11 @@ export type {
   ReconciliationJobPort,
 } from '../ports/index.js';
 export type {
+  WalletChallengeRepository,
+  WalletChallengeRow,
+  ConsumeAndEnrollResult,
+} from '../ports/index.js';
+export type {
   EpisodeTransition,
   FinalizationResult,
   BreachEpisodeRepository,

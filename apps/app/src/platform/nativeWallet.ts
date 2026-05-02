@@ -8,6 +8,9 @@ type NativeSigningWallet = {
   signTransactions(args: { payloads: string[] }): Promise<{
     signed_payloads: string[];
   }>;
+  signMessages(args: { addresses: string[]; payloads: string[] }): Promise<{
+    signed_payloads: string[];
+  }>;
 };
 
 const APP_IDENTITY = {
@@ -15,6 +18,13 @@ const APP_IDENTITY = {
   uri: 'https://clmm.v2.app',
   icon: 'favicon.ico',
 };
+
+function uint8ArrayToBase64(bytes: Uint8Array): string {
+  let binary = '';
+  for (const b of bytes) binary += String.fromCharCode(b);
+  if (typeof btoa === 'function') return btoa(binary);
+  return Buffer.from(binary, 'binary').toString('base64');
+}
 
 export async function connectNativeWallet(cluster: string = 'solana:mainnet'): Promise<string> {
   const authorization = await transact(async (wallet) => {
@@ -56,6 +66,39 @@ export async function signNativeTransaction(params: {
     const signedPayload = signed.signed_payloads[0];
     if (typeof signedPayload !== 'string' || signedPayload.length === 0) {
       throw new Error('Native wallet did not return a signed payload');
+    }
+
+    return signedPayload;
+  });
+}
+
+export async function signNativeMessage(params: {
+  message: string;
+  walletId: string;
+  cluster?: string;
+}): Promise<string> {
+  return transact(async (wallet) => {
+    const signingWallet = wallet as unknown as NativeSigningWallet;
+    const authorization = await signingWallet.authorize({
+      identity: APP_IDENTITY,
+      chain: (params.cluster ?? 'solana:mainnet') as Chain,
+    });
+
+    const account = authorization.accounts[0];
+    if (!account || account.address !== params.walletId) {
+      throw new Error('Native wallet did not return the requested authorized account');
+    }
+
+    const messageBytes = new TextEncoder().encode(params.message);
+    const base64Payload = uint8ArrayToBase64(messageBytes);
+    const result = await signingWallet.signMessages({
+      addresses: [params.walletId],
+      payloads: [base64Payload],
+    });
+
+    const signedPayload = result.signed_payloads[0];
+    if (typeof signedPayload !== 'string' || signedPayload.length === 0) {
+      throw new Error('Native wallet did not return a signed message payload');
     }
 
     return signedPayload;

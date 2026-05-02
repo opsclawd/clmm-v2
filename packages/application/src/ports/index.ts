@@ -267,3 +267,37 @@ export interface IdGeneratorPort {
 export interface SrLevelsReadPort {
   fetchCurrent(symbol: string, source: string): Promise<SrLevelsBlock | null>;
 }
+
+// --- Wallet ownership challenge port ---
+
+export type WalletChallengeRow = {
+  walletId: WalletId;
+  nonce: string;
+  expiresAt: ClockTimestamp;
+  issuedAt: ClockTimestamp;
+};
+
+export type ConsumeAndEnrollResult =
+  | { kind: 'consumed' }
+  | { kind: 'not_found' }
+  | { kind: 'expired' }
+  | { kind: 'mismatch' };
+
+export interface WalletChallengeRepository {
+  issue(params: {
+    walletId: WalletId;
+    nonce: string;
+    expiresAt: ClockTimestamp;
+    issuedAt: ClockTimestamp;
+    now: ClockTimestamp;
+  }): Promise<WalletChallengeRow>;
+
+  get(walletId: WalletId): Promise<WalletChallengeRow | null>;
+
+  consumeAndEnrollIfMatches(params: {
+    walletId: WalletId;
+    nonce: string;
+    now: ClockTimestamp;
+    enrolledAt: ClockTimestamp;
+  }): Promise<ConsumeAndEnrollResult>;
+}

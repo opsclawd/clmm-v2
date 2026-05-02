@@ -12,6 +12,7 @@ import { PgBossLifecycle } from './PgBossLifecycle.js';
 import { OperationalStorageAdapter } from '../../outbound/storage/OperationalStorageAdapter.js';
 import { OffChainHistoryStorageAdapter } from '../../outbound/storage/OffChainHistoryStorageAdapter.js';
 import { MonitoredWalletStorageAdapter } from '../../outbound/storage/MonitoredWalletStorageAdapter.js';
+import { WalletChallengePostgresAdapter } from '../../outbound/storage/WalletChallengePostgresAdapter.js';
 import { SolanaPositionSnapshotReader } from '../../outbound/solana-position-reads/SolanaPositionSnapshotReader.js';
 import { OrcaPositionReadAdapter, parsePoolDataCacheTtlMs } from '../../outbound/solana-position-reads/OrcaPositionReadAdapter.js';
 import { JupiterQuoteAdapter } from '../../outbound/swap-execution/JupiterQuoteAdapter.js';
@@ -41,6 +42,7 @@ import {
   CLOCK_PORT,
   ID_GENERATOR_PORT,
   MONITORED_WALLET_REPOSITORY,
+  WALLET_CHALLENGE_REPOSITORY,
   REGIME_ENGINE_EVENT_PORT,
   CURRENT_SR_LEVELS_PORT,
   OBSERVABILITY_PORT,
@@ -78,6 +80,7 @@ const jupiterQuote = new JupiterQuoteAdapter();
 const solanaPreparation = new SolanaExecutionPreparationAdapter(rpcUrl, snapshotReader);
 const solanaSubmission = new SolanaExecutionSubmissionAdapter(rpcUrl);
 const monitoredWalletStorage = new MonitoredWalletStorageAdapter(db);
+const walletChallengeStorage = new WalletChallengePostgresAdapter(db);
 const telemetry = new TelemetryAdapter();
 const regimeEngineBaseUrl = (process.env as Record<string, string | undefined>)['REGIME_ENGINE_BASE_URL'] ?? null;
 const regimeEngineInternalToken = (process.env as Record<string, string | undefined>)['REGIME_ENGINE_INTERNAL_TOKEN'] ?? null;
@@ -111,6 +114,7 @@ export const SR_LEVELS_POOL_ALLOWLIST_MAP = new Map<string, { symbol: string; so
     { provide: CLOCK_PORT, useValue: systemClock },
     { provide: ID_GENERATOR_PORT, useValue: systemIds },
     { provide: MONITORED_WALLET_REPOSITORY, useValue: monitoredWalletStorage },
+    { provide: WALLET_CHALLENGE_REPOSITORY, useValue: walletChallengeStorage },
     { provide: REGIME_ENGINE_EVENT_PORT, useValue: regimeEngineEventAdapter },
     // TODO: Remove CURRENT_SR_LEVELS_PORT once SrLevelsController migrates to SR_LEVELS_READ_PORT.
     { provide: CURRENT_SR_LEVELS_PORT, useValue: currentSrLevelsAdapter },
