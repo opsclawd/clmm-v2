@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { Platform, Linking } from 'react-native';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import { useStore } from 'zustand';
@@ -77,6 +77,8 @@ export default function ConnectRoute() {
 
   const browserConnect = useBrowserWalletConnect();
   const browserAdapter = useConnectorKitAdapter();
+  const browserAdapterRef = useRef(browserAdapter);
+  browserAdapterRef.current = browserAdapter;
   const walletCount = browserConnect.wallets.length;
 
   const discovery: WalletDiscoveryState = useMemo(() => {
@@ -154,17 +156,19 @@ export default function ConnectRoute() {
 
   async function completeConnect(address: string, kind: 'native' | 'browser') {
     markConnected({ walletAddress: address, connectionKind: kind });
+    const liveAdapter = browserAdapterRef.current;
+    const browserSigner: import('../src/wallet-verify/signMessageWithWallet').BrowserMessageSigner | null =
+      kind === 'browser'
+        ? {
+            isConnected: liveAdapter.isConnected,
+            account: liveAdapter.account,
+            signMessageBytes: liveAdapter.signMessageBytes,
+          }
+        : null;
     const outcome = await verifyWalletEnrollment({
       walletId: address,
       connectionKind: kind,
-      browserSigner:
-        kind === 'browser'
-          ? {
-              isConnected: browserAdapter.isConnected,
-              account: browserAdapter.account,
-              signMessageBytes: browserAdapter.signMessageBytes,
-            }
-          : null,
+      browserSigner,
     });
     if (outcome.kind !== 'enrolled') {
       markOutcome({ kind: 'failed', reason: mapEnrollmentToOutcomeReason(outcome) });

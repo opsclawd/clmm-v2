@@ -115,6 +115,9 @@ export class WalletController {
 }
 
 function assertValidWalletId(walletId: string): asserts walletId is WalletId {
+  if (walletId.length > 88) {
+    throw new HttpException({ code: 'WALLET_MALFORMED' }, 400);
+  }
   try {
     base58ToBuffer(walletId, 32);
   } catch {

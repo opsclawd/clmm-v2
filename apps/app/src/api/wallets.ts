@@ -15,6 +15,7 @@ export type EnrollErrorCode =
   | 'SIGNATURE_INVALID'
   | 'ENROLLMENT_UPGRADE_REQUIRED'
   | 'BAD_REQUEST'
+  | 'INTERNAL_ERROR'
   | 'NETWORK_ERROR';
 
 export type ChallengeResult =
@@ -33,6 +34,7 @@ const KNOWN_CODES = new Set<EnrollErrorCode>([
   'SIGNATURE_INVALID',
   'ENROLLMENT_UPGRADE_REQUIRED',
   'BAD_REQUEST',
+  'INTERNAL_ERROR',
 ]);
 
 export async function requestWalletChallenge(walletId: string): Promise<ChallengeResult> {
@@ -53,16 +55,16 @@ export async function requestWalletChallenge(walletId: string): Promise<Challeng
   return { kind: 'ok', challenge };
 }
 
-export async function enrollWalletWithProof(
+export async function enrollWalletWithCredentials(
   walletId: string,
-  proof: { nonce: string; message: string; signature: string },
+  credentials: { nonce: string; message: string; signature: string },
 ): Promise<EnrollResult> {
   let response: Response;
   try {
     response = await fetch(`${getBffBaseUrl()}/wallets/${walletId}/enroll`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(proof),
+      body: JSON.stringify(credentials),
     });
   } catch {
     return { kind: 'error', code: 'NETWORK_ERROR' };

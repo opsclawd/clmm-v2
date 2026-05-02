@@ -53,6 +53,13 @@ export type {
   WalletChallengeRepository,
   WalletChallengeRow,
   ConsumeAndEnrollResult,
+  WalletEnrollmentApiPort,
+  WalletMessageSigningPort,
+  EnrollmentErrorCode,
+  ChallengeDetails,
+  ChallengeRequestResult,
+  EnrollWithCredentialsResult,
+  SignMessageOutcome,
 } from '../ports/index.js';
 export type {
   EpisodeTransition,
@@ -89,6 +96,8 @@ export { listActionableAlerts } from '../use-cases/alerts/ListActionableAlerts.j
 export { acknowledgeAlert } from '../use-cases/alerts/AcknowledgeAlert.js';
 export { connectWalletSession } from '../use-cases/wallet/ConnectWalletSession.js';
 export { syncPlatformCapabilities } from '../use-cases/wallet/SyncPlatformCapabilities.js';
+export { verifyWalletEnrollment } from '../use-cases/wallet/VerifyWalletEnrollment.js';
+export type { EnrollmentOutcome } from '../use-cases/wallet/VerifyWalletEnrollment.js';
 export {
   requestWalletSignature,
   PreviewNotFoundError,

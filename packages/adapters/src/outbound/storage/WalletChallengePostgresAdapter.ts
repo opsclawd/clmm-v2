@@ -52,11 +52,20 @@ export class WalletChallengePostgresAdapter implements WalletChallengeRepository
           },
         });
 
+      const [row] = await tx
+        .select()
+        .from(walletChallenges)
+        .where(eq(walletChallenges.walletId, params.walletId));
+
+      if (!row) {
+        throw new Error('wallet_challenges row missing after upsert');
+      }
+
       return {
-        walletId: params.walletId,
-        nonce: params.nonce,
-        expiresAt: params.expiresAt,
-        issuedAt: params.issuedAt,
+        walletId: row.walletId as WalletId,
+        nonce: row.nonce,
+        expiresAt: makeClockTimestamp(row.expiresAt),
+        issuedAt: makeClockTimestamp(row.issuedAt),
       };
     });
   }

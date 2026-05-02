@@ -1,7 +1,7 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import {
   requestWalletChallenge,
-  enrollWalletWithProof,
+  enrollWalletWithCredentials,
   type EnrollErrorCode,
 } from './wallets';
 
@@ -84,13 +84,13 @@ describe('requestWalletChallenge', () => {
   });
 });
 
-describe('enrollWalletWithProof', () => {
+describe('enrollWalletWithCredentials', () => {
   it('returns ok on success', async () => {
     (fetch as unknown as ReturnType<typeof vi.fn>).mockResolvedValueOnce(
       jsonResponse(200, { enrolled: true, enrolledAt: 1_000_000 }),
     );
 
-    const result = await enrollWalletWithProof('wallet-1', {
+    const result = await enrollWalletWithCredentials('wallet-1', {
       nonce: 'a'.repeat(64),
       message: 'CLMM wallet verification\n…',
       signature: 'AAAA',
@@ -113,7 +113,7 @@ describe('enrollWalletWithProof', () => {
       (fetch as unknown as ReturnType<typeof vi.fn>).mockResolvedValueOnce(
         jsonResponse(c.status, { code: c.code }),
       );
-      const result = await enrollWalletWithProof('wallet-1', {
+      const result = await enrollWalletWithCredentials('wallet-1', {
         nonce: 'a'.repeat(64),
         message: 'm',
         signature: 'AAAA',
@@ -127,7 +127,7 @@ describe('enrollWalletWithProof', () => {
       jsonResponse(200, { enrolled: true }),
     );
 
-    const result = await enrollWalletWithProof('wallet-1', {
+    const result = await enrollWalletWithCredentials('wallet-1', {
       nonce: 'a'.repeat(64),
       message: 'm',
       signature: 'AAAA',
