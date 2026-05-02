@@ -28,7 +28,7 @@ export async function signMessageWithWallet(params: {
       });
       return { kind: 'ok', signatureBase64 };
     } catch (error) {
-      return classifyError(error, params.walletId);
+      return classifyError(error);
     }
   }
 
@@ -48,11 +48,11 @@ export async function signMessageWithWallet(params: {
     const signatureBytes = await signer.signMessageBytes(messageBytes);
     return { kind: 'ok', signatureBase64: bytesToBase64(signatureBytes) };
   } catch (error) {
-    return classifyError(error, params.walletId);
+    return classifyError(error);
   }
 }
 
-function classifyError(error: unknown, walletId: string): SignMessageOutcome {
+function classifyError(error: unknown): SignMessageOutcome {
   const message = error instanceof Error ? error.message : String(error);
   if (/not return the requested authorized account/i.test(message)) {
     return { kind: 'wallet-mismatch' };
@@ -66,7 +66,6 @@ function classifyError(error: unknown, walletId: string): SignMessageOutcome {
   if (/reject|denied|cancell?ed|user/i.test(message)) {
     return { kind: 'rejected' };
   }
-  void walletId;
   return { kind: 'failed' };
 }
 

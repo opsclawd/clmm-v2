@@ -4,9 +4,6 @@ import {
   Param,
   Body,
   Inject,
-  BadRequestException,
-  ConflictException,
-  UnauthorizedException,
   HttpException,
 } from '@nestjs/common';
 import type { WalletChallengeRepository, ClockPort } from '@clmm/application';
@@ -20,6 +17,8 @@ import {
 } from './WalletVerification.js';
 
 const CHALLENGE_TTL_MS = 5 * 60 * 1000;
+const MAX_MESSAGE_LENGTH = 512;
+const MAX_SIGNATURE_LENGTH = 256;
 
 @Controller('wallets')
 export class WalletController {
@@ -37,7 +36,7 @@ export class WalletController {
     const candidateExpiresAt = makeClockTimestamp(now + CHALLENGE_TTL_MS);
     const candidateNonce = generateNonceHex();
     const row = await this.challenges.issue({
-      walletId: walletId as WalletId,
+      walletId,
       nonce: candidateNonce,
       expiresAt: candidateExpiresAt,
       issuedAt: now,
@@ -51,7 +50,7 @@ export class WalletController {
     return {
       walletId: row.walletId,
       nonce: row.nonce,
-      expiresAt: row.expiresAt as number,
+      expiresAt: unbrand(row.expiresAt),
       message,
     };
   }
@@ -64,25 +63,18 @@ export class WalletController {
     assertValidWalletId(walletId);
     const { nonce, message, signature } = assertEnrollBody(body);
 
-    const now = this.clock.now();
-    const existing = await this.challenges.get(walletId as WalletId);
-    if (existing === null) {
-      throw new BadRequestException({ code: 'CHALLENGE_NOT_FOUND' });
-    }
-    if (existing.expiresAt < now) {
-      throw new HttpException({ code: 'CHALLENGE_EXPIRED' }, 410);
-    }
-    if (existing.nonce !== nonce) {
-      throw new ConflictException({ code: 'CHALLENGE_MISMATCH' });
+    const challenge = await this.challenges.get(walletId);
+    if (challenge === null) {
+      throw new HttpException({ code: 'CHALLENGE_NOT_FOUND' }, 400);
     }
 
     const expectedMessage = buildWalletVerificationMessage({
       walletId,
-      nonce: existing.nonce,
-      expiresAt: existing.expiresAt,
+      nonce: challenge.nonce,
+      expiresAt: challenge.expiresAt,
     });
     if (message !== expectedMessage) {
-      throw new ConflictException({ code: 'CHALLENGE_MISMATCH' });
+      throw new HttpException({ code: 'CHALLENGE_MISMATCH' }, 409);
     }
 
     const verified = await verifyWalletSignature({
@@ -91,26 +83,28 @@ export class WalletController {
       signatureBase64: signature,
     });
     if (!verified) {
-      throw new UnauthorizedException({ code: 'SIGNATURE_INVALID' });
+      throw new HttpException({ code: 'SIGNATURE_INVALID' }, 401);
     }
 
-    const enrolledAt = this.clock.now();
+    const now = this.clock.now();
     const result = await this.challenges.consumeAndEnrollIfMatches({
-      walletId: walletId as WalletId,
+      walletId,
       nonce,
-      now: enrolledAt,
-      enrolledAt,
+      now,
+      enrolledAt: now,
     });
 
     switch (result.kind) {
       case 'consumed':
-        return { enrolled: true, enrolledAt: enrolledAt as number };
+        return { enrolled: true, enrolledAt: unbrand(now) };
       case 'not_found':
-        throw new BadRequestException({ code: 'CHALLENGE_NOT_FOUND' });
+        throw new HttpException({ code: 'CHALLENGE_NOT_FOUND' }, 400);
       case 'expired':
         throw new HttpException({ code: 'CHALLENGE_EXPIRED' }, 410);
       case 'mismatch':
-        throw new ConflictException({ code: 'CHALLENGE_MISMATCH' });
+        throw new HttpException({ code: 'CHALLENGE_MISMATCH' }, 409);
+      default:
+        throw new HttpException({ code: 'INTERNAL_ERROR' }, 500);
     }
   }
 
@@ -120,11 +114,11 @@ export class WalletController {
   }
 }
 
-function assertValidWalletId(walletId: string): void {
+function assertValidWalletId(walletId: string): asserts walletId is WalletId {
   try {
     base58ToBuffer(walletId, 32);
   } catch {
-    throw new BadRequestException({ code: 'WALLET_MALFORMED' });
+    throw new HttpException({ code: 'WALLET_MALFORMED' }, 400);
   }
 }
 
@@ -136,13 +130,15 @@ function assertEnrollBody(body: {
   const { nonce, message, signature } = body ?? {};
   if (
     typeof nonce !== 'string' ||
-    !/^[0-9a-f]{64}$/.test(nonce) ||
+    !/^[0-9a-fA-F]{64}$/.test(nonce) ||
     typeof message !== 'string' ||
     message.length === 0 ||
+    message.length > MAX_MESSAGE_LENGTH ||
     typeof signature !== 'string' ||
-    signature.length === 0
+    signature.length === 0 ||
+    signature.length > MAX_SIGNATURE_LENGTH
   ) {
-    throw new BadRequestException({ code: 'BAD_REQUEST' });
+    throw new HttpException({ code: 'BAD_REQUEST' }, 400);
   }
   return { nonce, message, signature };
 }
@@ -153,4 +149,8 @@ function generateNonceHex(): string {
   let hex = '';
   for (const b of bytes) hex += b.toString(16).padStart(2, '0');
   return hex;
+}
+
+function unbrand(t: import('@clmm/domain').ClockTimestamp): number {
+  return t as number;
 }

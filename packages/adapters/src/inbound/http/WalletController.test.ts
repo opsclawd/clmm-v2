@@ -26,7 +26,7 @@ describe('WalletController.issueChallenge', () => {
     const result = await controller.issueChallenge(VALID_WALLET_ID);
 
     expect(result.walletId).toBe(VALID_WALLET_ID);
-    expect(result.nonce).toMatch(/^[0-9a-f]{64}$/);
+    expect(result.nonce).toMatch(/^[0-9a-fA-F]{64}$/);
     expect(result.expiresAt).toBe(1_000_000 + 5 * 60 * 1000);
     expect(result.message).toBe(
       buildWalletVerificationMessage({
@@ -284,6 +284,80 @@ describe('WalletController.enroll', () => {
         signature: ctx.signatureBase64,
       }),
     ).rejects.toMatchObject({ status: 400, response: { code: 'CHALLENGE_NOT_FOUND' } });
+  });
+
+  it('returns CHALLENGE_EXPIRED when consumeAndEnrollIfMatches reports expired', async () => {
+    const ctx = await makeSignedChallenge(1_000_000);
+    ctx.challenges.consumeAndEnrollIfMatches = async (params: unknown) => {
+      void params;
+      return { kind: 'expired' };
+    };
+
+    await expect(
+      ctx.controller.enroll(ctx.walletId, {
+        nonce: ctx.nonce,
+        message: ctx.message,
+        signature: ctx.signatureBase64,
+      }),
+    ).rejects.toMatchObject({ status: 410, response: { code: 'CHALLENGE_EXPIRED' } });
+
+    expect(await ctx.monitoredWallets.listActiveWallets()).toHaveLength(0);
+  });
+
+  it('returns CHALLENGE_MISMATCH when consumeAndEnrollIfMatches reports mismatch', async () => {
+    const ctx = await makeSignedChallenge(1_000_000);
+    ctx.challenges.consumeAndEnrollIfMatches = async (params: unknown) => {
+      void params;
+      return { kind: 'mismatch' };
+    };
+
+    await expect(
+      ctx.controller.enroll(ctx.walletId, {
+        nonce: ctx.nonce,
+        message: ctx.message,
+        signature: ctx.signatureBase64,
+      }),
+    ).rejects.toMatchObject({ status: 409, response: { code: 'CHALLENGE_MISMATCH' } });
+
+    expect(await ctx.monitoredWallets.listActiveWallets()).toHaveLength(0);
+  });
+
+  it('returns CHALLENGE_NOT_FOUND when consumeAndEnrollIfMatches reports not_found (race condition)', async () => {
+    const ctx = await makeSignedChallenge(1_000_000);
+    ctx.challenges.consumeAndEnrollIfMatches = async (params: unknown) => {
+      void params;
+      return { kind: 'not_found' };
+    };
+
+    await expect(
+      ctx.controller.enroll(ctx.walletId, {
+        nonce: ctx.nonce,
+        message: ctx.message,
+        signature: ctx.signatureBase64,
+      }),
+    ).rejects.toMatchObject({ status: 400, response: { code: 'CHALLENGE_NOT_FOUND' } });
+
+    expect(await ctx.monitoredWallets.listActiveWallets()).toHaveLength(0);
+  });
+
+  it('returns BAD_REQUEST on oversized message or signature', async () => {
+    const ctx = await makeSignedChallenge(1_000_000);
+
+    await expect(
+      ctx.controller.enroll(ctx.walletId, {
+        nonce: ctx.nonce,
+        message: 'x'.repeat(513),
+        signature: ctx.signatureBase64,
+      }),
+    ).rejects.toMatchObject({ status: 400, response: { code: 'BAD_REQUEST' } });
+
+    await expect(
+      ctx.controller.enroll(ctx.walletId, {
+        nonce: ctx.nonce,
+        message: ctx.message,
+        signature: 'A'.repeat(257),
+      }),
+    ).rejects.toMatchObject({ status: 400, response: { code: 'BAD_REQUEST' } });
   });
 });
 

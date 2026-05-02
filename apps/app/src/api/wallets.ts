@@ -71,15 +71,9 @@ export async function enrollWalletWithProof(
     return { kind: 'error', code: await parseErrorCode(response) };
   }
   const body: unknown = await response.json().catch(() => null);
-  if (
-    typeof body === 'object' &&
-    body !== null &&
-    'enrolledAt' in body &&
-    typeof (body as { enrolledAt: unknown }).enrolledAt === 'number'
-  ) {
-    return { kind: 'ok', enrolledAt: (body as { enrolledAt: number }).enrolledAt };
-  }
-  return { kind: 'error', code: 'NETWORK_ERROR' };
+  const enrolledAt = parseEnrolledAt(body);
+  if (enrolledAt === null) return { kind: 'error', code: 'NETWORK_ERROR' };
+  return { kind: 'ok', enrolledAt };
 }
 
 function parseChallenge(value: unknown): WalletChallenge | null {
@@ -101,15 +95,21 @@ function parseChallenge(value: unknown): WalletChallenge | null {
   };
 }
 
+function parseEnrolledAt(value: unknown): number | null {
+  if (typeof value === 'object' && value !== null && 'enrolledAt' in value) {
+    const v = value as Record<string, unknown>;
+    if (typeof v['enrolledAt'] === 'number') return v['enrolledAt'];
+  }
+  return null;
+}
+
 async function parseErrorCode(response: Response): Promise<EnrollErrorCode> {
   const body: unknown = await response.json().catch(() => null);
-  if (
-    typeof body === 'object' &&
-    body !== null &&
-    typeof (body as { code: unknown }).code === 'string' &&
-    KNOWN_CODES.has((body as { code: string }).code as EnrollErrorCode)
-  ) {
-    return (body as { code: EnrollErrorCode }).code;
+  if (typeof body === 'object' && body !== null && 'code' in body) {
+    const v = body as Record<string, unknown>;
+    if (typeof v['code'] === 'string' && KNOWN_CODES.has(v['code'] as EnrollErrorCode)) {
+      return v['code'] as EnrollErrorCode;
+    }
   }
   return 'NETWORK_ERROR';
 }

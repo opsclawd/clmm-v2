@@ -78,7 +78,7 @@ export async function verifyWalletSignature(params: {
       false,
       ['verify'],
     );
-    return await subtle.verify({ name: 'Ed25519' }, cryptoKey, signature.buffer as ArrayBuffer, messageBytes);
+    return await subtle.verify({ name: 'Ed25519' }, cryptoKey, signature as Uint8Array<ArrayBuffer>, messageBytes);
   } catch {
     return false;
   }

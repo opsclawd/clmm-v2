@@ -73,6 +73,15 @@ describe('requestWalletChallenge', () => {
     const result = await requestWalletChallenge('wallet-1');
     expect(result).toEqual({ kind: 'error', code: 'NETWORK_ERROR' });
   });
+
+  it('maps 200 with malformed response body to NETWORK_ERROR', async () => {
+    (fetch as unknown as ReturnType<typeof vi.fn>).mockResolvedValueOnce(
+      jsonResponse(200, { walletId: 'x' }),
+    );
+
+    const result = await requestWalletChallenge('wallet-1');
+    expect(result).toEqual({ kind: 'error', code: 'NETWORK_ERROR' });
+  });
 });
 
 describe('enrollWalletWithProof', () => {
@@ -111,5 +120,19 @@ describe('enrollWalletWithProof', () => {
       });
       expect(result).toEqual({ kind: 'error', code: c.code });
     }
+  });
+
+  it('maps 200 with missing enrolledAt to NETWORK_ERROR', async () => {
+    (fetch as unknown as ReturnType<typeof vi.fn>).mockResolvedValueOnce(
+      jsonResponse(200, { enrolled: true }),
+    );
+
+    const result = await enrollWalletWithProof('wallet-1', {
+      nonce: 'a'.repeat(64),
+      message: 'm',
+      signature: 'AAAA',
+    });
+
+    expect(result).toEqual({ kind: 'error', code: 'NETWORK_ERROR' });
   });
 });
