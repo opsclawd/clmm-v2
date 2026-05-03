@@ -8,6 +8,13 @@
       "when": 1776272593765,
       "tag": "0000_bitter_riptide",
       "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "7",
+      "when": 1777737438515,
+      "tag": "0001_fat_beyonder",
+      "breakpoints": true
     }
   ]
 }

@@ -267,3 +267,89 @@ export interface IdGeneratorPort {
 export interface SrLevelsReadPort {
   fetchCurrent(symbol: string, source: string): Promise<SrLevelsBlock | null>;
 }
+
+// --- Wallet ownership challenge port ---
+
+export type WalletChallengeRow = {
+  walletId: WalletId;
+  nonce: string;
+  expiresAt: ClockTimestamp;
+  issuedAt: ClockTimestamp;
+};
+
+export type ConsumeAndEnrollResult =
+  | { kind: 'consumed' }
+  | { kind: 'not_found' }
+  | { kind: 'expired' }
+  | { kind: 'mismatch' };
+
+export interface WalletChallengeRepository {
+  issue(params: {
+    walletId: WalletId;
+    nonce: string;
+    expiresAt: ClockTimestamp;
+    issuedAt: ClockTimestamp;
+    now: ClockTimestamp;
+  }): Promise<WalletChallengeRow>;
+
+  get(walletId: WalletId): Promise<WalletChallengeRow | null>;
+
+  consumeAndEnrollIfMatches(params: {
+    walletId: WalletId;
+    nonce: string;
+    now: ClockTimestamp;
+    enrolledAt: ClockTimestamp;
+  }): Promise<ConsumeAndEnrollResult>;
+}
+
+// --- Wallet enrollment API port ---
+
+export type EnrollmentErrorCode =
+  | 'WALLET_MALFORMED'
+  | 'CHALLENGE_NOT_FOUND'
+  | 'CHALLENGE_EXPIRED'
+  | 'CHALLENGE_MISMATCH'
+  | 'SIGNATURE_INVALID'
+  | 'ENROLLMENT_UPGRADE_REQUIRED'
+  | 'BAD_REQUEST'
+  | 'INTERNAL_ERROR'
+  | 'NETWORK_ERROR';
+
+export type ChallengeDetails = {
+  walletId: string;
+  nonce: string;
+  expiresAt: number;
+  message: string;
+};
+
+export type ChallengeRequestResult =
+  | { kind: 'ok'; challenge: ChallengeDetails }
+  | { kind: 'error'; code: EnrollmentErrorCode };
+
+export type EnrollWithCredentialsResult =
+  | { kind: 'ok'; enrolledAt: number }
+  | { kind: 'error'; code: EnrollmentErrorCode };
+
+export interface WalletEnrollmentApiPort {
+  requestChallenge(walletId: string): Promise<ChallengeRequestResult>;
+  enrollWithCredentials(
+    walletId: string,
+    credentials: { nonce: string; message: string; signature: string },
+  ): Promise<EnrollWithCredentialsResult>;
+}
+
+// --- Wallet message signing port ---
+
+export type SignMessageOutcome =
+  | { kind: 'ok'; signatureBase64: string }
+  | { kind: 'unsupported' }
+  | { kind: 'wallet-mismatch' }
+  | { kind: 'rejected' }
+  | { kind: 'failed' };
+
+export interface WalletMessageSigningPort {
+  signMessage(params: {
+    walletId: string;
+    message: string;
+  }): Promise<SignMessageOutcome>;
+}

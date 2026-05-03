@@ -7,3 +7,4 @@ export * from './monitored-wallets.js';
 export * from './notification-dedup.js';
 export * from './wallet-position-ownership.js';
 export * from './notification-events.js';
+export * from './wallet-challenges.js';

@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { Platform, Linking } from 'react-native';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import { useStore } from 'zustand';
@@ -20,7 +20,8 @@ import { mapWalletErrorToOutcome } from '../src/platform/walletConnection';
 import { navigateRoute } from '../src/platform/webNavigation';
 import { parseReturnTo } from '../src/wallet-boot/parseReturnTo';
 import { walletSessionStore } from '../src/state/walletSessionStore';
-import { enrollWalletForMonitoring } from '../src/api/wallets';
+import { verifyWalletEnrollment, type EnrollmentOutcome } from '../src/wallet-verify/verifyWalletEnrollment';
+import { useConnectorKitAdapter } from '../src/platform/browserWallet/connectorKitAdapter';
 
 const NO_WALLET_MESSAGE = 'No supported browser wallet detected on this device';
 const WALLET_DISCOVERY_TIMEOUT_MS = 2000;
@@ -75,6 +76,9 @@ export default function ConnectRoute() {
   const [discoveryTimedOut, setDiscoveryTimedOut] = useState(false);
 
   const browserConnect = useBrowserWalletConnect();
+  const browserAdapter = useConnectorKitAdapter();
+  const browserAdapterRef = useRef(browserAdapter);
+  browserAdapterRef.current = browserAdapter;
   const walletCount = browserConnect.wallets.length;
 
   const discovery: WalletDiscoveryState = useMemo(() => {
@@ -131,35 +135,65 @@ export default function ConnectRoute() {
     connectionOutcome,
   });
 
+  function mapEnrollmentToOutcomeReason(outcome: EnrollmentOutcome): string {
+    switch (outcome.kind) {
+      case 'challenge-failed':
+        return `Could not start wallet verification (${outcome.code})`;
+      case 'signing-unsupported':
+        return 'This wallet does not support signing the verification message';
+      case 'wallet-mismatch':
+        return 'Signed by a different wallet than the one connected';
+      case 'user-rejected':
+        return 'Verification signature was declined';
+      case 'signing-failed':
+        return 'Failed to sign the verification message';
+      case 'enroll-failed':
+        return `Could not enroll wallet (${outcome.code})`;
+      case 'enrolled':
+        return '';
+    }
+  }
+
+  async function completeConnect(address: string, kind: 'native' | 'browser') {
+    markConnected({ walletAddress: address, connectionKind: kind });
+    const liveAdapter = browserAdapterRef.current;
+    const browserSigner: import('../src/wallet-verify/signMessageWithWallet').BrowserMessageSigner | null =
+      kind === 'browser'
+        ? {
+            isConnected: liveAdapter.isConnected,
+            account: liveAdapter.account,
+            signMessageBytes: liveAdapter.signMessageBytes,
+          }
+        : null;
+    const outcome = await verifyWalletEnrollment({
+      walletId: address,
+      connectionKind: kind,
+      browserSigner,
+    });
+    if (outcome.kind !== 'enrolled') {
+      markOutcome({ kind: 'failed', reason: mapEnrollmentToOutcomeReason(outcome) });
+      return;
+    }
+    navigateRoute({ router, path: returnTo, method: 'replace' });
+  }
+
   const actions: WalletConnectActions = useMemo(() => ({
     onSelectNative: () => {
       beginConnection();
       void walletPlatform.connectNativeWallet()
-        .then((address) => {
-          markConnected({ walletAddress: address, connectionKind: 'native' });
-          void enrollWalletForMonitoring(address).catch(() => {});
-          navigateRoute({ router, path: returnTo, method: 'replace' });
-        })
+        .then((address) => completeConnect(address, 'native'))
         .catch(handleConnectionError);
     },
     onSelectDiscoveredWallet: (walletId: string) => {
       beginConnection();
       void browserConnect.connect(walletId)
-        .then(({ address }) => {
-          markConnected({ walletAddress: address, connectionKind: 'browser' });
-          void enrollWalletForMonitoring(address).catch(() => {});
-          navigateRoute({ router, path: returnTo, method: 'replace' });
-        })
+        .then(({ address }) => completeConnect(address, 'browser'))
         .catch(handleConnectionError);
     },
     onConnectDefaultBrowser: () => {
       beginConnection();
       void browserConnect.connect()
-        .then(({ address }) => {
-          markConnected({ walletAddress: address, connectionKind: 'browser' });
-          void enrollWalletForMonitoring(address).catch(() => {});
-          navigateRoute({ router, path: returnTo, method: 'replace' });
-        })
+        .then(({ address }) => completeConnect(address, 'browser'))
         .catch(handleConnectionError);
     },
     onOpenPhantom: () => {
@@ -184,7 +218,7 @@ export default function ConnectRoute() {
       clearOutcome();
       router.back();
     },
-  }), [router, returnTo, browserConnect, beginConnection, markConnected, markOutcome, clearOutcome, platformCapabilities, discovery, discoveredWallets, fallback, socialEscapeAttempted, isConnecting, connectionOutcome]);
+  }), [router, returnTo, browserConnect, browserAdapter, beginConnection, markConnected, markOutcome, clearOutcome, platformCapabilities, discovery, discoveredWallets, fallback, socialEscapeAttempted, isConnecting, connectionOutcome]);
 
   return <WalletConnectScreen vm={vm} actions={actions} />;
 }

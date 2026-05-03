@@ -19,6 +19,7 @@ export type ConnectorKitAdapterResult = {
   walletError: Error | null;
   walletStatus: WalletStatus;
   signTransactionBytes: (payload: Uint8Array) => Promise<Uint8Array>;
+  signMessageBytes: (message: Uint8Array) => Promise<Uint8Array>;
 };
 
 export function useConnectorKitAdapter(): ConnectorKitAdapterResult {
@@ -48,6 +49,19 @@ export function useConnectorKitAdapter(): ConnectorKitAdapterResult {
     [signer],
   );
 
+  const signMessageBytes = useCallback(
+    async (message: Uint8Array): Promise<Uint8Array> => {
+      if (!signer) {
+        throw new Error('No wallet account is connected');
+      }
+      if (!signer.signMessage) {
+        throw new Error('Connected wallet does not support message signing');
+      }
+      return await signer.signMessage(message);
+    },
+    [signer],
+  );
+
   return useMemo(
     () => ({
       connectors: snapshot.connectors,
@@ -59,6 +73,7 @@ export function useConnectorKitAdapter(): ConnectorKitAdapterResult {
       walletError: snapshot.walletError,
       walletStatus: snapshot.walletStatus,
       signTransactionBytes,
+      signMessageBytes,
     }),
     [
       snapshot.connectors,
@@ -70,6 +85,7 @@ export function useConnectorKitAdapter(): ConnectorKitAdapterResult {
       snapshot.walletError,
       snapshot.walletStatus,
       signTransactionBytes,
+      signMessageBytes,
     ],
   );
 }

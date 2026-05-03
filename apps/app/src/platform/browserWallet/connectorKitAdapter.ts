@@ -18,6 +18,7 @@ export type ConnectorKitAdapterResult = {
   walletError: Error | null;
   walletStatus: WalletStatus;
   signTransactionBytes: (payload: Uint8Array) => Promise<Uint8Array>;
+  signMessageBytes: (message: Uint8Array) => Promise<Uint8Array>;
 };
 
 const UNRESOLVED_STUB: ConnectorKitAdapterResult = {
@@ -32,6 +33,9 @@ const UNRESOLVED_STUB: ConnectorKitAdapterResult = {
   walletError: null,
   walletStatus: 'disconnected' as unknown as WalletStatus,
   signTransactionBytes: async () => {
+    throw new Error('Browser wallet is not available on this platform');
+  },
+  signMessageBytes: async () => {
     throw new Error('Browser wallet is not available on this platform');
   },
 };
