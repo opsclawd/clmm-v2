@@ -114,7 +114,7 @@ export async function signNativeMessage(params: {
       throw new Error('Native wallet signed payload too short to contain Ed25519 signature');
     }
 
-    const signatureBytes = signedBytes.slice(0, 64);
+    const signatureBytes = signedBytes.slice(signedBytes.length - 64);
     return uint8ArrayToBase64(signatureBytes);
   });
 }
