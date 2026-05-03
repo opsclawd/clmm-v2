@@ -1,7 +1,6 @@
 import 'dotenv/config';
 import 'reflect-metadata';
 import { NestFactory } from '@nestjs/core';
-import { WorkerModule } from './WorkerModule.js';
 import { createDb, schema } from '../../outbound/storage/db.js';
 import { checkSchemaReadiness } from '../../outbound/storage/SchemaReadiness.js';
 
@@ -43,6 +42,7 @@ export async function bootstrap(): Promise<void> {
     return;
   }
 
+  const { WorkerModule } = await import('./WorkerModule.js');
   const app = await NestFactory.createApplicationContext(WorkerModule);
 
   const signals = ['SIGTERM', 'SIGINT'] as const;

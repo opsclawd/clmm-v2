@@ -18,7 +18,14 @@ export class HealthController {
     let result: Awaited<ReturnType<typeof checkSchemaReadiness>>;
     try {
       result = await checkSchemaReadiness(this.db, schema);
-    } catch {
+    } catch (error: unknown) {
+      const message = error instanceof Error ? error.message : String(error);
+      console.error(JSON.stringify({
+        level: 'error',
+        message: 'Health check failed',
+        error: message,
+        timestamp: new Date().toISOString(),
+      }));
       throw new HttpException(
         { status: 'error', message: 'health check failed' },
         HttpStatus.SERVICE_UNAVAILABLE,
