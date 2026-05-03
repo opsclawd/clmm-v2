@@ -1,0 +1,16 @@
+# CLMM API service deploy contract.
+#
+# Owner of database migrations. preDeployCommand runs drizzle-kit migrate
+# before any new API instance serves traffic. /health is schema-aware:
+# it returns 503 with the missing-tables list while schema is incomplete,
+# so Railway's healthcheck holds traffic from pre-migration pods.
+#
+# DO NOT hand-edit the corresponding fields in the Railway dashboard.
+# This file is the source of truth.
+
+[deploy]
+preDeployCommand   = "pnpm --filter @clmm/adapters db:migrate"
+startCommand       = "pnpm --filter @clmm/adapters start:api"
+healthcheckPath    = "/health"
+healthcheckTimeout = 30
+restartPolicyType  = "ON_FAILURE"

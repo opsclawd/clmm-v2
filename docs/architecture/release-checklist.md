@@ -54,3 +54,13 @@
 - [ ] Mobile web capability adapter returns `isMobileWeb: true` + `browserWalletAvailable: false`
 - [ ] Native capability adapter returns `nativeWalletAvailable: true`
 - [ ] `ExecutionStateViewModel` for `partial` always has `partialCompletionWarning` set
+
+## Deploy / Schema Readiness
+
+- [ ] API service Railway config has `preDeployCommand = "pnpm --filter @clmm/adapters db:migrate"`
+- [ ] API service Railway config has `startCommand = "pnpm --filter @clmm/adapters start:api"` (not `dev:api`)
+- [ ] Worker service Railway config has no `preDeployCommand`
+- [ ] `GET /health` returns 503 with `missing` list when any schema table is missing in the target DB (verify in staging by pointing the API at an unmigrated DB)
+- [ ] Worker exits non-zero with the structured fatal log when schema is missing (same verification)
+- [ ] `wallet_challenges` table exists in production DB after deploy
+- [ ] No `READINESS_REQUIRED_TABLES` env var or hardcoded allowlist exists in production code paths
