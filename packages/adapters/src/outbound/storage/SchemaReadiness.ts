@@ -20,10 +20,10 @@ export async function checkSchemaReadiness(
     SELECT table_name
     FROM information_schema.tables
     WHERE table_schema = current_schema()
-      AND table_name = ANY(${expected})
+      AND table_name IN (${expected})
   `);
 
-  const present = new Set((rows as Array<{ table_name: string }>).map((row) => row.table_name));
+  const present = new Set(rows.map((row) => row.table_name));
   const missing = expected.filter((table) => !present.has(table)).sort();
 
   return missing.length === 0 ? { ready: true } : { ready: false, missing };

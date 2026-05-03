@@ -32,7 +32,7 @@ describe('HealthController', () => {
     expect(result).toEqual({ status: 'ok' });
     expect(checkSchemaReadinessMock).toHaveBeenCalledWith(
       fakeDb,
-      expect.any(Object),
+      { walletChallenges: 'fake-table' },
     );
   });
 
@@ -59,10 +59,21 @@ describe('HealthController', () => {
     }
   });
 
-  it('lets readiness errors propagate (Nest default 500 mapping)', async () => {
+  it('returns 503 with error status when readiness check throws', async () => {
     checkSchemaReadinessMock.mockRejectedValue(new Error('connection refused'));
     const controller = new HealthController(fakeDb);
 
-    await expect(controller.health()).rejects.toThrow('connection refused');
+    try {
+      await controller.health();
+      throw new Error('Expected HttpException');
+    } catch (error: unknown) {
+      expect(error).toBeInstanceOf(HttpException);
+      const httpError = error as HttpException;
+      expect(httpError.getStatus()).toBe(HttpStatus.SERVICE_UNAVAILABLE);
+      expect(httpError.getResponse()).toEqual({
+        status: 'error',
+        message: 'health check failed',
+      });
+    }
   });
 });

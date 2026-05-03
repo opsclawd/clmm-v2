@@ -15,7 +15,15 @@ export class HealthController {
 
   @Get('health')
   async health(): Promise<{ status: 'ok' }> {
-    const result = await checkSchemaReadiness(this.db, schema);
+    let result: Awaited<ReturnType<typeof checkSchemaReadiness>>;
+    try {
+      result = await checkSchemaReadiness(this.db, schema);
+    } catch {
+      throw new HttpException(
+        { status: 'error', message: 'health check failed' },
+        HttpStatus.SERVICE_UNAVAILABLE,
+      );
+    }
     if (result.ready) return { status: 'ok' };
     throw new HttpException(
       { status: 'not_ready', missing: result.missing },

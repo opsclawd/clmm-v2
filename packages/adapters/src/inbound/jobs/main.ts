@@ -18,7 +18,20 @@ export async function bootstrap(): Promise<void> {
   }
 
   const gateDb = createDb(dbUrl);
-  const readiness = await checkSchemaReadiness(gateDb, schema);
+  let readiness: Awaited<ReturnType<typeof checkSchemaReadiness>>;
+  try {
+    readiness = await checkSchemaReadiness(gateDb, schema);
+  } catch (error: unknown) {
+    const message = error instanceof Error ? error.message : String(error);
+    console.error(JSON.stringify({
+      level: 'fatal',
+      message: 'Worker: schema readiness check failed; refusing to start',
+      error: message,
+      timestamp: new Date().toISOString(),
+    }));
+    process.exit(1);
+    return;
+  }
   if (!readiness.ready) {
     console.error(JSON.stringify({
       level: 'fatal',

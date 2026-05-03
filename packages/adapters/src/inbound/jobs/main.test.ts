@@ -118,4 +118,20 @@ describe('worker bootstrap', () => {
     expect(createDbMock).not.toHaveBeenCalled();
     expect(exitMock).toHaveBeenCalledWith(1);
   });
+
+  it('logs fatal and exits 1 when checkSchemaReadiness throws', async () => {
+    checkSchemaReadinessMock.mockRejectedValue(new Error('connection refused'));
+
+    await bootstrap();
+
+    expect(createApplicationContextMock).not.toHaveBeenCalled();
+    expect(exitMock).toHaveBeenCalledWith(1);
+    expect(errorMock).toHaveBeenCalledTimes(1);
+
+    const errorCalls = errorMock.mock.calls as Array<[string]>;
+    const [logLine] = errorCalls[0] ?? [''];
+    const parsed = JSON.parse(logLine) as Record<string, unknown>;
+    expect(parsed['level']).toBe('fatal');
+    expect(parsed['error']).toBe('connection refused');
+  });
 });

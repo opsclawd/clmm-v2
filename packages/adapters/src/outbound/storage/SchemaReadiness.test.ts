@@ -87,4 +87,13 @@ describe('checkSchemaReadiness', () => {
 
     expect(executeMock).toHaveBeenCalledTimes(1);
   });
+
+  it('propagates database errors from execute', async () => {
+    const db = {
+      execute: vi.fn().mockRejectedValue(new Error('ECONNREFUSED')),
+    } as unknown as Db;
+    const namespace = { fixtureTableA, fixtureTableB };
+
+    await expect(checkSchemaReadiness(db, namespace)).rejects.toThrow('ECONNREFUSED');
+  });
 });
