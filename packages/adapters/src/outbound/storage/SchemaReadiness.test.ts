@@ -88,6 +88,28 @@ describe('checkSchemaReadiness', () => {
     expect(executeMock).toHaveBeenCalledTimes(1);
   });
 
+  it('produces IN with individual params, not a row constructor', async () => {
+    const executeMock = vi.fn(async () => [
+      { table_name: 'fixture_a' },
+      { table_name: 'fixture_b' },
+    ]);
+    const db = { execute: executeMock } as unknown as Db;
+    const namespace = { fixtureTableA, fixtureTableB };
+
+    await checkSchemaReadiness(db, namespace);
+
+    const callArgs = executeMock.mock.calls as unknown as [[unknown]];
+    const query = callArgs[0][0] as { toQuery: (config: unknown) => { sql: string; params: unknown[] } };
+    const built = query.toQuery({
+      escapeName: (s: string) => `"${s}"`,
+      escapeParam: (_: unknown, i: number) => `$${i + 1}`,
+      prepareTyping: () => [],
+      paramStartIndex: { value: 0 },
+    });
+    expect(built.sql).toContain('IN');
+    expect(built.sql).not.toMatch(/IN\s*\(\s*\(/);
+  });
+
   it('propagates database errors from execute', async () => {
     const db = {
       execute: vi.fn().mockRejectedValue(new Error('ECONNREFUSED')),

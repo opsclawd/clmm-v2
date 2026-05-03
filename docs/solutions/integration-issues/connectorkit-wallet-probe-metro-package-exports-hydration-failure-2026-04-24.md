@@ -99,7 +99,7 @@ config.resolver.resolveRequest = (context, moduleName, platform) => {
 };
 ```
 
-Then make the diagnostic route prove client hydration explicitly. In `apps/app/app/spike-wallet.web.tsx`, initialize environment fields as pending client state and populate them from `window` and `navigator` inside `useEffect`:
+Then make the diagnostic route prove client hydration explicitly. Initialize environment fields as pending client state and populate them from `window` and `navigator` inside `useEffect`:
 
 ```typescript
 const [environment, setEnvironment] = useState({
@@ -122,7 +122,7 @@ useEffect(() => {
 
 Include a `hydrated: true` field in the debug JSON so browser automation can distinguish a working client route from static export output.
 
-Keep the sibling `apps/app/app/spike-wallet.tsx` fallback route. Expo Router still needs a non-platform sibling for the `.web.tsx` route.
+The spike diagnostic route files (`spike-wallet.web.tsx` and `spike-wallet.tsx`) were removed after the real `BrowserWalletProvider` integration was completed. The production equivalents are `apps/app/src/platform/browserWallet/BrowserWalletProvider.web.tsx` and `apps/app/src/platform/browserWallet/connectorKitAdapter.web.ts`.
 
 ## Why This Works
 

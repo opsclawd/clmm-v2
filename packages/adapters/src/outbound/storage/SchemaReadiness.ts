@@ -16,11 +16,12 @@ export async function checkSchemaReadiness(
 
   if (expected.length === 0) return { ready: true };
 
+  const tableParams = expected.map((name) => sql`${name}`);
   const rows = await db.execute<{ table_name: string }>(sql`
     SELECT table_name
     FROM information_schema.tables
     WHERE table_schema = current_schema()
-      AND table_name IN (${expected})
+      AND table_name IN (${sql.join(tableParams, sql`, `)})
   `);
 
   const present = new Set(rows.map((row) => row.table_name));

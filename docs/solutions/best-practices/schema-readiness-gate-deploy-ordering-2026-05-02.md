@@ -57,9 +57,17 @@ const expected = Object.values(schemaNamespace)
   .filter((value): value is PgTable => is(value, PgTable))
   .map((table) => getTableName(table));
 
-const rows = await db.execute(sql`
+if (expected.length === 0) return { ready: true };
+
+// IMPORTANT: Use sql.join() to produce IN ($1, $2, $3) with individual params.
+// Do NOT use IN (${expected}) or ANY(${expected}) — Drizzle's sql template
+// wraps JS arrays as row constructors ($1, $2, $3) producing IN (($1, $2, ...))
+// which PostgreSQL rejects as "operator does not exist: sql_identifier = record".
+const tableParams = expected.map((name) => sql`${name}`);
+const rows = await db.execute<{ table_name: string }>(sql`
   SELECT table_name FROM information_schema.tables
-  WHERE table_schema = current_schema() AND table_name = ANY(${expected})
+  WHERE table_schema = current_schema()
+    AND table_name IN (${sql.join(tableParams, sql`, `)})
 `);
 const present = new Set(rows.map((row) => row.table_name));
 const missing = expected.filter((t) => !present.has(t)).sort();

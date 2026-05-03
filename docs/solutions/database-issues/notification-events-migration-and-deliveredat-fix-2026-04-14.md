@@ -36,7 +36,7 @@ PR #11 introduced a durable notification write path, but the database schema and
 - Recording delivery timing with `clock.now()` measured handler time, not provider delivery time.
 
 ## Solution
-- Add the missing migration and journal entry. The project later consolidated migrations into a single baseline (`0000_bitter_riptide`); the `notification_events` schema lives in `packages/adapters/src/outbound/storage/schema/notification-events.ts`.
+- Add the missing migration and journal entry. The project consolidated migrations into a baseline (`0000_bitter_riptide`), with a follow-up migration (`0001_fat_beyonder`) for `wallet_challenges`; the `notification_events` schema lives in `packages/adapters/src/outbound/storage/schema/notification-events.ts`.
   - `packages/adapters/drizzle/0000_bitter_riptide.sql` (consolidated baseline)
   - `packages/adapters/drizzle/meta/_journal.json`
 - Preserve the adapter's timestamp in `NotificationDispatchJobHandler`:
