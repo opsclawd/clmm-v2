@@ -4,7 +4,7 @@ const { drizzleMock } = vi.hoisted(() => ({
   drizzleMock: vi.fn(),
 }));
 
-type DrizzleCall = [unknown, { schema?: unknown }];
+type DrizzleCall = [unknown, { schema?: Record<string, unknown> }];
 
 vi.mock('drizzle-orm/postgres-js', () => ({
   drizzle: drizzleMock,
@@ -17,26 +17,39 @@ describe('createDb', () => {
     drizzleMock.mockReset();
   });
 
-  it('passes a configured schema into drizzle and returns the db handle', () => {
+  it('passes a schema namespace containing every defined table into drizzle', () => {
     const fakeDb = { query: vi.fn() };
     drizzleMock.mockReturnValue(fakeDb);
 
     const db = createDb('postgresql://localhost/clmm');
 
     expect(drizzleMock).toHaveBeenCalledTimes(1);
-
     const drizzleCalls = drizzleMock.mock.calls as DrizzleCall[];
     const drizzleCall = drizzleCalls[0];
-    expect(drizzleCall).toBeDefined();
-    if (drizzleCall == null) {
-      throw new Error('Expected drizzle to be called once');
-    }
+    if (drizzleCall == null) throw new Error('Expected drizzle to be called once');
 
-    const [client, config] = drizzleCall;
-    expect(client).toBeDefined();
-    expect(config).toBeDefined();
+    const [, config] = drizzleCall;
     expect(config.schema).toBeDefined();
     expect(typeof config.schema).toBe('object');
+
+    const schemaKeys = Object.keys(config.schema ?? {});
+    expect(schemaKeys).toEqual(
+      expect.arrayContaining([
+        'walletChallenges',
+        'monitoredWallets',
+        'executionAttempts',
+        'executionSessions',
+        'notificationDedup',
+        'notificationEvents',
+        'executionPreviews',
+        'historyEvents',
+        'walletPositionOwnership',
+        'preparedPayloads',
+        'breachEpisodes',
+        'exitTriggers',
+      ]),
+    );
+
     expect(db).toBe(fakeDb);
   });
 });
