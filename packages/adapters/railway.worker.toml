@@ -1,0 +1,14 @@
+# CLMM Worker service deploy contract.
+#
+# IMPORTANT: Worker MUST NOT run migrations. The API service is the sole
+# migration owner (railway.api.toml preDeployCommand). The worker
+# bootstrap runs a schema readiness check before any pg-boss listener
+# attaches and exits non-zero on missing schema, so a worker deploy
+# that races ahead of an API migration will restart-loop until the API
+# catches up — never process jobs against a half-migrated DB.
+#
+# DO NOT hand-edit the corresponding fields in the Railway dashboard.
+
+[deploy]
+startCommand      = "pnpm --filter @clmm/adapters start:worker"
+restartPolicyType = "ON_FAILURE"

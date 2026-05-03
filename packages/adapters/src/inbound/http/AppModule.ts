@@ -52,6 +52,7 @@ import {
   PRICE_PORT,
   SR_LEVELS_READ_PORT,
   INSIGHTS_API_KEY,
+  DB,
 } from './tokens.js';
 
 // boundary: process.env values are untyped at runtime; validated via env schema at deploy
@@ -104,6 +105,7 @@ export const SR_LEVELS_POOL_ALLOWLIST_MAP = new Map<string, { symbol: string; so
 @Module({
   controllers: [HealthController, PositionController, SrLevelsController, InsightsDataController, AlertController, PreviewController, ExecutionController, WalletController],
   providers: [
+    { provide: DB, useValue: db },
     { provide: TRIGGER_REPOSITORY, useValue: operationalStorage },
     { provide: EXECUTION_REPOSITORY, useValue: operationalStorage },
     { provide: EXECUTION_HISTORY_REPOSITORY, useValue: historyStorage },

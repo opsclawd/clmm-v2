@@ -91,6 +91,17 @@ Never define `EXPO_PUBLIC_REGIME_ENGINE_*`. Regime-engine is not reachable from 
 
 Deploy + verification runbook: `docs/plans/2026-04-19-002-feat-clmm-regime-engine-deploy-runbook-plan.md` — Task 7 (Railway wiring) and Task 8 (E2E verification) in §5.
 
+## Deploy
+
+The CLMM backend deploys to Railway as two services: `clmm-api` and
+`clmm-worker`. The API service is the sole owner of database
+migrations (`pnpm db:migrate` runs as a Railway `preDeployCommand`
+before the API serves traffic). Both services refuse to operate
+against missing schema: `/health` returns 503 with the missing-tables
+list; the worker exits non-zero on bootstrap.
+
+Source of truth: [`docs/runbooks/railway-deploy.md`](docs/runbooks/railway-deploy.md).
+
 ## Important Docs
 
 - Agent instructions: `AGENTS.md`
