@@ -80,6 +80,7 @@ describe('ListSupportedPositions', () => {
 
     expect(result.positions).toHaveLength(1);
     expect(result.summaryDtos).toHaveLength(0);
+    expect(result.poolMetadataFailures).toBeGreaterThan(0);
   });
 
   it('excludes positions whose pool metadata has null decimals', async () => {
@@ -114,5 +115,37 @@ describe('ListSupportedPositions', () => {
 
     expect(result.summaryDtos[0]?.rangeState).toBe('below-range');
     expect(result.summaryDtos[0]?.rangeDistance.belowLowerPercent).toBeGreaterThanOrEqual(0);
+  });
+
+  it('counts poolMetadataFailures when getPoolData throws', async () => {
+    const positionReadPort = new FakeSupportedPositionReadPort(
+      [FIXTURE_POSITION_IN_RANGE],
+      {},
+    );
+    positionReadPort.getPoolData = async () => { throw new Error('RPC timeout'); };
+
+    const result = await listSupportedPositions({
+      walletId: FIXTURE_WALLET_ID,
+      positionReadPort,
+    });
+
+    expect(result.positions).toHaveLength(1);
+    expect(result.summaryDtos).toHaveLength(0);
+    expect(result.poolMetadataFailures).toBeGreaterThan(0);
+  });
+
+  it('reports zero poolMetadataFailures when all pool data is available', async () => {
+    const positionReadPort = new FakeSupportedPositionReadPort(
+      [FIXTURE_POSITION_IN_RANGE],
+      { [FIXTURE_POSITION_IN_RANGE.poolId]: FIXTURE_POOL_DATA },
+    );
+
+    const result = await listSupportedPositions({
+      walletId: FIXTURE_WALLET_ID,
+      positionReadPort,
+    });
+
+    expect(result.poolMetadataFailures).toBe(0);
+    expect(result.summaryDtos).toHaveLength(1);
   });
 });

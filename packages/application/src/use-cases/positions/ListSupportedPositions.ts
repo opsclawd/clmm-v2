@@ -7,7 +7,7 @@ import { buildPositionDisplayBounds } from './buildPositionDisplayBounds.js';
 export type ListSupportedPositionsResult = {
   positions: LiquidityPosition[];
   summaryDtos: PositionSummaryDto[];
-  poolLookupFailures: number;
+  poolMetadataFailures: number;
 };
 
 export async function listSupportedPositions(params: {
@@ -19,13 +19,17 @@ export async function listSupportedPositions(params: {
   const uniquePoolIds = [...new Set(positions.map((p) => p.poolId))];
   const poolDataMap = new Map<PoolId, Awaited<ReturnType<SupportedPositionReadPort['getPoolData']>>>();
 
-  let poolLookupFailures = 0;
+  let poolMetadataFailures = 0;
   await Promise.allSettled(uniquePoolIds.map(async (poolId) => {
     try {
       const poolData = await params.positionReadPort.getPoolData(poolId);
-      if (poolData) poolDataMap.set(poolId, poolData);
+      if (poolData) {
+        poolDataMap.set(poolId, poolData);
+      } else {
+        poolMetadataFailures++;
+      }
     } catch {
-      poolLookupFailures++;
+      poolMetadataFailures++;
     }
   }));
 
@@ -73,5 +77,5 @@ export async function listSupportedPositions(params: {
     });
   }
 
-  return { positions, summaryDtos, poolLookupFailures };
+  return { positions, summaryDtos, poolMetadataFailures };
 }

@@ -238,6 +238,23 @@ describe('PositionController', () => {
       controller.listPositions(FIXTURE_POSITION_IN_RANGE.walletId),
     ).rejects.toThrow('Database connection pool exhausted');
   });
+
+  it('includes warning when pool metadata fetches fail in listPositions', async () => {
+    const positionReadPort = new FakeSupportedPositionReadPort(
+      [FIXTURE_POSITION_IN_RANGE],
+      {},
+      FIXTURE_POSITION_DETAIL,
+    );
+    positionReadPort.getPoolData = async () => null;
+    const triggerRepo = new FakeTriggerRepository();
+    const controller = new PositionController(positionReadPort, triggerRepo, fakePricePort);
+
+    const result = await controller.listPositions(FIXTURE_POSITION_IN_RANGE.walletId);
+
+    expect(result.positions).toHaveLength(0);
+    expect(result.warning).toBe('Some pool data unavailable. Position list may be incomplete.');
+  });
+
   it('never includes srLevels on the position detail payload (S/R lives behind a dedicated endpoint)', async () => {
     const positionReadPort = new FakeSupportedPositionReadPort(
       [FIXTURE_POSITION_IN_RANGE],
