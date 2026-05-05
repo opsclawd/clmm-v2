@@ -6,7 +6,8 @@ import { buildPositionDisplayBounds } from './buildPositionDisplayBounds.js';
 
 export type GetPositionDetailResult =
   | { kind: 'found'; position: LiquidityPosition; detailDto: PositionDetailDto }
-  | { kind: 'not-found' };
+  | { kind: 'not-found' }
+  | { kind: 'cannot-build-supported-detail-dto' };
 
 export async function getPositionDetail(params: {
   walletId: WalletId;
@@ -26,7 +27,7 @@ export async function getPositionDetail(params: {
 
   const { decimalsA, decimalsB } = poolData.tokenPair;
   if (decimalsA === null || decimalsB === null) {
-    return { kind: 'not-found' };
+    return { kind: 'cannot-build-supported-detail-dto' };
   }
   const priceMap = new Map<string, { usdValue: number; symbol: string }>();
   try {

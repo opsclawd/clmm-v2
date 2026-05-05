@@ -76,4 +76,60 @@ describe('GetPositionDetail', () => {
 
     expect(result.kind).toBe('not-found');
   });
+
+  it('returns price-space bound fields', async () => {
+    const positionReadPort = new FakeSupportedPositionReadPort(
+      [FIXTURE_POSITION_IN_RANGE],
+      { [FIXTURE_POSITION_IN_RANGE.poolId]: FIXTURE_POOL_DATA },
+      FIXTURE_POSITION_DETAIL,
+    );
+    const pricePort = new FakePricePort([FIXTURE_SOL_PRICE_QUOTE, FIXTURE_USDC_PRICE_QUOTE]);
+
+    const result = await getPositionDetail({
+      walletId: FIXTURE_WALLET_ID,
+      positionId: FIXTURE_POSITION_ID,
+      positionReadPort,
+      pricePort,
+    });
+
+    expect(result.kind).toBe('found');
+    if (result.kind === 'found') {
+      expect(result.detailDto.lowerBoundPrice).toBeDefined();
+      expect(result.detailDto.upperBoundPrice).toBeDefined();
+      expect(result.detailDto.lowerBoundLabel).toBeDefined();
+      expect(result.detailDto.upperBoundLabel).toBeDefined();
+      expect(typeof result.detailDto.lowerBoundPrice).toBe('number');
+      expect(typeof result.detailDto.upperBoundPrice).toBe('number');
+    }
+  });
+
+  it('returns cannot-build-supported-detail-dto when token decimals are null', async () => {
+    const poolDataNullDecimals: typeof FIXTURE_POOL_DATA = {
+      ...FIXTURE_POOL_DATA,
+      tokenPair: {
+        ...FIXTURE_POOL_DATA.tokenPair,
+        decimalsA: null,
+        decimalsB: null,
+      },
+    };
+    const positionDetailNullDecimals: typeof FIXTURE_POSITION_DETAIL = {
+      ...FIXTURE_POSITION_DETAIL,
+      poolData: poolDataNullDecimals,
+    };
+    const positionReadPort = new FakeSupportedPositionReadPort(
+      [FIXTURE_POSITION_IN_RANGE],
+      { [FIXTURE_POSITION_IN_RANGE.poolId]: poolDataNullDecimals },
+      positionDetailNullDecimals,
+    );
+    const pricePort = new FakePricePort([]);
+
+    const result = await getPositionDetail({
+      walletId: FIXTURE_WALLET_ID,
+      positionId: FIXTURE_POSITION_ID,
+      positionReadPort,
+      pricePort,
+    });
+
+    expect(result.kind).toBe('cannot-build-supported-detail-dto');
+  });
 });

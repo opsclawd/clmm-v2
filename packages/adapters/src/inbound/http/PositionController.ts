@@ -1,4 +1,4 @@
-import { Controller, Get, Param, Inject, NotFoundException } from '@nestjs/common';
+import { Controller, Get, Param, Inject, NotFoundException, UnprocessableEntityException } from '@nestjs/common';
 import type {
   SupportedPositionReadPort,
   PricePort,
@@ -65,6 +65,12 @@ export class PositionController {
 
     if (result.kind === 'not-found') {
       throw new NotFoundException(`Position not found: ${positionId}`);
+    }
+
+    if (result.kind === 'cannot-build-supported-detail-dto') {
+      throw new UnprocessableEntityException(
+        `Position detail unavailable: missing token metadata for ${positionId}`,
+      );
     }
 
     if (result.position.walletId !== wallet) {

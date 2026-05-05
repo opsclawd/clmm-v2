@@ -10,6 +10,10 @@ export type PositionListItemViewModel = {
   rangeDistanceLabel: string;
   hasAlert: boolean;
   monitoringLabel: string;
+  lowerBoundPrice: number;
+  upperBoundPrice: number;
+  lowerBoundLabel: string;
+  upperBoundLabel: string;
 };
 
 export type PositionListViewModel = {
@@ -57,6 +61,10 @@ export function buildPositionListViewModel(positions: PositionSummaryDto[]): Pos
     rangeDistanceLabel: rangeDistanceLabel(p.rangeDistance),
     hasAlert: p.hasActionableTrigger,
     monitoringLabel: monitoringLabel(p.monitoringStatus),
+    lowerBoundPrice: p.lowerBoundPrice,
+    upperBoundPrice: p.upperBoundPrice,
+    lowerBoundLabel: p.lowerBoundLabel,
+    upperBoundLabel: p.upperBoundLabel,
   }));
 
   return { items, isEmpty: items.length === 0 };

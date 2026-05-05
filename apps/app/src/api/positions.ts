@@ -40,7 +40,11 @@ function isPositionSummaryRecord(value: Record<string, unknown>): boolean {
     VALID_RANGE_STATES.includes(value['rangeState'] as (typeof VALID_RANGE_STATES)[number]) &&
     VALID_MONITORING_STATUSES.includes(
       value['monitoringStatus'] as (typeof VALID_MONITORING_STATUSES)[number],
-    )
+    ) &&
+    typeof value['lowerBoundPrice'] === 'number' &&
+    Number.isFinite(value['lowerBoundPrice']) &&
+    typeof value['upperBoundPrice'] === 'number' &&
+    Number.isFinite(value['upperBoundPrice'])
   );
 }
 
@@ -51,16 +55,10 @@ function isPositionDetailDto(value: unknown): value is PositionDetailDto {
   }
 
   const breachDirection = value['breachDirection'];
-  const lowerBound = value['lowerBound'];
-  const upperBound = value['upperBound'];
   const currentPrice = value['currentPrice'];
 
   const baseValid =
     isPositionSummaryRecord(value) &&
-    typeof lowerBound === 'number' &&
-    Number.isFinite(lowerBound) &&
-    typeof upperBound === 'number' &&
-    Number.isFinite(upperBound) &&
     typeof currentPrice === 'number' &&
     Number.isFinite(currentPrice) &&
     (value['triggerId'] == null || typeof value['triggerId'] === 'string') &&
