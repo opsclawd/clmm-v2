@@ -235,20 +235,7 @@ function ConnectedPositionsList({
         />
       }
       renderItem={({ item }) => (
-        <PositionCard
-          poolId={item.poolId}
-          poolLabel={item.poolLabel}
-          currentPrice={item.currentPrice}
-          currentPriceLabel={item.currentPriceLabel}
-          lowerBoundPrice={item.lowerBoundPrice}
-          upperBoundPrice={item.upperBoundPrice}
-          lowerBoundLabel={item.lowerBoundLabel}
-          upperBoundLabel={item.upperBoundLabel}
-          rangeStatusKind={item.rangeStatusKind}
-          hasAlert={item.hasAlert}
-          monitoringLabel={item.monitoringLabel}
-          onPress={() => onSelectPosition?.(item.positionId)}
-        />
+        <PositionCard item={item} onPress={() => onSelectPosition?.(item.positionId)} />
       )}
     />
   );
