@@ -40,6 +40,10 @@ export type PositionSummaryDto = {
   currentPrice: number;
   currentPriceLabel: string;
   feeRateLabel: string;
+  lowerBoundPrice: number;
+  upperBoundPrice: number;
+  lowerBoundLabel: string;
+  upperBoundLabel: string;
   rangeState: 'in-range' | 'below-range' | 'above-range';
   rangeDistance: {
     belowLowerPercent: number;
@@ -65,10 +69,6 @@ export type RewardAmountValue = {
 };
 
 export type PositionDetailDto = PositionSummaryDto & {
-  lowerBound: number;
-  upperBound: number;
-  lowerBoundLabel: string;
-  upperBoundLabel: string;
   currentPrice: number;
   sqrtPrice: string;
   unclaimedFees: {
