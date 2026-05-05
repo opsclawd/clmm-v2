@@ -178,26 +178,22 @@ describe('getStatusChipProps', () => {
 });
 
 describe('getMonitoringDisplay', () => {
-  it('maps the active label to Live with the safe tone color', () => {
-    const r = getMonitoringDisplay('Monitoring Active');
+  it('maps active to Live with the safe tone', () => {
+    const r = getMonitoringDisplay('active');
     expect(r.text).toBe('Live');
     expect(r.tone).toBe('safe');
   });
 
-  it('maps the degraded label to Degraded with the warn tone color', () => {
-    const r = getMonitoringDisplay('Monitoring Degraded');
+  it('maps degraded to Degraded with the warn tone', () => {
+    const r = getMonitoringDisplay('degraded');
     expect(r.text).toBe('Degraded');
     expect(r.tone).toBe('warn');
   });
 
-  it('falls back to Inactive with a faint tone for any other input', () => {
-    const r = getMonitoringDisplay('Monitoring Inactive');
+  it('maps inactive to Inactive with the faint tone', () => {
+    const r = getMonitoringDisplay('inactive');
     expect(r.text).toBe('Inactive');
     expect(r.tone).toBe('faint');
-
-    const u = getMonitoringDisplay('totally unknown');
-    expect(u.text).toBe('Inactive');
-    expect(u.tone).toBe('faint');
   });
 });
 
