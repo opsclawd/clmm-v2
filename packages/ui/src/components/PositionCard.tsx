@@ -1,62 +1,66 @@
 import { View, Text, TouchableOpacity } from 'react-native';
 import { colors, typography } from '../design-system/index.js';
 import { Chip } from './Chip.js';
+import { PairGlyph } from './PairGlyph.js';
+import { RangeBar } from './RangeBar.js';
+import {
+  formatPoolId,
+  getCardPlaceholderMetrics,
+  getMonitoringDisplay,
+  getStatusChipProps,
+  isNearEdge,
+  splitTokenPair,
+} from './PositionCardUtils.js';
 
 type Props = {
+  poolId: string;
   poolLabel: string;
+  currentPrice: number;
   currentPriceLabel: string;
-  feeRateLabel: string;
+  lowerBoundPrice: number;
+  upperBoundPrice: number;
+  lowerBoundLabel: string;
+  upperBoundLabel: string;
   rangeStatusKind: 'in-range' | 'below-range' | 'above-range';
-  rangeDistanceLabel: string;
   hasAlert: boolean;
   monitoringLabel: string;
   onPress?: () => void;
 };
 
-function getChipProps(
-  rangeStatusKind: string,
-  hasAlert: boolean,
-): { tone: 'safe' | 'warn' | 'breach'; label: string } {
-  if (hasAlert) {
-    return { tone: 'breach', label: 'Breach' };
-  }
-  if (rangeStatusKind === 'in-range') {
-    return { tone: 'safe', label: 'In range' };
-  }
-  if (rangeStatusKind === 'below-range') {
-    return { tone: 'warn', label: 'Below range' };
-  }
-  if (rangeStatusKind === 'above-range') {
-    return { tone: 'warn', label: 'Above range' };
-  }
-  return { tone: 'warn', label: 'Unknown' };
-}
-
-function getMonitoringColor(status: string): string {
-  if (status === 'Monitoring Active') return colors.safe;
-  if (status === 'Monitoring Degraded') return colors.warn;
+function monitoringDotColor(tone: 'safe' | 'warn' | 'faint'): string {
+  if (tone === 'safe') return colors.safe;
+  if (tone === 'warn') return colors.warn;
   return colors.textFaint;
 }
 
-function getMonitoringText(status: string): string {
-  if (status === 'Monitoring Active') return 'Live';
-  if (status === 'Monitoring Degraded') return 'Degraded';
-  return 'Inactive';
-}
-
 export function PositionCard({
+  poolId,
   poolLabel,
+  currentPrice,
   currentPriceLabel,
-  feeRateLabel,
+  lowerBoundPrice,
+  upperBoundPrice,
+  lowerBoundLabel,
+  upperBoundLabel,
   rangeStatusKind,
-  rangeDistanceLabel,
   hasAlert,
   monitoringLabel,
   onPress,
 }: Props): JSX.Element {
-  const chip = getChipProps(rangeStatusKind, hasAlert);
-  const monitoringColor = getMonitoringColor(monitoringLabel);
-  const monitoringText = getMonitoringText(monitoringLabel);
+  const tokens = splitTokenPair(poolLabel);
+  const truncatedPoolId = formatPoolId(poolId);
+  const nearEdge = isNearEdge({ currentPrice, lowerBoundPrice, upperBoundPrice });
+  const chip = getStatusChipProps({ rangeStatusKind, hasAlert, nearEdge });
+  const monitoring = getMonitoringDisplay(monitoringLabel);
+  const placeholders = getCardPlaceholderMetrics(poolId);
+
+  const breachSide: 'below' | 'above' | undefined = hasAlert
+    ? rangeStatusKind === 'below-range'
+      ? 'below'
+      : rangeStatusKind === 'above-range'
+        ? 'above'
+        : undefined
+    : undefined;
 
   return (
     <TouchableOpacity
@@ -72,102 +76,139 @@ export function PositionCard({
         marginHorizontal: 20,
       }}
     >
-      {/* Row 1: chip + monitoring indicator */}
+      {/* Top row: pair glyph + label + pool id, chip on the right */}
       <View
         style={{
           flexDirection: 'row',
-          justifyContent: 'space-between',
           alignItems: 'center',
-          marginBottom: 12,
+          justifyContent: 'space-between',
+          marginBottom: 14,
         }}
       >
-        <Chip tone={chip.tone}>{chip.label}</Chip>
-        <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-          <View
-            style={{
-              width: 6,
-              height: 6,
-              borderRadius: 999,
-              backgroundColor: monitoringColor,
-              marginRight: 5,
-            }}
-          />
-          <Text
-            style={{
-              fontSize: typography.fontSize.caption,
-              color: colors.textBody,
-            }}
-          >
-            {monitoringText}
-          </Text>
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
+          <PairGlyph a={tokens.a} b={tokens.b} size={30} />
+          <View>
+            <Text
+              style={{
+                fontWeight: typography.fontWeight.semibold,
+                fontSize: typography.fontSize.md,
+                color: colors.textPrimary,
+                letterSpacing: -0.01 * typography.fontSize.md,
+              }}
+            >
+              {poolLabel}
+            </Text>
+            <Text
+              style={{
+                fontFamily: typography.fontFamily.mono,
+                fontSize: 11,
+                color: colors.textTertiary,
+              }}
+            >
+              {truncatedPoolId}
+            </Text>
+          </View>
         </View>
+        <Chip tone={chip.tone}>{chip.label}</Chip>
       </View>
 
-      {/* Row 2: pool pair label */}
-      <Text
-        style={{
-          fontSize: typography.fontSize.body,
-          fontWeight: typography.fontWeight.semibold,
-          color: colors.textPrimary,
-          letterSpacing: -0.01 * typography.fontSize.body,
-        }}
-      >
-        {poolLabel}
-      </Text>
+      {/* Range bar */}
+      <RangeBar
+        lowerBoundPrice={lowerBoundPrice}
+        upperBoundPrice={upperBoundPrice}
+        currentPrice={currentPrice}
+        lowerBoundLabel={lowerBoundLabel}
+        upperBoundLabel={upperBoundLabel}
+        currentPriceLabel={currentPriceLabel}
+        {...(breachSide ? { breachSide } : {})}
+      />
 
-      {/* Row 3: current price */}
-      <Text
+      {/* Bottom row: TVL · Fees 24h · Monitor */}
+      <View
         style={{
-          fontSize: typography.fontSize.body,
-          color: colors.textSecondary,
+          flexDirection: 'row',
           marginTop: 4,
         }}
       >
-        {currentPriceLabel}
-      </Text>
-
-      {/* Row 4: fee rate + range distance */}
-      <View
-        style={{
-          flexDirection: 'row',
-          justifyContent: 'space-between',
-          marginTop: 6,
-        }}
-      >
-        <Text
-          style={{
-            fontSize: typography.fontSize.caption,
-            color: colors.textTertiary,
-          }}
-        >
-          {feeRateLabel}
-        </Text>
-        {rangeDistanceLabel ? (
+        <View style={{ flex: 1 }}>
           <Text
             style={{
-              fontSize: typography.fontSize.caption,
-              color: rangeStatusKind === 'in-range' ? colors.textTertiary : colors.warn,
+              fontSize: 10,
+              textTransform: 'uppercase',
+              letterSpacing: 0.08,
+              color: colors.textTertiary,
+              fontWeight: typography.fontWeight.semibold,
             }}
           >
-            {rangeDistanceLabel}
+            TVL
           </Text>
-        ) : null}
+          <Text
+            style={{
+              fontFamily: typography.fontFamily.mono,
+              fontSize: 14,
+              marginTop: 2,
+              color: colors.textPrimary,
+            }}
+          >
+            {placeholders.tvlLabel}
+          </Text>
+        </View>
+        <View style={{ flex: 1 }}>
+          <Text
+            style={{
+              fontSize: 10,
+              textTransform: 'uppercase',
+              letterSpacing: 0.08,
+              color: colors.textTertiary,
+              fontWeight: typography.fontWeight.semibold,
+            }}
+          >
+            Fees 24h
+          </Text>
+          <Text
+            style={{
+              fontFamily: typography.fontFamily.mono,
+              fontSize: 14,
+              marginTop: 2,
+              color: colors.safe,
+            }}
+          >
+            {placeholders.fees24hLabel}
+          </Text>
+        </View>
+        <View style={{ flex: 1, alignItems: 'flex-end' }}>
+          <Text
+            style={{
+              fontSize: 10,
+              textTransform: 'uppercase',
+              letterSpacing: 0.08,
+              color: colors.textTertiary,
+              fontWeight: typography.fontWeight.semibold,
+            }}
+          >
+            Monitor
+          </Text>
+          <View style={{ flexDirection: 'row', alignItems: 'center', marginTop: 3 }}>
+            <View
+              style={{
+                width: 6,
+                height: 6,
+                borderRadius: 999,
+                backgroundColor: monitoringDotColor(monitoring.tone),
+                marginRight: 5,
+              }}
+            />
+            <Text
+              style={{
+                fontSize: typography.fontSize.caption,
+                color: colors.textBody,
+              }}
+            >
+              {monitoring.text}
+            </Text>
+          </View>
+        </View>
       </View>
-
-      {/* Alert dot */}
-      {hasAlert ? (
-        <View
-          style={{
-            position: 'absolute',
-            top: 12,
-            right: 12,
-            width: 8,
-            height: 8,
-            borderRadius: 999,
-            backgroundColor: colors.breachAccent,
-          }}
-        />
-      ) : null}
     </TouchableOpacity>
   );
 }
