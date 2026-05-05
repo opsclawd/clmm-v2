@@ -11,7 +11,6 @@ export type PositionListItemViewModel = {
   rangeStatusKind: 'in-range' | 'below-range' | 'above-range';
   hasAlert: boolean;
   monitoringStatus: MonitoringStatus;
-  monitoringLabel: string;
   lowerBoundPrice: number;
   upperBoundPrice: number;
   lowerBoundLabel: string;
@@ -23,19 +22,6 @@ export type PositionListViewModel = {
   isEmpty: boolean;
 };
 
-function monitoringLabel(status: string): string {
-  switch (status) {
-    case 'active':
-      return 'Monitoring Active';
-    case 'degraded':
-      return 'Monitoring Degraded';
-    case 'inactive':
-      return 'Monitoring Inactive';
-    default:
-      return 'Unknown';
-  }
-}
-
 export function buildPositionListViewModel(positions: PositionSummaryDto[]): PositionListViewModel {
   const items: PositionListItemViewModel[] = positions.map((p) => ({
     positionId: p.positionId,
@@ -46,7 +32,6 @@ export function buildPositionListViewModel(positions: PositionSummaryDto[]): Pos
     rangeStatusKind: p.rangeState,
     hasAlert: p.hasActionableTrigger,
     monitoringStatus: p.monitoringStatus,
-    monitoringLabel: monitoringLabel(p.monitoringStatus),
     lowerBoundPrice: p.lowerBoundPrice,
     upperBoundPrice: p.upperBoundPrice,
     lowerBoundLabel: p.lowerBoundLabel,
