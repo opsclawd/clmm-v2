@@ -103,4 +103,66 @@ describe('RangeBar', () => {
 
     expect(screen.getAllByText('100').length).toBe(3);
   });
+
+  it('renders breach-below testID when breachSide is below', () => {
+    render(
+      <RangeBar
+        lowerBoundPrice={100}
+        upperBoundPrice={200}
+        currentPrice={50}
+        lowerBoundLabel="100"
+        upperBoundLabel="200"
+        currentPriceLabel="50"
+        breachSide="below"
+      />,
+    );
+
+    expect(screen.getByTestId('range-bar-breach-below')).toBeTruthy();
+  });
+
+  it('renders the tick when current price is far below the lower bound (clamped)', () => {
+    render(
+      <RangeBar
+        lowerBoundPrice={100}
+        upperBoundPrice={200}
+        currentPrice={1}
+        lowerBoundLabel="100"
+        upperBoundLabel="200"
+        currentPriceLabel="1"
+      />,
+    );
+
+    expect(screen.getByTestId('range-bar-tick')).toBeTruthy();
+    expect(screen.getByText('1')).toBeTruthy();
+  });
+
+  it('renders without crashing when bounds are NaN', () => {
+    render(
+      <RangeBar
+        lowerBoundPrice={Number.NaN}
+        upperBoundPrice={200}
+        currentPrice={150}
+        lowerBoundLabel="N/A"
+        upperBoundLabel="200"
+        currentPriceLabel="150"
+      />,
+    );
+
+    expect(screen.getByTestId('range-bar-tick')).toBeTruthy();
+  });
+
+  it('renders without crashing when currentPrice is Infinity', () => {
+    render(
+      <RangeBar
+        lowerBoundPrice={100}
+        upperBoundPrice={200}
+        currentPrice={Number.POSITIVE_INFINITY}
+        lowerBoundLabel="100"
+        upperBoundLabel="200"
+        currentPriceLabel="∞"
+      />,
+    );
+
+    expect(screen.getByTestId('range-bar-tick')).toBeTruthy();
+  });
 });

@@ -5,6 +5,7 @@ import { PairGlyph } from './PairGlyph.js';
 import { RangeBar } from './RangeBar.js';
 import {
   formatPoolId,
+  getBreachSide,
   getCardPlaceholderMetrics,
   getMonitoringDisplay,
   getStatusChipProps,
@@ -54,16 +55,13 @@ export function PositionCard({
   const monitoring = getMonitoringDisplay(monitoringLabel);
   const placeholders = getCardPlaceholderMetrics(poolId);
 
-  const breachSide: 'below' | 'above' | undefined = hasAlert
-    ? rangeStatusKind === 'below-range'
-      ? 'below'
-      : rangeStatusKind === 'above-range'
-        ? 'above'
-        : undefined
-    : undefined;
+  const breachSide = getBreachSide(hasAlert, rangeStatusKind);
 
   return (
     <TouchableOpacity
+      testID={`position-card-${poolId}`}
+      accessibilityRole="button"
+      accessibilityLabel={`Position card for ${poolLabel}, ${chip.label}`}
       onPress={onPress}
       activeOpacity={0.8}
       style={{

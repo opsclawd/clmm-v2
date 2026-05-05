@@ -8,13 +8,16 @@ function SummaryCard({
   label,
   value,
   valueColor,
+  testID,
 }: {
   label: string;
   value: string;
   valueColor: string;
+  testID: string;
 }): JSX.Element {
   return (
     <View
+      testID={testID}
       style={{
         flex: 1,
         paddingVertical: 10,
@@ -61,8 +64,18 @@ export function PortfolioSummaryStrip(): JSX.Element {
         paddingBottom: 4,
       }}
     >
-      <SummaryCard label="Portfolio" value={PORTFOLIO_VALUE} valueColor={colors.textPrimary} />
-      <SummaryCard label="Fees earned" value={FEES_EARNED_VALUE} valueColor={colors.safe} />
+      <SummaryCard
+        testID="portfolio-summary-portfolio"
+        label="Portfolio"
+        value={PORTFOLIO_VALUE}
+        valueColor={colors.textPrimary}
+      />
+      <SummaryCard
+        testID="portfolio-summary-fees-earned"
+        label="Fees earned"
+        value={FEES_EARNED_VALUE}
+        valueColor={colors.safe}
+      />
     </View>
   );
 }

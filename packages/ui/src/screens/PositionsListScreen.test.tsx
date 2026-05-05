@@ -349,6 +349,8 @@ describe('PositionsListScreen', () => {
     );
 
     expect(screen.getByText('Market context unavailable for mixed pools')).toBeTruthy();
+    expect(screen.getByText('SOL / USDC')).toBeTruthy();
+    expect(screen.getByText('BTC / USDC')).toBeTruthy();
   });
 
   it('does not label out-of-range positions as Near edge even when current price is close to a bound', () => {

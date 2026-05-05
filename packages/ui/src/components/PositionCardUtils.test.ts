@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
   formatPoolId,
+  getBreachSide,
   getCardPlaceholderMetrics,
   getMonitoringDisplay,
   getStatusChipProps,
@@ -106,6 +107,30 @@ describe('isNearEdge', () => {
       }),
     ).toBe(false);
   });
+
+  it('returns false when current price is below the lower bound', () => {
+    expect(isNearEdge({ currentPrice: 50, lowerBoundPrice: 100, upperBoundPrice: 200 })).toBe(
+      false,
+    );
+  });
+
+  it('returns false when current price is above the upper bound', () => {
+    expect(isNearEdge({ currentPrice: 250, lowerBoundPrice: 100, upperBoundPrice: 200 })).toBe(
+      false,
+    );
+  });
+
+  it('returns false just outside the 10% threshold on the lower side', () => {
+    expect(isNearEdge({ currentPrice: 111, lowerBoundPrice: 100, upperBoundPrice: 200 })).toBe(
+      false,
+    );
+  });
+
+  it('returns false just outside the 10% threshold on the upper side', () => {
+    expect(isNearEdge({ currentPrice: 189, lowerBoundPrice: 100, upperBoundPrice: 200 })).toBe(
+      false,
+    );
+  });
 });
 
 describe('getStatusChipProps', () => {
@@ -195,5 +220,27 @@ describe('getCardPlaceholderMetrics', () => {
     expect(typeof r.fees24hLabel).toBe('string');
     expect(r.tvlLabel.length).toBeGreaterThan(0);
     expect(r.fees24hLabel.length).toBeGreaterThan(0);
+  });
+});
+
+describe('getBreachSide', () => {
+  it('returns below when hasAlert and below-range', () => {
+    expect(getBreachSide(true, 'below-range')).toBe('below');
+  });
+
+  it('returns above when hasAlert and above-range', () => {
+    expect(getBreachSide(true, 'above-range')).toBe('above');
+  });
+
+  it('returns undefined when hasAlert but in-range', () => {
+    expect(getBreachSide(true, 'in-range')).toBe(undefined);
+  });
+
+  it('returns undefined when no alert and below-range', () => {
+    expect(getBreachSide(false, 'below-range')).toBe(undefined);
+  });
+
+  it('returns undefined when no alert and above-range', () => {
+    expect(getBreachSide(false, 'above-range')).toBe(undefined);
   });
 });
