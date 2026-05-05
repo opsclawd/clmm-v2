@@ -29,7 +29,10 @@ const MS_PER_MINUTE = 60_000;
 const MS_PER_HOUR = 3_600_000;
 const STALE_THRESHOLD_MS = 48 * MS_PER_HOUR;
 
-function computeFreshness(capturedAtUnixMs: number, now: number): { freshnessLabel: string; isStale: boolean } {
+function computeFreshness(
+  capturedAtUnixMs: number,
+  now: number,
+): { freshnessLabel: string; isStale: boolean } {
   const ageMs = Math.max(0, now - capturedAtUnixMs);
   if (ageMs < MS_PER_HOUR) {
     const minutes = Math.max(1, Math.round(ageMs / MS_PER_MINUTE));
@@ -55,7 +58,10 @@ function parseNotes(notes: string | undefined): {
     return { remaining: '' };
   }
 
-  const parts = notes.split('|').map((s) => s.trim()).filter(Boolean);
+  const parts = notes
+    .split('|')
+    .map((s) => s.trim())
+    .filter(Boolean);
   if (parts.length === 0) {
     return { remaining: '' };
   }
@@ -121,7 +127,10 @@ function parseNotes(notes: string | undefined): {
   };
 }
 
-export function buildSrLevelsViewModelBlock(block: SrLevelsBlock, now: number): SrLevelsViewModelBlock {
+export function buildSrLevelsViewModelBlock(
+  block: SrLevelsBlock,
+  now: number,
+): SrLevelsViewModelBlock {
   const { freshnessLabel, isStale } = computeFreshness(block.capturedAtUnixMs, now);
 
   type LevelWithMeta = {

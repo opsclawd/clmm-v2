@@ -28,12 +28,7 @@ describe('NotificationDispatchJobHandler', () => {
     clock = new FakeClockPort(1_000_000);
 
     // Construct directly without NestJS DI
-    handler = new NotificationDispatchJobHandler(
-      notificationPort,
-      dedupPort,
-      observability,
-      clock,
-    );
+    handler = new NotificationDispatchJobHandler(notificationPort, dedupPort, observability, clock);
   });
 
   it('dispatches notification for a fresh trigger and marks it as dispatched', async () => {
@@ -48,7 +43,9 @@ describe('NotificationDispatchJobHandler', () => {
     expect(notificationPort.dispatched).toHaveLength(1);
     expect(notificationPort.dispatched[0]?.triggerId).toBe('trigger-1');
     expect(
-      observability.logs.some((l: ObservabilityLog) => l.level === 'info' && l.message.includes('trigger-1')),
+      observability.logs.some(
+        (l: ObservabilityLog) => l.level === 'info' && l.message.includes('trigger-1'),
+      ),
     ).toBe(true);
     expect(observability.deliveryTimings).toHaveLength(1);
   });
@@ -68,7 +65,9 @@ describe('NotificationDispatchJobHandler', () => {
     expect(observability.deliveryTimings).toHaveLength(0);
     // Info log should still be recorded (dispatched=false)
     expect(
-      observability.logs.some((l: ObservabilityLog) => l.level === 'info' && l.message.includes('dispatched=false')),
+      observability.logs.some(
+        (l: ObservabilityLog) => l.level === 'info' && l.message.includes('dispatched=false'),
+      ),
     ).toBe(true);
   });
 
@@ -150,7 +149,9 @@ describe('NotificationDispatchJobHandler', () => {
     expect(
       observability.logs.some(
         (l: ObservabilityLog) =>
-          l.level === 'error' && l.message.includes('trigger-3') && l.context?.['error'] === 'Push service unavailable',
+          l.level === 'error' &&
+          l.message.includes('trigger-3') &&
+          l.context?.['error'] === 'Push service unavailable',
       ),
     ).toBe(true);
   });

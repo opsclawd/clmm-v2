@@ -128,7 +128,8 @@ function isHistoryEventDto(value: unknown): value is HistoryEventDto {
     typeof value['eventType'] === 'string' &&
     isBreachDirection(value['breachDirection']) &&
     typeof value['occurredAt'] === 'number' &&
-    (value['transactionReference'] == null || isTransactionReference(value['transactionReference'])) &&
+    (value['transactionReference'] == null ||
+      isTransactionReference(value['transactionReference'])) &&
     value['note'] === 'off-chain operational history — not an on-chain receipt or attestation'
   );
 }
@@ -186,10 +187,14 @@ function isSubmitExecutionResponse(value: unknown): value is SubmitExecutionResp
   }
 
   if (value['result'] === 'partial') {
-    return Array.isArray(value['confirmedSteps']) && value['confirmedSteps'].every(isExecutionStepKind);
+    return (
+      Array.isArray(value['confirmedSteps']) && value['confirmedSteps'].every(isExecutionStepKind)
+    );
   }
 
-  return value['result'] === 'pending' || value['result'] === 'confirmed' || value['result'] === 'failed';
+  return (
+    value['result'] === 'pending' || value['result'] === 'confirmed' || value['result'] === 'failed'
+  );
 }
 
 type ApproveExecutionPreviewInput = {

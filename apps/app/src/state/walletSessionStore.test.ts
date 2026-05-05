@@ -23,10 +23,7 @@ vi.mock('@react-native-async-storage/async-storage', () => {
     },
   };
 });
-import {
-  createWalletSessionStore,
-  type WalletConnectionKind,
-} from './walletSessionStore';
+import { createWalletSessionStore, type WalletConnectionKind } from './walletSessionStore';
 
 const caps: PlatformCapabilityState = {
   nativePushAvailable: false,
@@ -61,7 +58,9 @@ describe('walletSessionStore', () => {
 
     expect(store.getState().walletAddress).toBe('DemoWallet1111111111111111111111111111111111');
     expect(store.getState().connectionKind).toBe('browser');
-    expect(store.getState().browserRestoreAddress).toBe('DemoWallet1111111111111111111111111111111111');
+    expect(store.getState().browserRestoreAddress).toBe(
+      'DemoWallet1111111111111111111111111111111111',
+    );
     expect(store.getState().connectionOutcome).toEqual({ kind: 'connected' });
     expect(store.getState().isConnecting).toBe(false);
   });
@@ -157,7 +156,9 @@ describe('walletSessionStore', () => {
 
     expect(store2.getState().walletAddress).toBeNull();
     expect(store2.getState().connectionKind).toBe('browser');
-    expect(store2.getState().browserRestoreAddress).toBe('DemoWallet1111111111111111111111111111111111');
+    expect(store2.getState().browserRestoreAddress).toBe(
+      'DemoWallet1111111111111111111111111111111111',
+    );
     expect(store2.getState().platformCapabilities).toEqual(caps);
   });
 

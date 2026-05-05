@@ -74,7 +74,9 @@ class RecordingPreparationPort implements ExecutionPreparationPort {
 class RecordingRegimeEngineEventPort implements RegimeEngineEventPort {
   events: Array<import('../../outbound/regime-engine/types.js').ClmmExecutionEventRequest> = [];
 
-  async notifyExecutionEvent(event: import('../../outbound/regime-engine/types.js').ClmmExecutionEventRequest): Promise<void> {
+  async notifyExecutionEvent(
+    event: import('../../outbound/regime-engine/types.js').ClmmExecutionEventRequest,
+  ): Promise<void> {
     this.events.push(event);
   }
 }
@@ -292,10 +294,18 @@ describe('ExecutionController', () => {
     });
     clock.set(1_000_001);
 
-    await expect(controller.getSigningPayload('missing-attempt')).rejects.toBeInstanceOf(NotFoundException);
-    await expect(controller.getSigningPayload('attempt-not-signable')).rejects.toBeInstanceOf(ConflictException);
-    await expect(controller.getSigningPayload('attempt-missing-payload')).rejects.toBeInstanceOf(ConflictException);
-    await expect(controller.getSigningPayload('attempt-expired-payload')).rejects.toBeInstanceOf(ConflictException);
+    await expect(controller.getSigningPayload('missing-attempt')).rejects.toBeInstanceOf(
+      NotFoundException,
+    );
+    await expect(controller.getSigningPayload('attempt-not-signable')).rejects.toBeInstanceOf(
+      ConflictException,
+    );
+    await expect(controller.getSigningPayload('attempt-missing-payload')).rejects.toBeInstanceOf(
+      ConflictException,
+    );
+    await expect(controller.getSigningPayload('attempt-expired-payload')).rejects.toBeInstanceOf(
+      ConflictException,
+    );
   });
 
   it('returns wallet-scoped execution history', async () => {
@@ -356,8 +366,12 @@ describe('ExecutionController', () => {
       transactionReferences: [],
     });
 
-    await expect(controller.declineSignature('attempt-decline-missing')).rejects.toBeInstanceOf(NotFoundException);
-    await expect(controller.declineSignature('attempt-decline-terminal')).rejects.toBeInstanceOf(ConflictException);
+    await expect(controller.declineSignature('attempt-decline-missing')).rejects.toBeInstanceOf(
+      NotFoundException,
+    );
+    await expect(controller.declineSignature('attempt-decline-terminal')).rejects.toBeInstanceOf(
+      ConflictException,
+    );
   });
 
   it('records signature interruption and reports the new state', async () => {
@@ -389,8 +403,12 @@ describe('ExecutionController', () => {
       transactionReferences: [],
     });
 
-    await expect(controller.interruptSignature('attempt-interrupt-missing')).rejects.toBeInstanceOf(NotFoundException);
-    await expect(controller.interruptSignature('attempt-interrupt-terminal')).rejects.toBeInstanceOf(ConflictException);
+    await expect(controller.interruptSignature('attempt-interrupt-missing')).rejects.toBeInstanceOf(
+      NotFoundException,
+    );
+    await expect(
+      controller.interruptSignature('attempt-interrupt-terminal'),
+    ).rejects.toBeInstanceOf(ConflictException);
   });
 
   it('uses the attempt-persisted direction for GET /executions/:attemptId even when history disagrees', async () => {
@@ -460,13 +478,19 @@ describe('ExecutionController', () => {
     expect(result.result).toBe('confirmed');
     expect(submissionPort.submittedPayloads).toHaveLength(1);
     expect(Array.from(submissionPort.submittedPayloads[0] ?? [])).toEqual([1, 2, 3, 4]);
-    expect(submissionPort.reconcileCalls).toEqual([[{ signature: 'sig-submit-1', stepKind: 'swap-assets' }]]);
+    expect(submissionPort.reconcileCalls).toEqual([
+      [{ signature: 'sig-submit-1', stepKind: 'swap-assets' }],
+    ]);
 
     const storedAttempt = await executionRepo.getAttempt('attempt-submit');
-    expect(storedAttempt?.transactionReferences).toEqual([{ signature: 'sig-submit-1', stepKind: 'swap-assets' }]);
+    expect(storedAttempt?.transactionReferences).toEqual([
+      { signature: 'sig-submit-1', stepKind: 'swap-assets' },
+    ]);
     expect(storedAttempt?.breachDirection).toEqual(UPPER_BOUND_BREACH);
 
-    const submittedEvent = historyRepo.events.find((event: HistoryEvent) => event.eventType === 'submitted');
+    const submittedEvent = historyRepo.events.find(
+      (event: HistoryEvent) => event.eventType === 'submitted',
+    );
     expect(submittedEvent?.breachDirection).toEqual(UPPER_BOUND_BREACH);
   });
 
@@ -858,7 +882,9 @@ describe('ExecutionController', () => {
 
     it('does not fire regime-engine event when reconcileExecution throws', async () => {
       await saveAwaitingSignature('attempt-regime-throw');
-      submissionPort.reconcileExecution = async () => { throw new Error('boom'); };
+      submissionPort.reconcileExecution = async () => {
+        throw new Error('boom');
+      };
 
       await expect(
         controller.submitExecution('attempt-regime-throw', {
@@ -873,7 +899,9 @@ describe('ExecutionController', () => {
     it('returns confirmed HTTP response even when event port rejects', async () => {
       await saveAwaitingSignature('attempt-regime-port-rejects');
       submissionPort.finalState = { kind: 'confirmed' };
-      regimeEngineEventPort.notifyExecutionEvent = async () => { throw new Error('port down'); };
+      regimeEngineEventPort.notifyExecutionEvent = async () => {
+        throw new Error('port down');
+      };
 
       const result = await controller.submitExecution('attempt-regime-port-rejects', {
         signedPayload: Buffer.from([1, 2, 3]).toString('base64'),

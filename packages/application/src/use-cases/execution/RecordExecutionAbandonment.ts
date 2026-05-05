@@ -34,7 +34,9 @@ export async function recordExecutionAbandonment(params: {
   }
 
   if (attempt.breachDirection.kind !== breachDirection.kind) {
-    throw new Error(`recordExecutionAbandonment: breachDirection mismatch for attempt ${attemptId}`);
+    throw new Error(
+      `recordExecutionAbandonment: breachDirection mismatch for attempt ${attemptId}`,
+    );
   }
 
   await executionRepo.updateAttemptState(attemptId, { kind: 'abandoned' });

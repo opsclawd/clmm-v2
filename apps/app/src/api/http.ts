@@ -1,5 +1,4 @@
 export function getBffBaseUrl(): string {
-  
   // @ts-expect-error: variables are defined at build time
   // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
   const configuredBaseUrl = process.env.EXPO_PUBLIC_BFF_BASE_URL;
@@ -57,7 +56,10 @@ async function extractErrorDetail(response: Response): Promise<string> {
         return body['message'];
       }
 
-      if (Array.isArray(body['message']) && body['message'].every((entry) => typeof entry === 'string')) {
+      if (
+        Array.isArray(body['message']) &&
+        body['message'].every((entry) => typeof entry === 'string')
+      ) {
         return body['message'].join('; ');
       }
     }

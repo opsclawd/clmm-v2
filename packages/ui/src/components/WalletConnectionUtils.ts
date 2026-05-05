@@ -28,7 +28,8 @@ export function buildWalletOptions(caps: PlatformCapabilities): WalletOption[] {
     options.push({
       kind: 'browser',
       label: 'Connect Browser Wallet',
-      description: 'Sign transactions with your browser wallet extension. You can review positions and execute exits from desktop.',
+      description:
+        'Sign transactions with your browser wallet extension. You can review positions and execute exits from desktop.',
     });
   }
 
@@ -70,7 +71,8 @@ export function getConnectionOutcomeDisplay(outcome: ConnectionOutcome): Connect
     case 'interrupted':
       return {
         title: 'Connection Interrupted',
-        detail: 'The connection was interrupted before completing. You have returned to the app — please try connecting again.',
+        detail:
+          'The connection was interrupted before completing. You have returned to the app — please try connecting again.',
         severity: 'warning',
       };
     default: {
@@ -91,9 +93,7 @@ export function buildConnectedWalletSummary(params: {
 }): ConnectedWalletSummary {
   return {
     displayAddress: truncateAddress(params.walletAddress),
-    connectionLabel: params.connectionKind === 'native'
-      ? 'Mobile Wallet'
-      : 'Browser Wallet',
+    connectionLabel: params.connectionKind === 'native' ? 'Mobile Wallet' : 'Browser Wallet',
   };
 }
 
@@ -109,27 +109,22 @@ export function buildPlatformNotice(caps: PlatformCapabilities): PlatformNotice 
 
   if (caps.isMobileWeb) {
     return {
-      message: 'You are on mobile web. Wallet signing is not available in this browser. You can view positions and alerts, but cannot execute exits. Use the native app or a desktop browser with a wallet extension for full functionality.',
+      message:
+        'You are on mobile web. Wallet signing is not available in this browser. You can view positions and alerts, but cannot execute exits. Use the native app or a desktop browser with a wallet extension for full functionality.',
       severity: 'warning',
     };
   }
 
   return {
-    message: 'No supported wallet detected on this device. Install a compatible Solana wallet to connect.',
+    message:
+      'No supported wallet detected on this device. Install a compatible Solana wallet to connect.',
     severity: 'error',
   };
 }
 
-export type FallbackState =
-  | 'none'
-  | 'wallet-fallback'
-  | 'desktop-no-wallet'
-  | 'social-webview';
+export type FallbackState = 'none' | 'wallet-fallback' | 'desktop-no-wallet' | 'social-webview';
 
-export type WalletDiscoveryState =
-  | 'discovering'
-  | 'ready'
-  | 'timed-out';
+export type WalletDiscoveryState = 'discovering' | 'ready' | 'timed-out';
 
 export type DiscoveredWallet = {
   id: string;

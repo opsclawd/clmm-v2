@@ -1,11 +1,4 @@
-import {
-  Controller,
-  Post,
-  Param,
-  Body,
-  Inject,
-  HttpException,
-} from '@nestjs/common';
+import { Controller, Post, Param, Body, Inject, HttpException } from '@nestjs/common';
 import type { WalletChallengeRepository, ClockPort } from '@clmm/application';
 import type { WalletId } from '@clmm/domain';
 import { makeClockTimestamp } from '@clmm/domain';
@@ -125,11 +118,11 @@ function assertValidWalletId(walletId: string): asserts walletId is WalletId {
   }
 }
 
-function assertEnrollBody(body: {
-  nonce?: unknown;
-  message?: unknown;
-  signature?: unknown;
-}): { nonce: string; message: string; signature: string } {
+function assertEnrollBody(body: { nonce?: unknown; message?: unknown; signature?: unknown }): {
+  nonce: string;
+  message: string;
+  signature: string;
+} {
   const { nonce, message, signature } = body ?? {};
   if (
     typeof nonce !== 'string' ||

@@ -1,9 +1,7 @@
 import type { TriggerRepository } from '../../ports/index.js';
 import type { ExitTriggerId } from '@clmm/domain';
 
-export type AcknowledgeAlertResult =
-  | { kind: 'acknowledged' }
-  | { kind: 'not-found' };
+export type AcknowledgeAlertResult = { kind: 'acknowledged' } | { kind: 'not-found' };
 
 export async function acknowledgeAlert(params: {
   triggerId: ExitTriggerId;

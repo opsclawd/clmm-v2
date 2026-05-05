@@ -3,9 +3,7 @@ import { BrowserWalletSigningAdapter } from './BrowserWalletSigningAdapter';
 import { runWalletSigningPortContract } from '@clmm/testing';
 import { makeWalletId } from '@clmm/domain';
 
-runWalletSigningPortContract(() =>
-  BrowserWalletSigningAdapter.create(async (tx) => tx),
-);
+runWalletSigningPortContract(() => BrowserWalletSigningAdapter.create(async (tx) => tx));
 
 describe('BrowserWalletSigningAdapter', () => {
   it('returns signed with the bytes from the callback', async () => {

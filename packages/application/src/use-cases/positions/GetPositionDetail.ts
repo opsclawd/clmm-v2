@@ -1,7 +1,12 @@
 import type { SupportedPositionReadPort, PricePort } from '../../ports/index.js';
 import type { PositionId, WalletId, LiquidityPosition } from '@clmm/domain';
 import type { PositionDetailDto, TokenAmountValue, RewardAmountValue } from '../../dto/index.js';
-import { priceFromSqrtPrice, rangeDistancePercent, tokenAmountToUsd, formatFeeRateLabel } from '@clmm/domain';
+import {
+  priceFromSqrtPrice,
+  rangeDistancePercent,
+  tokenAmountToUsd,
+  formatFeeRateLabel,
+} from '@clmm/domain';
 import { buildPositionDisplayBounds } from './buildPositionDisplayBounds.js';
 
 export type GetPositionDetailResult =
@@ -15,7 +20,10 @@ export async function getPositionDetail(params: {
   positionReadPort: SupportedPositionReadPort;
   pricePort: PricePort;
 }): Promise<GetPositionDetailResult> {
-  const detail = await params.positionReadPort.getPositionDetail(params.walletId, params.positionId);
+  const detail = await params.positionReadPort.getPositionDetail(
+    params.walletId,
+    params.positionId,
+  );
   if (!detail) return { kind: 'not-found' };
 
   const { position, poolData, fees, positionLiquidity } = detail;
@@ -81,7 +89,10 @@ export async function getPositionDetail(params: {
         amount: r.amountOwed.toString(),
         decimals: r.decimals,
         symbol: rPrice?.symbol ?? r.mint,
-        usdValue: (r.decimals !== null && rPrice) ? tokenAmountToUsd(r.amountOwed, r.decimals, rPrice.usdValue) : 0,
+        usdValue:
+          r.decimals !== null && rPrice
+            ? tokenAmountToUsd(r.amountOwed, r.decimals, rPrice.usdValue)
+            : 0,
       };
     });
 

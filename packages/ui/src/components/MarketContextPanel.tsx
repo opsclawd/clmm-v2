@@ -15,7 +15,15 @@ type Props = {
   now: number;
 };
 
-export function MarketContextPanel({ srLevels, isLoading, isError, isUnsupported, isMixedPools, poolLabel, now }: Props): JSX.Element | null {
+export function MarketContextPanel({
+  srLevels,
+  isLoading,
+  isError,
+  isUnsupported,
+  isMixedPools,
+  poolLabel,
+  now,
+}: Props): JSX.Element | null {
   if (isMixedPools) {
     return (
       <View
@@ -106,7 +114,9 @@ export function MarketContextPanel({ srLevels, isLoading, isError, isUnsupported
   return (
     <View style={{ marginHorizontal: 16 }}>
       {poolLabel ? (
-        <Text style={{ color: colors.textSecondary, fontSize: typography.fontSize.xs, marginBottom: 4 }}>
+        <Text
+          style={{ color: colors.textSecondary, fontSize: typography.fontSize.xs, marginBottom: 4 }}
+        >
           {poolLabel}
         </Text>
       ) : null}

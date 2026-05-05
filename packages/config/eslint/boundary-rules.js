@@ -16,7 +16,15 @@ module.exports = {
       rules: {
         'no-restricted-imports': restrictedPatterns([
           {
-            group: ['@clmm/adapters', '@clmm/ui', '@solana/*', '@orca-so/*', 'react', 'react-native', 'expo*'],
+            group: [
+              '@clmm/adapters',
+              '@clmm/ui',
+              '@solana/*',
+              '@orca-so/*',
+              'react',
+              'react-native',
+              'expo*',
+            ],
             message: 'packages/domain must not import external SDKs or framework packages.',
           },
         ]),
@@ -39,7 +47,8 @@ module.exports = {
         'no-restricted-imports': restrictedPatterns([
           {
             group: ['@clmm/adapters', '@clmm/domain', '@solana/*', '@orca-so/*'],
-            message: 'packages/ui must not import @clmm/domain, adapters, or Solana SDK packages. Use @clmm/application/public re-exports.',
+            message:
+              'packages/ui must not import @clmm/domain, adapters, or Solana SDK packages. Use @clmm/application/public re-exports.',
           },
         ]),
       },

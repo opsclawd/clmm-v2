@@ -10,7 +10,14 @@
 import { createSolanaRpc, address } from '@solana/kit';
 import { getPositionAddress, fetchPosition, fetchWhirlpool } from '@orca-so/whirlpools-client';
 
-import type { LiquidityPosition, WalletId, PositionId, PoolData, PositionFees, PositionRewardInfo } from '@clmm/domain';
+import type {
+  LiquidityPosition,
+  WalletId,
+  PositionId,
+  PoolData,
+  PositionFees,
+  PositionRewardInfo,
+} from '@clmm/domain';
 import { makePoolId, makeClockTimestamp, evaluateRangeState } from '@clmm/domain';
 import { KNOWN_TOKENS } from '../price/known-tokens.js';
 
@@ -83,11 +90,7 @@ export class SolanaPositionSnapshotReader {
       const mintAddress = address(positionId);
 
       const response = await rpc
-        .getTokenAccountsByOwner(
-          ownerAddress,
-          { mint: mintAddress },
-          { encoding: 'jsonParsed' },
-        )
+        .getTokenAccountsByOwner(ownerAddress, { mint: mintAddress }, { encoding: 'jsonParsed' })
         .send();
 
       return response.value.some(
@@ -114,23 +117,25 @@ export class SolanaPositionSnapshotReader {
     for (let i = 0; i < uniqueAddresses.length; i += WHIRLPOOL_FETCH_BATCH_SIZE) {
       const batch = uniqueAddresses.slice(i, i + WHIRLPOOL_FETCH_BATCH_SIZE);
 
-      await Promise.all(batch.map(async (addr) => {
-        try {
-          const whirlpoolAccount = await fetchWhirlpool(rpc, address(addr));
-          const w = whirlpoolAccount.data;
-          results.set(addr, {
-            tickCurrentIndex: w.tickCurrentIndex,
-            sqrtPrice: w.sqrtPrice,
-            tokenMintA: w.tokenMintA.toString(),
-            tokenMintB: w.tokenMintB.toString(),
-            feeRate: w.feeRate,
-            tickSpacing: w.tickSpacing,
-            liquidity: w.liquidity,
-          });
-        } catch {
-          // Skip failed fetches — positions referencing this pool will be excluded.
-        }
-      }));
+      await Promise.all(
+        batch.map(async (addr) => {
+          try {
+            const whirlpoolAccount = await fetchWhirlpool(rpc, address(addr));
+            const w = whirlpoolAccount.data;
+            results.set(addr, {
+              tickCurrentIndex: w.tickCurrentIndex,
+              sqrtPrice: w.sqrtPrice,
+              tokenMintA: w.tokenMintA.toString(),
+              tokenMintB: w.tokenMintB.toString(),
+              feeRate: w.feeRate,
+              tickSpacing: w.tickSpacing,
+              liquidity: w.liquidity,
+            });
+          } catch {
+            // Skip failed fetches — positions referencing this pool will be excluded.
+          }
+        }),
+      );
     }
 
     return results;

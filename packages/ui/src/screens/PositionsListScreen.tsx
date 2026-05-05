@@ -79,21 +79,25 @@ export function PositionsListScreen({
 
 function PartialDataBanner({ message }: { message: string }) {
   return (
-    <View style={{
-      marginTop: 8,
-      marginBottom: 4,
-      paddingVertical: 8,
-      paddingHorizontal: 12,
-      backgroundColor: '#422006',
-      borderRadius: 8,
-      borderWidth: 1,
-      borderColor: colors.warning,
-    }}>
-      <Text style={{
-        color: colors.warning,
-        fontSize: typography.fontSize.sm,
-        fontWeight: typography.fontWeight.medium,
-      }}>
+    <View
+      style={{
+        marginTop: 8,
+        marginBottom: 4,
+        paddingVertical: 8,
+        paddingHorizontal: 12,
+        backgroundColor: '#422006',
+        borderRadius: 8,
+        borderWidth: 1,
+        borderColor: colors.warning,
+      }}
+    >
+      <Text
+        style={{
+          color: colors.warning,
+          fontSize: typography.fontSize.sm,
+          fontWeight: typography.fontWeight.medium,
+        }}
+      >
         {message}
       </Text>
     </View>
@@ -223,10 +227,7 @@ function ConnectedPositionsList({
             poolLabel={poolLabel}
             now={now ?? Date.now()}
           />
-          <SectionHeader
-            title="Active positions"
-            meta={`${positions.length} monitored`}
-          />
+          <SectionHeader title="Active positions" meta={`${positions.length} monitored`} />
         </View>
       }
       renderItem={({ item }) => (

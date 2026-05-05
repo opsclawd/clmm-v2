@@ -42,21 +42,15 @@ export function applyLifecycleTransition(
     case 'partial':
       throw new Error(
         `FORBIDDEN: partial state cannot transition; event=${event}. ` +
-        'Partial completion requires explicit recovery guidance, not replay.',
+          'Partial completion requires explicit recovery guidance, not replay.',
       );
 
     case 'confirmed':
-      throw new Error(
-        `FORBIDDEN: confirmed is terminal; event=${event}`,
-      );
+      throw new Error(`FORBIDDEN: confirmed is terminal; event=${event}`);
 
     case 'abandoned':
-      throw new Error(
-        `FORBIDDEN: abandoned is terminal; event=${event}`,
-      );
+      throw new Error(`FORBIDDEN: abandoned is terminal; event=${event}`);
   }
 
-  throw new Error(
-    `Invalid transition: ${current.kind} + ${event}`,
-  );
+  throw new Error(`Invalid transition: ${current.kind} + ${event}`);
 }

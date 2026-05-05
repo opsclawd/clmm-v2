@@ -37,12 +37,17 @@ export function WalletSettingsScreen({
   });
 
   return (
-    <ScrollView style={{ flex: 1, backgroundColor: colors.background }} contentContainerStyle={{ padding: 16 }}>
-      <Text style={{
-        color: colors.text,
-        fontSize: typography.fontSize.xl,
-        fontWeight: typography.fontWeight.bold,
-      }}>
+    <ScrollView
+      style={{ flex: 1, backgroundColor: colors.background }}
+      contentContainerStyle={{ padding: 16 }}
+    >
+      <Text
+        style={{
+          color: colors.text,
+          fontSize: typography.fontSize.xl,
+          fontWeight: typography.fontWeight.bold,
+        }}
+      >
         Wallet / Settings
       </Text>
 
@@ -50,25 +55,31 @@ export function WalletSettingsScreen({
 
       {vm.connected && vm.walletSummary ? (
         <View style={{ marginTop: 16 }}>
-          <View style={{
-            padding: 16,
-            backgroundColor: colors.surface,
-            borderRadius: 8,
-            borderWidth: 1,
-            borderColor: colors.border,
-          }}>
-            <Text style={{
-              color: colors.textSecondary,
-              fontSize: typography.fontSize.sm,
-            }}>
+          <View
+            style={{
+              padding: 16,
+              backgroundColor: colors.surface,
+              borderRadius: 8,
+              borderWidth: 1,
+              borderColor: colors.border,
+            }}
+          >
+            <Text
+              style={{
+                color: colors.textSecondary,
+                fontSize: typography.fontSize.sm,
+              }}
+            >
               Connected via {vm.walletSummary.connectionLabel}
             </Text>
-            <Text style={{
-              color: colors.text,
-              fontSize: typography.fontSize.lg,
-              fontWeight: typography.fontWeight.semibold,
-              marginTop: 4,
-            }}>
+            <Text
+              style={{
+                color: colors.text,
+                fontSize: typography.fontSize.lg,
+                fontWeight: typography.fontWeight.semibold,
+                marginTop: 4,
+              }}
+            >
               {vm.walletSummary.displayAddress}
             </Text>
           </View>
@@ -86,12 +97,14 @@ export function WalletSettingsScreen({
                 ...(onReconnect == null ? { opacity: 0.5 } : {}),
               }}
             >
-              <Text style={{
-                color: colors.text,
-                fontSize: typography.fontSize.base,
-                fontWeight: typography.fontWeight.medium,
-                textAlign: 'center',
-              }}>
+              <Text
+                style={{
+                  color: colors.text,
+                  fontSize: typography.fontSize.base,
+                  fontWeight: typography.fontWeight.medium,
+                  textAlign: 'center',
+                }}
+              >
                 Reconnect
               </Text>
             </TouchableOpacity>
@@ -108,12 +121,14 @@ export function WalletSettingsScreen({
                 ...(onSwitchWallet == null ? { opacity: 0.5 } : {}),
               }}
             >
-              <Text style={{
-                color: colors.text,
-                fontSize: typography.fontSize.base,
-                fontWeight: typography.fontWeight.medium,
-                textAlign: 'center',
-              }}>
+              <Text
+                style={{
+                  color: colors.text,
+                  fontSize: typography.fontSize.base,
+                  fontWeight: typography.fontWeight.medium,
+                  textAlign: 'center',
+                }}
+              >
                 Switch Wallet
               </Text>
             </TouchableOpacity>
@@ -130,12 +145,14 @@ export function WalletSettingsScreen({
                 ...(onDisconnect == null ? { opacity: 0.5 } : {}),
               }}
             >
-              <Text style={{
-                color: colors.danger,
-                fontSize: typography.fontSize.base,
-                fontWeight: typography.fontWeight.medium,
-                textAlign: 'center',
-              }}>
+              <Text
+                style={{
+                  color: colors.danger,
+                  fontSize: typography.fontSize.base,
+                  fontWeight: typography.fontWeight.medium,
+                  textAlign: 'center',
+                }}
+              >
                 Disconnect
               </Text>
             </TouchableOpacity>
@@ -143,26 +160,33 @@ export function WalletSettingsScreen({
         </View>
       ) : (
         <View style={{ marginTop: 16 }}>
-          <Text style={{
-            color: colors.textSecondary,
-            fontSize: typography.fontSize.base,
-          }}>
+          <Text
+            style={{
+              color: colors.textSecondary,
+              fontSize: typography.fontSize.base,
+            }}
+          >
             No wallet connected.
           </Text>
           {vm.platformNotice ? (
-            <View style={{
-              marginTop: 12,
-              padding: 12,
-              backgroundColor: vm.platformNotice.severity === 'warning' ? '#422006' : '#450a0a',
-              borderRadius: 8,
-              borderWidth: 1,
-              borderColor: vm.platformNotice.severity === 'warning' ? colors.warning : colors.danger,
-            }}>
-              <Text style={{
-                color: vm.platformNotice.severity === 'warning' ? colors.warning : colors.danger,
-                fontSize: typography.fontSize.sm,
-                fontWeight: typography.fontWeight.medium,
-              }}>
+            <View
+              style={{
+                marginTop: 12,
+                padding: 12,
+                backgroundColor: vm.platformNotice.severity === 'warning' ? '#422006' : '#450a0a',
+                borderRadius: 8,
+                borderWidth: 1,
+                borderColor:
+                  vm.platformNotice.severity === 'warning' ? colors.warning : colors.danger,
+              }}
+            >
+              <Text
+                style={{
+                  color: vm.platformNotice.severity === 'warning' ? colors.warning : colors.danger,
+                  fontSize: typography.fontSize.sm,
+                  fontWeight: typography.fontWeight.medium,
+                }}
+              >
                 {vm.platformNotice.message}
               </Text>
             </View>

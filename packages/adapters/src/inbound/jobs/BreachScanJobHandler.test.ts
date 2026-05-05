@@ -164,7 +164,9 @@ describe('BreachScanJobHandler', () => {
 
   it('abandons stale awaiting-signature attempt when position recovers', async () => {
     await walletRepo.enroll(FIXTURE_WALLET_ID, makeClockTimestamp(1_000));
-    const breachHandler = buildHandler(new FakeSupportedPositionReadPort([FIXTURE_POSITION_BELOW_RANGE]));
+    const breachHandler = buildHandler(
+      new FakeSupportedPositionReadPort([FIXTURE_POSITION_BELOW_RANGE]),
+    );
 
     await breachHandler.handle();
 
@@ -181,7 +183,9 @@ describe('BreachScanJobHandler', () => {
       transactionReferences: [],
     });
 
-    const recoveryHandler = buildHandler(new FakeSupportedPositionReadPort([FIXTURE_POSITION_IN_RANGE]));
+    const recoveryHandler = buildHandler(
+      new FakeSupportedPositionReadPort([FIXTURE_POSITION_IN_RANGE]),
+    );
     await recoveryHandler.handle();
 
     const updated = await executionRepo.getAttempt('attempt-recover-1');
@@ -191,7 +195,9 @@ describe('BreachScanJobHandler', () => {
 
   it('abandons stale awaiting-signature attempt on direction reversal', async () => {
     await walletRepo.enroll(FIXTURE_WALLET_ID, makeClockTimestamp(1_000));
-    const firstHandler = buildHandler(new FakeSupportedPositionReadPort([FIXTURE_POSITION_BELOW_RANGE]));
+    const firstHandler = buildHandler(
+      new FakeSupportedPositionReadPort([FIXTURE_POSITION_BELOW_RANGE]),
+    );
 
     await firstHandler.handle();
 
@@ -208,7 +214,9 @@ describe('BreachScanJobHandler', () => {
       transactionReferences: [],
     });
 
-    const reversedHandler = buildHandler(new FakeSupportedPositionReadPort([FIXTURE_POSITION_ABOVE_RANGE]));
+    const reversedHandler = buildHandler(
+      new FakeSupportedPositionReadPort([FIXTURE_POSITION_ABOVE_RANGE]),
+    );
     await reversedHandler.handle();
 
     const updated = await executionRepo.getAttempt('attempt-reversal-1');
@@ -220,7 +228,9 @@ describe('BreachScanJobHandler', () => {
 
   it('logs warning when multiple awaiting-signature attempts exist for one episode', async () => {
     await walletRepo.enroll(FIXTURE_WALLET_ID, makeClockTimestamp(1_000));
-    const firstHandler = buildHandler(new FakeSupportedPositionReadPort([FIXTURE_POSITION_BELOW_RANGE]));
+    const firstHandler = buildHandler(
+      new FakeSupportedPositionReadPort([FIXTURE_POSITION_BELOW_RANGE]),
+    );
 
     await firstHandler.handle();
 
@@ -246,7 +256,9 @@ describe('BreachScanJobHandler', () => {
       transactionReferences: [],
     });
 
-    const recoveryHandler = buildHandler(new FakeSupportedPositionReadPort([FIXTURE_POSITION_IN_RANGE]));
+    const recoveryHandler = buildHandler(
+      new FakeSupportedPositionReadPort([FIXTURE_POSITION_IN_RANGE]),
+    );
     await recoveryHandler.handle();
 
     const warnLog = observability.logs.find(
@@ -255,14 +267,17 @@ describe('BreachScanJobHandler', () => {
     expect(warnLog).toBeDefined();
 
     const abandonedInfoLogs = observability.logs.filter(
-      (entry) => entry.level === 'info' && entry.message.toLowerCase().includes('abandoned stale attempt'),
+      (entry) =>
+        entry.level === 'info' && entry.message.toLowerCase().includes('abandoned stale attempt'),
     );
     expect(abandonedInfoLogs).toHaveLength(2);
   });
 
   it('uses attempt position id when abandoning stale attempts', async () => {
     await walletRepo.enroll(FIXTURE_WALLET_ID, makeClockTimestamp(1_000));
-    const breachHandler = buildHandler(new FakeSupportedPositionReadPort([FIXTURE_POSITION_BELOW_RANGE]));
+    const breachHandler = buildHandler(
+      new FakeSupportedPositionReadPort([FIXTURE_POSITION_BELOW_RANGE]),
+    );
 
     await breachHandler.handle();
 
@@ -280,7 +295,9 @@ describe('BreachScanJobHandler', () => {
       transactionReferences: [],
     });
 
-    const recoveryHandler = buildHandler(new FakeSupportedPositionReadPort([FIXTURE_POSITION_IN_RANGE]));
+    const recoveryHandler = buildHandler(
+      new FakeSupportedPositionReadPort([FIXTURE_POSITION_IN_RANGE]),
+    );
     await recoveryHandler.handle();
 
     const updated = await executionRepo.getAttempt('attempt-mismatched-position');

@@ -95,15 +95,21 @@ export class BreachScanJobHandler {
         }
 
         for (const abandonment of observations.abandonments) {
-          const staleAttempts = await this.executionRepo.listAwaitingSignatureAttemptsByEpisode(abandonment.episodeId);
+          const staleAttempts = await this.executionRepo.listAwaitingSignatureAttemptsByEpisode(
+            abandonment.episodeId,
+          );
 
           if (staleAttempts.length > 1) {
-            this.observability.log('warn', `Execution integrity violation for episode ${abandonment.episodeId}`, {
-              episodeId: abandonment.episodeId,
-              positionId: abandonment.positionId,
-              reason: abandonment.reason,
-              awaitingSignatureAttempts: staleAttempts.length,
-            });
+            this.observability.log(
+              'warn',
+              `Execution integrity violation for episode ${abandonment.episodeId}`,
+              {
+                episodeId: abandonment.episodeId,
+                positionId: abandonment.positionId,
+                reason: abandonment.reason,
+                awaitingSignatureAttempts: staleAttempts.length,
+              },
+            );
           }
 
           for (const attempt of staleAttempts) {
@@ -117,12 +123,16 @@ export class BreachScanJobHandler {
               ids: this.ids,
             });
 
-            this.observability.log('info', `Abandoned stale attempt ${attempt.attemptId} for closed episode`, {
-              attemptId: attempt.attemptId,
-              episodeId: abandonment.episodeId,
-              positionId: abandonment.positionId,
-              reason: abandonment.reason,
-            });
+            this.observability.log(
+              'info',
+              `Abandoned stale attempt ${attempt.attemptId} for closed episode`,
+              {
+                attemptId: attempt.attemptId,
+                episodeId: abandonment.episodeId,
+                positionId: abandonment.positionId,
+                reason: abandonment.reason,
+              },
+            );
           }
         }
 

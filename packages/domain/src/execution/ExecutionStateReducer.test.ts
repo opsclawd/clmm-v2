@@ -63,12 +63,20 @@ describe('ExecutionStateReducer — forbidden transitions', () => {
     ['confirmed', 'reset-to-preview'],
     ['abandoned', 'submit'],
     ['abandoned', 'reset-to-preview'],
-  ] as Array<[StateKind, string]>)(
-    'FORBIDDEN: %s → cannot apply %s',
-    (fromKind, event) => {
-      expect(() =>
-        applyLifecycleTransition(state(fromKind), event as 'request-signature' | 'submit' | 'decline' | 'expire' | 'confirm' | 'fail' | 'partial-completion' | 'reset-to-preview'),
-      ).toThrow();
-    },
-  );
+  ] as Array<[StateKind, string]>)('FORBIDDEN: %s → cannot apply %s', (fromKind, event) => {
+    expect(() =>
+      applyLifecycleTransition(
+        state(fromKind),
+        event as
+          | 'request-signature'
+          | 'submit'
+          | 'decline'
+          | 'expire'
+          | 'confirm'
+          | 'fail'
+          | 'partial-completion'
+          | 'reset-to-preview',
+      ),
+    ).toThrow();
+  });
 });

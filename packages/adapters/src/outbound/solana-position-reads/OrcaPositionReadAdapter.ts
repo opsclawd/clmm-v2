@@ -13,13 +13,15 @@ import { fetchPositionsForOwner } from '@orca-so/whirlpools';
 import { fetchWhirlpool } from '@orca-so/whirlpools-client';
 
 import type { SupportedPositionReadPort } from '@clmm/application';
-import type { LiquidityPosition, WalletId, PositionId, PoolId, PoolData, PositionDetail } from '@clmm/domain';
-import {
-  makePositionId,
-  makePoolId,
-  makeClockTimestamp,
-  evaluateRangeState,
+import type {
+  LiquidityPosition,
+  WalletId,
+  PositionId,
+  PoolId,
+  PoolData,
+  PositionDetail,
 } from '@clmm/domain';
+import { makePositionId, makePoolId, makeClockTimestamp, evaluateRangeState } from '@clmm/domain';
 
 import { SolanaPositionSnapshotReader } from './SolanaPositionSnapshotReader.js';
 import type { Db } from '../storage/db.js';
@@ -36,10 +38,7 @@ export function parsePoolDataCacheTtlMs(raw: string | undefined): number {
 }
 
 export class OrcaPositionReadAdapter implements SupportedPositionReadPort {
-  private readonly poolDataCache = new Map<
-    string,
-    { data: PoolData | null; staleAt: number }
-  >();
+  private readonly poolDataCache = new Map<string, { data: PoolData | null; staleAt: number }>();
   private readonly POOL_DATA_CACHE_TTL_MS: number;
 
   constructor(
@@ -61,7 +60,12 @@ export class OrcaPositionReadAdapter implements SupportedPositionReadPort {
       return false;
     }
 
-    if (!("whirlpool" in value) || !("tickLowerIndex" in value) || !("tickUpperIndex" in value) || !("positionMint" in value)) {
+    if (
+      !('whirlpool' in value) ||
+      !('tickLowerIndex' in value) ||
+      !('tickUpperIndex' in value) ||
+      !('positionMint' in value)
+    ) {
       return false;
     }
 
@@ -78,7 +82,11 @@ export class OrcaPositionReadAdapter implements SupportedPositionReadPort {
   }
 
   private getBundleEntryData(bundlePosition: unknown): unknown {
-    if (typeof bundlePosition !== 'object' || bundlePosition == null || !('data' in bundlePosition)) {
+    if (
+      typeof bundlePosition !== 'object' ||
+      bundlePosition == null ||
+      !('data' in bundlePosition)
+    ) {
       return null;
     }
 
@@ -110,12 +118,16 @@ export class OrcaPositionReadAdapter implements SupportedPositionReadPort {
 
       return positionData.positions
         .map((bundlePosition) => this.getBundleEntryData(bundlePosition))
-        .filter((entry): entry is {
-          whirlpool: Address | string;
-          tickLowerIndex: number;
-          tickUpperIndex: number;
-          positionMint: Address | string;
-        } => this.isOwnedPositionEntry(entry));
+        .filter(
+          (
+            entry,
+          ): entry is {
+            whirlpool: Address | string;
+            tickLowerIndex: number;
+            tickUpperIndex: number;
+            positionMint: Address | string;
+          } => this.isOwnedPositionEntry(entry),
+        );
     }
 
     if (!('data' in positionData) || !this.isOwnedPositionEntry(positionData.data)) {
@@ -283,7 +295,10 @@ export class OrcaPositionReadAdapter implements SupportedPositionReadPort {
       this.poolDataCache.set(poolId, { data, staleAt: Date.now() + this.POOL_DATA_CACHE_TTL_MS });
       return data;
     } catch {
-      this.poolDataCache.set(poolId, { data: null, staleAt: Date.now() + this.POOL_DATA_CACHE_TTL_MS });
+      this.poolDataCache.set(poolId, {
+        data: null,
+        staleAt: Date.now() + this.POOL_DATA_CACHE_TTL_MS,
+      });
       return null;
     }
   }
@@ -292,7 +307,10 @@ export class OrcaPositionReadAdapter implements SupportedPositionReadPort {
     return this.fetchPoolData(poolId);
   }
 
-  async getPositionDetail(walletId: WalletId, positionId: PositionId): Promise<PositionDetail | null> {
+  async getPositionDetail(
+    walletId: WalletId,
+    positionId: PositionId,
+  ): Promise<PositionDetail | null> {
     const rpc = this.getRpc();
     const detail = await this.snapshotReader.fetchPositionDetail(rpc, positionId, walletId);
     if (!detail) return null;

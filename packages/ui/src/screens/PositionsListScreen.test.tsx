@@ -81,7 +81,9 @@ describe('PositionsListScreen', () => {
     );
 
     expect(screen.getByText('SOL / USDC')).toBeTruthy();
-    expect(screen.getByText('Some pool data unavailable. Position list may be incomplete.')).toBeTruthy();
+    expect(
+      screen.getByText('Some pool data unavailable. Position list may be incomplete.'),
+    ).toBeTruthy();
   });
 
   it('does not render warning banner when positionsWarning is null', () => {
@@ -102,9 +104,7 @@ describe('PositionsListScreen', () => {
 
     expect(screen.getByText('No supported positions')).toBeTruthy();
     expect(
-      screen.getByText(
-        'Connect a wallet with Orca CLMM positions to see them here.',
-      ),
+      screen.getByText('Connect a wallet with Orca CLMM positions to see them here.'),
     ).toBeTruthy();
   });
 
@@ -116,7 +116,11 @@ describe('PositionsListScreen', () => {
           makePosition({ rangeState: 'in-range' }),
           makePosition({ positionId: brand('position-2'), rangeState: 'below-range' }),
           makePosition({ positionId: brand('position-3'), rangeState: 'above-range' }),
-          makePosition({ positionId: brand('position-4'), rangeState: 'above-range', hasActionableTrigger: true }),
+          makePosition({
+            positionId: brand('position-4'),
+            rangeState: 'above-range',
+            hasActionableTrigger: true,
+          }),
         ]}
       />,
     );
@@ -145,7 +149,12 @@ describe('PositionsListScreen', () => {
     render(
       <PositionsListScreen
         walletAddress="wallet-1"
-        positions={[makePosition({ positionId: brand<PositionSummaryDto['positionId']>('pos-tap-test'), poolId: brand<PositionSummaryDto['poolId']>('pool-tap-test') })]}
+        positions={[
+          makePosition({
+            positionId: brand<PositionSummaryDto['positionId']>('pos-tap-test'),
+            poolId: brand<PositionSummaryDto['poolId']>('pool-tap-test'),
+          }),
+        ]}
         onSelectPosition={onSelectPosition}
       />,
     );
@@ -157,12 +166,7 @@ describe('PositionsListScreen', () => {
   it('calls onConnectWallet when Connect Wallet is tapped', () => {
     const onConnectWallet = vi.fn();
 
-    render(
-      <PositionsListScreen
-        walletAddress={null}
-        onConnectWallet={onConnectWallet}
-      />,
-    );
+    render(<PositionsListScreen walletAddress={null} onConnectWallet={onConnectWallet} />);
 
     fireEvent.click(screen.getByText('Connect Wallet'));
     expect(onConnectWallet).toHaveBeenCalled();
@@ -289,11 +293,7 @@ describe('PositionsListScreen', () => {
 
   it('renders the positions list when S/R is loading (non-blocking)', () => {
     render(
-      <PositionsListScreen
-        walletAddress="wallet-1"
-        positions={[makePosition()]}
-        srLevelsLoading
-      />,
+      <PositionsListScreen walletAddress="wallet-1" positions={[makePosition()]} srLevelsLoading />,
     );
 
     expect(screen.getByText('Active positions')).toBeTruthy();
@@ -305,7 +305,11 @@ describe('PositionsListScreen', () => {
         walletAddress="wallet-1"
         positions={[
           makePosition({ poolId: brand<PositionSummaryDto['poolId']>('pool-a') }),
-          makePosition({ positionId: brand('position-2'), poolId: brand<PositionSummaryDto['poolId']>('pool-b'), tokenPairLabel: 'BTC / USDC' }),
+          makePosition({
+            positionId: brand('position-2'),
+            poolId: brand<PositionSummaryDto['poolId']>('pool-b'),
+            tokenPairLabel: 'BTC / USDC',
+          }),
         ]}
         isMixedPools
       />,

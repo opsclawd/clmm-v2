@@ -19,8 +19,7 @@ export class JupiterPriceAdapter implements PricePort {
 
   constructor(params?: { apiKey?: string; cacheTtlMs?: number }) {
     this.apiKey =
-      params?.apiKey ??
-      (process.env as Record<string, string | undefined>)['JUPITER_API_KEY'];
+      params?.apiKey ?? (process.env as Record<string, string | undefined>)['JUPITER_API_KEY'];
     this.cacheTtlMs = params?.cacheTtlMs ?? 30_000;
   }
 

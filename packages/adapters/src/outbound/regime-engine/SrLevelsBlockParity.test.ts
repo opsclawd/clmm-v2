@@ -1,6 +1,9 @@
 import { describe, it, expect } from 'vitest';
 import type { SrLevelsBlock as AppSrLevelsBlock, SrLevel as AppSrLevel } from '@clmm/application';
-import type { SrLevelsBlock as AdapterSrLevelsBlock, SrLevel as AdapterSrLevel } from '../../outbound/regime-engine/types.js';
+import type {
+  SrLevelsBlock as AdapterSrLevelsBlock,
+  SrLevel as AdapterSrLevel,
+} from '../../outbound/regime-engine/types.js';
 
 describe('SrLevelsBlock structural parity', () => {
   it('application SrLevelsBlock satisfies the adapter SrLevelsBlock shape', () => {

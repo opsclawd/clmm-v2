@@ -172,9 +172,7 @@
         "exit_triggers_episode_id_unique": {
           "name": "exit_triggers_episode_id_unique",
           "nullsNotDistinct": false,
-          "columns": [
-            "episode_id"
-          ]
+          "columns": ["episode_id"]
         }
       },
       "policies": {},
@@ -423,9 +421,7 @@
         "prepared_payloads_attempt_id_unique": {
           "name": "prepared_payloads_attempt_id_unique",
           "nullsNotDistinct": false,
-          "columns": [
-            "attempt_id"
-          ]
+          "columns": ["attempt_id"]
         }
       },
       "policies": {},
@@ -591,10 +587,7 @@
         "wallet_position_ownership_wallet_position_unique": {
           "name": "wallet_position_ownership_wallet_position_unique",
           "nullsNotDistinct": false,
-          "columns": [
-            "wallet_id",
-            "position_id"
-          ]
+          "columns": ["wallet_id", "position_id"]
         }
       },
       "policies": {},

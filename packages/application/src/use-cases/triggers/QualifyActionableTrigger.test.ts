@@ -13,9 +13,7 @@ import {
 } from '@clmm/domain';
 import type { BreachObservationResult } from './ScanPositionsForBreaches.js';
 
-function makeObs(
-  direction = LOWER_BOUND_BREACH,
-): BreachObservationResult {
+function makeObs(direction = LOWER_BOUND_BREACH): BreachObservationResult {
   return {
     positionId: FIXTURE_POSITION_ID,
     direction,

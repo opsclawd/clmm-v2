@@ -1,4 +1,9 @@
-import type { SwapQuotePort, ExecutionRepository, ClockPort, IdGeneratorPort } from '../../ports/index.js';
+import type {
+  SwapQuotePort,
+  ExecutionRepository,
+  ClockPort,
+  IdGeneratorPort,
+} from '../../ports/index.js';
 import type { PositionId, BreachDirection, ExecutionPreview } from '@clmm/domain';
 import { buildExecutionPlan, evaluatePreviewFreshness } from '@clmm/domain';
 

@@ -15,20 +15,20 @@ export function HistoryListScreen({ events, onSelectEvent }: Props): JSX.Element
 
   return (
     <View style={{ flex: 1, backgroundColor: colors.background, padding: 16 }}>
-      <Text style={{
-        color: colors.text,
-        fontSize: typography.fontSize.xl,
-        fontWeight: typography.fontWeight.bold,
-      }}>
+      <Text
+        style={{
+          color: colors.text,
+          fontSize: typography.fontSize.xl,
+          fontWeight: typography.fontWeight.bold,
+        }}
+      >
         History
       </Text>
 
       <OffChainHistoryLabel note={viewModel.offChainNote} />
 
       {viewModel.isEmpty ? (
-        <Text style={{ color: colors.textSecondary, marginTop: 8 }}>
-          No execution history yet.
-        </Text>
+        <Text style={{ color: colors.textSecondary, marginTop: 8 }}>No execution history yet.</Text>
       ) : (
         <FlatList
           data={viewModel.items}
@@ -47,29 +47,41 @@ export function HistoryListScreen({ events, onSelectEvent }: Props): JSX.Element
                 borderColor: colors.border,
               }}
             >
-              <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
+              <View
+                style={{
+                  flexDirection: 'row',
+                  justifyContent: 'space-between',
+                  alignItems: 'center',
+                }}
+              >
                 <View style={{ flex: 1 }}>
-                  <Text style={{
-                    color: colors.text,
-                    fontSize: typography.fontSize.base,
-                    fontWeight: typography.fontWeight.medium,
-                  }}>
+                  <Text
+                    style={{
+                      color: colors.text,
+                      fontSize: typography.fontSize.base,
+                      fontWeight: typography.fontWeight.medium,
+                    }}
+                  >
                     {item.eventTypeLabel}
                   </Text>
                   {item.transactionSignatureShort ? (
-                    <Text style={{
-                      color: colors.textSecondary,
-                      fontSize: typography.fontSize.xs,
-                      marginTop: 2,
-                    }}>
+                    <Text
+                      style={{
+                        color: colors.textSecondary,
+                        fontSize: typography.fontSize.xs,
+                        marginTop: 2,
+                      }}
+                    >
                       tx: {item.transactionSignatureShort}
                     </Text>
                   ) : null}
                 </View>
-                <Text style={{
-                  color: colors.textSecondary,
-                  fontSize: typography.fontSize.sm,
-                }}>
+                <Text
+                  style={{
+                    color: colors.textSecondary,
+                    fontSize: typography.fontSize.sm,
+                  }}
+                >
                   {item.occurredAtLabel}
                 </Text>
               </View>

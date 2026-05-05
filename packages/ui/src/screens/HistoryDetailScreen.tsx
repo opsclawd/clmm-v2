@@ -22,20 +22,24 @@ export function HistoryDetailScreen({ positionId, events }: Props): JSX.Element 
 
   return (
     <View style={{ flex: 1, backgroundColor: colors.background, padding: 16 }}>
-      <Text style={{
-        color: colors.text,
-        fontSize: typography.fontSize.xl,
-        fontWeight: typography.fontWeight.bold,
-      }}>
+      <Text
+        style={{
+          color: colors.text,
+          fontSize: typography.fontSize.xl,
+          fontWeight: typography.fontWeight.bold,
+        }}
+      >
         History Detail
       </Text>
 
       {positionId ? (
-        <Text style={{
-          color: colors.textSecondary,
-          fontSize: typography.fontSize.sm,
-          marginTop: 4,
-        }}>
+        <Text
+          style={{
+            color: colors.textSecondary,
+            fontSize: typography.fontSize.sm,
+            marginTop: 4,
+          }}
+        >
           Position: {positionId}
         </Text>
       ) : null}
@@ -43,17 +47,21 @@ export function HistoryDetailScreen({ positionId, events }: Props): JSX.Element 
       <OffChainHistoryLabel note="off-chain operational history — not an on-chain receipt or attestation" />
 
       {!isEmpty && eventItems[0] ? (
-        <View style={{
-          marginTop: 12,
-          padding: 12,
-          backgroundColor: colors.surface,
-          borderRadius: 8,
-        }}>
-          <Text style={{
-            color: colors.breach,
-            fontSize: typography.fontSize.base,
-            fontWeight: typography.fontWeight.semibold,
-          }}>
+        <View
+          style={{
+            marginTop: 12,
+            padding: 12,
+            backgroundColor: colors.surface,
+            borderRadius: 8,
+          }}
+        >
+          <Text
+            style={{
+              color: colors.breach,
+              fontSize: typography.fontSize.base,
+              fontWeight: typography.fontWeight.semibold,
+            }}
+          >
             {breachDirectionLabel(eventItems[0].breachDirection)}
           </Text>
         </View>
@@ -68,9 +76,7 @@ export function HistoryDetailScreen({ positionId, events }: Props): JSX.Element 
           data={eventItems}
           keyExtractor={(item) => item.eventId}
           style={{ marginTop: 12 }}
-          renderItem={({ item }) => (
-            <HistoryEventRow event={item} />
-          )}
+          renderItem={({ item }) => <HistoryEventRow event={item} />}
         />
       )}
     </View>

@@ -24,10 +24,7 @@ export class FakeWalletSigningPort implements WalletSigningPort {
     this._nextResult = { kind: 'signed', signedPayload: payload ?? new Uint8Array([1, 2, 3]) };
   }
 
-  async requestSignature(
-    _payload: Uint8Array,
-    _walletId: WalletId,
-  ): Promise<SigningResult> {
+  async requestSignature(_payload: Uint8Array, _walletId: WalletId): Promise<SigningResult> {
     return this._nextResult;
   }
 }

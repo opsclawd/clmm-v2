@@ -13,7 +13,10 @@ type Props = {
   onPress?: () => void;
 };
 
-function getChipProps(rangeStatusKind: string, hasAlert: boolean): { tone: 'safe' | 'warn' | 'breach'; label: string } {
+function getChipProps(
+  rangeStatusKind: string,
+  hasAlert: boolean,
+): { tone: 'safe' | 'warn' | 'breach'; label: string } {
   if (hasAlert) {
     return { tone: 'breach', label: 'Breach' };
   }

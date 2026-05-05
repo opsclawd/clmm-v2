@@ -1,7 +1,5 @@
 import type { BreachDirection, PostExitAssetPosture, SwapInstruction } from '@clmm/domain';
-import {
-  makeWalletId,
-} from '@clmm/domain';
+import { makeWalletId } from '@clmm/domain';
 import { scanPositionsForBreaches } from '@clmm/application';
 import { qualifyActionableTrigger } from '@clmm/application';
 import { createExecutionPreview } from '@clmm/application';

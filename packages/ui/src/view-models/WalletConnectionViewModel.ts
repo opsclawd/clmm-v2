@@ -47,10 +47,11 @@ export function buildWalletConnectViewModel(params: {
     isMobileWeb: false,
   };
 
-  const screenState: WalletConnectViewModel['screenState'] =
-    !params.platformCapabilities ? 'loading'
-    : params.fallback === 'social-webview' ? 'social-webview'
-    : 'standard';
+  const screenState: WalletConnectViewModel['screenState'] = !params.platformCapabilities
+    ? 'loading'
+    : params.fallback === 'social-webview'
+      ? 'social-webview'
+      : 'standard';
 
   return {
     screenState,

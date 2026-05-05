@@ -47,10 +47,7 @@ import type {
   WalletId,
   BreachEpisodeId,
 } from '@clmm/domain';
-import {
-  applyDirectionalExitPolicy,
-  evaluateRetryEligibility,
-} from '@clmm/domain';
+import { applyDirectionalExitPolicy, evaluateRetryEligibility } from '@clmm/domain';
 import type { RegimeEngineEventPort } from '../../outbound/regime-engine/types.js';
 import { buildClmmExecutionEvent } from '../../outbound/regime-engine/RegimeEngineExecutionEventAdapter.js';
 import {
@@ -178,11 +175,7 @@ export class ExecutionController {
 
   @Post('approve')
   async approveExecution(
-    @Body() body: {
-      previewId: string;
-      walletId: string;
-      episodeId?: string;
-    },
+    @Body() body: { previewId: string; walletId: string; episodeId?: string },
   ): Promise<{ approval: ExecutionApprovalDto }> {
     try {
       const approval = await requestWalletSignature({
@@ -371,7 +364,10 @@ export class ExecutionController {
       }
     }
 
-    const { references } = await this.submissionPort.submitExecution(signedPayload, plannedStepKinds);
+    const { references } = await this.submissionPort.submitExecution(
+      signedPayload,
+      plannedStepKinds,
+    );
 
     await this.executionRepo.saveAttempt({
       ...attempt,
@@ -395,10 +391,14 @@ export class ExecutionController {
       try {
         await this.reconciliationJobPort.enqueue(attemptId);
       } catch (enqueueError: unknown) {
-        this.observability.log('warn', `Failed to enqueue reconciliation for attempt ${attemptId}; sweep job will retry`, {
-          attemptId,
-          error: enqueueError instanceof Error ? enqueueError.message : String(enqueueError),
-        });
+        this.observability.log(
+          'warn',
+          `Failed to enqueue reconciliation for attempt ${attemptId}; sweep job will retry`,
+          {
+            attemptId,
+            error: enqueueError instanceof Error ? enqueueError.message : String(enqueueError),
+          },
+        );
       }
       return { result: 'pending' as const };
     }
@@ -430,7 +430,10 @@ export class ExecutionController {
       return { result: 'partial' as const, confirmedSteps: reconciliation.confirmedSteps };
     }
 
-    if (reconciliation.finalState.kind === 'confirmed' || reconciliation.finalState.kind === 'failed') {
+    if (
+      reconciliation.finalState.kind === 'confirmed' ||
+      reconciliation.finalState.kind === 'failed'
+    ) {
       const savedAttempt = {
         ...attempt,
         attemptId,
@@ -441,14 +444,24 @@ export class ExecutionController {
       };
       try {
         const policy = applyDirectionalExitPolicy(attempt.breachDirection);
-        const event = buildClmmExecutionEvent(savedAttempt, reconciliation.finalState.kind, this.clock, policy.swapInstruction.toAsset);
+        const event = buildClmmExecutionEvent(
+          savedAttempt,
+          reconciliation.finalState.kind,
+          this.clock,
+          policy.swapInstruction.toAsset,
+        );
         this.regimeEngineEventPort.notifyExecutionEvent(event).catch(() => {});
       } catch {
         // intentional: regime-engine event build/fire must never block the HTTP response
       }
     }
 
-    return { result: reconciliation.finalState.kind === 'confirmed' ? 'confirmed' as const : 'failed' as const };
+    return {
+      result:
+        reconciliation.finalState.kind === 'confirmed'
+          ? ('confirmed' as const)
+          : ('failed' as const),
+    };
   }
 
   @Post(':attemptId/abandon')

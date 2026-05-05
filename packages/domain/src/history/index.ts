@@ -1,8 +1,4 @@
-import type {
-  PositionId,
-  BreachDirection,
-  ClockTimestamp,
-} from '../shared/index.js';
+import type { PositionId, BreachDirection, ClockTimestamp } from '../shared/index.js';
 import type { ExecutionLifecycleState, TransactionReference } from '../execution/index.js';
 
 export type HistoryEventType =

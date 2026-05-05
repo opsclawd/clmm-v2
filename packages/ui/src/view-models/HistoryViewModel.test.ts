@@ -3,7 +3,9 @@ import { buildHistoryViewModel } from './HistoryViewModel.js';
 import { makeClockTimestamp, makePositionId } from '@clmm/application/public';
 import type { HistoryEventDto } from '@clmm/application/public';
 
-function makeEvent(overrides: { eventId: string; occurredAt: number } & Omit<Partial<HistoryEventDto>, 'occurredAt'>): HistoryEventDto {
+function makeEvent(
+  overrides: { eventId: string; occurredAt: number } & Omit<Partial<HistoryEventDto>, 'occurredAt'>,
+): HistoryEventDto {
   const base: HistoryEventDto = {
     eventId: overrides.eventId,
     positionId: overrides.positionId ?? makePositionId('pos-1'),
@@ -42,12 +44,12 @@ describe('HistoryViewModel', () => {
   });
 
   it('includes offChainNote in view-model items', () => {
-    const events: HistoryEventDto[] = [
-      makeEvent({ eventId: 'e1', occurredAt: 1000 }),
-    ];
+    const events: HistoryEventDto[] = [makeEvent({ eventId: 'e1', occurredAt: 1000 })];
 
     const vm = buildHistoryViewModel(events);
-    expect(vm.offChainNote).toBe('off-chain operational history — not an on-chain receipt or attestation');
+    expect(vm.offChainNote).toBe(
+      'off-chain operational history — not an on-chain receipt or attestation',
+    );
   });
 
   it('formats event type from kebab-case to title case', () => {

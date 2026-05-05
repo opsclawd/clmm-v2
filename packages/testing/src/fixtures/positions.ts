@@ -1,10 +1,5 @@
 import type { LiquidityPosition, PoolData, PositionDetail, PriceQuote } from '@clmm/domain';
-import {
-  makePositionId,
-  makeWalletId,
-  makePoolId,
-  makeClockTimestamp,
-} from '@clmm/domain';
+import { makePositionId, makeWalletId, makePoolId, makeClockTimestamp } from '@clmm/domain';
 
 export const FIXTURE_POSITION_ID = makePositionId('fixture-pos-1');
 export const FIXTURE_WALLET_ID = makeWalletId('fixture-wallet-1');

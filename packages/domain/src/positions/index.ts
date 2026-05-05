@@ -10,10 +10,7 @@ export type RangeState =
   | { readonly kind: 'below-range'; readonly currentPrice: number }
   | { readonly kind: 'above-range'; readonly currentPrice: number };
 
-export function evaluateRangeState(
-  bounds: RangeBounds,
-  currentPrice: number,
-): RangeState {
+export function evaluateRangeState(bounds: RangeBounds, currentPrice: number): RangeState {
   if (currentPrice < bounds.lowerBound) {
     return { kind: 'below-range', currentPrice };
   }

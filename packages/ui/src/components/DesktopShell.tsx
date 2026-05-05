@@ -20,28 +20,36 @@ export function DesktopShell({ children, title }: Props): JSX.Element {
   }
 
   return (
-    <View style={{
-      flex: 1,
-      backgroundColor: colors.background,
-      alignItems: 'center',
-    }}>
-      <View style={{
-        width: '100%',
-        maxWidth: 480,
+    <View
+      style={{
         flex: 1,
-      }}>
+        backgroundColor: colors.background,
+        alignItems: 'center',
+      }}
+    >
+      <View
+        style={{
+          width: '100%',
+          maxWidth: 480,
+          flex: 1,
+        }}
+      >
         {title ? (
-          <View style={{
-            paddingHorizontal: 16,
-            paddingVertical: 12,
-            borderBottomWidth: 1,
-            borderBottomColor: colors.border,
-          }}>
-            <Text style={{
-              color: colors.text,
-              fontSize: typography.fontSize.lg,
-              fontWeight: typography.fontWeight.bold,
-            }}>
+          <View
+            style={{
+              paddingHorizontal: 16,
+              paddingVertical: 12,
+              borderBottomWidth: 1,
+              borderBottomColor: colors.border,
+            }}
+          >
+            <Text
+              style={{
+                color: colors.text,
+                fontSize: typography.fontSize.lg,
+                fontWeight: typography.fontWeight.bold,
+              }}
+            >
               {title}
             </Text>
           </View>

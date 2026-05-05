@@ -1,7 +1,6 @@
 import type { ClockTimestamp } from '@clmm/domain';
 
-const BASE58_ALPHABET =
-  '123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz';
+const BASE58_ALPHABET = '123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz';
 const BASE58_MAP: Record<string, number> = {};
 for (let i = 0; i < BASE58_ALPHABET.length; i++) {
   BASE58_MAP[BASE58_ALPHABET.charAt(i)] = i;
@@ -30,9 +29,7 @@ export function base58ToBuffer(str: string, expectedLength: number): Uint8Array 
   }
   const total = leadingZeros + bodyBytes.length;
   if (total !== expectedLength) {
-    throw new Error(
-      `Invalid base58 payload: decoded ${total} bytes, expected ${expectedLength}`,
-    );
+    throw new Error(`Invalid base58 payload: decoded ${total} bytes, expected ${expectedLength}`);
   }
   const out = new Uint8Array(expectedLength);
   out.set(bodyBytes, leadingZeros);
@@ -71,14 +68,13 @@ export async function verifyWalletSignature(params: {
       crv: 'Ed25519',
       x: bytesToBase64Url(publicKey),
     };
-    const cryptoKey = await subtle.importKey(
-      'jwk',
-      jwk,
+    const cryptoKey = await subtle.importKey('jwk', jwk, { name: 'Ed25519' }, false, ['verify']);
+    return await subtle.verify(
       { name: 'Ed25519' },
-      false,
-      ['verify'],
+      cryptoKey,
+      signature as Uint8Array<ArrayBuffer>,
+      messageBytes,
     );
-    return await subtle.verify({ name: 'Ed25519' }, cryptoKey, signature as Uint8Array<ArrayBuffer>, messageBytes);
   } catch {
     return false;
   }

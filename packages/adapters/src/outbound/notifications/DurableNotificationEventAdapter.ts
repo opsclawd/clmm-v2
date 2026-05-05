@@ -1,5 +1,11 @@
 import type { NotificationPort, IdGeneratorPort } from '@clmm/application';
-import type { WalletId, PositionId, BreachDirection, ClockTimestamp, ExitTriggerId } from '@clmm/domain';
+import type {
+  WalletId,
+  PositionId,
+  BreachDirection,
+  ClockTimestamp,
+  ExitTriggerId,
+} from '@clmm/domain';
 import type { Db } from '../storage/db.js';
 import { notificationEvents } from '../storage/schema/index.js';
 

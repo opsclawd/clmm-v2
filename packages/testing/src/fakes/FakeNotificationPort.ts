@@ -1,5 +1,11 @@
 import type { NotificationPort } from '@clmm/application';
-import type { WalletId, PositionId, BreachDirection, ClockTimestamp, ExitTriggerId } from '@clmm/domain';
+import type {
+  WalletId,
+  PositionId,
+  BreachDirection,
+  ClockTimestamp,
+  ExitTriggerId,
+} from '@clmm/domain';
 import { makeClockTimestamp } from '@clmm/domain';
 
 export class FakeNotificationPort implements NotificationPort {

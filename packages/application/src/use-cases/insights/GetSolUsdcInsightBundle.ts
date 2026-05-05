@@ -5,10 +5,7 @@ import type {
   PricePort,
   SrLevelsReadPort,
 } from '../../ports/index.js';
-import type {
-  SolUsdcInsightInputBundleDto,
-  InsightDataWarning,
-} from '../../dto/index.js';
+import type { SolUsdcInsightInputBundleDto, InsightDataWarning } from '../../dto/index.js';
 import { getSolUsdcInsightPoolSnapshot } from './GetSolUsdcInsightPoolSnapshot.js';
 import { getSolUsdcInsightPositions } from './GetSolUsdcInsightPositions.js';
 
@@ -51,7 +48,8 @@ export async function getSolUsdcInsightBundle(params: {
     now,
   });
   if (positionsResult.kind === 'pool-unavailable') return { kind: 'pool-unavailable' };
-  if (positionsResult.kind === 'position-list-unavailable') return { kind: 'position-list-unavailable' };
+  if (positionsResult.kind === 'position-list-unavailable')
+    return { kind: 'position-list-unavailable' };
   if (positionsResult.kind === 'position-detail-unavailable') {
     return { kind: 'position-detail-unavailable', positionId: positionsResult.positionId };
   }
@@ -80,9 +78,10 @@ export async function getSolUsdcInsightBundle(params: {
     bundle: {
       pair: 'SOL/USDC',
       source: 'orca',
-      observedAtUnixMs: snapshot.positions.length > 0
-        ? snapshot.positions[0]!.observedAtUnixMs
-        : poolResult.pool.observedAtUnixMs,
+      observedAtUnixMs:
+        snapshot.positions.length > 0
+          ? snapshot.positions[0]!.observedAtUnixMs
+          : poolResult.pool.observedAtUnixMs,
       pool: poolResult.pool,
       srLevels,
       positions: snapshot.positions,

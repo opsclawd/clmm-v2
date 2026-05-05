@@ -54,7 +54,10 @@ export class ReconciliationJobHandler {
     }
 
     if (attempt.lifecycleState.kind !== 'submitted') {
-      this.observability.log('warn', `Reconciliation: attempt ${data.attemptId} not in submitted state (${attempt.lifecycleState.kind})`);
+      this.observability.log(
+        'warn',
+        `Reconciliation: attempt ${data.attemptId} not in submitted state (${attempt.lifecycleState.kind})`,
+      );
       return;
     }
 
@@ -70,27 +73,44 @@ export class ReconciliationJobHandler {
         ids: this.ids,
       });
 
-      this.observability.log('info', `Reconciliation result for ${data.attemptId}: ${result.kind}`, {
-        attemptId: data.attemptId,
-        result: result.kind,
-      });
+      this.observability.log(
+        'info',
+        `Reconciliation result for ${data.attemptId}: ${result.kind}`,
+        {
+          attemptId: data.attemptId,
+          result: result.kind,
+        },
+      );
 
       if (result.kind === 'confirmed' || result.kind === 'failed') {
         try {
           const updatedAttempt = await this.executionRepo.getAttempt(data.attemptId);
           if (!updatedAttempt) {
-            this.observability.log('warn', `RegimeEngine: attempt ${data.attemptId} not found after reconciliation, skipping event`, {
-              attemptId: data.attemptId,
-            });
+            this.observability.log(
+              'warn',
+              `RegimeEngine: attempt ${data.attemptId} not found after reconciliation, skipping event`,
+              {
+                attemptId: data.attemptId,
+              },
+            );
           } else {
-            const event = buildClmmExecutionEvent(updatedAttempt, result.kind, this.clock, applyDirectionalExitPolicy(updatedAttempt.breachDirection).swapInstruction.toAsset);
+            const event = buildClmmExecutionEvent(
+              updatedAttempt,
+              result.kind,
+              this.clock,
+              applyDirectionalExitPolicy(updatedAttempt.breachDirection).swapInstruction.toAsset,
+            );
             await this.regimeEngineEventPort.notifyExecutionEvent(event);
           }
         } catch (adapterError: unknown) {
-          this.observability.log('error', `RegimeEngine: failed to notify execution event for ${data.attemptId}`, {
-            attemptId: data.attemptId,
-            error: adapterError instanceof Error ? adapterError.message : String(adapterError),
-          });
+          this.observability.log(
+            'error',
+            `RegimeEngine: failed to notify execution event for ${data.attemptId}`,
+            {
+              attemptId: data.attemptId,
+              error: adapterError instanceof Error ? adapterError.message : String(adapterError),
+            },
+          );
         }
       }
     } catch (error: unknown) {

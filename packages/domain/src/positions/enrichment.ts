@@ -4,9 +4,7 @@ export function whirlpoolFeeRateToBps(feeRateHundredths: number): number {
 
 export function formatFeeRateLabel(feeRateHundredths: number): string {
   const bps = whirlpoolFeeRateToBps(feeRateHundredths);
-  const formatted = Number.isInteger(bps)
-    ? String(bps)
-    : bps.toFixed(2).replace(/\.?0+$/, '');
+  const formatted = Number.isInteger(bps) ? String(bps) : bps.toFixed(2).replace(/\.?0+$/, '');
   return `${formatted} bps`;
 }
 
@@ -23,11 +21,7 @@ export function priceFromSqrtPrice(
   return price * decimalShift;
 }
 
-export function tickToPrice(
-  tickIndex: number,
-  decimalsA: number,
-  decimalsB: number,
-): number {
+export function tickToPrice(tickIndex: number, decimalsA: number, decimalsB: number): number {
   const price = Math.pow(1.0001, tickIndex);
   const decimalShift = 10 ** (decimalsA - decimalsB);
   return price * decimalShift;
@@ -53,11 +47,7 @@ export function rangeDistancePercent(
   return { belowLowerPercent: 0, aboveUpperPercent };
 }
 
-export function tokenAmountToUsd(
-  amount: bigint,
-  decimals: number,
-  usdPrice: number,
-): number {
+export function tokenAmountToUsd(amount: bigint, decimals: number, usdPrice: number): number {
   if (amount === 0n || usdPrice === 0) return 0;
 
   const priceScale = 100_000_000; // 8 decimal places for usdPrice

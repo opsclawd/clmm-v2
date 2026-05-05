@@ -6,7 +6,8 @@ import type { ExecutionRepository, ObservabilityPort } from '@clmm/application';
 import type { PgBoss } from 'pg-boss';
 
 class FakeObservabilityPort {
-  logs: Array<{ level: string; message: string; context?: Record<string, unknown> | undefined }> = [];
+  logs: Array<{ level: string; message: string; context?: Record<string, unknown> | undefined }> =
+    [];
 
   log(level: string, message: string, context?: Record<string, unknown>): void {
     this.logs.push({ level, message, ...(context !== undefined ? { context } : {}) });
@@ -122,7 +123,11 @@ describe('SubmittedAttemptSweepHandler', () => {
 
     expect(boss.sentJobs).toHaveLength(1);
     // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
-    const errorLog = expect.objectContaining({ level: 'error', message: expect.stringContaining('attempt-1') });
+    const errorLog = expect.objectContaining({
+      level: 'error',
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
+      message: expect.stringContaining('attempt-1'),
+    });
     expect(observability.logs).toContainEqual(errorLog);
   });
 });

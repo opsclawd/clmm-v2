@@ -44,8 +44,9 @@ describe('parseReturnTo', () => {
   });
 
   it('decodes and returns a valid path with query string', () => {
-    expect(parseReturnTo(encodeURIComponent('/preview/abc?triggerId=xyz')))
-      .toBe('/preview/abc?triggerId=xyz');
+    expect(parseReturnTo(encodeURIComponent('/preview/abc?triggerId=xyz'))).toBe(
+      '/preview/abc?triggerId=xyz',
+    );
   });
 
   it('returns fallback for a path that does not start with /', () => {

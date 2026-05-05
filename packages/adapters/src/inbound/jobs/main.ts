@@ -7,11 +7,13 @@ import { checkSchemaReadiness } from '../../outbound/storage/SchemaReadiness.js'
 export async function bootstrap(): Promise<void> {
   const dbUrl = (process.env as Record<string, string | undefined>)['DATABASE_URL'];
   if (dbUrl == null || dbUrl === '') {
-    console.error(JSON.stringify({
-      level: 'fatal',
-      message: 'Worker: DATABASE_URL not set',
-      timestamp: new Date().toISOString(),
-    }));
+    console.error(
+      JSON.stringify({
+        level: 'fatal',
+        message: 'Worker: DATABASE_URL not set',
+        timestamp: new Date().toISOString(),
+      }),
+    );
     process.exit(1);
     return;
   }
@@ -22,22 +24,26 @@ export async function bootstrap(): Promise<void> {
     readiness = await checkSchemaReadiness(gateDb, schema);
   } catch (error: unknown) {
     const message = error instanceof Error ? error.message : String(error);
-    console.error(JSON.stringify({
-      level: 'fatal',
-      message: 'Worker: schema readiness check failed; refusing to start',
-      error: message,
-      timestamp: new Date().toISOString(),
-    }));
+    console.error(
+      JSON.stringify({
+        level: 'fatal',
+        message: 'Worker: schema readiness check failed; refusing to start',
+        error: message,
+        timestamp: new Date().toISOString(),
+      }),
+    );
     process.exit(1);
     return;
   }
   if (!readiness.ready) {
-    console.error(JSON.stringify({
-      level: 'fatal',
-      message: 'Worker: schema readiness check failed; refusing to start',
-      missing: readiness.missing,
-      timestamp: new Date().toISOString(),
-    }));
+    console.error(
+      JSON.stringify({
+        level: 'fatal',
+        message: 'Worker: schema readiness check failed; refusing to start',
+        missing: readiness.missing,
+        timestamp: new Date().toISOString(),
+      }),
+    );
     process.exit(1);
     return;
   }

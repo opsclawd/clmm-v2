@@ -1,7 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import {
-  makeWalletId,
-} from '@clmm/domain';
+import { makeWalletId } from '@clmm/domain';
 import {
   scanPositionsForBreaches,
   qualifyActionableTrigger,
@@ -49,16 +47,34 @@ describe('Interrupted-Session Resume Smoke Scenario', () => {
     const historyRepo = new FakeExecutionHistoryRepository();
 
     return {
-      walletId, clock, ids, positionRead, episodeRepo, swapQuote,
-      executionRepo, prepPort, signingPort, submissionPort, historyRepo,
+      walletId,
+      clock,
+      ids,
+      positionRead,
+      episodeRepo,
+      swapQuote,
+      executionRepo,
+      prepPort,
+      signingPort,
+      submissionPort,
+      historyRepo,
     };
   }
 
   it('interrupted signing session is resumable and can complete after re-approval', async () => {
     const fakes = buildFakes();
     const {
-      walletId, clock, ids, positionRead, episodeRepo, swapQuote,
-      executionRepo, prepPort, signingPort, submissionPort, historyRepo,
+      walletId,
+      clock,
+      ids,
+      positionRead,
+      episodeRepo,
+      swapQuote,
+      executionRepo,
+      prepPort,
+      signingPort,
+      submissionPort,
+      historyRepo,
     } = fakes;
 
     // 1. Scan — detect below-range position
@@ -162,8 +178,17 @@ describe('Interrupted-Session Resume Smoke Scenario', () => {
   it('interrupted attempt is distinct from declined (abandoned) attempt', async () => {
     const fakes = buildFakes();
     const {
-      walletId, clock, ids, positionRead, episodeRepo, swapQuote,
-      executionRepo, prepPort, signingPort, submissionPort, historyRepo,
+      walletId,
+      clock,
+      ids,
+      positionRead,
+      episodeRepo,
+      swapQuote,
+      executionRepo,
+      prepPort,
+      signingPort,
+      submissionPort,
+      historyRepo,
     } = fakes;
 
     // 1. Scan — detect below-range position

@@ -1,19 +1,15 @@
 import { describe, it, expect } from 'vitest';
 import { getSolUsdcInsightPoolSnapshot } from './GetSolUsdcInsightPoolSnapshot.js';
-import {
-  FakeSupportedPositionReadPort,
-  FIXTURE_POOL_DATA,
-} from '@clmm/testing';
+import { FakeSupportedPositionReadPort, FIXTURE_POOL_DATA } from '@clmm/testing';
 import { makePoolId } from '@clmm/domain';
 
 const SOL_USDC_POOL_ID = makePoolId('Czfq3xZZDmsdGdUyrNLtRhGc47cXcZtLG4crryfu44zE');
 
 describe('getSolUsdcInsightPoolSnapshot', () => {
   it('returns ok with a populated SOL/USDC pool snapshot', async () => {
-    const positionReadPort = new FakeSupportedPositionReadPort(
-      [],
-      { [SOL_USDC_POOL_ID]: { ...FIXTURE_POOL_DATA, poolId: SOL_USDC_POOL_ID } },
-    );
+    const positionReadPort = new FakeSupportedPositionReadPort([], {
+      [SOL_USDC_POOL_ID]: { ...FIXTURE_POOL_DATA, poolId: SOL_USDC_POOL_ID },
+    });
     const result = await getSolUsdcInsightPoolSnapshot({
       poolId: SOL_USDC_POOL_ID,
       positionReadPort,
@@ -51,7 +47,9 @@ describe('getSolUsdcInsightPoolSnapshot', () => {
       listSupportedPositions: async () => [],
       getPosition: async () => null,
       getPositionDetail: async () => null,
-      getPoolData: async () => { throw new Error('rpc timeout'); },
+      getPoolData: async () => {
+        throw new Error('rpc timeout');
+      },
     } as unknown as FakeSupportedPositionReadPort;
     const result = await getSolUsdcInsightPoolSnapshot({
       poolId: SOL_USDC_POOL_ID,
@@ -67,10 +65,9 @@ describe('getSolUsdcInsightPoolSnapshot', () => {
       poolId: SOL_USDC_POOL_ID,
       tokenPair: { ...FIXTURE_POOL_DATA.tokenPair, decimalsA: null, decimalsB: null },
     };
-    const positionReadPort = new FakeSupportedPositionReadPort(
-      [],
-      { [SOL_USDC_POOL_ID]: noDecimalsPool },
-    );
+    const positionReadPort = new FakeSupportedPositionReadPort([], {
+      [SOL_USDC_POOL_ID]: noDecimalsPool,
+    });
     const result = await getSolUsdcInsightPoolSnapshot({
       poolId: SOL_USDC_POOL_ID,
       positionReadPort,

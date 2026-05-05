@@ -43,7 +43,9 @@ describe('CurrentSrLevelsAdapter', () => {
   });
 
   it('returns sorted SrLevelsBlock on happy path', async () => {
-    vi.mocked(fetch).mockResolvedValue(new Response(JSON.stringify(SAMPLE_RESPONSE), { status: 200 }));
+    vi.mocked(fetch).mockResolvedValue(
+      new Response(JSON.stringify(SAMPLE_RESPONSE), { status: 200 }),
+    );
 
     const adapter = new CurrentSrLevelsAdapter('https://regime.example.com', obs.port);
     const result = await adapter.fetchCurrent('SOL/USDC', 'mco');
@@ -58,7 +60,9 @@ describe('CurrentSrLevelsAdapter', () => {
   });
 
   it('URL-encodes symbol and source parameters', async () => {
-    vi.mocked(fetch).mockResolvedValue(new Response(JSON.stringify(SAMPLE_RESPONSE), { status: 200 }));
+    vi.mocked(fetch).mockResolvedValue(
+      new Response(JSON.stringify(SAMPLE_RESPONSE), { status: 200 }),
+    );
 
     const adapter = new CurrentSrLevelsAdapter('https://regime.example.com', obs.port);
     await adapter.fetchCurrent('SOL/USDC', 'mco');
@@ -69,7 +73,9 @@ describe('CurrentSrLevelsAdapter', () => {
   });
 
   it('strips trailing slash from baseUrl to avoid double-slash path', async () => {
-    vi.mocked(fetch).mockResolvedValue(new Response(JSON.stringify(SAMPLE_RESPONSE), { status: 200 }));
+    vi.mocked(fetch).mockResolvedValue(
+      new Response(JSON.stringify(SAMPLE_RESPONSE), { status: 200 }),
+    );
 
     const adapter = new CurrentSrLevelsAdapter('https://regime.example.com/', obs.port);
     await adapter.fetchCurrent('SOL/USDC', 'mco');
@@ -80,7 +86,9 @@ describe('CurrentSrLevelsAdapter', () => {
   });
 
   it('does not send auth headers (public read)', async () => {
-    vi.mocked(fetch).mockResolvedValue(new Response(JSON.stringify(SAMPLE_RESPONSE), { status: 200 }));
+    vi.mocked(fetch).mockResolvedValue(
+      new Response(JSON.stringify(SAMPLE_RESPONSE), { status: 200 }),
+    );
 
     const adapter = new CurrentSrLevelsAdapter('https://regime.example.com', obs.port);
     await adapter.fetchCurrent('SOL/USDC', 'mco');
@@ -91,7 +99,9 @@ describe('CurrentSrLevelsAdapter', () => {
 
   it('returns block with empty arrays when supports/resistances are empty', async () => {
     const emptyResponse = { ...SAMPLE_RESPONSE, supports: [], resistances: [] };
-    vi.mocked(fetch).mockResolvedValue(new Response(JSON.stringify(emptyResponse), { status: 200 }));
+    vi.mocked(fetch).mockResolvedValue(
+      new Response(JSON.stringify(emptyResponse), { status: 200 }),
+    );
 
     const adapter = new CurrentSrLevelsAdapter('https://regime.example.com', obs.port);
     const result = await adapter.fetchCurrent('SOL/USDC', 'mco');
@@ -107,7 +117,9 @@ describe('CurrentSrLevelsAdapter', () => {
       supports: [{ price: 300 }, { price: 100 }, { price: 200 }],
       resistances: [{ price: 600 }, { price: 400 }, { price: 500 }],
     };
-    vi.mocked(fetch).mockResolvedValue(new Response(JSON.stringify(unsortedResponse), { status: 200 }));
+    vi.mocked(fetch).mockResolvedValue(
+      new Response(JSON.stringify(unsortedResponse), { status: 200 }),
+    );
 
     const adapter = new CurrentSrLevelsAdapter('https://regime.example.com', obs.port);
     const result = await adapter.fetchCurrent('SOL/USDC', 'mco');
@@ -161,7 +173,9 @@ describe('CurrentSrLevelsAdapter', () => {
   });
 
   it('returns null and logs warn on wrong shape JSON', async () => {
-    vi.mocked(fetch).mockResolvedValue(new Response(JSON.stringify({ unexpected: true }), { status: 200 }));
+    vi.mocked(fetch).mockResolvedValue(
+      new Response(JSON.stringify({ unexpected: true }), { status: 200 }),
+    );
 
     const adapter = new CurrentSrLevelsAdapter('https://regime.example.com', obs.port);
     const result = await adapter.fetchCurrent('SOL/USDC', 'mco');
@@ -198,7 +212,9 @@ describe('CurrentSrLevelsAdapter', () => {
 
   it('returns null on invalid capturedAtIso producing NaN Date.parse', async () => {
     const badDateResponse = { ...SAMPLE_RESPONSE, capturedAtIso: 'not-a-date' };
-    vi.mocked(fetch).mockResolvedValue(new Response(JSON.stringify(badDateResponse), { status: 200 }));
+    vi.mocked(fetch).mockResolvedValue(
+      new Response(JSON.stringify(badDateResponse), { status: 200 }),
+    );
 
     const adapter = new CurrentSrLevelsAdapter('https://regime.example.com', obs.port);
     const result = await adapter.fetchCurrent('SOL/USDC', 'mco');
@@ -210,7 +226,9 @@ describe('CurrentSrLevelsAdapter', () => {
 
   it('returns null when supports contains non-numeric price', async () => {
     const badPriceResponse = { ...SAMPLE_RESPONSE, supports: [{ price: 'not-a-number' }] };
-    vi.mocked(fetch).mockResolvedValue(new Response(JSON.stringify(badPriceResponse), { status: 200 }));
+    vi.mocked(fetch).mockResolvedValue(
+      new Response(JSON.stringify(badPriceResponse), { status: 200 }),
+    );
 
     const adapter = new CurrentSrLevelsAdapter('https://regime.example.com', obs.port);
     const result = await adapter.fetchCurrent('SOL/USDC', 'mco');
@@ -222,7 +240,9 @@ describe('CurrentSrLevelsAdapter', () => {
 
   it('returns null when resistances contains non-object entry', async () => {
     const badEntryResponse = { ...SAMPLE_RESPONSE, resistances: ['not-an-object'] };
-    vi.mocked(fetch).mockResolvedValue(new Response(JSON.stringify(badEntryResponse), { status: 200 }));
+    vi.mocked(fetch).mockResolvedValue(
+      new Response(JSON.stringify(badEntryResponse), { status: 200 }),
+    );
 
     const adapter = new CurrentSrLevelsAdapter('https://regime.example.com', obs.port);
     const result = await adapter.fetchCurrent('SOL/USDC', 'mco');
@@ -241,6 +261,12 @@ describe('CurrentSrLevelsAdapter', () => {
     const result = await adapter.fetchCurrent('SOL/USDC', 'mco');
 
     expect(result).not.toBeNull();
-    expect(result!.supports[0]).toEqual({ price: 90, rank: 'S1', timeframe: '4h', invalidation: 85, notes: 'strong' });
+    expect(result!.supports[0]).toEqual({
+      price: 90,
+      rank: 'S1',
+      timeframe: '4h',
+      invalidation: 85,
+      notes: 'strong',
+    });
   });
 });

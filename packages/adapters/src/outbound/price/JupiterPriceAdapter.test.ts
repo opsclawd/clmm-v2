@@ -67,18 +67,14 @@ describe('JupiterPriceAdapter', () => {
     mockFetch(() => jsonRes({}, 429));
 
     const adapter = new JupiterPriceAdapter();
-    await expect(adapter.getPrices([SOL_MINT])).rejects.toThrow(
-      'price API error 429',
-    );
+    await expect(adapter.getPrices([SOL_MINT])).rejects.toThrow('price API error 429');
   });
 
   it('throws on 5xx responses', async () => {
     mockFetch(() => jsonRes({}, 503));
 
     const adapter = new JupiterPriceAdapter();
-    await expect(adapter.getPrices([SOL_MINT])).rejects.toThrow(
-      'price API error 503',
-    );
+    await expect(adapter.getPrices([SOL_MINT])).rejects.toThrow('price API error 503');
   });
 
   it('fetches only uncached mints on partial cache miss', async () => {

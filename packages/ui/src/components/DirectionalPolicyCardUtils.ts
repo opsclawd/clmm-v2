@@ -8,9 +8,7 @@ export type DirectionalPolicyText = {
   policyReason: string;
 };
 
-export function renderDirectionalPolicyText(
-  direction: BreachDirection,
-): DirectionalPolicyText {
+export function renderDirectionalPolicyText(direction: BreachDirection): DirectionalPolicyText {
   const policy = applyDirectionalExitPolicy(direction);
 
   const directionLabel =

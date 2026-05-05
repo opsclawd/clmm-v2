@@ -6,7 +6,15 @@ import type { WalletConnectViewModel } from '../view-models/WalletConnectionView
 import type { WalletConnectActions } from '../components/WalletConnectionUtils.js';
 
 vi.mock('@expo/vector-icons/Feather', () => ({
-  default: function MockFeather({ name, size, color }: { name: string; size: number; color: string }) {
+  default: function MockFeather({
+    name,
+    size,
+    color,
+  }: {
+    name: string;
+    size: number;
+    color: string;
+  }) {
     return <span data-testid="feather-icon" data-name={name} data-size={size} data-color={color} />;
   },
   glyphMap: {},
@@ -89,10 +97,7 @@ describe('WalletConnectScreen', () => {
 
   it('renders native wallet button when available', () => {
     render(
-      <WalletConnectScreen
-        vm={makeVm({ nativeWalletAvailable: true })}
-        actions={makeActions()}
-      />,
+      <WalletConnectScreen vm={makeVm({ nativeWalletAvailable: true })} actions={makeActions()} />,
     );
     expect(screen.getByText('Connect Mobile Wallet')).toBeTruthy();
   });
@@ -111,10 +116,7 @@ describe('WalletConnectScreen', () => {
 
   it('renders discovery indicator when discovering', () => {
     render(
-      <WalletConnectScreen
-        vm={makeVm({ discovery: 'discovering' })}
-        actions={makeActions()}
-      />,
+      <WalletConnectScreen vm={makeVm({ discovery: 'discovering' })} actions={makeActions()} />,
     );
     expect(screen.getByText('Detecting browser wallets...')).toBeTruthy();
   });
@@ -124,9 +126,7 @@ describe('WalletConnectScreen', () => {
       <WalletConnectScreen
         vm={makeVm({
           discovery: 'ready',
-          discoveredWallets: [
-            { id: 'phantom', name: 'Phantom', icon: null },
-          ],
+          discoveredWallets: [{ id: 'phantom', name: 'Phantom', icon: null }],
         })}
         actions={makeActions()}
       />,
@@ -140,9 +140,7 @@ describe('WalletConnectScreen', () => {
       <WalletConnectScreen
         vm={makeVm({
           discovery: 'ready',
-          discoveredWallets: [
-            { id: 'phantom', name: 'Phantom', icon: null },
-          ],
+          discoveredWallets: [{ id: 'phantom', name: 'Phantom', icon: null }],
         })}
         actions={makeActions({ onSelectDiscoveredWallet })}
       />,
@@ -152,12 +150,7 @@ describe('WalletConnectScreen', () => {
   });
 
   it('renders fallback browser wallet button on discovery timeout', () => {
-    render(
-      <WalletConnectScreen
-        vm={makeVm({ discovery: 'timed-out' })}
-        actions={makeActions()}
-      />,
-    );
+    render(<WalletConnectScreen vm={makeVm({ discovery: 'timed-out' })} actions={makeActions()} />);
     expect(screen.getByText('Connect Browser Wallet')).toBeTruthy();
   });
 
@@ -228,7 +221,11 @@ describe('WalletConnectScreen', () => {
       <WalletConnectScreen
         vm={makeVm({
           screenState: 'social-webview',
-          outcomeDisplay: { title: 'Connection Failed', detail: 'Capability probe failed', severity: 'error' },
+          outcomeDisplay: {
+            title: 'Connection Failed',
+            detail: 'Capability probe failed',
+            severity: 'error',
+          },
         })}
         actions={makeActions()}
       />,
@@ -252,10 +249,7 @@ describe('WalletConnectScreen', () => {
 
   it('renders wallet fallback with deep links', () => {
     render(
-      <WalletConnectScreen
-        vm={makeVm({ fallback: 'wallet-fallback' })}
-        actions={makeActions()}
-      />,
+      <WalletConnectScreen vm={makeVm({ fallback: 'wallet-fallback' })} actions={makeActions()} />,
     );
     expect(screen.getByText('No wallet extension detected in this browser.')).toBeTruthy();
   });

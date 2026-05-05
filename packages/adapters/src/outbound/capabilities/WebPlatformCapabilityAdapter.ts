@@ -12,7 +12,9 @@ async function hasWalletStandardWallet(): Promise<boolean> {
     if (typeof (globalThis as Record<string, unknown>)['window'] === 'undefined') return false;
     const walletStandardModuleName = '@wallet-standard/app';
     // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
-    const walletStandard: Record<string, unknown> = await import(walletStandardModuleName) as Record<string, unknown>;
+    const walletStandard: Record<string, unknown> = (await import(
+      walletStandardModuleName
+    )) as Record<string, unknown>;
     const getWalletsFn = walletStandard['getWallets'] as WalletStandardGetWallets | undefined;
     if (typeof getWalletsFn !== 'function') return false;
     const wallets = getWalletsFn().get() as WalletStandardWallet[];
@@ -47,8 +49,7 @@ function isAndroidChromeLike(): boolean {
 export class WebPlatformCapabilityAdapter implements PlatformCapabilityPort {
   async getCapabilities(): Promise<PlatformCapabilityState> {
     const isMobileWeb =
-      typeof navigator !== 'undefined' &&
-      /Mobile|Android|iPhone/i.test(navigator.userAgent);
+      typeof navigator !== 'undefined' && /Mobile|Android|iPhone/i.test(navigator.userAgent);
 
     const walletStandardAvailable = await hasWalletStandardWallet();
     const legacyInjectedAvailable = hasLegacyInjectedSolanaProvider();

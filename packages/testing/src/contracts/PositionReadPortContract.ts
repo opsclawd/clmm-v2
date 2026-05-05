@@ -6,9 +6,7 @@ import { describe, it, expect } from 'vitest';
 import type { SupportedPositionReadPort } from '@clmm/application';
 import { makeWalletId, makePositionId, makePoolId } from '@clmm/domain';
 
-export function runPositionReadPortContract(
-  factory: () => SupportedPositionReadPort,
-): void {
+export function runPositionReadPortContract(factory: () => SupportedPositionReadPort): void {
   describe('SupportedPositionReadPort contract', () => {
     it('returns an array from listSupportedPositions (may be empty)', async () => {
       const port = factory();
@@ -37,14 +35,26 @@ export function runPositionReadPortContract(
 
     it('implements getPositionDetail returning PositionDetail or null', async () => {
       const port = factory();
-      const result = await port.getPositionDetail(makeWalletId('test-wallet'), makePositionId('test-pos'));
-      expect(result === null || (typeof result === 'object' && 'position' in result && 'poolData' in result && 'fees' in result)).toBe(true);
+      const result = await port.getPositionDetail(
+        makeWalletId('test-wallet'),
+        makePositionId('test-pos'),
+      );
+      expect(
+        result === null ||
+          (typeof result === 'object' &&
+            'position' in result &&
+            'poolData' in result &&
+            'fees' in result),
+      ).toBe(true);
     });
 
     it('implements getPoolData returning PoolData or null', async () => {
       const port = factory();
       const result = await port.getPoolData(makePoolId('test-pool'));
-      expect(result === null || (typeof result === 'object' && 'tokenPair' in result && 'sqrtPrice' in result)).toBe(true);
+      expect(
+        result === null ||
+          (typeof result === 'object' && 'tokenPair' in result && 'sqrtPrice' in result),
+      ).toBe(true);
     });
   });
 }

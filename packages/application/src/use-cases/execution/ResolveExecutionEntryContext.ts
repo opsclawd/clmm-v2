@@ -43,7 +43,10 @@ export function resolveExecutionEntryContext(params: {
 
     default: {
       const _exhaustive: never = metadata.kind;
-      return { kind: 'degraded-recovery', reason: `Unhandled deep link kind: ${String(_exhaustive)}` };
+      return {
+        kind: 'degraded-recovery',
+        reason: `Unhandled deep link kind: ${String(_exhaustive)}`,
+      };
     }
   }
 }

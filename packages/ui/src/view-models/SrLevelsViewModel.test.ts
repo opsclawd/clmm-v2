@@ -45,10 +45,7 @@ describe('buildSrLevelsViewModelBlock', () => {
 
   it('clamps negative age to 1m ago when capturedAtUnixMs is in the future', () => {
     const now = 1_700_000;
-    const vm = buildSrLevelsViewModelBlock(
-      makeBlock({ capturedAtUnixMs: now + 300_000 }),
-      now,
-    );
+    const vm = buildSrLevelsViewModelBlock(makeBlock({ capturedAtUnixMs: now + 300_000 }), now);
 
     expect(vm.freshnessLabel).toBe('AI · MCO · 1m ago');
     expect(vm.isStale).toBe(false);

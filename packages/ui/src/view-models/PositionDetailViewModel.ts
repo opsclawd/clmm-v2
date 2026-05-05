@@ -23,7 +23,6 @@ export type PositionDetailViewModel = {
   breachDirectionLabel?: string;
 };
 
-
 function formatTokenAmount(raw: string, decimals: number | null, symbol: string): string {
   if (decimals === null) return `${raw} (unknown decimals) ${symbol}`;
   if (decimals === 0) return `${raw} ${symbol}`;
@@ -37,7 +36,10 @@ function formatTokenAmount(raw: string, decimals: number | null, symbol: string)
   return `${whole}.${fraction.padEnd(fractionalDigits, '0')} ${symbol}`;
 }
 
-function rangeDistanceLabel(distance: { belowLowerPercent: number; aboveUpperPercent: number }): string {
+function rangeDistanceLabel(distance: {
+  belowLowerPercent: number;
+  aboveUpperPercent: number;
+}): string {
   if (distance.belowLowerPercent > 0) {
     return `${distance.belowLowerPercent.toFixed(1)}% below lower bound`;
   }
@@ -50,15 +52,19 @@ function rangeDistanceLabel(distance: { belowLowerPercent: number; aboveUpperPer
 export function buildPositionDetailViewModel(dto: PositionDetailDto): PositionDetailViewModel {
   const badge = getRangeStatusBadgeProps(dto.rangeState);
 
-  const unclaimedFeesLabel = dto.unclaimedFees.totalUsd > 0
-    ? `$${dto.unclaimedFees.totalUsd.toFixed(2)} in unclaimed fees`
-    : `${formatTokenAmount(dto.unclaimedFees.feeOwedA.raw, dto.unclaimedFees.feeOwedA.decimals, dto.unclaimedFees.feeOwedA.symbol)} + ${formatTokenAmount(dto.unclaimedFees.feeOwedB.raw, dto.unclaimedFees.feeOwedB.decimals, dto.unclaimedFees.feeOwedB.symbol)} unclaimed`;
+  const unclaimedFeesLabel =
+    dto.unclaimedFees.totalUsd > 0
+      ? `$${dto.unclaimedFees.totalUsd.toFixed(2)} in unclaimed fees`
+      : `${formatTokenAmount(dto.unclaimedFees.feeOwedA.raw, dto.unclaimedFees.feeOwedA.decimals, dto.unclaimedFees.feeOwedA.symbol)} + ${formatTokenAmount(dto.unclaimedFees.feeOwedB.raw, dto.unclaimedFees.feeOwedB.decimals, dto.unclaimedFees.feeOwedB.symbol)} unclaimed`;
 
-  const unclaimedRewardsLabel = dto.unclaimedRewards.totalUsd > 0
-    ? `$${dto.unclaimedRewards.totalUsd.toFixed(2)} in rewards`
-    : dto.unclaimedRewards.rewards.length > 0
-      ? dto.unclaimedRewards.rewards.map((r) => formatTokenAmount(r.amount, r.decimals, r.symbol)).join(', ') + ' rewards'
-      : 'No rewards';
+  const unclaimedRewardsLabel =
+    dto.unclaimedRewards.totalUsd > 0
+      ? `$${dto.unclaimedRewards.totalUsd.toFixed(2)} in rewards`
+      : dto.unclaimedRewards.rewards.length > 0
+        ? dto.unclaimedRewards.rewards
+            .map((r) => formatTokenAmount(r.amount, r.decimals, r.symbol))
+            .join(', ') + ' rewards'
+        : 'No rewards';
 
   const base = {
     positionId: dto.positionId,
@@ -71,8 +77,16 @@ export function buildPositionDetailViewModel(dto: PositionDetailDto): PositionDe
     rangeDistanceLabel: rangeDistanceLabel(dto.rangeDistance),
     unclaimedFeesLabel,
     unclaimedFeesBreakdown: {
-      feeA: formatTokenAmount(dto.unclaimedFees.feeOwedA.raw, dto.unclaimedFees.feeOwedA.decimals, dto.unclaimedFees.feeOwedA.symbol),
-      feeB: formatTokenAmount(dto.unclaimedFees.feeOwedB.raw, dto.unclaimedFees.feeOwedB.decimals, dto.unclaimedFees.feeOwedB.symbol),
+      feeA: formatTokenAmount(
+        dto.unclaimedFees.feeOwedA.raw,
+        dto.unclaimedFees.feeOwedA.decimals,
+        dto.unclaimedFees.feeOwedA.symbol,
+      ),
+      feeB: formatTokenAmount(
+        dto.unclaimedFees.feeOwedB.raw,
+        dto.unclaimedFees.feeOwedB.decimals,
+        dto.unclaimedFees.feeOwedB.symbol,
+      ),
     },
     unclaimedRewardsLabel,
     positionSizeLabel: `${dto.positionLiquidity.toString()} liquidity units`,
@@ -84,9 +98,10 @@ export function buildPositionDetailViewModel(dto: PositionDetailDto): PositionDe
   if (dto.breachDirection) {
     return {
       ...base,
-      breachDirectionLabel: dto.breachDirection.kind === 'lower-bound-breach'
-        ? 'Price dropped below lower bound'
-        : 'Price rose above upper bound',
+      breachDirectionLabel:
+        dto.breachDirection.kind === 'lower-bound-breach'
+          ? 'Price dropped below lower bound'
+          : 'Price rose above upper bound',
     };
   }
 

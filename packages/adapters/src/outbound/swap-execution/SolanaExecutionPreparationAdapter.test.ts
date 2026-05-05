@@ -30,7 +30,10 @@ describe('SolanaExecutionPreparationAdapter', () => {
     vi.spyOn(console, 'error').mockImplementation(() => {});
 
     const mockReader = new SolanaPositionSnapshotReader('https://api.mainnet-beta.solana.com');
-    const adapter = new SolanaExecutionPreparationAdapter('https://api.mainnet-beta.solana.com', mockReader);
+    const adapter = new SolanaExecutionPreparationAdapter(
+      'https://api.mainnet-beta.solana.com',
+      mockReader,
+    );
     const internal = adapter as unknown as {
       getJupiterQuote: (inputMint: string, outputMint: string, amount: string) => Promise<unknown>;
       buildSwapInstructions: (
@@ -49,7 +52,9 @@ describe('SolanaExecutionPreparationAdapter', () => {
 
     vi.spyOn(internal, 'getJupiterQuote').mockRejectedValue(new Error('Jupiter quote unavailable'));
     const fallbackInstruction = { programAddress: SOL_MINT } as unknown as Instruction;
-    const fallbackSpy = vi.fn<[...unknown[]], Promise<Instruction[]>>().mockResolvedValue([fallbackInstruction]);
+    const fallbackSpy = vi
+      .fn<[...unknown[]], Promise<Instruction[]>>()
+      .mockResolvedValue([fallbackInstruction]);
     internal.buildOrcaSwapInstructions = fallbackSpy;
 
     const plan = {
@@ -64,11 +69,17 @@ describe('SolanaExecutionPreparationAdapter', () => {
       ],
     } as unknown as ExecutionPlan;
 
-    const result = await internal.buildSwapInstructions({} as object, plan, MOCK_WALLET, MOCK_POOL, {
-      tokenAmounts: { tokenA: 12_057_701n, tokenB: 0n },
-      tokenMintA: SOL_MINT,
-      tokenMintB: USDC_MINT,
-    });
+    const result = await internal.buildSwapInstructions(
+      {} as object,
+      plan,
+      MOCK_WALLET,
+      MOCK_POOL,
+      {
+        tokenAmounts: { tokenA: 12_057_701n, tokenB: 0n },
+        tokenMintA: SOL_MINT,
+        tokenMintB: USDC_MINT,
+      },
+    );
 
     expect(fallbackSpy).toHaveBeenCalled();
     expect(result.failureReason).toBeUndefined();
@@ -87,10 +98,15 @@ describe('SolanaExecutionPreparationAdapter', () => {
       monitoringReadiness: { kind: 'active' },
     });
 
-    const adapter = new SolanaExecutionPreparationAdapter('https://api.mainnet-beta.solana.com', mockReader);
+    const adapter = new SolanaExecutionPreparationAdapter(
+      'https://api.mainnet-beta.solana.com',
+      mockReader,
+    );
     const internal = adapter as unknown as {
       getRpc: () => {
-        getLatestBlockhash: () => { send: () => Promise<{ value: { blockhash: string; lastValidBlockHeight: bigint } }> };
+        getLatestBlockhash: () => {
+          send: () => Promise<{ value: { blockhash: string; lastValidBlockHeight: bigint } }>;
+        };
       };
       buildOrcaInstructions: (...args: unknown[]) => Promise<{
         instructions: Instruction[];
@@ -98,7 +114,9 @@ describe('SolanaExecutionPreparationAdapter', () => {
         tokenMintA: string;
         tokenMintB: string;
       }>;
-      buildSwapInstructions: (...args: unknown[]) => Promise<{ instructions: Instruction[]; failureReason?: string }>;
+      buildSwapInstructions: (
+        ...args: unknown[]
+      ) => Promise<{ instructions: Instruction[]; failureReason?: string }>;
     };
 
     vi.spyOn(internal, 'getRpc').mockReturnValue({
@@ -118,11 +136,13 @@ describe('SolanaExecutionPreparationAdapter', () => {
 
     vi.spyOn(internal, 'buildSwapInstructions').mockResolvedValue({ instructions: [] });
 
-    await expect(adapter.prepareExecution({
-      plan: { steps: [] } as unknown as ExecutionPlan,
-      walletId: MOCK_WALLET,
-      positionId: MOCK_POSITION_ID as PositionId,
-    })).resolves.toMatchObject({
+    await expect(
+      adapter.prepareExecution({
+        plan: { steps: [] } as unknown as ExecutionPlan,
+        walletId: MOCK_WALLET,
+        positionId: MOCK_POSITION_ID as PositionId,
+      }),
+    ).resolves.toMatchObject({
       serializedPayload: expect.any(Uint8Array) as Uint8Array,
     });
 

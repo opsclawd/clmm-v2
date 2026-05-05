@@ -26,7 +26,5 @@ declare module '@solana-mobile/mobile-wallet-adapter-protocol-kit' {
     }): Promise<WireTransaction[]>;
   };
 
-  export function transact<T>(
-    callback: (wallet: KitMobileWallet) => Promise<T>,
-  ): Promise<T>;
+  export function transact<T>(callback: (wallet: KitMobileWallet) => Promise<T>): Promise<T>;
 }

@@ -51,12 +51,14 @@ describe('buildWalletOptions', () => {
   });
 
   it('returns both options when both are available', () => {
-    const options = buildWalletOptions(makeCaps({
-      nativeWalletAvailable: true,
-      browserWalletAvailable: true,
-    }));
+    const options = buildWalletOptions(
+      makeCaps({
+        nativeWalletAvailable: true,
+        browserWalletAvailable: true,
+      }),
+    );
     expect(options).toHaveLength(2);
-    expect(options.map(o => o.kind)).toEqual(['native', 'browser']);
+    expect(options.map((o) => o.kind)).toEqual(['native', 'browser']);
   });
 
   it('returns empty array when no wallet is available', () => {

@@ -2,14 +2,19 @@
 
 module.exports = {
   root: true,
-  extends: [
-    './packages/config/eslint/index.js',
-    './packages/config/eslint/boundary-rules.js',
-  ],
+  extends: ['./packages/config/eslint/index.js', './packages/config/eslint/boundary-rules.js'],
   parserOptions: {
     project: true,
     tsconfigRootDir: __dirname,
   },
+  ignorePatterns: [
+    '**/vitest.config.ts',
+    '**/drizzle.config.ts',
+    '**/nativewind.config.js',
+    '**/metro.config.js',
+    '**/tailwind.config.js',
+    'packages/config/eslint/**',
+  ],
   overrides: [
     {
       files: ['packages/application/src/**/*.test.ts'],

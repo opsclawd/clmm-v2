@@ -1,4 +1,8 @@
-import type { BreachEpisodeRepository, EpisodeTransition, FinalizationResult } from '@clmm/application';
+import type {
+  BreachEpisodeRepository,
+  EpisodeTransition,
+  FinalizationResult,
+} from '@clmm/application';
 import type {
   BreachDirection,
   BreachEpisode,
@@ -18,7 +22,10 @@ export class FakeBreachEpisodeRepository implements BreachEpisodeRepository {
   readonly episodes = new Map<string, BreachEpisode>();
   readonly openEpisodeIdsByPosition = new Map<string, string>();
 
-  async recordInRange(positionId: PositionId, observedAt: ClockTimestamp): Promise<EpisodeTransition> {
+  async recordInRange(
+    positionId: PositionId,
+    observedAt: ClockTimestamp,
+  ): Promise<EpisodeTransition> {
     const openEpisode = this.getStoredOpenEpisode(positionId);
     if (!openEpisode) {
       return { kind: 'no-op' };
@@ -117,7 +124,10 @@ export class FakeBreachEpisodeRepository implements BreachEpisodeRepository {
     return { ...openEpisode };
   }
 
-  async finalizeQualification(episodeId: BreachEpisodeId, trigger: ExitTrigger): Promise<FinalizationResult> {
+  async finalizeQualification(
+    episodeId: BreachEpisodeId,
+    trigger: ExitTrigger,
+  ): Promise<FinalizationResult> {
     const episode = this.episodes.get(episodeId);
     if (!episode) {
       throw new Error(`Unknown breach episode: ${episodeId}`);

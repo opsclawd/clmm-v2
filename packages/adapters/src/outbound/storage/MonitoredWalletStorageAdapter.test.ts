@@ -10,7 +10,11 @@ describe('MonitoredWalletStorageAdapter (unit shape)', () => {
     // Verify the adapter class has the expected methods
     const methods = ['enroll', 'unenroll', 'listActiveWallets', 'markScanned'] as const;
     for (const method of methods) {
-      expect(typeof MonitoredWalletStorageAdapter.prototype[method as keyof MonitoredWalletStorageAdapter]).toBe('function');
+      expect(
+        typeof MonitoredWalletStorageAdapter.prototype[
+          method as keyof MonitoredWalletStorageAdapter
+        ],
+      ).toBe('function');
     }
   });
 });

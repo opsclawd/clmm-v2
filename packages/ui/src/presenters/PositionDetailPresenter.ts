@@ -1,5 +1,8 @@
 import type { PositionDetailDto } from '@clmm/application/public';
-import { buildPositionDetailViewModel, type PositionDetailViewModel } from '../view-models/PositionDetailViewModel.js';
+import {
+  buildPositionDetailViewModel,
+  type PositionDetailViewModel,
+} from '../view-models/PositionDetailViewModel.js';
 
 export type PositionDetailPresentation = {
   position: PositionDetailViewModel;
@@ -7,7 +10,9 @@ export type PositionDetailPresentation = {
 
 const EMPTY_TOKEN_AMOUNT = { raw: '0', decimals: null, symbol: '', usdValue: 0 };
 
-function normalizePositionDetailDto(dto: Partial<PositionDetailDto> & Pick<PositionDetailDto, 'positionId' | 'poolId'>): PositionDetailDto {
+function normalizePositionDetailDto(
+  dto: Partial<PositionDetailDto> & Pick<PositionDetailDto, 'positionId' | 'poolId'>,
+): PositionDetailDto {
   const poolId = dto.poolId ?? 'unknown';
   return {
     positionId: dto.positionId,
@@ -45,6 +50,9 @@ function normalizePositionDetailDto(dto: Partial<PositionDetailDto> & Pick<Posit
 export function presentPositionDetail(params: {
   position: PositionDetailDto;
 }): PositionDetailPresentation {
-  const normalized = normalizePositionDetailDto(params.position as Partial<PositionDetailDto> & Pick<PositionDetailDto, 'positionId' | 'poolId'>);
+  const normalized = normalizePositionDetailDto(
+    params.position as Partial<PositionDetailDto> &
+      Pick<PositionDetailDto, 'positionId' | 'poolId'>,
+  );
   return { position: buildPositionDetailViewModel(normalized) };
 }

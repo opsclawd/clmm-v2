@@ -53,7 +53,9 @@ describe('SubmitExecutionAttempt', () => {
       currentState: 'expired',
     });
     expect(submitSpy).not.toHaveBeenCalled();
-    expect((await executionRepo.getAttempt('attempt-1'))?.lifecycleState).toEqual({ kind: 'expired' });
+    expect((await executionRepo.getAttempt('attempt-1'))?.lifecycleState).toEqual({
+      kind: 'expired',
+    });
     expect(historyRepo.events).toContainEqual(
       expect.objectContaining({
         eventType: 'preview-expired',
@@ -253,7 +255,10 @@ describe('SubmitExecutionAttempt', () => {
           steps: [
             { kind: 'remove-liquidity' },
             { kind: 'collect-fees' },
-            { kind: 'swap-assets', instruction: { fromAsset: 'SOL', toAsset: 'USDC', policyReason: 'test' } },
+            {
+              kind: 'swap-assets',
+              instruction: { fromAsset: 'SOL', toAsset: 'USDC', policyReason: 'test' },
+            },
           ],
           postExitPosture: { kind: 'exit-to-usdc' },
           swapInstruction: { fromAsset: 'SOL', toAsset: 'USDC', policyReason: 'test' },
@@ -285,10 +290,11 @@ describe('SubmitExecutionAttempt', () => {
       ids,
     });
 
-    expect(submitSpy).toHaveBeenCalledWith(
-      expect.any(Uint8Array),
-      ['remove-liquidity', 'collect-fees', 'swap-assets'],
-    );
+    expect(submitSpy).toHaveBeenCalledWith(expect.any(Uint8Array), [
+      'remove-liquidity',
+      'collect-fees',
+      'swap-assets',
+    ]);
   });
 
   it('falls back to swap-assets when attempt has no previewId', async () => {
@@ -319,9 +325,6 @@ describe('SubmitExecutionAttempt', () => {
       ids,
     });
 
-    expect(submitSpy).toHaveBeenCalledWith(
-      expect.any(Uint8Array),
-      ['swap-assets'],
-    );
+    expect(submitSpy).toHaveBeenCalledWith(expect.any(Uint8Array), ['swap-assets']);
   });
 });

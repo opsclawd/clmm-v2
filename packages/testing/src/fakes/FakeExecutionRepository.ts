@@ -36,7 +36,11 @@ export class FakeExecutionRepository implements ExecutionRepository {
   readonly preparedPayloads = new Map<string, StoredPreparedPayload>();
   private _previewCounter = 0;
 
-  async savePreview(positionId: PositionId, preview: ExecutionPreview, breachDirection: BreachDirection): Promise<{ previewId: string }> {
+  async savePreview(
+    positionId: PositionId,
+    preview: ExecutionPreview,
+    breachDirection: BreachDirection,
+  ): Promise<{ previewId: string }> {
     const previewId = `preview-${++this._previewCounter}`;
     this.previews.set(previewId, { preview, positionId, breachDirection });
     return { previewId };
@@ -81,9 +85,14 @@ export class FakeExecutionRepository implements ExecutionRepository {
     };
   }
 
-  async listAwaitingSignatureAttemptsByEpisode(episodeId: BreachEpisodeId): Promise<StoredExecutionAttempt[]> {
+  async listAwaitingSignatureAttemptsByEpisode(
+    episodeId: BreachEpisodeId,
+  ): Promise<StoredExecutionAttempt[]> {
     return Array.from(this.attempts.values())
-      .filter((attempt) => attempt.episodeId === episodeId && attempt.lifecycleState.kind === 'awaiting-signature')
+      .filter(
+        (attempt) =>
+          attempt.episodeId === episodeId && attempt.lifecycleState.kind === 'awaiting-signature',
+      )
       .map((attempt) => ({
         ...attempt,
         completedSteps: [...attempt.completedSteps],

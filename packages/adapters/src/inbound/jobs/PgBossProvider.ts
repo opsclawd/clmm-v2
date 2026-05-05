@@ -23,21 +23,25 @@ export function createPgBossProvider(connectionString: string): PgBoss {
   const bossEvents = boss as PgBoss & EventEmitter;
 
   bossEvents.on('error', (error: unknown) => {
-    console.error(JSON.stringify({
-      level: 'error',
-      message: 'pg-boss error',
-      timestamp: new Date().toISOString(),
-      ...serializeEventDetails(error),
-    }));
+    console.error(
+      JSON.stringify({
+        level: 'error',
+        message: 'pg-boss error',
+        timestamp: new Date().toISOString(),
+        ...serializeEventDetails(error),
+      }),
+    );
   });
 
   bossEvents.on('warning', (warning: unknown) => {
-    console.warn(JSON.stringify({
-      level: 'warn',
-      message: 'pg-boss warning',
-      timestamp: new Date().toISOString(),
-      ...serializeEventDetails(warning),
-    }));
+    console.warn(
+      JSON.stringify({
+        level: 'warn',
+        message: 'pg-boss warning',
+        timestamp: new Date().toISOString(),
+        ...serializeEventDetails(warning),
+      }),
+    );
   });
 
   return boss;

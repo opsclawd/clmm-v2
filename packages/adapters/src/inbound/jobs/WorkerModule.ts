@@ -11,7 +11,9 @@ import { PG_BOSS, PG_BOSS_INSTANCE } from './tokens.js';
 import { WorkerLifecycle } from './WorkerLifecycle.js';
 
 // boundary: process.env values are untyped at runtime; validated via env schema at deploy
-const dbUrl = (process.env as Record<string, string | undefined>)['DATABASE_URL'] ?? 'postgresql://localhost/clmm';
+const dbUrl =
+  (process.env as Record<string, string | undefined>)['DATABASE_URL'] ??
+  'postgresql://localhost/clmm';
 const boss = createPgBossProvider(dbUrl);
 
 @Module({

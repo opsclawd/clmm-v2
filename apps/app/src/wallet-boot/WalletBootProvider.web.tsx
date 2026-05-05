@@ -14,8 +14,7 @@ export function WalletBootProvider({ children }: { children: ReactNode }) {
   const walletAddress = useStore(walletSessionStore, (s) => s.walletAddress);
   const browserRestoreAddress = useStore(walletSessionStore, (s) => s.browserRestoreAddress);
 
-  const hasBrowserRestoreCandidate =
-    connectionKind === 'browser' && browserRestoreAddress != null;
+  const hasBrowserRestoreCandidate = connectionKind === 'browser' && browserRestoreAddress != null;
 
   const [hasSeenInflight, setSeenInflight] = useState(false);
   useEffect(() => {
@@ -47,7 +46,16 @@ export function WalletBootProvider({ children }: { children: ReactNode }) {
         hasSeenConnectorInflight: hasSeenInflight,
         restoreTimedOut,
       }),
-    [hasHydrated, connectionKind, walletAddress, browserRestoreAddress, walletStatus, account, hasSeenInflight, restoreTimedOut],
+    [
+      hasHydrated,
+      connectionKind,
+      walletAddress,
+      browserRestoreAddress,
+      walletStatus,
+      account,
+      hasSeenInflight,
+      restoreTimedOut,
+    ],
   );
 
   useEffect(() => {
@@ -65,9 +73,5 @@ export function WalletBootProvider({ children }: { children: ReactNode }) {
     }
   }, [status, connectionKind]);
 
-  return (
-    <WalletBootContext.Provider value={status}>
-      {children}
-    </WalletBootContext.Provider>
-  );
+  return <WalletBootContext.Provider value={status}>{children}</WalletBootContext.Provider>;
 }

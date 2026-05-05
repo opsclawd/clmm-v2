@@ -14,69 +14,98 @@ type Props = {
   platformCapabilities?: PlatformCapabilities | null;
 };
 
-export function AlertsListScreen({ alerts, alertsLoading, alertsError, onSelectAlert, platformCapabilities }: Props): JSX.Element {
+export function AlertsListScreen({
+  alerts,
+  alertsLoading,
+  alertsError,
+  onSelectAlert,
+  platformCapabilities,
+}: Props): JSX.Element {
   const isLoading = alertsLoading ?? (alerts == null && alertsError == null);
   const alertItems = alerts ?? [];
   const isEmpty = alertItems.length === 0;
 
   return (
     <View style={{ flex: 1, backgroundColor: colors.background, padding: 16 }}>
-      <Text style={{
-        color: colors.text,
-        fontSize: typography.fontSize.xl,
-        fontWeight: typography.fontWeight.bold,
-      }}>
+      <Text
+        style={{
+          color: colors.text,
+          fontSize: typography.fontSize.xl,
+          fontWeight: typography.fontWeight.bold,
+        }}
+      >
         Alerts
       </Text>
 
       <DegradedCapabilityBanner capabilities={platformCapabilities} />
 
       {isEmpty && isLoading ? (
-        <View style={{ alignItems: 'center', justifyContent: 'center', paddingVertical: 48, paddingHorizontal: 24 }}>
+        <View
+          style={{
+            alignItems: 'center',
+            justifyContent: 'center',
+            paddingVertical: 48,
+            paddingHorizontal: 24,
+          }}
+        >
           <ActivityIndicator color={colors.primary} />
-          <Text style={{
-            color: colors.text,
-            fontSize: typography.fontSize.lg,
-            fontWeight: typography.fontWeight.semibold,
-            textAlign: 'center',
-            marginTop: 12,
-          }}>
+          <Text
+            style={{
+              color: colors.text,
+              fontSize: typography.fontSize.lg,
+              fontWeight: typography.fontWeight.semibold,
+              textAlign: 'center',
+              marginTop: 12,
+            }}
+          >
             Loading actionable alerts
           </Text>
         </View>
       ) : isEmpty && alertsError ? (
-        <View style={{ alignItems: 'center', justifyContent: 'center', paddingVertical: 48, paddingHorizontal: 24 }}>
-          <Text style={{
-            color: colors.text,
-            fontSize: typography.fontSize.lg,
-            fontWeight: typography.fontWeight.semibold,
-            textAlign: 'center',
-          }}>
+        <View
+          style={{
+            alignItems: 'center',
+            justifyContent: 'center',
+            paddingVertical: 48,
+            paddingHorizontal: 24,
+          }}
+        >
+          <Text
+            style={{
+              color: colors.text,
+              fontSize: typography.fontSize.lg,
+              fontWeight: typography.fontWeight.semibold,
+              textAlign: 'center',
+            }}
+          >
             Could not load alerts
           </Text>
-          <Text style={{
-            color: colors.textSecondary,
-            fontSize: typography.fontSize.base,
-            textAlign: 'center',
-            marginTop: 8,
-            lineHeight: typography.fontSize.base * typography.lineHeight.normal,
-          }}>
+          <Text
+            style={{
+              color: colors.textSecondary,
+              fontSize: typography.fontSize.base,
+              textAlign: 'center',
+              marginTop: 8,
+              lineHeight: typography.fontSize.base * typography.lineHeight.normal,
+            }}
+          >
             {alertsError}
           </Text>
         </View>
       ) : isEmpty ? (
-        <Text style={{ color: colors.textSecondary, marginTop: 8 }}>
-          No active alerts.
-        </Text>
+        <Text style={{ color: colors.textSecondary, marginTop: 8 }}>No active alerts.</Text>
       ) : (
         <>
-          <Text style={{
-            color: colors.breach,
-            fontSize: typography.fontSize.base,
-            fontWeight: typography.fontWeight.semibold,
-            marginTop: 8,
-          }}>
-            {alertItems.length} position{alertItems.length === 1 ? '' : 's'} require{alertItems.length === 1 ? 's' : ''} action
+          <Text
+            style={{
+              color: colors.breach,
+              fontSize: typography.fontSize.base,
+              fontWeight: typography.fontWeight.semibold,
+              marginTop: 8,
+            }}
+          >
+            {alertItems.length} position{alertItems.length === 1 ? '' : 's'} require
+            {alertItems.length === 1 ? 's' : ''} action
           </Text>
           <FlatList
             data={alertItems}
@@ -88,22 +117,28 @@ export function AlertsListScreen({ alerts, alertsLoading, alertsError, onSelectA
                 onPress={() => onSelectAlert?.(item.triggerId, item.positionId)}
                 style={{ marginBottom: 12 }}
               >
-                <View style={{
-                  borderWidth: 1,
-                  borderColor: colors.border,
-                  borderRadius: 8,
-                  overflow: 'hidden',
-                }}>
-                  <View style={{
-                    paddingHorizontal: 16,
-                    paddingTop: 12,
-                    paddingBottom: 4,
-                    backgroundColor: colors.surface,
-                  }}>
-                    <Text style={{
-                      color: colors.textSecondary,
-                      fontSize: typography.fontSize.sm,
-                    }}>
+                <View
+                  style={{
+                    borderWidth: 1,
+                    borderColor: colors.border,
+                    borderRadius: 8,
+                    overflow: 'hidden',
+                  }}
+                >
+                  <View
+                    style={{
+                      paddingHorizontal: 16,
+                      paddingTop: 12,
+                      paddingBottom: 4,
+                      backgroundColor: colors.surface,
+                    }}
+                  >
+                    <Text
+                      style={{
+                        color: colors.textSecondary,
+                        fontSize: typography.fontSize.sm,
+                      }}
+                    >
                       Position: {item.positionId}
                     </Text>
                   </View>

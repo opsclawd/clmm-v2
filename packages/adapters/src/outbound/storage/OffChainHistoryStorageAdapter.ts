@@ -44,22 +44,23 @@ function mapHistoryEventRow(row: HistoryEventRow): HistoryEvent {
 }
 
 export class OffChainHistoryStorageAdapter implements ExecutionHistoryRepository {
-  constructor(
-    private readonly db: Db,
-  ) {}
+  constructor(private readonly db: Db) {}
 
   async appendEvent(event: HistoryEvent): Promise<void> {
-    await this.db.insert(historyEvents).values({
-      eventId: event.eventId,
-      positionId: event.positionId,
-      eventType: event.eventType,
-      directionKind: event.breachDirection.kind,
-      occurredAt: event.occurredAt,
-      lifecycleStateKind: event.lifecycleState?.kind ?? null,
-      transactionRefJson: event.transactionReference
-        ? (event.transactionReference as unknown as Record<string, unknown>)
-        : null,
-    }).onConflictDoNothing();
+    await this.db
+      .insert(historyEvents)
+      .values({
+        eventId: event.eventId,
+        positionId: event.positionId,
+        eventType: event.eventType,
+        directionKind: event.breachDirection.kind,
+        occurredAt: event.occurredAt,
+        lifecycleStateKind: event.lifecycleState?.kind ?? null,
+        transactionRefJson: event.transactionReference
+          ? (event.transactionReference as unknown as Record<string, unknown>)
+          : null,
+      })
+      .onConflictDoNothing();
   }
 
   async recordWalletPositionOwnership(
@@ -124,9 +125,7 @@ export class OffChainHistoryStorageAdapter implements ExecutionHistoryRepository
 
     // Find the last terminal event (confirmed, failed, partial-completion, abandoned)
     const terminalEventTypes = ['confirmed', 'failed', 'partial-completion', 'abandoned'];
-    const terminalRow = [...rows].reverse().find(
-      (r) => terminalEventTypes.includes(r.eventType),
-    );
+    const terminalRow = [...rows].reverse().find((r) => terminalEventTypes.includes(r.eventType));
 
     if (!terminalRow) return null;
 
@@ -136,7 +135,9 @@ export class OffChainHistoryStorageAdapter implements ExecutionHistoryRepository
         : terminalRow.directionKind === 'upper-bound-breach'
           ? UPPER_BOUND_BREACH
           : (() => {
-              throw new Error(`getOutcomeSummary: unknown directionKind ${terminalRow.directionKind}`);
+              throw new Error(
+                `getOutcomeSummary: unknown directionKind ${terminalRow.directionKind}`,
+              );
             })();
 
     const lifecycleStateKind = terminalRow.lifecycleStateKind;

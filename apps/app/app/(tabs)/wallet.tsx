@@ -53,7 +53,16 @@ export default function WalletRoute() {
   return (
     <>
       {disconnectError ? (
-        <View style={{ padding: 12, backgroundColor: '#450a0a', borderRadius: 8, borderWidth: 1, borderColor: '#dc2626', margin: 16 }}>
+        <View
+          style={{
+            padding: 12,
+            backgroundColor: '#450a0a',
+            borderRadius: 8,
+            borderWidth: 1,
+            borderColor: '#dc2626',
+            margin: 16,
+          }}
+        >
           <Text style={{ color: '#ef4444', fontSize: 14, fontWeight: '600' }}>
             Could not disconnect wallet
           </Text>
@@ -67,7 +76,9 @@ export default function WalletRoute() {
         connectionKind={connectionKind}
         platformCapabilities={platformCapabilities}
         onReconnect={handleReconnect}
-        onSwitchWallet={() => { void handleSwitchWallet(); }}
+        onSwitchWallet={() => {
+          void handleSwitchWallet();
+        }}
         onDisconnect={() => {
           void handleDisconnect();
         }}

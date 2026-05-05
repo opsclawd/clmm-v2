@@ -101,19 +101,27 @@ function FeatureRow({ title, description }: { title: string; description: string
 
 function severityBorderColor(severity: string) {
   switch (severity) {
-    case 'error': return colors.breachAccent;
-    case 'warning': return colors.warn;
-    case 'success': return colors.safe;
-    default: return colors.border;
+    case 'error':
+      return colors.breachAccent;
+    case 'warning':
+      return colors.warn;
+    case 'success':
+      return colors.safe;
+    default:
+      return colors.border;
   }
 }
 
 function severityTextColor(severity: string) {
   switch (severity) {
-    case 'error': return colors.breachAccent;
-    case 'warning': return colors.warn;
-    case 'success': return colors.safe;
-    default: return colors.textPrimary;
+    case 'error':
+      return colors.breachAccent;
+    case 'warning':
+      return colors.warn;
+    case 'success':
+      return colors.safe;
+    default:
+      return colors.textPrimary;
   }
 }
 
@@ -121,7 +129,11 @@ function renderSocialWebview(vm: WalletConnectViewModel, actions: WalletConnectA
   return (
     <View style={styles.container}>
       <View style={styles.contentContainer}>
-        <TouchableOpacity onPress={actions.onGoBack} style={styles.backButton} accessibilityLabel="Back">
+        <TouchableOpacity
+          onPress={actions.onGoBack}
+          style={styles.backButton}
+          accessibilityLabel="Back"
+        >
           <Icon name="chevronLeft" size={20} color={colors.textBody} />
         </TouchableOpacity>
 
@@ -169,19 +181,11 @@ function renderSocialWebview(vm: WalletConnectViewModel, actions: WalletConnectA
 
         <Text style={styles.deepLinkLabel}>Or open in a wallet browser:</Text>
 
-        <TouchableOpacity
-          onPress={actions.onOpenPhantom}
-          style={styles.deepLinkButton}
-        >
-          <Text style={{ color: '#ab9ff2', fontSize: 14, fontWeight: '600' }}>
-            Open in Phantom
-          </Text>
+        <TouchableOpacity onPress={actions.onOpenPhantom} style={styles.deepLinkButton}>
+          <Text style={{ color: '#ab9ff2', fontSize: 14, fontWeight: '600' }}>Open in Phantom</Text>
         </TouchableOpacity>
 
-        <TouchableOpacity
-          onPress={actions.onOpenSolflare}
-          style={styles.deepLinkButton}
-        >
+        <TouchableOpacity onPress={actions.onOpenSolflare} style={styles.deepLinkButton}>
           <Text style={{ color: '#fc8748', fontSize: 14, fontWeight: '600' }}>
             Open in Solflare
           </Text>
@@ -198,11 +202,12 @@ function renderSocialWebview(vm: WalletConnectViewModel, actions: WalletConnectA
 function renderStandard(vm: WalletConnectViewModel, actions: WalletConnectActions) {
   return (
     <View style={styles.container}>
-      <ScrollView
-        style={styles.scrollView}
-        contentContainerStyle={styles.contentContainer}
-      >
-        <TouchableOpacity onPress={actions.onGoBack} style={styles.backButton} accessibilityLabel="Back">
+      <ScrollView style={styles.scrollView} contentContainerStyle={styles.contentContainer}>
+        <TouchableOpacity
+          onPress={actions.onGoBack}
+          style={styles.backButton}
+          accessibilityLabel="Back"
+        >
           <Icon name="chevronLeft" size={20} color={colors.textBody} />
         </TouchableOpacity>
 
@@ -210,7 +215,8 @@ function renderStandard(vm: WalletConnectViewModel, actions: WalletConnectAction
 
         <Text style={styles.title}>Protect your Orca positions</Text>
         <Text style={styles.subtitle}>
-          We monitor your concentrated liquidity range and prepare a safe one-click exit the moment price breaches it.
+          We monitor your concentrated liquidity range and prepare a safe one-click exit the moment
+          price breaches it.
         </Text>
 
         {vm.outcomeDisplay ? (
@@ -238,13 +244,19 @@ function renderStandard(vm: WalletConnectViewModel, actions: WalletConnectAction
           <View
             style={[
               styles.outcomeBanner,
-              { borderColor: vm.platformNotice.severity === 'warning' ? colors.warn : colors.breachAccent },
+              {
+                borderColor:
+                  vm.platformNotice.severity === 'warning' ? colors.warn : colors.breachAccent,
+              },
             ]}
           >
             <Text
               style={[
                 styles.outcomeTitle,
-                { color: vm.platformNotice.severity === 'warning' ? colors.warn : colors.breachAccent },
+                {
+                  color:
+                    vm.platformNotice.severity === 'warning' ? colors.warn : colors.breachAccent,
+                },
               ]}
             >
               {vm.platformNotice.message}
@@ -253,10 +265,7 @@ function renderStandard(vm: WalletConnectViewModel, actions: WalletConnectAction
         ) : null}
 
         {vm.nativeWalletAvailable && !vm.isConnecting ? (
-          <TouchableOpacity
-            onPress={actions.onSelectNative}
-            style={styles.walletOptionButton}
-          >
+          <TouchableOpacity onPress={actions.onSelectNative} style={styles.walletOptionButton}>
             <Icon name="wallet" size={20} color={colors.textPrimary} />
             <View style={styles.walletOptionText}>
               <Text style={styles.walletOptionLabel}>Connect Mobile Wallet</Text>
@@ -274,7 +283,10 @@ function renderStandard(vm: WalletConnectViewModel, actions: WalletConnectAction
           </View>
         ) : null}
 
-        {!vm.isConnecting && vm.browserWalletAvailable && vm.discovery === 'ready' && vm.discoveredWallets.length > 0
+        {!vm.isConnecting &&
+        vm.browserWalletAvailable &&
+        vm.discovery === 'ready' &&
+        vm.discoveredWallets.length > 0
           ? vm.discoveredWallets.map((wallet) => (
               <TouchableOpacity
                 key={wallet.id}

@@ -1,12 +1,12 @@
 export type ClmmExecutionEventRequest = {
-  schemaVersion: "1.0";
+  schemaVersion: '1.0';
   correlationId: string;
   positionId: string;
-  breachDirection: "LowerBoundBreach" | "UpperBoundBreach";
+  breachDirection: 'LowerBoundBreach' | 'UpperBoundBreach';
   reconciledAtIso: string;
   txSignature: string;
-  tokenOut: "SOL" | "USDC";
-  status: "confirmed" | "failed";
+  tokenOut: 'SOL' | 'USDC';
+  status: 'confirmed' | 'failed';
   episodeId?: string;
   previewId?: string;
   detectedAtIso?: string;

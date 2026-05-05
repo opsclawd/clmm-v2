@@ -15,7 +15,9 @@ describe('AlertController', () => {
       triggerRepo.lastListedWalletId = walletId;
       return originalListActionableTriggers(walletId).then((triggers) =>
         triggers.filter(
-          (trigger) => walletId === requestedWalletId && trigger.positionId === FIXTURE_POSITION_IN_RANGE.positionId,
+          (trigger) =>
+            walletId === requestedWalletId &&
+            trigger.positionId === FIXTURE_POSITION_IN_RANGE.positionId,
         ),
       );
     };

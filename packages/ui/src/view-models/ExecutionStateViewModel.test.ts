@@ -15,7 +15,10 @@ describe('ExecutionStateViewModel', () => {
   ] as Array<[string, string, boolean, boolean]>)(
     '%s state: title=%s, isTerminal=%s, showRetry=%s',
     (kind, expectedTitle, isTerminal, showRetry) => {
-      const vm = buildExecutionStateViewModel(makeState(kind as ExecutionLifecycleState['kind']), false);
+      const vm = buildExecutionStateViewModel(
+        makeState(kind as ExecutionLifecycleState['kind']),
+        false,
+      );
       expect(vm.title).toBe(expectedTitle);
       expect(vm.isTerminal).toBe(isTerminal);
       expect(vm.showRetry).toBe(showRetry);

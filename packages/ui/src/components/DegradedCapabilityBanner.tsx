@@ -18,21 +18,25 @@ export function DegradedCapabilityBanner({ capabilities }: Props): JSX.Element |
   if (!message) return null;
 
   return (
-    <View style={{
-      marginTop: 8,
-      marginBottom: 4,
-      paddingVertical: 8,
-      paddingHorizontal: 12,
-      backgroundColor: '#422006',
-      borderRadius: 8,
-      borderWidth: 1,
-      borderColor: colors.warning,
-    }}>
-      <Text style={{
-        color: colors.warning,
-        fontSize: typography.fontSize.sm,
-        fontWeight: typography.fontWeight.medium,
-      }}>
+    <View
+      style={{
+        marginTop: 8,
+        marginBottom: 4,
+        paddingVertical: 8,
+        paddingHorizontal: 12,
+        backgroundColor: '#422006',
+        borderRadius: 8,
+        borderWidth: 1,
+        borderColor: colors.warning,
+      }}
+    >
+      <Text
+        style={{
+          color: colors.warning,
+          fontSize: typography.fontSize.sm,
+          fontWeight: typography.fontWeight.medium,
+        }}
+      >
         {message}
       </Text>
     </View>

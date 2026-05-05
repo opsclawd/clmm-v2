@@ -66,10 +66,14 @@ export class NotificationDispatchJobHandler {
       );
     } catch (error: unknown) {
       // Notification failure is non-fatal: trigger exists in DB regardless
-      this.observability.log('error', `Notification dispatch failed for trigger ${data.triggerId}`, {
-        triggerId: data.triggerId,
-        error: error instanceof Error ? error.message : String(error),
-      });
+      this.observability.log(
+        'error',
+        `Notification dispatch failed for trigger ${data.triggerId}`,
+        {
+          triggerId: data.triggerId,
+          error: error instanceof Error ? error.message : String(error),
+        },
+      );
       // Do NOT rethrow -- notification failure should not cause pg-boss retry
     }
   }

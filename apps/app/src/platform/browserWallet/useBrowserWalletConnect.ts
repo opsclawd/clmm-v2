@@ -13,7 +13,13 @@ function isSolanaBrowserWallet(connector: { id: string; chains: readonly string[
 }
 
 function getSupportedWallets(
-  connectors: Array<{ id: string; name: string; icon: string; chains: readonly string[]; ready: boolean }>,
+  connectors: Array<{
+    id: string;
+    name: string;
+    icon: string;
+    chains: readonly string[];
+    ready: boolean;
+  }>,
 ): BrowserWalletOption[] {
   return connectors
     .filter((c) => isSolanaBrowserWallet(c) && c.ready)
@@ -29,10 +35,7 @@ export function useBrowserWalletConnect() {
     adapterRef.current = adapter;
   }, [adapter]);
 
-  const wallets = useMemo(
-    () => getSupportedWallets(adapter.connectors),
-    [adapter.connectors],
-  );
+  const wallets = useMemo(() => getSupportedWallets(adapter.connectors), [adapter.connectors]);
 
   const connect = useCallback(async (walletId?: string): Promise<BrowserWalletConnectResult> => {
     setConnecting(true);
@@ -67,7 +70,9 @@ export function useBrowserWalletConnect() {
         targetWallet = supported[0]!;
       }
 
-      await adapterRef.current.connectWallet(targetWallet.id as import('@solana/connector').WalletConnectorId);
+      await adapterRef.current.connectWallet(
+        targetWallet.id as import('@solana/connector').WalletConnectorId,
+      );
 
       let address = adapterRef.current.account;
       if (!address) {

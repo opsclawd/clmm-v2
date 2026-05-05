@@ -22,7 +22,19 @@
     "test:e2e": "pnpm --filter @clmm/testing test",
     "db:migrate": "pnpm --filter @clmm/adapters db:migrate",
     "db:generate": "pnpm --filter @clmm/adapters db:generate",
-    "db:studio": "pnpm --filter @clmm/adapters db:studio"
+    "db:studio": "pnpm --filter @clmm/adapters db:studio",
+    "format": "prettier --write 'packages/**/*.{ts,tsx,js,jsx,json,md,css,yml,yaml}' 'apps/**/*.{ts,tsx,js,jsx,json,md,css,yml,yaml}'",
+    "prepare": "husky || true"
+  },
+  "lint-staged": {
+    "*.{ts,tsx}": [
+      "prettier --write",
+      "eslint --fix"
+    ],
+    "*.{js,jsx}": [
+      "prettier --write"
+    ],
+    "*.{json,md,mdx,css,yml,yaml}": "prettier --write"
   },
   "devDependencies": {
     "@typescript-eslint/eslint-plugin": "^7.0.0",
@@ -31,6 +43,9 @@
     "dotenv": "^17.4.0",
     "eslint": "^8.57.0",
     "eslint-plugin-import": "^2.29.0",
+    "husky": "^9.1.7",
+    "lint-staged": "^16.4.0",
+    "prettier": "^3.8.3",
     "turbo": "^2.0.0",
     "typescript": "^5.4.0"
   }

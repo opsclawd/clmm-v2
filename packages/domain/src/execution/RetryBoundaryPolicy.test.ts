@@ -48,28 +48,28 @@ describe('RetryBoundaryPolicy', () => {
   });
 
   describe('terminal states block retry permanently', () => {
-    it.each([
-      { kind: 'confirmed' as const },
-      { kind: 'abandoned' as const },
-    ])('$kind is ineligible', ({ kind }) => {
-      const result = evaluateRetryEligibility({
-        ...baseAttempt,
-        lifecycleState: { kind },
-      });
-      expect(result.kind).toBe('ineligible');
-    });
+    it.each([{ kind: 'confirmed' as const }, { kind: 'abandoned' as const }])(
+      '$kind is ineligible',
+      ({ kind }) => {
+        const result = evaluateRetryEligibility({
+          ...baseAttempt,
+          lifecycleState: { kind },
+        });
+        expect(result.kind).toBe('ineligible');
+      },
+    );
   });
 
   describe('in-flight states block retry', () => {
-    it.each([
-      { kind: 'awaiting-signature' as const },
-      { kind: 'submitted' as const },
-    ])('$kind is ineligible', ({ kind }) => {
-      const result = evaluateRetryEligibility({
-        ...baseAttempt,
-        lifecycleState: { kind },
-      });
-      expect(result.kind).toBe('ineligible');
-    });
+    it.each([{ kind: 'awaiting-signature' as const }, { kind: 'submitted' as const }])(
+      '$kind is ineligible',
+      ({ kind }) => {
+        const result = evaluateRetryEligibility({
+          ...baseAttempt,
+          lifecycleState: { kind },
+        });
+        expect(result.kind).toBe('ineligible');
+      },
+    );
   });
 });

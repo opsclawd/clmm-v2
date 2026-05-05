@@ -10,9 +10,7 @@ export {
   evaluateConfirmationThreshold,
   buildExitTrigger,
 } from './triggers/TriggerQualificationService.js';
-export type {
-  ThresholdEvaluation,
-} from './triggers/TriggerQualificationService.js';
+export type { ThresholdEvaluation } from './triggers/TriggerQualificationService.js';
 
 // Exit policy — THE CORE INVARIANT
 export { applyDirectionalExitPolicy } from './exit-policy/DirectionalExitPolicyService.js';

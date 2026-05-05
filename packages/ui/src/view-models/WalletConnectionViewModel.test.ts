@@ -1,5 +1,8 @@
 import { describe, it, expect } from 'vitest';
-import { buildWalletConnectViewModel, buildWalletSettingsViewModel } from './WalletConnectionViewModel.js';
+import {
+  buildWalletConnectViewModel,
+  buildWalletSettingsViewModel,
+} from './WalletConnectionViewModel.js';
 import type { PlatformCapabilities } from '../components/DegradedCapabilityBannerUtils.js';
 import type { DiscoveredWallet } from '../components/WalletConnectionUtils.js';
 

@@ -25,7 +25,9 @@ vi.mock('@solana/kit', async (importOriginal) => {
       getTokenAccountsByOwner: () => ({
         send: () =>
           Promise.resolve({
-            value: [{ account: { data: { parsed: { info: { tokenAmount: { amount: '1000000' } } } } } }],
+            value: [
+              { account: { data: { parsed: { info: { tokenAmount: { amount: '1000000' } } } } } },
+            ],
           }),
       }),
     }),
@@ -50,7 +52,8 @@ describe('Solana read path efficiency integration', () => {
 
   it('uses the reduced RPC shape for list, detail, and trigger flows', async () => {
     const { fetchPositionsForOwner } = await import('@orca-so/whirlpools');
-    const { fetchWhirlpool, getPositionAddress, fetchPosition } = await import('@orca-so/whirlpools-client');
+    const { fetchWhirlpool, getPositionAddress, fetchPosition } =
+      await import('@orca-so/whirlpools-client');
     const now = Date.now();
 
     // Arrange: wallet scan returns two positions on the same whirlpool
@@ -91,7 +94,9 @@ describe('Solana read path efficiency integration', () => {
     } as unknown as Awaited<ReturnType<typeof fetchWhirlpool>>);
 
     // Direct position lookup for getPosition()
-    vi.mocked(getPositionAddress).mockResolvedValue(['PositionPDA1', 0] as unknown as Awaited<ReturnType<typeof getPositionAddress>>);
+    vi.mocked(getPositionAddress).mockResolvedValue(['PositionPDA1', 0] as unknown as Awaited<
+      ReturnType<typeof getPositionAddress>
+    >);
     vi.mocked(fetchPosition).mockResolvedValue({
       data: {
         whirlpool: MOCK_WHIRLPOOL,
@@ -143,14 +148,28 @@ describe('Solana read path efficiency integration', () => {
     const mockDb = {
       select: () => ({
         from: (table: unknown) => {
-          const tableName = (table as { name?: string })?.name ??
-            ((table as Record<string | symbol, unknown>)[Symbol.for('drizzle:Name')] as string | undefined) ?? '';
+          const tableName =
+            (table as { name?: string })?.name ??
+            ((table as Record<string | symbol, unknown>)[Symbol.for('drizzle:Name')] as
+              | string
+              | undefined) ??
+            '';
           if (tableName === 'wallet_position_ownership') {
             ownershipSelectCalls++;
             return {
               where: async () => [
-                { walletId: MOCK_WALLET, positionId: MOCK_POSITION_MINT, firstSeenAt: now - 1_000, lastSeenAt: now - 1_000 },
-                { walletId: MOCK_WALLET, positionId: MOCK_POSITION_MINT_2, firstSeenAt: now - 1_000, lastSeenAt: now - 1_000 },
+                {
+                  walletId: MOCK_WALLET,
+                  positionId: MOCK_POSITION_MINT,
+                  firstSeenAt: now - 1_000,
+                  lastSeenAt: now - 1_000,
+                },
+                {
+                  walletId: MOCK_WALLET,
+                  positionId: MOCK_POSITION_MINT_2,
+                  firstSeenAt: now - 1_000,
+                  lastSeenAt: now - 1_000,
+                },
               ],
             };
           }
@@ -187,7 +206,10 @@ describe('Solana read path efficiency integration', () => {
     const rpcUrl = 'https://api.mainnet-beta.solana.com';
     const snapshotReader = new SolanaPositionSnapshotReader(rpcUrl);
     const positionRead = new OrcaPositionReadAdapter(rpcUrl, snapshotReader, mockDb as never);
-    const storage = new OperationalStorageAdapter(mockDb as never, { generateId: () => 'id' } as never);
+    const storage = new OperationalStorageAdapter(
+      mockDb as never,
+      { generateId: () => 'id' } as never,
+    );
 
     // Act
     const listed = await positionRead.listSupportedPositions(MOCK_WALLET);

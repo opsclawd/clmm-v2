@@ -24,7 +24,8 @@ function PositionDetailRouteBody() {
   const router = useRouter();
   const walletAddress = useStore(walletSessionStore, (state) => state.walletAddress);
   const positionId = typeof id === 'string' ? id : undefined;
-  const alertTriggerId = typeof triggerId === 'string' && triggerId.length > 0 ? triggerId : undefined;
+  const alertTriggerId =
+    typeof triggerId === 'string' && triggerId.length > 0 ? triggerId : undefined;
   const hasValidPositionId = positionId != null && positionId.length > 0;
 
   const positionQuery = useQuery({

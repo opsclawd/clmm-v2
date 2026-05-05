@@ -18,14 +18,16 @@ type ObservabilityLog = {
 
 type EnqueuedJob = { name: string; data: unknown };
 
-function makePayload(overrides?: Partial<{
-  positionId: string;
-  walletId: string;
-  directionKind: 'lower-bound-breach' | 'upper-bound-breach';
-  observedAt: number;
-  episodeId: string;
-  consecutiveCount: number;
-}>) {
+function makePayload(
+  overrides?: Partial<{
+    positionId: string;
+    walletId: string;
+    directionKind: 'lower-bound-breach' | 'upper-bound-breach';
+    observedAt: number;
+    episodeId: string;
+    consecutiveCount: number;
+  }>,
+) {
   return {
     positionId: FIXTURE_POSITION_ID as string,
     walletId: FIXTURE_WALLET_ID as string,
@@ -75,13 +77,7 @@ describe('TriggerQualificationJobHandler', () => {
       enqueuedJobs.push({ name, data });
     };
 
-    handler = new TriggerQualificationJobHandler(
-      episodeRepo,
-      clock,
-      ids,
-      observability,
-      enqueue,
-    );
+    handler = new TriggerQualificationJobHandler(episodeRepo, clock, ids, observability, enqueue);
   });
 
   it('creates a trigger and enqueues notification for lower-bound breach', async () => {

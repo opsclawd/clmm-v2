@@ -11,10 +11,9 @@ import {
 
 describe('ListSupportedPositions', () => {
   it('returns enriched summaries with pool data', async () => {
-    const positionReadPort = new FakeSupportedPositionReadPort(
-      [FIXTURE_POSITION_IN_RANGE],
-      { [FIXTURE_POSITION_IN_RANGE.poolId]: FIXTURE_POOL_DATA },
-    );
+    const positionReadPort = new FakeSupportedPositionReadPort([FIXTURE_POSITION_IN_RANGE], {
+      [FIXTURE_POSITION_IN_RANGE.poolId]: FIXTURE_POOL_DATA,
+    });
 
     const result = await listSupportedPositions({
       walletId: FIXTURE_WALLET_ID,
@@ -41,10 +40,9 @@ describe('ListSupportedPositions', () => {
   });
 
   it('emits price-space lowerBoundPrice and upperBoundPrice (no tick fields) for the SOL/USDC pool', async () => {
-    const positionReadPort = new FakeSupportedPositionReadPort(
-      [FIXTURE_POSITION_IN_RANGE],
-      { [FIXTURE_POSITION_IN_RANGE.poolId]: FIXTURE_POOL_DATA },
-    );
+    const positionReadPort = new FakeSupportedPositionReadPort([FIXTURE_POSITION_IN_RANGE], {
+      [FIXTURE_POSITION_IN_RANGE.poolId]: FIXTURE_POOL_DATA,
+    });
 
     const result = await listSupportedPositions({
       walletId: FIXTURE_WALLET_ID,
@@ -68,10 +66,7 @@ describe('ListSupportedPositions', () => {
   });
 
   it('excludes positions whose pool metadata is missing', async () => {
-    const positionReadPort = new FakeSupportedPositionReadPort(
-      [FIXTURE_POSITION_IN_RANGE],
-      {},
-    );
+    const positionReadPort = new FakeSupportedPositionReadPort([FIXTURE_POSITION_IN_RANGE], {});
 
     const result = await listSupportedPositions({
       walletId: FIXTURE_WALLET_ID,
@@ -88,10 +83,9 @@ describe('ListSupportedPositions', () => {
       ...FIXTURE_POOL_DATA,
       tokenPair: { ...FIXTURE_POOL_DATA.tokenPair, decimalsA: null, decimalsB: null },
     };
-    const positionReadPort = new FakeSupportedPositionReadPort(
-      [FIXTURE_POSITION_IN_RANGE],
-      { [FIXTURE_POSITION_IN_RANGE.poolId]: poolDataNullDecimals },
-    );
+    const positionReadPort = new FakeSupportedPositionReadPort([FIXTURE_POSITION_IN_RANGE], {
+      [FIXTURE_POSITION_IN_RANGE.poolId]: poolDataNullDecimals,
+    });
 
     const result = await listSupportedPositions({
       walletId: FIXTURE_WALLET_ID,
@@ -103,10 +97,9 @@ describe('ListSupportedPositions', () => {
   });
 
   it('computes range distance for out-of-range positions', async () => {
-    const positionReadPort = new FakeSupportedPositionReadPort(
-      [FIXTURE_POSITION_BELOW_RANGE],
-      { [FIXTURE_POSITION_BELOW_RANGE.poolId]: FIXTURE_POOL_DATA },
-    );
+    const positionReadPort = new FakeSupportedPositionReadPort([FIXTURE_POSITION_BELOW_RANGE], {
+      [FIXTURE_POSITION_BELOW_RANGE.poolId]: FIXTURE_POOL_DATA,
+    });
 
     const result = await listSupportedPositions({
       walletId: FIXTURE_WALLET_ID,
@@ -118,11 +111,10 @@ describe('ListSupportedPositions', () => {
   });
 
   it('counts poolMetadataFailures when getPoolData throws', async () => {
-    const positionReadPort = new FakeSupportedPositionReadPort(
-      [FIXTURE_POSITION_IN_RANGE],
-      {},
-    );
-    positionReadPort.getPoolData = async () => { throw new Error('RPC timeout'); };
+    const positionReadPort = new FakeSupportedPositionReadPort([FIXTURE_POSITION_IN_RANGE], {});
+    positionReadPort.getPoolData = async () => {
+      throw new Error('RPC timeout');
+    };
 
     const result = await listSupportedPositions({
       walletId: FIXTURE_WALLET_ID,
@@ -135,10 +127,9 @@ describe('ListSupportedPositions', () => {
   });
 
   it('reports zero poolMetadataFailures when all pool data is available', async () => {
-    const positionReadPort = new FakeSupportedPositionReadPort(
-      [FIXTURE_POSITION_IN_RANGE],
-      { [FIXTURE_POSITION_IN_RANGE.poolId]: FIXTURE_POOL_DATA },
-    );
+    const positionReadPort = new FakeSupportedPositionReadPort([FIXTURE_POSITION_IN_RANGE], {
+      [FIXTURE_POSITION_IN_RANGE.poolId]: FIXTURE_POOL_DATA,
+    });
 
     const result = await listSupportedPositions({
       walletId: FIXTURE_WALLET_ID,

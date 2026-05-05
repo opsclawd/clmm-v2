@@ -62,7 +62,9 @@ describe('ReconcileExecutionAttempt', () => {
       ids,
     });
     expect(result.kind).toBe('partial');
-    expect((await executionRepo.getAttempt('attempt-1'))?.completedSteps).toEqual(['remove-liquidity']);
+    expect((await executionRepo.getAttempt('attempt-1'))?.completedSteps).toEqual([
+      'remove-liquidity',
+    ]);
   });
 
   it('marks as partial when one step confirms and another fails', async () => {
@@ -93,7 +95,9 @@ describe('ReconcileExecutionAttempt', () => {
     });
 
     expect(result.kind).toBe('partial');
-    expect((await executionRepo.getAttempt('attempt-mixed'))?.completedSteps).toEqual(['remove-liquidity']);
+    expect((await executionRepo.getAttempt('attempt-mixed'))?.completedSteps).toEqual([
+      'remove-liquidity',
+    ]);
   });
 
   it('preserves directional context in history events', async () => {

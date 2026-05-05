@@ -16,9 +16,7 @@ describe('dependency-cruiser boundary enforcement config', () => {
     );
 
     expect(rule).toBeDefined();
-    expect(rule?.to.path).toEqual(
-      expect.arrayContaining([expect.stringMatching(/^\^@solana/)]),
-    );
+    expect(rule?.to.path).toEqual(expect.arrayContaining([expect.stringMatching(/^\^@solana/)]));
 
     const solanaPatterns = (rule?.to.path as string[]).map((pattern) => new RegExp(pattern));
     expect(solanaPatterns.some((pattern) => pattern.test('@solana/web3.js'))).toBe(true);

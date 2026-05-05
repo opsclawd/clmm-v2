@@ -14,7 +14,10 @@ import { OffChainHistoryStorageAdapter } from '../../outbound/storage/OffChainHi
 import { MonitoredWalletStorageAdapter } from '../../outbound/storage/MonitoredWalletStorageAdapter.js';
 import { WalletChallengePostgresAdapter } from '../../outbound/storage/WalletChallengePostgresAdapter.js';
 import { SolanaPositionSnapshotReader } from '../../outbound/solana-position-reads/SolanaPositionSnapshotReader.js';
-import { OrcaPositionReadAdapter, parsePoolDataCacheTtlMs } from '../../outbound/solana-position-reads/OrcaPositionReadAdapter.js';
+import {
+  OrcaPositionReadAdapter,
+  parsePoolDataCacheTtlMs,
+} from '../../outbound/solana-position-reads/OrcaPositionReadAdapter.js';
 import { JupiterQuoteAdapter } from '../../outbound/swap-execution/JupiterQuoteAdapter.js';
 import { SolanaExecutionPreparationAdapter } from '../../outbound/swap-execution/SolanaExecutionPreparationAdapter.js';
 import { SolanaExecutionSubmissionAdapter } from '../../outbound/swap-execution/SolanaExecutionSubmissionAdapter.js';
@@ -56,10 +59,14 @@ import {
 } from './tokens.js';
 
 // boundary: process.env values are untyped at runtime; validated via env schema at deploy
-const dbUrl = (process.env as Record<string, string | undefined>)['DATABASE_URL'] ?? 'postgresql://localhost/clmm';
+const dbUrl =
+  (process.env as Record<string, string | undefined>)['DATABASE_URL'] ??
+  'postgresql://localhost/clmm';
 const db = createDb(dbUrl);
 const boss = createPgBossProvider(dbUrl);
-const rpcUrl = (process.env as Record<string, string | undefined>)['SOLANA_RPC_URL'] ?? 'https://api.mainnet-beta.solana.com';
+const rpcUrl =
+  (process.env as Record<string, string | undefined>)['SOLANA_RPC_URL'] ??
+  'https://api.mainnet-beta.solana.com';
 
 const systemClock: ClockPort = {
   now: () => Date.now() as ClockTimestamp,
@@ -74,7 +81,12 @@ const snapshotReader = new SolanaPositionSnapshotReader(rpcUrl);
 const poolDataCacheTtlMs = parsePoolDataCacheTtlMs(
   (process.env as Record<string, string | undefined>)['CLMM_POOL_DATA_CACHE_TTL_MS'],
 );
-const orcaPositionRead = new OrcaPositionReadAdapter(rpcUrl, snapshotReader, db, poolDataCacheTtlMs);
+const orcaPositionRead = new OrcaPositionReadAdapter(
+  rpcUrl,
+  snapshotReader,
+  db,
+  poolDataCacheTtlMs,
+);
 const operationalStorage = new OperationalStorageAdapter(db, systemIds);
 const historyStorage = new OffChainHistoryStorageAdapter(db);
 const jupiterQuote = new JupiterQuoteAdapter();
@@ -83,8 +95,10 @@ const solanaSubmission = new SolanaExecutionSubmissionAdapter(rpcUrl);
 const monitoredWalletStorage = new MonitoredWalletStorageAdapter(db);
 const walletChallengeStorage = new WalletChallengePostgresAdapter(db);
 const telemetry = new TelemetryAdapter();
-const regimeEngineBaseUrl = (process.env as Record<string, string | undefined>)['REGIME_ENGINE_BASE_URL'] ?? null;
-const regimeEngineInternalToken = (process.env as Record<string, string | undefined>)['REGIME_ENGINE_INTERNAL_TOKEN'] ?? null;
+const regimeEngineBaseUrl =
+  (process.env as Record<string, string | undefined>)['REGIME_ENGINE_BASE_URL'] ?? null;
+const regimeEngineInternalToken =
+  (process.env as Record<string, string | undefined>)['REGIME_ENGINE_INTERNAL_TOKEN'] ?? null;
 const regimeEngineEventAdapter: RegimeEngineEventPort = new RegimeEngineExecutionEventAdapter(
   regimeEngineBaseUrl,
   regimeEngineInternalToken,
@@ -103,7 +117,16 @@ export const SR_LEVELS_POOL_ALLOWLIST_MAP = new Map<string, { symbol: string; so
 ]);
 
 @Module({
-  controllers: [HealthController, PositionController, SrLevelsController, InsightsDataController, AlertController, PreviewController, ExecutionController, WalletController],
+  controllers: [
+    HealthController,
+    PositionController,
+    SrLevelsController,
+    InsightsDataController,
+    AlertController,
+    PreviewController,
+    ExecutionController,
+    WalletController,
+  ],
   providers: [
     { provide: DB, useValue: db },
     { provide: TRIGGER_REPOSITORY, useValue: operationalStorage },
@@ -126,7 +149,10 @@ export const SR_LEVELS_POOL_ALLOWLIST_MAP = new Map<string, { symbol: string; so
     { provide: RECONCILIATION_JOB_PORT, useValue: reconciliationJobPort },
     { provide: SR_LEVELS_POOL_ALLOWLIST, useValue: SR_LEVELS_POOL_ALLOWLIST_MAP },
     { provide: PRICE_PORT, useValue: jupiterPrice },
-    { provide: INSIGHTS_API_KEY, useValue: (process.env as Record<string, string | undefined>)['INSIGHTS_API_KEY'] ?? '' },
+    {
+      provide: INSIGHTS_API_KEY,
+      useValue: (process.env as Record<string, string | undefined>)['INSIGHTS_API_KEY'] ?? '',
+    },
     InsightsApiKeyGuard,
     PgBossLifecycle,
   ],

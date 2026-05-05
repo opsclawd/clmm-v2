@@ -14,7 +14,8 @@ vi.mock('../platform/webNavigation', () => ({
 vi.mock('react-native', () => {
   const R = require('react');
   return {
-    ActivityIndicator: (_props: any) => R.createElement('span', { 'data-testid': 'activity-indicator' }),
+    ActivityIndicator: (_props: any) =>
+      R.createElement('span', { 'data-testid': 'activity-indicator' }),
     Text: (props: any) => R.createElement('span', null, props.children),
     View: (props: any) => R.createElement('div', null, props.children),
   };
@@ -38,8 +39,12 @@ function Harness({ initial }: { initial: WalletBootStatus }) {
       <RequireWallet>
         <span data-testid="children">child content</span>
       </RequireWallet>
-      <button data-testid="set-connected" onClick={() => setStatus('connected')}>c</button>
-      <button data-testid="set-disconnected" onClick={() => setStatus('disconnected')}>d</button>
+      <button data-testid="set-connected" onClick={() => setStatus('connected')}>
+        c
+      </button>
+      <button data-testid="set-disconnected" onClick={() => setStatus('disconnected')}>
+        d
+      </button>
     </WalletBootContext.Provider>
   );
 }
@@ -92,13 +97,17 @@ describe('RequireWallet', () => {
     render(<Harness initial="disconnected" />);
     expect(navigateMock).toHaveBeenCalledTimes(1);
     const call = navigateMock.mock.calls[0]![0]! as { path: string; method: string };
-    expect(call.path).toBe('/connect?returnTo=' + encodeURIComponent('/signing/mypass?tab=details'));
+    expect(call.path).toBe(
+      '/connect?returnTo=' + encodeURIComponent('/signing/mypass?tab=details'),
+    );
   });
 
   it('does not call navigate again if status flips back to connected', () => {
     render(<Harness initial="disconnected" />);
     expect(navigateMock).toHaveBeenCalledTimes(1);
-    act(() => { screen.getByTestId('set-connected').click(); });
+    act(() => {
+      screen.getByTestId('set-connected').click();
+    });
     expect(navigateMock).toHaveBeenCalledTimes(1);
     expect(screen.getByTestId('children')).toBeTruthy();
   });

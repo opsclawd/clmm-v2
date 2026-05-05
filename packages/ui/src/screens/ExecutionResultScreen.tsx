@@ -29,38 +29,81 @@ export function ExecutionResultScreen({
 }: Props): JSX.Element {
   if (resultLoading !== false && !lifecycleState) {
     return (
-      <View style={{ flex: 1, backgroundColor: colors.background, padding: 16, justifyContent: 'center', alignItems: 'center' }}>
-        <Text style={{ color: colors.text, fontSize: typography.fontSize.xl, fontWeight: typography.fontWeight.bold }}>
+      <View
+        style={{
+          flex: 1,
+          backgroundColor: colors.background,
+          padding: 16,
+          justifyContent: 'center',
+          alignItems: 'center',
+        }}
+      >
+        <Text
+          style={{
+            color: colors.text,
+            fontSize: typography.fontSize.xl,
+            fontWeight: typography.fontWeight.bold,
+          }}
+        >
           Execution Result
         </Text>
         <ActivityIndicator style={{ marginTop: 16 }} color={colors.primary} />
-        <Text style={{ color: colors.textSecondary, marginTop: 12 }}>
-          Loading execution result
-        </Text>
+        <Text style={{ color: colors.textSecondary, marginTop: 12 }}>Loading execution result</Text>
       </View>
     );
   }
 
   if (!lifecycleState && resultError) {
     return (
-      <View style={{ flex: 1, backgroundColor: colors.background, padding: 16, justifyContent: 'center' }}>
-        <Text style={{ color: colors.text, fontSize: typography.fontSize.xl, fontWeight: typography.fontWeight.bold }}>
+      <View
+        style={{
+          flex: 1,
+          backgroundColor: colors.background,
+          padding: 16,
+          justifyContent: 'center',
+        }}
+      >
+        <Text
+          style={{
+            color: colors.text,
+            fontSize: typography.fontSize.xl,
+            fontWeight: typography.fontWeight.bold,
+          }}
+        >
           Execution Result
         </Text>
-        <Text style={{ color: colors.text, fontSize: typography.fontSize.lg, fontWeight: typography.fontWeight.semibold, marginTop: 16 }}>
+        <Text
+          style={{
+            color: colors.text,
+            fontSize: typography.fontSize.lg,
+            fontWeight: typography.fontWeight.semibold,
+            marginTop: 16,
+          }}
+        >
           Could not load execution result
         </Text>
-        <Text style={{ color: colors.textSecondary, marginTop: 8 }}>
-          {resultError}
-        </Text>
+        <Text style={{ color: colors.textSecondary, marginTop: 8 }}>{resultError}</Text>
       </View>
     );
   }
 
   if (!lifecycleState) {
     return (
-      <View style={{ flex: 1, backgroundColor: colors.background, padding: 16, justifyContent: 'center' }}>
-        <Text style={{ color: colors.text, fontSize: typography.fontSize.xl, fontWeight: typography.fontWeight.bold }}>
+      <View
+        style={{
+          flex: 1,
+          backgroundColor: colors.background,
+          padding: 16,
+          justifyContent: 'center',
+        }}
+      >
+        <Text
+          style={{
+            color: colors.text,
+            fontSize: typography.fontSize.xl,
+            fontWeight: typography.fontWeight.bold,
+          }}
+        >
           Execution Result
         </Text>
         <Text style={{ color: colors.textSecondary, marginTop: 16 }}>
@@ -75,12 +118,14 @@ export function ExecutionResultScreen({
   return (
     <ScrollView style={{ flex: 1, backgroundColor: colors.background }}>
       <View style={{ padding: 16 }}>
-        <Text style={{
-          color: colors.text,
-          fontSize: typography.fontSize.xl,
-          fontWeight: typography.fontWeight.bold,
-          marginBottom: 16,
-        }}>
+        <Text
+          style={{
+            color: colors.text,
+            fontSize: typography.fontSize.xl,
+            fontWeight: typography.fontWeight.bold,
+            marginBottom: 16,
+          }}
+        >
           Execution Result
         </Text>
 
@@ -93,26 +138,32 @@ export function ExecutionResultScreen({
         <ExecutionStateCard viewModel={viewModel} />
 
         {transactionSignature ? (
-          <View style={{
-            marginTop: 16,
-            padding: 12,
-            backgroundColor: colors.surface,
-            borderRadius: 8,
-            borderWidth: 1,
-            borderColor: colors.border,
-          }}>
-            <Text style={{
-              color: colors.textSecondary,
-              fontSize: typography.fontSize.sm,
-            }}>
+          <View
+            style={{
+              marginTop: 16,
+              padding: 12,
+              backgroundColor: colors.surface,
+              borderRadius: 8,
+              borderWidth: 1,
+              borderColor: colors.border,
+            }}
+          >
+            <Text
+              style={{
+                color: colors.textSecondary,
+                fontSize: typography.fontSize.sm,
+              }}
+            >
               Transaction
             </Text>
-            <Text style={{
-              color: colors.text,
-              fontSize: typography.fontSize.sm,
-              fontWeight: typography.fontWeight.medium,
-              marginTop: 4,
-            }}>
+            <Text
+              style={{
+                color: colors.text,
+                fontSize: typography.fontSize.sm,
+                fontWeight: typography.fontWeight.medium,
+                marginTop: 4,
+              }}
+            >
               {transactionSignature}
             </Text>
           </View>
@@ -129,11 +180,13 @@ export function ExecutionResultScreen({
               alignItems: 'center',
             }}
           >
-            <Text style={{
-              color: colors.background,
-              fontSize: typography.fontSize.base,
-              fontWeight: typography.fontWeight.bold,
-            }}>
+            <Text
+              style={{
+                color: colors.background,
+                fontSize: typography.fontSize.base,
+                fontWeight: typography.fontWeight.bold,
+              }}
+            >
               Retry
             </Text>
           </TouchableOpacity>
@@ -151,11 +204,13 @@ export function ExecutionResultScreen({
             alignItems: 'center',
           }}
         >
-          <Text style={{
-            color: colors.text,
-            fontSize: typography.fontSize.base,
-            fontWeight: typography.fontWeight.semibold,
-          }}>
+          <Text
+            style={{
+              color: colors.text,
+              fontSize: typography.fontSize.base,
+              fontWeight: typography.fontWeight.semibold,
+            }}
+          >
             View History
           </Text>
         </TouchableOpacity>

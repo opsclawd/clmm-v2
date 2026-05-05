@@ -14,7 +14,11 @@ export function parseReturnTo(raw: string | string[] | undefined): string {
 
   if (!decoded.startsWith('/')) return RETURN_TO_FALLBACK;
   if (decoded.startsWith('//')) return RETURN_TO_FALLBACK;
-  if (decoded === '/connect' || decoded.startsWith('/connect?') || decoded.startsWith('/connect/')) {
+  if (
+    decoded === '/connect' ||
+    decoded.startsWith('/connect?') ||
+    decoded.startsWith('/connect/')
+  ) {
     return RETURN_TO_FALLBACK;
   }
 

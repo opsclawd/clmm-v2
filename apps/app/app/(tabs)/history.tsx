@@ -13,5 +13,7 @@ export default function HistoryRoute() {
     enabled: walletAddress != null && walletAddress.length > 0,
   });
 
-  return <HistoryListScreen {...(historyQuery.data != null ? { events: historyQuery.data } : {})} />;
+  return (
+    <HistoryListScreen {...(historyQuery.data != null ? { events: historyQuery.data } : {})} />
+  );
 }

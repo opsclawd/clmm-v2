@@ -56,32 +56,46 @@ export function SigningStatusScreen({
 }: Props): JSX.Element {
   if (statusLoading && !lifecycleState) {
     return (
-      <View style={{ flex: 1, backgroundColor: colors.background, justifyContent: 'center', alignItems: 'center', padding: 16 }}>
+      <View
+        style={{
+          flex: 1,
+          backgroundColor: colors.background,
+          justifyContent: 'center',
+          alignItems: 'center',
+          padding: 16,
+        }}
+      >
         <ActivityIndicator color={colors.primary} />
-        <Text style={{
-          color: colors.text,
-          fontSize: typography.fontSize.lg,
-          fontWeight: typography.fontWeight.semibold,
-          marginTop: 12,
-          textAlign: 'center',
-        }}>
+        <Text
+          style={{
+            color: colors.text,
+            fontSize: typography.fontSize.lg,
+            fontWeight: typography.fontWeight.semibold,
+            marginTop: 12,
+            textAlign: 'center',
+          }}
+        >
           Loading signing status
         </Text>
         {statusNotice ? (
-          <View style={{
-            marginTop: 16,
-            padding: 12,
-            backgroundColor: '#422006',
-            borderRadius: 8,
-            borderWidth: 1,
-            borderColor: colors.warning,
-            alignSelf: 'stretch',
-          }}>
-            <Text style={{
-              color: colors.warning,
-              fontSize: typography.fontSize.sm,
-              fontWeight: typography.fontWeight.medium,
-            }}>
+          <View
+            style={{
+              marginTop: 16,
+              padding: 12,
+              backgroundColor: '#422006',
+              borderRadius: 8,
+              borderWidth: 1,
+              borderColor: colors.warning,
+              alignSelf: 'stretch',
+            }}
+          >
+            <Text
+              style={{
+                color: colors.warning,
+                fontSize: typography.fontSize.sm,
+                fontWeight: typography.fontWeight.medium,
+              }}
+            >
               {statusNotice}
             </Text>
           </View>
@@ -92,16 +106,34 @@ export function SigningStatusScreen({
 
   if (!lifecycleState && statusError) {
     return (
-      <View style={{ flex: 1, backgroundColor: colors.background, padding: 16, justifyContent: 'center' }}>
-        <Text style={{ color: colors.text, fontSize: typography.fontSize.xl, fontWeight: typography.fontWeight.bold }}>
+      <View
+        style={{
+          flex: 1,
+          backgroundColor: colors.background,
+          padding: 16,
+          justifyContent: 'center',
+        }}
+      >
+        <Text
+          style={{
+            color: colors.text,
+            fontSize: typography.fontSize.xl,
+            fontWeight: typography.fontWeight.bold,
+          }}
+        >
           Signing Status
         </Text>
-        <Text style={{ color: colors.text, fontSize: typography.fontSize.lg, fontWeight: typography.fontWeight.semibold, marginTop: 16 }}>
+        <Text
+          style={{
+            color: colors.text,
+            fontSize: typography.fontSize.lg,
+            fontWeight: typography.fontWeight.semibold,
+            marginTop: 16,
+          }}
+        >
           Could not load signing status
         </Text>
-        <Text style={{ color: colors.textSecondary, marginTop: 8 }}>
-          {statusError}
-        </Text>
+        <Text style={{ color: colors.textSecondary, marginTop: 8 }}>{statusError}</Text>
         {onRefreshQuote ? (
           <TouchableOpacity
             onPress={onRefreshQuote}
@@ -113,11 +145,13 @@ export function SigningStatusScreen({
               alignItems: 'center',
             }}
           >
-            <Text style={{
-              color: colors.background,
-              fontSize: typography.fontSize.base,
-              fontWeight: typography.fontWeight.bold,
-            }}>
+            <Text
+              style={{
+                color: colors.background,
+                fontSize: typography.fontSize.base,
+                fontWeight: typography.fontWeight.bold,
+              }}
+            >
               Refresh Quote
             </Text>
           </TouchableOpacity>
@@ -135,29 +169,35 @@ export function SigningStatusScreen({
               alignItems: 'center',
             }}
           >
-            <Text style={{
-              color: colors.text,
-              fontSize: typography.fontSize.base,
-              fontWeight: typography.fontWeight.semibold,
-            }}>
+            <Text
+              style={{
+                color: colors.text,
+                fontSize: typography.fontSize.base,
+                fontWeight: typography.fontWeight.semibold,
+              }}
+            >
               Go Home
             </Text>
           </TouchableOpacity>
         ) : null}
         {statusNotice ? (
-          <View style={{
-            marginTop: 16,
-            padding: 12,
-            backgroundColor: '#422006',
-            borderRadius: 8,
-            borderWidth: 1,
-            borderColor: colors.warning,
-          }}>
-            <Text style={{
-              color: colors.warning,
-              fontSize: typography.fontSize.sm,
-              fontWeight: typography.fontWeight.medium,
-            }}>
+          <View
+            style={{
+              marginTop: 16,
+              padding: 12,
+              backgroundColor: '#422006',
+              borderRadius: 8,
+              borderWidth: 1,
+              borderColor: colors.warning,
+            }}
+          >
+            <Text
+              style={{
+                color: colors.warning,
+                fontSize: typography.fontSize.sm,
+                fontWeight: typography.fontWeight.medium,
+              }}
+            >
               {statusNotice}
             </Text>
           </View>
@@ -169,26 +209,34 @@ export function SigningStatusScreen({
   if (!lifecycleState) {
     return (
       <View style={{ flex: 1, backgroundColor: colors.background, padding: 16 }}>
-        <Text style={{ color: colors.text, fontSize: typography.fontSize.xl, fontWeight: typography.fontWeight.bold }}>
+        <Text
+          style={{
+            color: colors.text,
+            fontSize: typography.fontSize.xl,
+            fontWeight: typography.fontWeight.bold,
+          }}
+        >
           Signing Status
         </Text>
-        <Text style={{ color: colors.textSecondary, marginTop: 8 }}>
-          Loading signing status...
-        </Text>
+        <Text style={{ color: colors.textSecondary, marginTop: 8 }}>Loading signing status...</Text>
         {statusNotice ? (
-          <View style={{
-            marginTop: 16,
-            padding: 12,
-            backgroundColor: '#422006',
-            borderRadius: 8,
-            borderWidth: 1,
-            borderColor: colors.warning,
-          }}>
-            <Text style={{
-              color: colors.warning,
-              fontSize: typography.fontSize.sm,
-              fontWeight: typography.fontWeight.medium,
-            }}>
+          <View
+            style={{
+              marginTop: 16,
+              padding: 12,
+              backgroundColor: '#422006',
+              borderRadius: 8,
+              borderWidth: 1,
+              borderColor: colors.warning,
+            }}
+          >
+            <Text
+              style={{
+                color: colors.warning,
+                fontSize: typography.fontSize.sm,
+                fontWeight: typography.fontWeight.medium,
+              }}
+            >
               {statusNotice}
             </Text>
           </View>
@@ -199,16 +247,11 @@ export function SigningStatusScreen({
 
   const viewModel = buildExecutionStateViewModel(lifecycleState, retryEligible ?? false);
   const canSign =
-    signingState === 'idle' &&
-    lifecycleState.kind === 'awaiting-signature' &&
-    walletConnected;
+    signingState === 'idle' && lifecycleState.kind === 'awaiting-signature' && walletConnected;
   const showProgress =
     signingState === 'preparing' || signingState === 'signing' || signingState === 'submitting';
-  const showNoWalletMessage =
-    lifecycleState.kind === 'awaiting-signature' && !walletConnected;
-  const canRetry =
-    walletConnected &&
-    lifecycleState.kind === 'awaiting-signature';
+  const showNoWalletMessage = lifecycleState.kind === 'awaiting-signature' && !walletConnected;
+  const canRetry = walletConnected && lifecycleState.kind === 'awaiting-signature';
   const canDecline = lifecycleState.kind === 'awaiting-signature' && onDecline != null;
   const canViewResult =
     onViewResult != null &&
@@ -226,50 +269,62 @@ export function SigningStatusScreen({
   return (
     <ScrollView style={{ flex: 1, backgroundColor: colors.background }}>
       <View style={{ padding: 16 }}>
-        <Text style={{
-          color: colors.text,
-          fontSize: typography.fontSize.xl,
-          fontWeight: typography.fontWeight.bold,
-          marginBottom: 16,
-        }}>
+        <Text
+          style={{
+            color: colors.text,
+            fontSize: typography.fontSize.xl,
+            fontWeight: typography.fontWeight.bold,
+            marginBottom: 16,
+          }}
+        >
           Signing Status
         </Text>
 
         {statusNotice ? (
-          <View style={{
-            marginBottom: 16,
-            paddingVertical: 8,
-            paddingHorizontal: 12,
-            backgroundColor: '#422006',
-            borderRadius: 8,
-            borderWidth: 1,
-            borderColor: colors.warning,
-          }}>
-            <Text style={{
-              color: colors.warning,
-              fontSize: typography.fontSize.sm,
-              fontWeight: typography.fontWeight.medium,
-            }}>
+          <View
+            style={{
+              marginBottom: 16,
+              paddingVertical: 8,
+              paddingHorizontal: 12,
+              backgroundColor: '#422006',
+              borderRadius: 8,
+              borderWidth: 1,
+              borderColor: colors.warning,
+            }}
+          >
+            <Text
+              style={{
+                color: colors.warning,
+                fontSize: typography.fontSize.sm,
+                fontWeight: typography.fontWeight.medium,
+              }}
+            >
               {statusNotice}
             </Text>
           </View>
         ) : null}
 
-        {statusError && signingState !== 'error' && lifecycleState?.kind === 'awaiting-signature' ? (
-          <View style={{
-            marginBottom: 16,
-            paddingVertical: 8,
-            paddingHorizontal: 12,
-            backgroundColor: `${colors.danger}20`,
-            borderRadius: 8,
-            borderWidth: 1,
-            borderColor: colors.danger,
-          }}>
-            <Text style={{
-              color: colors.danger,
-              fontSize: typography.fontSize.sm,
-              fontWeight: typography.fontWeight.medium,
-            }}>
+        {statusError &&
+        signingState !== 'error' &&
+        lifecycleState?.kind === 'awaiting-signature' ? (
+          <View
+            style={{
+              marginBottom: 16,
+              paddingVertical: 8,
+              paddingHorizontal: 12,
+              backgroundColor: `${colors.danger}20`,
+              borderRadius: 8,
+              borderWidth: 1,
+              borderColor: colors.danger,
+            }}
+          >
+            <Text
+              style={{
+                color: colors.danger,
+                fontSize: typography.fontSize.sm,
+                fontWeight: typography.fontWeight.medium,
+              }}
+            >
               {statusError}
             </Text>
           </View>
@@ -284,19 +339,23 @@ export function SigningStatusScreen({
         <ExecutionStateCard viewModel={viewModel} />
 
         {showNoWalletMessage ? (
-          <View style={{
-            marginTop: 16,
-            padding: 12,
-            backgroundColor: `${colors.warning}20`,
-            borderRadius: 8,
-            borderWidth: 1,
-            borderColor: colors.warning,
-          }}>
-            <Text style={{
-              color: colors.warning,
-              fontSize: typography.fontSize.sm,
-              fontWeight: typography.fontWeight.semibold,
-            }}>
+          <View
+            style={{
+              marginTop: 16,
+              padding: 12,
+              backgroundColor: `${colors.warning}20`,
+              borderRadius: 8,
+              borderWidth: 1,
+              borderColor: colors.warning,
+            }}
+          >
+            <Text
+              style={{
+                color: colors.warning,
+                fontSize: typography.fontSize.sm,
+                fontWeight: typography.fontWeight.semibold,
+              }}
+            >
               Connect a browser wallet to sign and submit this exit.
             </Text>
           </View>
@@ -321,34 +380,40 @@ export function SigningStatusScreen({
             }}
           >
             {declineDisabled ? <ActivityIndicator size="small" color={colors.text} /> : null}
-            <Text style={{
-              color: colors.text,
-              fontSize: typography.fontSize.base,
-              fontWeight: typography.fontWeight.semibold,
-            }}>
+            <Text
+              style={{
+                color: colors.text,
+                fontSize: typography.fontSize.base,
+                fontWeight: typography.fontWeight.semibold,
+              }}
+            >
               {declineDisabled ? 'Declining...' : 'Decline Signing'}
             </Text>
           </TouchableOpacity>
         ) : null}
 
         {showProgress ? (
-          <View style={{
-            marginTop: 16,
-            padding: 16,
-            backgroundColor: colors.surface,
-            borderRadius: 8,
-            borderWidth: 1,
-            borderColor: colors.border,
-            flexDirection: 'row',
-            alignItems: 'center',
-            gap: 12,
-          }}>
+          <View
+            style={{
+              marginTop: 16,
+              padding: 16,
+              backgroundColor: colors.surface,
+              borderRadius: 8,
+              borderWidth: 1,
+              borderColor: colors.border,
+              flexDirection: 'row',
+              alignItems: 'center',
+              gap: 12,
+            }}
+          >
             <ActivityIndicator color={colors.primary} />
-            <Text style={{
-              color: colors.text,
-              fontSize: typography.fontSize.base,
-              fontWeight: typography.fontWeight.medium,
-            }}>
+            <Text
+              style={{
+                color: colors.text,
+                fontSize: typography.fontSize.base,
+                fontWeight: typography.fontWeight.medium,
+              }}
+            >
               {progressLabel}
             </Text>
           </View>
@@ -367,11 +432,13 @@ export function SigningStatusScreen({
               alignItems: 'center',
             }}
           >
-            <Text style={{
-              color: colors.text,
-              fontSize: typography.fontSize.base,
-              fontWeight: typography.fontWeight.semibold,
-            }}>
+            <Text
+              style={{
+                color: colors.text,
+                fontSize: typography.fontSize.base,
+                fontWeight: typography.fontWeight.semibold,
+              }}
+            >
               View Execution Result
             </Text>
           </TouchableOpacity>
@@ -390,37 +457,45 @@ export function SigningStatusScreen({
               alignItems: 'center',
             }}
           >
-            <Text style={{
-              color: colors.text,
-              fontSize: typography.fontSize.base,
-              fontWeight: typography.fontWeight.semibold,
-            }}>
+            <Text
+              style={{
+                color: colors.text,
+                fontSize: typography.fontSize.base,
+                fontWeight: typography.fontWeight.semibold,
+              }}
+            >
               Return Home
             </Text>
           </TouchableOpacity>
         ) : null}
 
         {signingState === 'error' ? (
-          <View style={{
-            marginTop: 16,
-            padding: 16,
-            backgroundColor: `${colors.danger}20`,
-            borderRadius: 8,
-            borderWidth: 1,
-            borderColor: colors.danger,
-          }}>
-            <Text style={{
-              color: colors.danger,
-              fontSize: typography.fontSize.base,
-              fontWeight: typography.fontWeight.bold,
-            }}>
+          <View
+            style={{
+              marginTop: 16,
+              padding: 16,
+              backgroundColor: `${colors.danger}20`,
+              borderRadius: 8,
+              borderWidth: 1,
+              borderColor: colors.danger,
+            }}
+          >
+            <Text
+              style={{
+                color: colors.danger,
+                fontSize: typography.fontSize.base,
+                fontWeight: typography.fontWeight.bold,
+              }}
+            >
               Signing error
             </Text>
-            <Text style={{
-              color: colors.text,
-              fontSize: typography.fontSize.sm,
-              marginTop: 8,
-            }}>
+            <Text
+              style={{
+                color: colors.text,
+                fontSize: typography.fontSize.sm,
+                marginTop: 8,
+              }}
+            >
               {signingError ?? 'Something went wrong while signing this execution.'}
             </Text>
             <TouchableOpacity
@@ -436,11 +511,13 @@ export function SigningStatusScreen({
                 alignItems: 'center',
               }}
             >
-              <Text style={{
-                color: retryDisabled ? colors.textSecondary : colors.background,
-                fontSize: typography.fontSize.base,
-                fontWeight: typography.fontWeight.bold,
-              }}>
+              <Text
+                style={{
+                  color: retryDisabled ? colors.textSecondary : colors.background,
+                  fontSize: typography.fontSize.base,
+                  fontWeight: typography.fontWeight.bold,
+                }}
+              >
                 Try Again
               </Text>
             </TouchableOpacity>
@@ -458,11 +535,13 @@ export function SigningStatusScreen({
               alignItems: 'center',
             }}
           >
-            <Text style={{
-              color: colors.background,
-              fontSize: typography.fontSize.base,
-              fontWeight: typography.fontWeight.bold,
-            }}>
+            <Text
+              style={{
+                color: colors.background,
+                fontSize: typography.fontSize.base,
+                fontWeight: typography.fontWeight.bold,
+              }}
+            >
               Sign & Execute
             </Text>
           </TouchableOpacity>

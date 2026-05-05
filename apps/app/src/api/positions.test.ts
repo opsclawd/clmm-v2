@@ -107,17 +107,18 @@ describe('fetchSupportedPositions', () => {
 
     globalThis.fetch = vi.fn().mockResolvedValue({
       ok: true,
-      json: () => Promise.resolve({
-        positions: [
-          {
-            positionId: 123,
-            poolId: 'Pool111111111111111111111111111111111111111',
-            rangeState: 'in-range',
-            hasActionableTrigger: false,
-            monitoringStatus: 'active',
-          },
-        ],
-      }),
+      json: () =>
+        Promise.resolve({
+          positions: [
+            {
+              positionId: 123,
+              poolId: 'Pool111111111111111111111111111111111111111',
+              rangeState: 'in-range',
+              hasActionableTrigger: false,
+              monitoringStatus: 'active',
+            },
+          ],
+        }),
     }) as typeof fetch;
 
     const error = await fetchSupportedPositions(
@@ -156,15 +157,14 @@ describe('fetchSupportedPositions', () => {
 
     globalThis.fetch = vi.fn().mockResolvedValue({
       ok: true,
-      json: () => Promise.resolve({
-        positions,
-        warning: 'Some pool data unavailable. Position list may be incomplete.',
-      }),
+      json: () =>
+        Promise.resolve({
+          positions,
+          warning: 'Some pool data unavailable. Position list may be incomplete.',
+        }),
     }) as typeof fetch;
 
-    const result = await fetchSupportedPositions(
-      'DemoWallet1111111111111111111111111111111111',
-    );
+    const result = await fetchSupportedPositions('DemoWallet1111111111111111111111111111111111');
 
     expect(result.positions).toEqual(positions);
     expect(result.warning).toBe('Some pool data unavailable. Position list may be incomplete.');
@@ -175,10 +175,11 @@ describe('fetchSupportedPositions', () => {
 
     globalThis.fetch = vi.fn().mockResolvedValue({
       ok: true,
-      json: () => Promise.resolve({
-        positions: [],
-        error: 'Unable to fetch positions. Position data temporarily unavailable.',
-      }),
+      json: () =>
+        Promise.resolve({
+          positions: [],
+          error: 'Unable to fetch positions. Position data temporarily unavailable.',
+        }),
     }) as typeof fetch;
 
     const error = await fetchSupportedPositions(
@@ -217,15 +218,14 @@ describe('fetchSupportedPositions', () => {
 
     globalThis.fetch = vi.fn().mockResolvedValue({
       ok: true,
-      json: () => Promise.resolve({
-        positions,
-        error: 'Unable to fetch trigger data. Trigger status may be incomplete.',
-      }),
+      json: () =>
+        Promise.resolve({
+          positions,
+          error: 'Unable to fetch trigger data. Trigger status may be incomplete.',
+        }),
     }) as typeof fetch;
 
-    const result = await fetchSupportedPositions(
-      'DemoWallet1111111111111111111111111111111111',
-    );
+    const result = await fetchSupportedPositions('DemoWallet1111111111111111111111111111111111');
 
     expect(result.positions).toEqual(positions);
     expect(result.warning).toBe('Unable to fetch trigger data. Trigger status may be incomplete.');
