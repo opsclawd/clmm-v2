@@ -39,7 +39,30 @@ describe('ListSupportedPositions', () => {
     expect(result.summaryDtos).toHaveLength(0);
   });
 
-  it('falls back to tick labels when pool data unavailable', async () => {
+  it('emits price-space lowerBoundPrice and upperBoundPrice (no tick fields) for the SOL/USDC pool', async () => {
+    const positionReadPort = new FakeSupportedPositionReadPort(
+      [FIXTURE_POSITION_IN_RANGE],
+      { [FIXTURE_POSITION_IN_RANGE.poolId]: FIXTURE_POOL_DATA },
+    );
+
+    const result = await listSupportedPositions({
+      walletId: FIXTURE_WALLET_ID,
+      positionReadPort,
+    });
+
+    const dto = result.summaryDtos[0]!;
+    expect(typeof dto.lowerBoundPrice).toBe('number');
+    expect(Number.isFinite(dto.lowerBoundPrice)).toBe(true);
+    expect(typeof dto.upperBoundPrice).toBe('number');
+    expect(Number.isFinite(dto.upperBoundPrice)).toBe(true);
+    expect(dto.lowerBoundPrice).toBeLessThan(dto.upperBoundPrice);
+    expect(dto.lowerBoundLabel).toBe(`USDC ${dto.lowerBoundPrice.toFixed(2)}`);
+    expect(dto.upperBoundLabel).toBe(`USDC ${dto.upperBoundPrice.toFixed(2)}`);
+    expect(dto).not.toHaveProperty('lowerBound');
+    expect(dto).not.toHaveProperty('upperBound');
+  });
+
+  it('excludes positions whose pool metadata is missing', async () => {
     const positionReadPort = new FakeSupportedPositionReadPort(
       [FIXTURE_POSITION_IN_RANGE],
       {},
@@ -50,9 +73,8 @@ describe('ListSupportedPositions', () => {
       positionReadPort,
     });
 
-    expect(result.summaryDtos).toHaveLength(1);
-    expect(result.summaryDtos[0]?.currentPriceLabel).toContain('tick:');
-    expect(result.summaryDtos[0]?.poolId).toBe(FIXTURE_POSITION_IN_RANGE.poolId);
+    expect(result.positions).toHaveLength(1);
+    expect(result.summaryDtos).toHaveLength(0);
   });
 
   it('computes range distance for out-of-range positions', async () => {

@@ -2,6 +2,7 @@ import type { SupportedPositionReadPort } from '../../ports/index.js';
 import type { WalletId, LiquidityPosition, PoolId } from '@clmm/domain';
 import type { PositionSummaryDto } from '../../dto/index.js';
 import { priceFromSqrtPrice, rangeDistancePercent, formatFeeRateLabel } from '@clmm/domain';
+import { buildPositionDisplayBounds } from './buildPositionDisplayBounds.js';
 
 export type ListSupportedPositionsResult = {
   positions: LiquidityPosition[];
@@ -22,29 +23,40 @@ export async function listSupportedPositions(params: {
     if (poolData) poolDataMap.set(poolId, poolData);
   }));
 
-  const summaryDtos: PositionSummaryDto[] = positions.map((p) => {
+  const summaryDtos: PositionSummaryDto[] = [];
+  for (const p of positions) {
     const poolData = poolDataMap.get(p.poolId);
-    const decimalsKnown = poolData && poolData.tokenPair.decimalsA !== null && poolData.tokenPair.decimalsB !== null;
+    if (!poolData) continue;
+    const { decimalsA, decimalsB } = poolData.tokenPair;
+    if (decimalsA === null || decimalsB === null) continue;
 
-    const currentPrice = (poolData && decimalsKnown)
-      ? priceFromSqrtPrice(poolData.sqrtPrice, poolData.tokenPair.decimalsA, poolData.tokenPair.decimalsB)
-      : p.rangeState.currentPrice;
-
+    const currentPrice = priceFromSqrtPrice(poolData.sqrtPrice, decimalsA, decimalsB);
     const distance = rangeDistancePercent(
       p.rangeState.currentPrice,
       p.bounds.lowerBound,
       p.bounds.upperBound,
     );
 
-    return {
+    const displayQuoteSymbol = poolData.tokenPair.symbolB;
+    const bounds = buildPositionDisplayBounds({
+      lowerTick: p.bounds.lowerBound,
+      upperTick: p.bounds.upperBound,
+      decimalsA,
+      decimalsB,
+      displayQuoteSymbol,
+    });
+
+    summaryDtos.push({
       positionId: p.positionId,
       poolId: p.poolId,
-      tokenPairLabel: poolData ? `${poolData.tokenPair.symbolA} / ${poolData.tokenPair.symbolB}` : `Pool ${p.poolId}`,
+      tokenPairLabel: `${poolData.tokenPair.symbolA} / ${poolData.tokenPair.symbolB}`,
       currentPrice,
-      currentPriceLabel: (poolData && decimalsKnown)
-        ? `${poolData.tokenPair.symbolB} ${currentPrice.toFixed(2)}`
-        : `tick: ${p.rangeState.currentPrice}`,
-      feeRateLabel: poolData ? formatFeeRateLabel(poolData.feeRate) : '',
+      currentPriceLabel: `${displayQuoteSymbol} ${currentPrice.toFixed(2)}`,
+      feeRateLabel: formatFeeRateLabel(poolData.feeRate),
+      lowerBoundPrice: bounds.lowerBoundPrice,
+      upperBoundPrice: bounds.upperBoundPrice,
+      lowerBoundLabel: bounds.lowerBoundLabel,
+      upperBoundLabel: bounds.upperBoundLabel,
       rangeState: p.rangeState.kind,
       rangeDistance: {
         belowLowerPercent: distance.belowLowerPercent,
@@ -52,8 +64,8 @@ export async function listSupportedPositions(params: {
       },
       hasActionableTrigger: false,
       monitoringStatus: p.monitoringReadiness.kind,
-    };
-  });
+    });
+  }
 
   return { positions, summaryDtos };
 }
