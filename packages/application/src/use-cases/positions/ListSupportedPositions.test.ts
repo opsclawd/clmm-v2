@@ -1,5 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { listSupportedPositions } from './ListSupportedPositions.js';
+import { tickToPrice } from '@clmm/domain';
 import {
   FakeSupportedPositionReadPort,
   FIXTURE_WALLET_ID,
@@ -51,13 +52,17 @@ describe('ListSupportedPositions', () => {
     });
 
     const dto = result.summaryDtos[0]!;
+    const expectedLower = tickToPrice(FIXTURE_POSITION_IN_RANGE.bounds.lowerBound, 9, 6);
+    const expectedUpper = tickToPrice(FIXTURE_POSITION_IN_RANGE.bounds.upperBound, 9, 6);
     expect(typeof dto.lowerBoundPrice).toBe('number');
     expect(Number.isFinite(dto.lowerBoundPrice)).toBe(true);
     expect(typeof dto.upperBoundPrice).toBe('number');
     expect(Number.isFinite(dto.upperBoundPrice)).toBe(true);
     expect(dto.lowerBoundPrice).toBeLessThan(dto.upperBoundPrice);
-    expect(dto.lowerBoundLabel).toBe(`USDC ${dto.lowerBoundPrice.toFixed(2)}`);
-    expect(dto.upperBoundLabel).toBe(`USDC ${dto.upperBoundPrice.toFixed(2)}`);
+    expect(dto.lowerBoundPrice).toBe(expectedLower);
+    expect(dto.upperBoundPrice).toBe(expectedUpper);
+    expect(dto.lowerBoundLabel).toBe(`USDC ${expectedLower.toFixed(2)}`);
+    expect(dto.upperBoundLabel).toBe(`USDC ${expectedUpper.toFixed(2)}`);
     expect(dto).not.toHaveProperty('lowerBound');
     expect(dto).not.toHaveProperty('upperBound');
   });
@@ -66,6 +71,25 @@ describe('ListSupportedPositions', () => {
     const positionReadPort = new FakeSupportedPositionReadPort(
       [FIXTURE_POSITION_IN_RANGE],
       {},
+    );
+
+    const result = await listSupportedPositions({
+      walletId: FIXTURE_WALLET_ID,
+      positionReadPort,
+    });
+
+    expect(result.positions).toHaveLength(1);
+    expect(result.summaryDtos).toHaveLength(0);
+  });
+
+  it('excludes positions whose pool metadata has null decimals', async () => {
+    const poolDataNullDecimals = {
+      ...FIXTURE_POOL_DATA,
+      tokenPair: { ...FIXTURE_POOL_DATA.tokenPair, decimalsA: null, decimalsB: null },
+    };
+    const positionReadPort = new FakeSupportedPositionReadPort(
+      [FIXTURE_POSITION_IN_RANGE],
+      { [FIXTURE_POSITION_IN_RANGE.poolId]: poolDataNullDecimals },
     );
 
     const result = await listSupportedPositions({

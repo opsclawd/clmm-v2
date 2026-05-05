@@ -18,9 +18,13 @@ export async function listSupportedPositions(params: {
   const uniquePoolIds = [...new Set(positions.map((p) => p.poolId))];
   const poolDataMap = new Map<PoolId, Awaited<ReturnType<SupportedPositionReadPort['getPoolData']>>>();
 
-  await Promise.all(uniquePoolIds.map(async (poolId) => {
-    const poolData = await params.positionReadPort.getPoolData(poolId);
-    if (poolData) poolDataMap.set(poolId, poolData);
+  await Promise.allSettled(uniquePoolIds.map(async (poolId) => {
+    try {
+      const poolData = await params.positionReadPort.getPoolData(poolId);
+      if (poolData) poolDataMap.set(poolId, poolData);
+    } catch {
+      // individual pool lookup failure — positions in this pool will be excluded
+    }
   }));
 
   const summaryDtos: PositionSummaryDto[] = [];

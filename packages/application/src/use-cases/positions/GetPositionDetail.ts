@@ -41,7 +41,8 @@ export async function getPositionDetail(params: {
       priceMap.set(q.tokenMint, { usdValue: q.usdValue, symbol: q.symbol });
     }
   } catch {
-    // Price fetch failed — degrade gracefully
+    // Price fetch failed — degrade gracefully. Fee USD values will be 0.
+    // TODO: propagate error via observability port when available
   }
 
   const currentPrice = priceFromSqrtPrice(poolData.sqrtPrice, decimalsA, decimalsB);

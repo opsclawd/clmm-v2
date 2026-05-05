@@ -1,5 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { buildPositionDisplayBounds } from './buildPositionDisplayBounds.js';
+import { tickToPrice } from '@clmm/domain';
 
 describe('buildPositionDisplayBounds', () => {
   it('returns price-space bounds and labels using token-B as the displayed quote symbol for SOL/USDC', () => {
@@ -11,10 +12,14 @@ describe('buildPositionDisplayBounds', () => {
       displayQuoteSymbol: 'USDC',
     });
 
+    const expectedLower = tickToPrice(-10000, 9, 6);
+    const expectedUpper = tickToPrice(10000, 9, 6);
+    expect(result.lowerBoundPrice).toBe(expectedLower);
+    expect(result.upperBoundPrice).toBe(expectedUpper);
     expect(result.lowerBoundPrice).toBeGreaterThan(0);
     expect(result.upperBoundPrice).toBeGreaterThan(result.lowerBoundPrice);
-    expect(result.lowerBoundLabel).toBe(`USDC ${result.lowerBoundPrice.toFixed(2)}`);
-    expect(result.upperBoundLabel).toBe(`USDC ${result.upperBoundPrice.toFixed(2)}`);
+    expect(result.lowerBoundLabel).toBe(`USDC ${expectedLower.toFixed(2)}`);
+    expect(result.upperBoundLabel).toBe(`USDC ${expectedUpper.toFixed(2)}`);
   });
 
   it('preserves lowerTick < upperTick into lowerBoundPrice < upperBoundPrice for SOL/USDC orientation', () => {

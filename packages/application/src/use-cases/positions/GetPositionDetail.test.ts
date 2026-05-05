@@ -132,4 +132,22 @@ describe('GetPositionDetail', () => {
 
     expect(result.kind).toBe('cannot-build-supported-detail-dto');
   });
+
+  it('returns not-found when returned detail has mismatched positionId', async () => {
+    const positionReadPort = new FakeSupportedPositionReadPort(
+      [FIXTURE_POSITION_IN_RANGE],
+      { [FIXTURE_POSITION_IN_RANGE.poolId]: FIXTURE_POOL_DATA },
+      FIXTURE_POSITION_DETAIL,
+    );
+    const pricePort = new FakePricePort([FIXTURE_SOL_PRICE_QUOTE, FIXTURE_USDC_PRICE_QUOTE]);
+
+    const result = await getPositionDetail({
+      walletId: FIXTURE_WALLET_ID,
+      positionId: makePositionId('different-position-id'),
+      positionReadPort,
+      pricePort,
+    });
+
+    expect(result.kind).toBe('not-found');
+  });
 });

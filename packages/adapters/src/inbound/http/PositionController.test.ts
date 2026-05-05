@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { NotFoundException } from '@nestjs/common';
+import { NotFoundException, UnprocessableEntityException } from '@nestjs/common';
 import { PositionController } from './PositionController.js';
 import {
   FakeSupportedPositionReadPort,
@@ -78,6 +78,25 @@ describe('PositionController', () => {
     await expect(
       controller.getPosition(FIXTURE_POSITION_IN_RANGE.walletId, FIXTURE_POSITION_IN_RANGE.positionId),
     ).rejects.toBeInstanceOf(NotFoundException);
+  });
+
+  it('throws UnprocessableEntityException when token decimals are null', async () => {
+    const poolDataNullDecimals = {
+      ...FIXTURE_POOL_DATA,
+      tokenPair: { ...FIXTURE_POOL_DATA.tokenPair, decimalsA: null, decimalsB: null },
+    };
+    const positionDetailNullDecimals = { ...FIXTURE_POSITION_DETAIL, poolData: poolDataNullDecimals };
+    const positionReadPort = new FakeSupportedPositionReadPort(
+      [FIXTURE_POSITION_IN_RANGE],
+      { [FIXTURE_POOL_DATA.poolId]: poolDataNullDecimals },
+      positionDetailNullDecimals,
+    );
+    const triggerRepo = new FakeTriggerRepository();
+    const controller = new PositionController(positionReadPort, triggerRepo, fakePricePort);
+
+    await expect(
+      controller.getPosition(FIXTURE_POSITION_IN_RANGE.walletId, FIXTURE_POSITION_IN_RANGE.positionId),
+    ).rejects.toBeInstanceOf(UnprocessableEntityException);
   });
 
   it('throws NotFoundException when wallet does not own the position', async () => {
