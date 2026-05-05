@@ -1,5 +1,7 @@
 import type { PositionSummaryDto } from '@clmm/application/public';
 
+export type MonitoringStatus = 'active' | 'degraded' | 'inactive';
+
 export type PositionListItemViewModel = {
   positionId: string;
   poolId: string;
@@ -8,6 +10,7 @@ export type PositionListItemViewModel = {
   currentPriceLabel: string;
   rangeStatusKind: 'in-range' | 'below-range' | 'above-range';
   hasAlert: boolean;
+  monitoringStatus: MonitoringStatus;
   monitoringLabel: string;
   lowerBoundPrice: number;
   upperBoundPrice: number;
@@ -42,6 +45,7 @@ export function buildPositionListViewModel(positions: PositionSummaryDto[]): Pos
     currentPriceLabel: p.currentPriceLabel ?? `Current: ${p.currentPrice}`,
     rangeStatusKind: p.rangeState,
     hasAlert: p.hasActionableTrigger,
+    monitoringStatus: p.monitoringStatus,
     monitoringLabel: monitoringLabel(p.monitoringStatus),
     lowerBoundPrice: p.lowerBoundPrice,
     upperBoundPrice: p.upperBoundPrice,
