@@ -239,7 +239,7 @@ describe('PositionController', () => {
     ).rejects.toThrow('Database connection pool exhausted');
   });
 
-  it('includes warning when pool metadata fetches fail in listPositions', async () => {
+  it('returns error when all pool metadata fetches fail in listPositions', async () => {
     const positionReadPort = new FakeSupportedPositionReadPort(
       [FIXTURE_POSITION_IN_RANGE],
       {},
@@ -252,7 +252,7 @@ describe('PositionController', () => {
     const result = await controller.listPositions(FIXTURE_POSITION_IN_RANGE.walletId);
 
     expect(result.positions).toHaveLength(0);
-    expect(result.warning).toBe('Some pool data unavailable. Position list may be incomplete.');
+    expect(result.error).toBe('Unable to fetch position data. Pool metadata unavailable.');
   });
 
   it('never includes srLevels on the position detail payload (S/R lives behind a dedicated endpoint)', async () => {

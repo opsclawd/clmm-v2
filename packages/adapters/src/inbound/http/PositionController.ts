@@ -120,6 +120,13 @@ export class PositionController {
       };
     }
 
+    if (poolMetadataFailures > 0 && summaryDtos.length === 0) {
+      return {
+        positions: [],
+        error: 'Unable to fetch position data. Pool metadata unavailable.',
+      };
+    }
+
     let triggerPositionIds: ReadonlySet<string> = new Set();
     let triggerError: string | undefined;
 

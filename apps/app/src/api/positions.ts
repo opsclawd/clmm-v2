@@ -4,6 +4,8 @@ import { fetchJson } from './http';
 
 type PositionsResponse = {
   positions: PositionSummaryDto[];
+  warning?: string;
+  error?: string;
 };
 
 type PositionDetailResponse = {
@@ -11,9 +13,14 @@ type PositionDetailResponse = {
   error?: string;
 };
 
+export type PositionsResult = {
+  positions: PositionSummaryDto[];
+  warning?: string;
+};
+
 export async function fetchSupportedPositions(
   walletAddress: string,
-): Promise<PositionSummaryDto[]> {
+): Promise<PositionsResult> {
   try {
     const payload = (await fetchJson(`/positions/${walletAddress}`)) as Partial<PositionsResponse>;
 
@@ -21,7 +28,14 @@ export async function fetchSupportedPositions(
       throw new Error('Malformed positions response');
     }
 
-    return payload.positions;
+    if (payload.error) {
+      throw new Error(payload.error);
+    }
+
+    return {
+      positions: payload.positions,
+      ...(payload.warning ? { warning: payload.warning } : {}),
+    };
   } catch (cause: unknown) {
     throw new Error('Could not load supported positions for this wallet', { cause });
   }

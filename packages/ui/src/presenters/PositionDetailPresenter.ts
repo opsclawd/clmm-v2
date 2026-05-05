@@ -22,8 +22,8 @@ function normalizePositionDetailDto(dto: Partial<PositionDetailDto> & Pick<Posit
     monitoringStatus: dto.monitoringStatus ?? 'active',
     lowerBoundPrice: dto.lowerBoundPrice ?? 0,
     upperBoundPrice: dto.upperBoundPrice ?? 0,
-    lowerBoundLabel: dto.lowerBoundLabel ?? `${dto.lowerBoundPrice ?? 0}`,
-    upperBoundLabel: dto.upperBoundLabel ?? `${dto.upperBoundPrice ?? 0}`,
+    lowerBoundLabel: dto.lowerBoundLabel ?? `${dto.lowerBoundPrice?.toFixed(2) ?? '0.00'}`,
+    upperBoundLabel: dto.upperBoundLabel ?? `${dto.upperBoundPrice?.toFixed(2) ?? '0.00'}`,
     sqrtPrice: dto.sqrtPrice ?? '0',
     unclaimedFees: dto.unclaimedFees ?? {
       feeOwedA: { ...EMPTY_TOKEN_AMOUNT },

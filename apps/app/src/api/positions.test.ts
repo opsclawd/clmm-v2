@@ -58,7 +58,7 @@ describe('fetchSupportedPositions', () => {
 
     await expect(
       fetchSupportedPositions('DemoWallet1111111111111111111111111111111111'),
-    ).resolves.toEqual(positions);
+    ).resolves.toEqual({ positions });
 
     expect(fetchMock).toHaveBeenCalledWith(
       'https://bff.example.test/positions/DemoWallet1111111111111111111111111111111111',
@@ -129,6 +129,67 @@ describe('fetchSupportedPositions', () => {
     expect((error as Error & { cause?: unknown }).cause).toBeInstanceOf(Error);
     expect(((error as Error & { cause?: Error }).cause as Error).message).toContain(
       'Malformed positions response',
+    );
+  });
+
+  it('returns positions with warning when BFF signals partial data', async () => {
+    env.EXPO_PUBLIC_BFF_BASE_URL = 'https://bff.example.test';
+
+    const positions = [
+      {
+        positionId: 'Position1111111111111111111111111111111111',
+        poolId: 'Pool111111111111111111111111111111111111111',
+        tokenPairLabel: 'SOL / USDC',
+        currentPrice: 150,
+        currentPriceLabel: 'USDC 150.00',
+        feeRateLabel: '30 bps',
+        lowerBoundPrice: 100,
+        upperBoundPrice: 200,
+        lowerBoundLabel: 'USDC 100.00',
+        upperBoundLabel: 'USDC 200.00',
+        rangeState: 'in-range',
+        hasActionableTrigger: false,
+        monitoringStatus: 'active',
+        rangeDistance: { belowLowerPercent: 0, aboveUpperPercent: 0 },
+      },
+    ] as PositionSummaryDto[];
+
+    globalThis.fetch = vi.fn().mockResolvedValue({
+      ok: true,
+      json: () => Promise.resolve({
+        positions,
+        warning: 'Some pool data unavailable. Position list may be incomplete.',
+      }),
+    }) as typeof fetch;
+
+    const result = await fetchSupportedPositions(
+      'DemoWallet1111111111111111111111111111111111',
+    );
+
+    expect(result.positions).toEqual(positions);
+    expect(result.warning).toBe('Some pool data unavailable. Position list may be incomplete.');
+  });
+
+  it('throws a controlled error when BFF returns an error field in positions response', async () => {
+    env.EXPO_PUBLIC_BFF_BASE_URL = 'https://bff.example.test';
+
+    globalThis.fetch = vi.fn().mockResolvedValue({
+      ok: true,
+      json: () => Promise.resolve({
+        positions: [],
+        error: 'Unable to fetch positions. Position data temporarily unavailable.',
+      }),
+    }) as typeof fetch;
+
+    const error = await fetchSupportedPositions(
+      'DemoWallet1111111111111111111111111111111111',
+    ).catch((reason: unknown) => reason);
+
+    expect(error).toBeInstanceOf(Error);
+    expect((error as Error).message).toBe('Could not load supported positions for this wallet');
+    expect((error as Error & { cause?: unknown }).cause).toBeInstanceOf(Error);
+    expect(((error as Error & { cause?: Error }).cause as Error).message).toContain(
+      'Unable to fetch positions',
     );
   });
 });
