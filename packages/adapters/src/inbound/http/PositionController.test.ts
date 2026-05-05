@@ -223,7 +223,7 @@ describe('PositionController', () => {
     expect(result.positions).toHaveLength(1);
     expect(result.positions[0]!.hasActionableTrigger).toBe(false);
     expect(result.positions[0]!.positionId).toBe(FIXTURE_POSITION_IN_RANGE.positionId);
-    expect(result.warning).toBe('Unable to fetch trigger data. Trigger status may be incomplete.');
+    expect((result as { warning?: string }).warning).toBe('Unable to fetch trigger data. Trigger status may be incomplete.');
   });
 
   it('rethrows non-transient trigger errors from listPositions', async () => {
@@ -252,7 +252,7 @@ describe('PositionController', () => {
     const result = await controller.listPositions(FIXTURE_POSITION_IN_RANGE.walletId);
 
     expect(result.positions).toHaveLength(0);
-    expect(result.error).toBe('Unable to fetch position data. Pool metadata unavailable.');
+    expect((result as { error?: string }).error).toBe('Unable to fetch position data. Pool metadata unavailable.');
   });
 
   it('never includes srLevels on the position detail payload (S/R lives behind a dedicated endpoint)', async () => {

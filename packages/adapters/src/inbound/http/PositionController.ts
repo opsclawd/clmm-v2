@@ -13,6 +13,23 @@ import { SUPPORTED_POSITION_READ_PORT, TRIGGER_REPOSITORY, PRICE_PORT } from './
 
 import { isTransientPositionReadFailure } from './transient-errors.js';
 
+type ListPositionsErrorResponse = {
+  positions: [];
+  error: string;
+};
+
+type ListPositionsSuccessResponse = {
+  positions: PositionSummaryDto[];
+  warning?: string;
+};
+
+type ListPositionsResponse = ListPositionsErrorResponse | ListPositionsSuccessResponse;
+
+type GetPositionDetailResponse = {
+  position: PositionDetailDto;
+  warning?: string;
+};
+
 function toPositionSummaryDto(
   dto: PositionSummaryDto,
   hasActionableTrigger = false,
@@ -140,10 +157,14 @@ export class PositionController {
       triggerError = 'Unable to fetch trigger data. Trigger status may be incomplete.';
     }
 
-    return {
+    const warnings: string[] = [];
+    if (triggerError) warnings.push(triggerError);
+    if (poolMetadataFailures > 0) warnings.push('Some pool data unavailable. Position list may be incomplete.');
+
+    const response: ListPositionsSuccessResponse = {
       positions: summaryDtos.map((dto) => toPositionSummaryDto(dto, triggerPositionIds.has(dto.positionId))),
-      ...(triggerError ? { warning: triggerError } : {}),
-      ...(poolMetadataFailures > 0 ? { warning: 'Some pool data unavailable. Position list may be incomplete.' } : {}),
     };
+    if (warnings.length > 0) response.warning = warnings.join(' ');
+    return response;
   }
 }
