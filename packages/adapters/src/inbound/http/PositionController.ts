@@ -102,12 +102,14 @@ export class PositionController {
     const wallet = makeWalletId(walletId);
 
     let summaryDtos: PositionSummaryDto[];
+    let poolLookupFailures = 0;
     try {
       const result = await listSupportedPositions({
         walletId: wallet,
         positionReadPort: this.positionReadPort,
       });
       summaryDtos = result.summaryDtos;
+      poolLookupFailures = result.poolLookupFailures;
     } catch (error: unknown) {
       if (!isTransientPositionReadFailure(error)) {
         throw error;
@@ -134,6 +136,7 @@ export class PositionController {
     return {
       positions: summaryDtos.map((dto) => toPositionSummaryDto(dto, triggerPositionIds.has(dto.positionId))),
       ...(triggerError ? { error: triggerError } : {}),
+      ...(poolLookupFailures > 0 ? { warning: 'Some pool data unavailable. Position list may be incomplete.' } : {}),
     };
   }
 }
