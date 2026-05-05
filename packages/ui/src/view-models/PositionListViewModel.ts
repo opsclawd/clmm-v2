@@ -2,7 +2,9 @@ import type { PositionSummaryDto } from '@clmm/application/public';
 
 export type PositionListItemViewModel = {
   positionId: string;
+  poolId: string;
   poolLabel: string;
+  currentPrice: number;
   currentPriceLabel: string;
   feeRateLabel: string;
   rangeStatusLabel: string;
@@ -63,7 +65,9 @@ function rangeDistanceLabel(
 export function buildPositionListViewModel(positions: PositionSummaryDto[]): PositionListViewModel {
   const items: PositionListItemViewModel[] = positions.map((p) => ({
     positionId: p.positionId,
+    poolId: p.poolId,
     poolLabel: p.tokenPairLabel,
+    currentPrice: p.currentPrice,
     currentPriceLabel: p.currentPriceLabel ?? `Current: ${p.currentPrice}`,
     feeRateLabel: p.feeRateLabel ?? '',
     rangeStatusLabel: rangeStateLabel(p.rangeState),
