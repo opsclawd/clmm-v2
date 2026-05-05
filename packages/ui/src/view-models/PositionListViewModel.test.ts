@@ -52,3 +52,20 @@ describe('buildPositionListViewModel', () => {
     expect(vm.items).toHaveLength(0);
   });
 });
+
+describe('buildPositionListViewModel monitoringStatus mapping', () => {
+  it('copies active monitoring status through as a typed value', () => {
+    const vm = buildPositionListViewModel([makeSummaryDto({ monitoringStatus: 'active' })]);
+    expect(vm.items[0]!.monitoringStatus).toBe('active');
+  });
+
+  it('copies degraded monitoring status through as a typed value', () => {
+    const vm = buildPositionListViewModel([makeSummaryDto({ monitoringStatus: 'degraded' })]);
+    expect(vm.items[0]!.monitoringStatus).toBe('degraded');
+  });
+
+  it('copies inactive monitoring status through as a typed value', () => {
+    const vm = buildPositionListViewModel([makeSummaryDto({ monitoringStatus: 'inactive' })]);
+    expect(vm.items[0]!.monitoringStatus).toBe('inactive');
+  });
+});
