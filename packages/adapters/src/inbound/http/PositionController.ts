@@ -93,7 +93,7 @@ export class PositionController {
 
     return {
       position: toPositionDetailDto(result.detailDto, trigger),
-      ...(triggerError ? { error: triggerError } : {}),
+      ...(triggerError ? { warning: triggerError } : {}),
     };
   }
 
@@ -142,7 +142,7 @@ export class PositionController {
 
     return {
       positions: summaryDtos.map((dto) => toPositionSummaryDto(dto, triggerPositionIds.has(dto.positionId))),
-      ...(triggerError ? { error: triggerError } : {}),
+      ...(triggerError ? { warning: triggerError } : {}),
       ...(poolMetadataFailures > 0 ? { warning: 'Some pool data unavailable. Position list may be incomplete.' } : {}),
     };
   }

@@ -143,7 +143,7 @@ describe('PositionController', () => {
     expect(result.position.positionId).toBe(FIXTURE_POSITION_IN_RANGE.positionId);
     expect(result.position.hasActionableTrigger).toBe(false);
     expect(result.position.triggerId).toBeUndefined();
-    expect(result.error).toBe('Unable to fetch trigger data. Position data temporarily unavailable.');
+    expect(result.warning).toBe('Unable to fetch trigger data. Position data temporarily unavailable.');
   });
 
   it('rethrows non-transient trigger errors from getPosition', async () => {
@@ -223,7 +223,7 @@ describe('PositionController', () => {
     expect(result.positions).toHaveLength(1);
     expect(result.positions[0]!.hasActionableTrigger).toBe(false);
     expect(result.positions[0]!.positionId).toBe(FIXTURE_POSITION_IN_RANGE.positionId);
-    expect(result.error).toBe('Unable to fetch trigger data. Trigger status may be incomplete.');
+    expect(result.warning).toBe('Unable to fetch trigger data. Trigger status may be incomplete.');
   });
 
   it('rethrows non-transient trigger errors from listPositions', async () => {

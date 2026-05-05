@@ -38,7 +38,10 @@ export async function listSupportedPositions(params: {
     const poolData = poolDataMap.get(p.poolId);
     if (!poolData) continue;
     const { decimalsA, decimalsB } = poolData.tokenPair;
-    if (decimalsA === null || decimalsB === null) continue;
+    if (decimalsA === null || decimalsB === null) {
+      poolMetadataFailures++;
+      continue;
+    }
 
     const currentPrice = priceFromSqrtPrice(poolData.sqrtPrice, decimalsA, decimalsB);
     const distance = rangeDistancePercent(
