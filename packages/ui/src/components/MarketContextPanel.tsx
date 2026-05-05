@@ -120,8 +120,8 @@ export function MarketContextPanel({
           {poolLabel}
         </Text>
       ) : null}
-      {vm.summary ? <MarketThesisCard summary={vm.summary} /> : null}
       <SrLevelsCard srLevels={vm} />
+      {vm.summary ? <MarketThesisCard summary={vm.summary} /> : null}
       {showDegraded ? (
         <Text style={{ color: colors.warn, fontSize: typography.fontSize.xs, marginTop: 4 }}>
           Refresh failed — showing last available analysis.

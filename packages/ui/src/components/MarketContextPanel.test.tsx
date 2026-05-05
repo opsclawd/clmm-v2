@@ -186,4 +186,25 @@ describe('MarketContextPanel', () => {
 
     expect(screen.getByText('Market context unavailable for mixed pools')).toBeTruthy();
   });
+
+  it('renders Support & Resistance before Market Thesis when both are present', () => {
+    const { container } = render(
+      <MarketContextPanel
+        srLevels={fixtureBlock()}
+        isLoading={false}
+        isError={false}
+        isUnsupported={false}
+        isMixedPools={false}
+        poolLabel={null}
+        now={fixtureBlock().capturedAtUnixMs + 5 * 60_000}
+      />,
+    );
+
+    const text = container.textContent ?? '';
+    const srIndex = text.indexOf('Support & Resistance');
+    const thesisIndex = text.indexOf('Market Thesis');
+    expect(srIndex).toBeGreaterThan(-1);
+    expect(thesisIndex).toBeGreaterThan(-1);
+    expect(srIndex).toBeLessThan(thesisIndex);
+  });
 });
