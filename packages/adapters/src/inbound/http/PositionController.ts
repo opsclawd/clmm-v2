@@ -1,4 +1,4 @@
-import { Controller, Get, Param, Inject, NotFoundException } from '@nestjs/common';
+import { Controller, Get, Param, Inject, NotFoundException, UnprocessableEntityException } from '@nestjs/common';
 import type {
   SupportedPositionReadPort,
   PricePort,
@@ -12,6 +12,23 @@ import { makeWalletId, makePositionId } from '@clmm/domain';
 import { SUPPORTED_POSITION_READ_PORT, TRIGGER_REPOSITORY, PRICE_PORT } from './tokens.js';
 
 import { isTransientPositionReadFailure } from './transient-errors.js';
+
+type ListPositionsErrorResponse = {
+  positions: [];
+  error: string;
+};
+
+type ListPositionsSuccessResponse = {
+  positions: PositionSummaryDto[];
+  warning?: string;
+};
+
+type ListPositionsResponse = ListPositionsErrorResponse | ListPositionsSuccessResponse;
+
+type GetPositionDetailResponse = {
+  position: PositionDetailDto;
+  warning?: string;
+};
 
 function toPositionSummaryDto(
   dto: PositionSummaryDto,
@@ -54,7 +71,7 @@ export class PositionController {
   async getPosition(
     @Param('walletId') walletId: string,
     @Param('positionId') positionId: string,
-  ) {
+  ): Promise<GetPositionDetailResponse> {
     const wallet = makeWalletId(walletId);
     const result = await getPositionDetail({
       walletId: wallet,
@@ -65,6 +82,12 @@ export class PositionController {
 
     if (result.kind === 'not-found') {
       throw new NotFoundException(`Position not found: ${positionId}`);
+    }
+
+    if (result.kind === 'cannot-build-supported-detail-dto') {
+      throw new UnprocessableEntityException(
+        `Position detail unavailable: missing token metadata for ${positionId}`,
+      );
     }
 
     if (result.position.walletId !== wallet) {
@@ -87,21 +110,23 @@ export class PositionController {
 
     return {
       position: toPositionDetailDto(result.detailDto, trigger),
-      ...(triggerError ? { error: triggerError } : {}),
+      ...(triggerError ? { warning: triggerError } : {}),
     };
   }
 
   @Get(':walletId')
-  async listPositions(@Param('walletId') walletId: string) {
+  async listPositions(@Param('walletId') walletId: string): Promise<ListPositionsResponse> {
     const wallet = makeWalletId(walletId);
 
     let summaryDtos: PositionSummaryDto[];
+    let poolMetadataFailures = 0;
     try {
       const result = await listSupportedPositions({
         walletId: wallet,
         positionReadPort: this.positionReadPort,
       });
       summaryDtos = result.summaryDtos;
+      poolMetadataFailures = result.poolMetadataFailures;
     } catch (error: unknown) {
       if (!isTransientPositionReadFailure(error)) {
         throw error;
@@ -109,6 +134,13 @@ export class PositionController {
       return {
         positions: [],
         error: 'Unable to fetch positions. Position data temporarily unavailable.',
+      };
+    }
+
+    if (poolMetadataFailures > 0 && summaryDtos.length === 0) {
+      return {
+        positions: [],
+        error: 'Unable to fetch position data. Pool metadata unavailable.',
       };
     }
 
@@ -125,9 +157,14 @@ export class PositionController {
       triggerError = 'Unable to fetch trigger data. Trigger status may be incomplete.';
     }
 
-    return {
+    const warnings: string[] = [];
+    if (triggerError) warnings.push(triggerError);
+    if (poolMetadataFailures > 0) warnings.push('Some pool data unavailable. Position list may be incomplete.');
+
+    const response: ListPositionsSuccessResponse = {
       positions: summaryDtos.map((dto) => toPositionSummaryDto(dto, triggerPositionIds.has(dto.positionId))),
-      ...(triggerError ? { error: triggerError } : {}),
     };
+    if (warnings.length > 0) response.warning = warnings.join(' ');
+    return response;
   }
 }

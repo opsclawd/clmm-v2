@@ -20,6 +20,10 @@ function makePosition(overrides: Partial<PositionSummaryDto> = {}): PositionSumm
     currentPrice: 142.35,
     currentPriceLabel: 'USDC 142.35',
     feeRateLabel: '10 bps',
+    lowerBoundPrice: 100,
+    upperBoundPrice: 200,
+    lowerBoundLabel: 'USDC 100.00',
+    upperBoundLabel: 'USDC 200.00',
     rangeState: 'in-range',
     rangeDistance: { belowLowerPercent: 0, aboveUpperPercent: 0 },
     hasActionableTrigger: false,
@@ -65,6 +69,32 @@ describe('PositionsListScreen', () => {
 
     expect(screen.getByText('SOL / USDC')).toBeTruthy();
     expect(screen.queryByText('Could not load supported positions')).toBeNull();
+  });
+
+  it('renders warning banner when positionsWarning is provided alongside positions', () => {
+    render(
+      <PositionsListScreen
+        walletAddress="wallet-1"
+        positions={[makePosition()]}
+        positionsWarning="Some pool data unavailable. Position list may be incomplete."
+      />,
+    );
+
+    expect(screen.getByText('SOL / USDC')).toBeTruthy();
+    expect(screen.getByText('Some pool data unavailable. Position list may be incomplete.')).toBeTruthy();
+  });
+
+  it('does not render warning banner when positionsWarning is null', () => {
+    render(
+      <PositionsListScreen
+        walletAddress="wallet-1"
+        positions={[makePosition()]}
+        positionsWarning={null}
+      />,
+    );
+
+    expect(screen.getByText('SOL / USDC')).toBeTruthy();
+    expect(screen.queryByText('unavailable')).toBeNull();
   });
 
   it('renders the empty state when connected without positions and without an error', () => {

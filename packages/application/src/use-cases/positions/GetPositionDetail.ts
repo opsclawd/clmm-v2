@@ -1,11 +1,13 @@
 import type { SupportedPositionReadPort, PricePort } from '../../ports/index.js';
 import type { PositionId, WalletId, LiquidityPosition } from '@clmm/domain';
 import type { PositionDetailDto, TokenAmountValue, RewardAmountValue } from '../../dto/index.js';
-import { priceFromSqrtPrice, rangeDistancePercent, tokenAmountToUsd, tickToPrice, formatFeeRateLabel } from '@clmm/domain';
+import { priceFromSqrtPrice, rangeDistancePercent, tokenAmountToUsd, formatFeeRateLabel } from '@clmm/domain';
+import { buildPositionDisplayBounds } from './buildPositionDisplayBounds.js';
 
 export type GetPositionDetailResult =
   | { kind: 'found'; position: LiquidityPosition; detailDto: PositionDetailDto }
-  | { kind: 'not-found' };
+  | { kind: 'not-found' }
+  | { kind: 'cannot-build-supported-detail-dto' };
 
 export async function getPositionDetail(params: {
   walletId: WalletId;
@@ -24,8 +26,9 @@ export async function getPositionDetail(params: {
   }
 
   const { decimalsA, decimalsB } = poolData.tokenPair;
-  const decimalsKnown = decimalsA !== null && decimalsB !== null;
-
+  if (decimalsA === null || decimalsB === null) {
+    return { kind: 'cannot-build-supported-detail-dto' };
+  }
   const priceMap = new Map<string, { usdValue: number; symbol: string }>();
   try {
     const mints = [poolData.tokenPair.mintA, poolData.tokenPair.mintB];
@@ -38,12 +41,11 @@ export async function getPositionDetail(params: {
       priceMap.set(q.tokenMint, { usdValue: q.usdValue, symbol: q.symbol });
     }
   } catch {
-    // Price fetch failed — degrade gracefully
+    // Price fetch failed — degrade gracefully. Fee USD values will be 0.
+    // TODO: propagate error via observability port when available
   }
 
-  const currentPrice = decimalsKnown
-    ? priceFromSqrtPrice(poolData.sqrtPrice, decimalsA, decimalsB)
-    : position.rangeState.currentPrice;
+  const currentPrice = priceFromSqrtPrice(poolData.sqrtPrice, decimalsA, decimalsB);
 
   const distance = rangeDistancePercent(
     position.rangeState.currentPrice,
@@ -58,14 +60,14 @@ export async function getPositionDetail(params: {
     raw: fees.feeOwedA.toString(),
     decimals: decimalsA,
     symbol: poolData.tokenPair.symbolA,
-    usdValue: (decimalsA !== null && priceA) ? tokenAmountToUsd(fees.feeOwedA, decimalsA, priceA.usdValue) : 0,
+    usdValue: priceA ? tokenAmountToUsd(fees.feeOwedA, decimalsA, priceA.usdValue) : 0,
   };
 
   const feeOwedB: TokenAmountValue = {
     raw: fees.feeOwedB.toString(),
     decimals: decimalsB,
     symbol: poolData.tokenPair.symbolB,
-    usdValue: (decimalsB !== null && priceB) ? tokenAmountToUsd(fees.feeOwedB, decimalsB, priceB.usdValue) : 0,
+    usdValue: priceB ? tokenAmountToUsd(fees.feeOwedB, decimalsB, priceB.usdValue) : 0,
   };
 
   const totalFeesUsd = feeOwedA.usdValue + feeOwedB.usdValue;
@@ -85,17 +87,15 @@ export async function getPositionDetail(params: {
 
   const totalRewardsUsd = rewardValues.reduce((sum, r) => sum + r.usdValue, 0);
 
-  const currentPriceLabel = decimalsKnown
-    ? `${poolData.tokenPair.symbolB} ${currentPrice.toFixed(2)}`
-    : `tick: ${position.rangeState.currentPrice}`;
-
-  const lowerBoundLabel = decimalsKnown
-    ? `${poolData.tokenPair.symbolB} ${tickToPrice(position.bounds.lowerBound, decimalsA, decimalsB).toFixed(2)}`
-    : `tick ${position.bounds.lowerBound}`;
-
-  const upperBoundLabel = decimalsKnown
-    ? `${poolData.tokenPair.symbolB} ${tickToPrice(position.bounds.upperBound, decimalsA, decimalsB).toFixed(2)}`
-    : `tick ${position.bounds.upperBound}`;
+  const displayQuoteSymbol = poolData.tokenPair.symbolB;
+  const currentPriceLabel = `${displayQuoteSymbol} ${currentPrice.toFixed(2)}`;
+  const bounds = buildPositionDisplayBounds({
+    lowerTick: position.bounds.lowerBound,
+    upperTick: position.bounds.upperBound,
+    decimalsA,
+    decimalsB,
+    displayQuoteSymbol,
+  });
 
   const detailDto: PositionDetailDto = {
     positionId: position.positionId,
@@ -104,6 +104,10 @@ export async function getPositionDetail(params: {
     currentPrice,
     currentPriceLabel,
     feeRateLabel: formatFeeRateLabel(poolData.feeRate),
+    lowerBoundPrice: bounds.lowerBoundPrice,
+    upperBoundPrice: bounds.upperBoundPrice,
+    lowerBoundLabel: bounds.lowerBoundLabel,
+    upperBoundLabel: bounds.upperBoundLabel,
     rangeState: position.rangeState.kind,
     rangeDistance: {
       belowLowerPercent: distance.belowLowerPercent,
@@ -111,10 +115,6 @@ export async function getPositionDetail(params: {
     },
     hasActionableTrigger: false,
     monitoringStatus: position.monitoringReadiness.kind,
-    lowerBound: position.bounds.lowerBound,
-    upperBound: position.bounds.upperBound,
-    lowerBoundLabel,
-    upperBoundLabel,
     sqrtPrice: poolData.sqrtPrice.toString(),
     unclaimedFees: {
       feeOwedA,

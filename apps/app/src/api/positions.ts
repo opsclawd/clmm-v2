@@ -1,8 +1,11 @@
 import type { PositionDetailDto, PositionSummaryDto } from '@clmm/application/public';
+import { isPositionSummaryDtoArray, isPositionDetailDto } from '@clmm/application/public';
 import { fetchJson } from './http';
 
 type PositionsResponse = {
   positions: PositionSummaryDto[];
+  warning?: string;
+  error?: string;
 };
 
 type PositionDetailResponse = {
@@ -10,80 +13,14 @@ type PositionDetailResponse = {
   error?: string;
 };
 
-type BreachDirection = NonNullable<PositionDetailDto['breachDirection']>;
-
-const VALID_RANGE_STATES = ['in-range', 'below-range', 'above-range'] as const;
-const VALID_MONITORING_STATUSES = ['active', 'degraded', 'inactive'] as const;
-const VALID_BREACH_DIRECTIONS: BreachDirection['kind'][] = [
-  'lower-bound-breach',
-  'upper-bound-breach',
-];
-
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return typeof value === 'object' && value != null;
-}
-
-function isPositionSummaryDto(value: unknown): value is PositionSummaryDto {
-  if (!isRecord(value)) {
-    return false;
-  }
-
-  return isPositionSummaryRecord(value);
-}
-
-function isPositionSummaryRecord(value: Record<string, unknown>): boolean {
-
-  return (
-    typeof value['positionId'] === 'string' &&
-    typeof value['poolId'] === 'string' &&
-    typeof value['hasActionableTrigger'] === 'boolean' &&
-    VALID_RANGE_STATES.includes(value['rangeState'] as (typeof VALID_RANGE_STATES)[number]) &&
-    VALID_MONITORING_STATUSES.includes(
-      value['monitoringStatus'] as (typeof VALID_MONITORING_STATUSES)[number],
-    )
-  );
-}
-
-
-function isPositionDetailDto(value: unknown): value is PositionDetailDto {
-  if (!isRecord(value)) {
-    return false;
-  }
-
-  const breachDirection = value['breachDirection'];
-  const lowerBound = value['lowerBound'];
-  const upperBound = value['upperBound'];
-  const currentPrice = value['currentPrice'];
-
-  const baseValid =
-    isPositionSummaryRecord(value) &&
-    typeof lowerBound === 'number' &&
-    Number.isFinite(lowerBound) &&
-    typeof upperBound === 'number' &&
-    Number.isFinite(upperBound) &&
-    typeof currentPrice === 'number' &&
-    Number.isFinite(currentPrice) &&
-    (value['triggerId'] == null || typeof value['triggerId'] === 'string') &&
-    (breachDirection == null ||
-      (isRecord(breachDirection) &&
-        VALID_BREACH_DIRECTIONS.includes(
-          breachDirection['kind'] as BreachDirection['kind'],
-        )));
-
-  if (!baseValid) {
-    return false;
-  }
-
-  return true;
-}
-
-function isPositionSummaryDtoArray(value: unknown): value is PositionSummaryDto[] {
-  return Array.isArray(value) && value.every(isPositionSummaryDto);
-}
+export type PositionsResult = {
+  positions: PositionSummaryDto[];
+  warning?: string;
+};
 
 export async function fetchSupportedPositions(
   walletAddress: string,
-): Promise<PositionSummaryDto[]> {
+): Promise<PositionsResult> {
   try {
     const payload = (await fetchJson(`/positions/${walletAddress}`)) as Partial<PositionsResponse>;
 
@@ -91,7 +28,15 @@ export async function fetchSupportedPositions(
       throw new Error('Malformed positions response');
     }
 
-    return payload.positions;
+    if (payload.error && payload.positions.length === 0) {
+      throw new Error(payload.error);
+    }
+
+    return {
+      positions: payload.positions,
+      ...(payload.warning ? { warning: payload.warning } : {}),
+      ...(payload.error && payload.positions.length > 0 ? { warning: payload.error } : {}),
+    };
   } catch (cause: unknown) {
     throw new Error('Could not load supported positions for this wallet', { cause });
   }

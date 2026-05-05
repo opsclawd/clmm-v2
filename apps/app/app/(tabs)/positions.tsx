@@ -40,9 +40,12 @@ export default function PositionsRoute() {
     queryFn: () => fetchSupportedPositions(walletAddress!),
     enabled: walletAddress != null && walletAddress.length > 0,
   });
-  const hasLoadedPositions = (positionsQuery.data?.length ?? 0) > 0;
+  const positionsResult = positionsQuery.data;
+  const positions = positionsResult?.positions;
+  const positionsWarning = positionsResult?.warning ?? null;
+  const hasLoadedPositions = (positions?.length ?? 0) > 0;
 
-  const { poolId, poolLabel, isMixedPools } = deriveUniquePool(positionsQuery.data);
+  const { poolId, poolLabel, isMixedPools } = deriveUniquePool(positions);
 
   const srLevelsQuery = useQuery({
     queryKey: ['sr-levels-current', poolId],
@@ -62,9 +65,10 @@ export default function PositionsRoute() {
   return (
     <PositionsListScreen
       walletAddress={walletAddress}
-      positions={positionsQuery.data}
+      positions={positions}
       positionsLoading={positionsQuery.isLoading}
       positionsError={positionsQuery.isError && !hasLoadedPositions ? 'Could not load supported positions for this wallet.' : null}
+      positionsWarning={positionsWarning}
       platformCapabilities={platformCapabilities}
       srLevels={srLevelsQuery.data?.srLevels}
       srLevelsLoading={srLevelsQuery.isLoading && srLevelsQuery.fetchStatus !== 'idle'}

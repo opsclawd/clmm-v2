@@ -49,7 +49,7 @@ describe('app shell wallet dependency guard', () => {
     expect(routeSource).toContain('fetchSupportedPositions');
     expect(routeSource).toContain("queryKey: ['supported-positions', walletAddress]");
     expect(routeSource).toContain('enabled: walletAddress != null && walletAddress.length > 0');
-    expect(routeSource).toContain('positions={positionsQuery.data}');
+    expect(routeSource).toContain('positions={positions}');
   });
 
   it('wires position tap navigation to the position detail route', () => {

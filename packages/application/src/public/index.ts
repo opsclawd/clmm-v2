@@ -83,6 +83,14 @@ export {
   makePositionId,
 } from '@clmm/domain';
 
+// DTO validation (needed by client-side API layer)
+export {
+  isPositionSummaryDto,
+  isPositionDetailDto,
+  isPositionSummaryDtoArray,
+  isPositionSummaryRecord,
+} from '../dto/validation.js';
+
 // Use cases (needed by testing scenarios)
 export { scanPositionsForBreaches } from '../use-cases/triggers/ScanPositionsForBreaches.js';
 export { qualifyActionableTrigger } from '../use-cases/triggers/QualifyActionableTrigger.js';

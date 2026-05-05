@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { NotFoundException } from '@nestjs/common';
+import { NotFoundException, UnprocessableEntityException } from '@nestjs/common';
 import { PositionController } from './PositionController.js';
 import {
   FakeSupportedPositionReadPort,
@@ -80,6 +80,25 @@ describe('PositionController', () => {
     ).rejects.toBeInstanceOf(NotFoundException);
   });
 
+  it('throws UnprocessableEntityException when token decimals are null', async () => {
+    const poolDataNullDecimals = {
+      ...FIXTURE_POOL_DATA,
+      tokenPair: { ...FIXTURE_POOL_DATA.tokenPair, decimalsA: null, decimalsB: null },
+    };
+    const positionDetailNullDecimals = { ...FIXTURE_POSITION_DETAIL, poolData: poolDataNullDecimals };
+    const positionReadPort = new FakeSupportedPositionReadPort(
+      [FIXTURE_POSITION_IN_RANGE],
+      { [FIXTURE_POOL_DATA.poolId]: poolDataNullDecimals },
+      positionDetailNullDecimals,
+    );
+    const triggerRepo = new FakeTriggerRepository();
+    const controller = new PositionController(positionReadPort, triggerRepo, fakePricePort);
+
+    await expect(
+      controller.getPosition(FIXTURE_POSITION_IN_RANGE.walletId, FIXTURE_POSITION_IN_RANGE.positionId),
+    ).rejects.toBeInstanceOf(UnprocessableEntityException);
+  });
+
   it('throws NotFoundException when wallet does not own the position', async () => {
     const positionReadPort = new FakeSupportedPositionReadPort([FIXTURE_POSITION_IN_RANGE], fixturePoolDataMap, FIXTURE_POSITION_DETAIL);
     const triggerRepo = new FakeTriggerRepository();
@@ -124,7 +143,7 @@ describe('PositionController', () => {
     expect(result.position.positionId).toBe(FIXTURE_POSITION_IN_RANGE.positionId);
     expect(result.position.hasActionableTrigger).toBe(false);
     expect(result.position.triggerId).toBeUndefined();
-    expect(result.error).toBe('Unable to fetch trigger data. Position data temporarily unavailable.');
+    expect(result.warning).toBe('Unable to fetch trigger data. Position data temporarily unavailable.');
   });
 
   it('rethrows non-transient trigger errors from getPosition', async () => {
@@ -204,7 +223,7 @@ describe('PositionController', () => {
     expect(result.positions).toHaveLength(1);
     expect(result.positions[0]!.hasActionableTrigger).toBe(false);
     expect(result.positions[0]!.positionId).toBe(FIXTURE_POSITION_IN_RANGE.positionId);
-    expect(result.error).toBe('Unable to fetch trigger data. Trigger status may be incomplete.');
+    expect((result as { warning?: string }).warning).toBe('Unable to fetch trigger data. Trigger status may be incomplete.');
   });
 
   it('rethrows non-transient trigger errors from listPositions', async () => {
@@ -219,6 +238,23 @@ describe('PositionController', () => {
       controller.listPositions(FIXTURE_POSITION_IN_RANGE.walletId),
     ).rejects.toThrow('Database connection pool exhausted');
   });
+
+  it('returns error when all pool metadata fetches fail in listPositions', async () => {
+    const positionReadPort = new FakeSupportedPositionReadPort(
+      [FIXTURE_POSITION_IN_RANGE],
+      {},
+      FIXTURE_POSITION_DETAIL,
+    );
+    positionReadPort.getPoolData = async () => null;
+    const triggerRepo = new FakeTriggerRepository();
+    const controller = new PositionController(positionReadPort, triggerRepo, fakePricePort);
+
+    const result = await controller.listPositions(FIXTURE_POSITION_IN_RANGE.walletId);
+
+    expect(result.positions).toHaveLength(0);
+    expect((result as { error?: string }).error).toBe('Unable to fetch position data. Pool metadata unavailable.');
+  });
+
   it('never includes srLevels on the position detail payload (S/R lives behind a dedicated endpoint)', async () => {
     const positionReadPort = new FakeSupportedPositionReadPort(
       [FIXTURE_POSITION_IN_RANGE],

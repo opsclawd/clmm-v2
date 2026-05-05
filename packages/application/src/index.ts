@@ -2,6 +2,7 @@
 export * from './ports/index.js';
 export * from './ports/BreachEpisodeRepository.js';
 export * from './dto/index.js';
+export * from './dto/validation.js';
 export * from './use-cases/triggers/ScanPositionsForBreaches.js';
 export * from './use-cases/triggers/QualifyActionableTrigger.js';
 export * from './use-cases/previews/CreateExecutionPreview.js';
