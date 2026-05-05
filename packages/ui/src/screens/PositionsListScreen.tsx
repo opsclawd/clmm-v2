@@ -14,6 +14,7 @@ type Props = {
   positions?: PositionSummaryDto[] | undefined;
   positionsLoading?: boolean;
   positionsError?: string | null;
+  positionsWarning?: string | null;
   onSelectPosition?: (positionId: string) => void;
   onConnectWallet?: () => void;
   platformCapabilities?: PlatformCapabilities | null;
@@ -31,6 +32,7 @@ export function PositionsListScreen({
   positions,
   positionsLoading,
   positionsError,
+  positionsWarning,
   onSelectPosition,
   onConnectWallet,
   platformCapabilities,
@@ -48,6 +50,7 @@ export function PositionsListScreen({
   return (
     <View style={{ flex: 1, backgroundColor: colors.appBackground }}>
       <DegradedCapabilityBanner capabilities={platformCapabilities} />
+      {positionsWarning ? <PartialDataBanner message={positionsWarning} /> : null}
 
       {!isConnected ? (
         <ConnectWalletEntry {...(onConnectWallet != null ? { onConnectWallet } : {})} />
@@ -70,6 +73,29 @@ export function PositionsListScreen({
       ) : (
         <EmptyState />
       )}
+    </View>
+  );
+}
+
+function PartialDataBanner({ message }: { message: string }) {
+  return (
+    <View style={{
+      marginTop: 8,
+      marginBottom: 4,
+      paddingVertical: 8,
+      paddingHorizontal: 12,
+      backgroundColor: '#422006',
+      borderRadius: 8,
+      borderWidth: 1,
+      borderColor: colors.warning,
+    }}>
+      <Text style={{
+        color: colors.warning,
+        fontSize: typography.fontSize.sm,
+        fontWeight: typography.fontWeight.medium,
+      }}>
+        {message}
+      </Text>
     </View>
   );
 }

@@ -71,7 +71,7 @@ export class PositionController {
   async getPosition(
     @Param('walletId') walletId: string,
     @Param('positionId') positionId: string,
-  ) {
+  ): Promise<GetPositionDetailResponse> {
     const wallet = makeWalletId(walletId);
     const result = await getPositionDetail({
       walletId: wallet,
@@ -115,7 +115,7 @@ export class PositionController {
   }
 
   @Get(':walletId')
-  async listPositions(@Param('walletId') walletId: string) {
+  async listPositions(@Param('walletId') walletId: string): Promise<ListPositionsResponse> {
     const wallet = makeWalletId(walletId);
 
     let summaryDtos: PositionSummaryDto[];

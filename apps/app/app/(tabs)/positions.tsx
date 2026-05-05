@@ -2,7 +2,7 @@ import { useRouter } from 'expo-router';
 import { useQuery } from '@tanstack/react-query';
 import { PositionsListScreen } from '@clmm/ui';
 import { useStore } from 'zustand';
-import { fetchSupportedPositions, type PositionsResult } from '../../src/api/positions';
+import { fetchSupportedPositions } from '../../src/api/positions';
 import { fetchCurrentSrLevels, SrLevelsUnsupportedPoolError } from '../../src/api/srLevels';
 import { walletSessionStore } from '../../src/state/walletSessionStore';
 import type { PositionListItemViewModel } from '@clmm/ui';
@@ -31,10 +31,6 @@ function deriveUniquePool(positions: { poolId: string; tokenPairLabel: string }[
   return { poolId: first[0], poolLabel: first[1], isMixedPools: false };
 }
 
-function positionsFromResult(result: PositionsResult | undefined) {
-  return result?.positions;
-}
-
 export default function PositionsRoute() {
   const router = useRouter();
   const walletAddress = useStore(walletSessionStore, (state) => state.walletAddress);
@@ -44,7 +40,9 @@ export default function PositionsRoute() {
     queryFn: () => fetchSupportedPositions(walletAddress!),
     enabled: walletAddress != null && walletAddress.length > 0,
   });
-  const positions = positionsFromResult(positionsQuery.data);
+  const positionsResult = positionsQuery.data;
+  const positions = positionsResult?.positions;
+  const positionsWarning = positionsResult?.warning ?? null;
   const hasLoadedPositions = (positions?.length ?? 0) > 0;
 
   const { poolId, poolLabel, isMixedPools } = deriveUniquePool(positions);
@@ -70,6 +68,7 @@ export default function PositionsRoute() {
       positions={positions}
       positionsLoading={positionsQuery.isLoading}
       positionsError={positionsQuery.isError && !hasLoadedPositions ? 'Could not load supported positions for this wallet.' : null}
+      positionsWarning={positionsWarning}
       platformCapabilities={platformCapabilities}
       srLevels={srLevelsQuery.data?.srLevels}
       srLevelsLoading={srLevelsQuery.isLoading && srLevelsQuery.fetchStatus !== 'idle'}
