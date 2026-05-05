@@ -44,7 +44,9 @@ function isPositionSummaryRecord(value: Record<string, unknown>): boolean {
     typeof value['lowerBoundPrice'] === 'number' &&
     Number.isFinite(value['lowerBoundPrice']) &&
     typeof value['upperBoundPrice'] === 'number' &&
-    Number.isFinite(value['upperBoundPrice'])
+    Number.isFinite(value['upperBoundPrice']) &&
+    typeof value['lowerBoundLabel'] === 'string' &&
+    typeof value['upperBoundLabel'] === 'string'
   );
 }
 
