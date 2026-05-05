@@ -28,13 +28,14 @@ export async function fetchSupportedPositions(
       throw new Error('Malformed positions response');
     }
 
-    if (payload.error) {
+    if (payload.error && payload.positions.length === 0) {
       throw new Error(payload.error);
     }
 
     return {
       positions: payload.positions,
       ...(payload.warning ? { warning: payload.warning } : {}),
+      ...(payload.error && payload.positions.length > 0 ? { warning: payload.error } : {}),
     };
   } catch (cause: unknown) {
     throw new Error('Could not load supported positions for this wallet', { cause });

@@ -192,6 +192,44 @@ describe('fetchSupportedPositions', () => {
       'Unable to fetch positions',
     );
   });
+
+  it('returns positions with error as warning when BFF has partial data and an error', async () => {
+    env.EXPO_PUBLIC_BFF_BASE_URL = 'https://bff.example.test';
+
+    const positions = [
+      {
+        positionId: 'Position1111111111111111111111111111111111',
+        poolId: 'Pool111111111111111111111111111111111111111',
+        tokenPairLabel: 'SOL / USDC',
+        currentPrice: 150,
+        currentPriceLabel: 'USDC 150.00',
+        feeRateLabel: '30 bps',
+        lowerBoundPrice: 100,
+        upperBoundPrice: 200,
+        lowerBoundLabel: 'USDC 100.00',
+        upperBoundLabel: 'USDC 200.00',
+        rangeState: 'in-range',
+        hasActionableTrigger: false,
+        monitoringStatus: 'active',
+        rangeDistance: { belowLowerPercent: 0, aboveUpperPercent: 0 },
+      },
+    ] as PositionSummaryDto[];
+
+    globalThis.fetch = vi.fn().mockResolvedValue({
+      ok: true,
+      json: () => Promise.resolve({
+        positions,
+        error: 'Unable to fetch trigger data. Trigger status may be incomplete.',
+      }),
+    }) as typeof fetch;
+
+    const result = await fetchSupportedPositions(
+      'DemoWallet1111111111111111111111111111111111',
+    );
+
+    expect(result.positions).toEqual(positions);
+    expect(result.warning).toBe('Unable to fetch trigger data. Trigger status may be incomplete.');
+  });
 });
 
 describe('fetchPositionDetail', () => {
