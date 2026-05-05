@@ -33,6 +33,19 @@ describe('buildPositionListViewModel', () => {
     expect(item.upperBoundLabel).toBe('USDC 200.00');
   });
 
+  it('exposes poolId and numeric currentPrice for card-layer consumers', () => {
+    const vm = buildPositionListViewModel([
+      makeSummaryDto({
+        poolId: 'pool-xyz' as PositionSummaryDto['poolId'],
+        currentPrice: 142.35,
+      }),
+    ]);
+    const item = vm.items[0]!;
+
+    expect(item.poolId).toBe('pool-xyz');
+    expect(item.currentPrice).toBe(142.35);
+  });
+
   it('returns isEmpty true when list is empty', () => {
     const vm = buildPositionListViewModel([]);
     expect(vm.isEmpty).toBe(true);

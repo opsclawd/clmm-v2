@@ -7,6 +7,7 @@ import { ConnectWalletEntry } from '../components/ConnectWalletEntry.js';
 import { SectionHeader } from '../components/SectionHeader.js';
 import { PositionCard } from '../components/PositionCard.js';
 import { MarketContextPanel } from '../components/MarketContextPanel.js';
+import { PortfolioSummaryStrip } from '../components/PortfolioSummaryStrip.js';
 import type { PlatformCapabilities } from '../components/DegradedCapabilityBannerUtils.js';
 
 type Props = {
@@ -218,25 +219,32 @@ function ConnectedPositionsList({
       removeClippedSubviews={false}
       ListHeaderComponent={
         <View>
-          <MarketContextPanel
-            srLevels={srLevels}
-            isLoading={srLevelsLoading ?? false}
-            isError={srLevelsError ?? false}
-            isUnsupported={srLevelsUnsupported ?? false}
-            isMixedPools={isMixedPools}
-            poolLabel={poolLabel}
-            now={now ?? Date.now()}
-          />
+          <PortfolioSummaryStrip />
           <SectionHeader title="Active positions" meta={`${positions.length} monitored`} />
         </View>
       }
+      ListFooterComponent={
+        <MarketContextPanel
+          srLevels={srLevels}
+          isLoading={srLevelsLoading ?? false}
+          isError={srLevelsError ?? false}
+          isUnsupported={srLevelsUnsupported ?? false}
+          isMixedPools={isMixedPools}
+          poolLabel={poolLabel}
+          now={now ?? Date.now()}
+        />
+      }
       renderItem={({ item }) => (
         <PositionCard
+          poolId={item.poolId}
           poolLabel={item.poolLabel}
+          currentPrice={item.currentPrice}
           currentPriceLabel={item.currentPriceLabel}
-          feeRateLabel={item.feeRateLabel}
+          lowerBoundPrice={item.lowerBoundPrice}
+          upperBoundPrice={item.upperBoundPrice}
+          lowerBoundLabel={item.lowerBoundLabel}
+          upperBoundLabel={item.upperBoundLabel}
           rangeStatusKind={item.rangeStatusKind}
-          rangeDistanceLabel={item.rangeDistanceLabel}
           hasAlert={item.hasAlert}
           monitoringLabel={item.monitoringLabel}
           onPress={() => onSelectPosition?.(item.positionId)}

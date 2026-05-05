@@ -108,16 +108,47 @@ describe('PositionsListScreen', () => {
     ).toBeTruthy();
   });
 
-  it('renders position cards with correct status chip', () => {
+  it('renders all six status-chip labels per the spec mapping', () => {
     render(
       <PositionsListScreen
         walletAddress="wallet-1"
         positions={[
-          makePosition({ rangeState: 'in-range' }),
-          makePosition({ positionId: brand('position-2'), rangeState: 'below-range' }),
-          makePosition({ positionId: brand('position-3'), rangeState: 'above-range' }),
           makePosition({
-            positionId: brand('position-4'),
+            positionId: brand('position-in'),
+            rangeState: 'in-range',
+            currentPrice: 150,
+            lowerBoundPrice: 100,
+            upperBoundPrice: 200,
+          }),
+          makePosition({
+            positionId: brand('position-near'),
+            poolId: brand('pool-near'),
+            rangeState: 'in-range',
+            currentPrice: 195,
+            lowerBoundPrice: 100,
+            upperBoundPrice: 200,
+          }),
+          makePosition({
+            positionId: brand('position-below'),
+            poolId: brand('pool-below'),
+            rangeState: 'below-range',
+            hasActionableTrigger: false,
+          }),
+          makePosition({
+            positionId: brand('position-above'),
+            poolId: brand('pool-above'),
+            rangeState: 'above-range',
+            hasActionableTrigger: false,
+          }),
+          makePosition({
+            positionId: brand('position-breach-below'),
+            poolId: brand('pool-breach-below'),
+            rangeState: 'below-range',
+            hasActionableTrigger: true,
+          }),
+          makePosition({
+            positionId: brand('position-breach-above'),
+            poolId: brand('pool-breach-above'),
             rangeState: 'above-range',
             hasActionableTrigger: true,
           }),
@@ -126,9 +157,11 @@ describe('PositionsListScreen', () => {
     );
 
     expect(screen.getByText('In range')).toBeTruthy();
+    expect(screen.getByText('Near edge')).toBeTruthy();
     expect(screen.getByText('Below range')).toBeTruthy();
     expect(screen.getByText('Above range')).toBeTruthy();
-    expect(screen.getByText('Breach')).toBeTruthy();
+    expect(screen.getByText('Breach · below')).toBeTruthy();
+    expect(screen.getByText('Breach · above')).toBeTruthy();
   });
 
   it('renders section header with position count', () => {
@@ -189,7 +222,7 @@ describe('PositionsListScreen', () => {
     expect(screen.getByText('Inactive')).toBeTruthy();
   });
 
-  it('renders breach chip for positions with actionable trigger', () => {
+  it('renders directional breach chip for positions with actionable trigger', () => {
     render(
       <PositionsListScreen
         walletAddress="wallet-1"
@@ -197,7 +230,7 @@ describe('PositionsListScreen', () => {
       />,
     );
 
-    expect(screen.getByText('Breach')).toBeTruthy();
+    expect(screen.getByText('Breach · below')).toBeTruthy();
   });
 
   it('renders the market context panel with pool label when positions and S/R data are available', () => {
@@ -316,5 +349,102 @@ describe('PositionsListScreen', () => {
     );
 
     expect(screen.getByText('Market context unavailable for mixed pools')).toBeTruthy();
+    expect(screen.getByText('SOL / USDC')).toBeTruthy();
+    expect(screen.getByText('BTC / USDC')).toBeTruthy();
+  });
+
+  it('does not label out-of-range positions as Near edge even when current price is close to a bound', () => {
+    render(
+      <PositionsListScreen
+        walletAddress="wallet-1"
+        positions={[
+          makePosition({
+            rangeState: 'below-range',
+            currentPrice: 99,
+            lowerBoundPrice: 100,
+            upperBoundPrice: 200,
+            hasActionableTrigger: false,
+          }),
+        ]}
+      />,
+    );
+
+    expect(screen.queryByText('Near edge')).toBeNull();
+    expect(screen.getByText('Below range')).toBeTruthy();
+  });
+
+  it('renders the portfolio summary strip above the active positions for connected wallets with positions', () => {
+    render(<PositionsListScreen walletAddress="wallet-1" positions={[makePosition()]} />);
+
+    expect(screen.getByText('Portfolio')).toBeTruthy();
+    expect(screen.getByText('$24,812')).toBeTruthy();
+    expect(screen.getByText('Fees earned')).toBeTruthy();
+    expect(screen.getByText('+$142.30')).toBeTruthy();
+  });
+
+  it('does not render the portfolio summary strip when disconnected, loading, or empty', () => {
+    const disconnected = render(<PositionsListScreen walletAddress={null} />);
+    expect(disconnected.container.textContent).not.toContain('$24,812');
+    cleanup();
+
+    const loading = render(<PositionsListScreen walletAddress="wallet-1" positionsLoading />);
+    expect(loading.container.textContent).not.toContain('$24,812');
+    cleanup();
+
+    const empty = render(<PositionsListScreen walletAddress="wallet-1" positions={[]} />);
+    expect(empty.container.textContent).not.toContain('$24,812');
+  });
+
+  it('renders summary strip → cards → Support & Resistance → Market Thesis in that order', () => {
+    const { container } = render(
+      <PositionsListScreen
+        walletAddress="wallet-1"
+        positions={[makePosition()]}
+        srLevels={{
+          briefId: 'brief-1',
+          sourceRecordedAtIso: null,
+          summary: 'Bullish continuation.',
+          capturedAtUnixMs: 1_745_712_000_000,
+          supports: [{ price: 132 }],
+          resistances: [{ price: 148 }],
+        }}
+        poolLabel="SOL / USDC"
+        now={1_745_712_000_000 + 5 * 60_000}
+      />,
+    );
+
+    const text = container.textContent ?? '';
+    const portfolioIdx = text.indexOf('Portfolio');
+    const cardIdx = text.indexOf('SOL / USDC');
+    const srIdx = text.indexOf('Support & Resistance');
+    const thesisIdx = text.indexOf('Market Thesis');
+
+    expect(portfolioIdx).toBeGreaterThan(-1);
+    expect(cardIdx).toBeGreaterThan(-1);
+    expect(srIdx).toBeGreaterThan(-1);
+    expect(thesisIdx).toBeGreaterThan(-1);
+
+    expect(portfolioIdx).toBeLessThan(cardIdx);
+    expect(cardIdx).toBeLessThan(srIdx);
+    expect(srIdx).toBeLessThan(thesisIdx);
+  });
+
+  it('renders the RangeBar with lower, current, and upper bound labels from the view model', () => {
+    render(
+      <PositionsListScreen
+        walletAddress="wallet-1"
+        positions={[
+          makePosition({
+            lowerBoundLabel: 'USDC 100.00',
+            upperBoundLabel: 'USDC 200.00',
+            currentPriceLabel: 'USDC 142.35',
+          }),
+        ]}
+      />,
+    );
+
+    expect(screen.getByText('USDC 100.00')).toBeTruthy();
+    expect(screen.getByText('USDC 200.00')).toBeTruthy();
+    expect(screen.getByText('USDC 142.35')).toBeTruthy();
   });
 });
