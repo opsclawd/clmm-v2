@@ -20,7 +20,10 @@ export { RangeStatusBadge, getRangeStatusBadgeProps } from './components/RangeSt
 export { ExecutionStateCard } from './components/ExecutionStateCard.js';
 export { HistoryEventRow } from './components/HistoryEventRow.js';
 export { OffChainHistoryLabel } from './components/OffChainHistoryLabel.js';
-export { DegradedCapabilityBanner, buildDegradedBannerMessage } from './components/DegradedCapabilityBanner.js';
+export {
+  DegradedCapabilityBanner,
+  buildDegradedBannerMessage,
+} from './components/DegradedCapabilityBanner.js';
 export { ConnectWalletEntry } from './components/ConnectWalletEntry.js';
 export { Icon } from './components/Icon.js';
 export type { IconName } from './components/Icon.js';
@@ -59,7 +62,10 @@ export { buildPositionDetailViewModel } from './view-models/PositionDetailViewMo
 export { buildHistoryViewModel } from './view-models/HistoryViewModel.js';
 export { buildWalletConnectViewModel } from './view-models/WalletConnectionViewModel.js';
 export { buildWalletSettingsViewModel } from './view-models/WalletConnectionViewModel.js';
-export type { WalletConnectViewModel, WalletSettingsViewModel } from './view-models/WalletConnectionViewModel.js';
+export type {
+  WalletConnectViewModel,
+  WalletSettingsViewModel,
+} from './view-models/WalletConnectionViewModel.js';
 
 // Presenters
 export { presentPositionDetail } from './presenters/PositionDetailPresenter.js';

@@ -7,7 +7,12 @@ import type { Db } from './db.js';
 const leakedPositionId = makePositionId('leaked-position');
 
 function makeDbWithTriggerRows(params: {
-  ownershipRows: Array<{ walletId: string; positionId: string; firstSeenAt: number; lastSeenAt: number }>;
+  ownershipRows: Array<{
+    walletId: string;
+    positionId: string;
+    firstSeenAt: number;
+    lastSeenAt: number;
+  }>;
   triggerRows: Array<{
     triggerId: string;
     positionId: string;
@@ -60,8 +65,12 @@ function makeDbWithTriggerRows(params: {
       selectCallCount++;
       return {
         from(table: unknown) {
-          const tableName = (table as { name?: string })?.name ??
-            ((table as Record<string | symbol, unknown>)[Symbol.for('drizzle:Name')] as string | undefined) ?? '';
+          const tableName =
+            (table as { name?: string })?.name ??
+            ((table as Record<string | symbol, unknown>)[Symbol.for('drizzle:Name')] as
+              | string
+              | undefined) ??
+            '';
 
           // First select call in listActionableTriggers queries wallet_position_ownership
           if (selectCallCount === 1 || tableName === 'wallet_position_ownership') {
@@ -73,11 +82,10 @@ function makeDbWithTriggerRows(params: {
           // Second select call queries exit_triggers joined with breach_episodes
           return {
             innerJoin: () => ({
-              where: async (predicate: unknown) => (
+              where: async (predicate: unknown) =>
                 predicateReferencesOpenEpisodeFilter(predicate)
                   ? params.triggerRows.filter((row) => row.episodeStatus === 'open')
-                  : params.triggerRows
-              ),
+                  : params.triggerRows,
             }),
           };
         },
@@ -107,9 +115,10 @@ function makeDbForFinalizeQualification(params: {
     updateEpisodes: 0,
   };
 
-  const existingTriggerRows = params.existingTriggerByEpisodeId == null
-    ? []
-    : [{ triggerId: params.existingTriggerByEpisodeId }];
+  const existingTriggerRows =
+    params.existingTriggerByEpisodeId == null
+      ? []
+      : [{ triggerId: params.existingTriggerByEpisodeId }];
 
   const db = {
     transaction: async (fn: (tx: unknown) => Promise<unknown>) => {
@@ -120,7 +129,10 @@ function makeDbForFinalizeQualification(params: {
             where: () => {
               return {
                 for: async () => [params.episode],
-                then: (resolve: (value: unknown[]) => unknown, _reject?: (reason?: unknown) => unknown) => resolve(existingTriggerRows),
+                then: (
+                  resolve: (value: unknown[]) => unknown,
+                  _reject?: (reason?: unknown) => unknown,
+                ) => resolve(existingTriggerRows),
               };
             },
           }),
@@ -320,10 +332,7 @@ describe('OperationalStorageAdapter', () => {
         closeReason: 'position-recovered',
       },
     });
-    const adapter = new OperationalStorageAdapter(
-      db,
-      new FakeIdGeneratorPort('storage'),
-    );
+    const adapter = new OperationalStorageAdapter(db, new FakeIdGeneratorPort('storage'));
 
     const result = await adapter.finalizeQualification(episodeId as never, {
       triggerId: 'trigger-new' as never,
@@ -358,20 +367,21 @@ describe('OperationalStorageAdapter', () => {
         closeReason: 'position-recovered',
       },
     });
-    const adapter = new OperationalStorageAdapter(
-      db,
-      new FakeIdGeneratorPort('storage'),
-    );
+    const adapter = new OperationalStorageAdapter(db, new FakeIdGeneratorPort('storage'));
 
-    await expect(() => adapter.finalizeQualification(episodeId as never, {
-      triggerId: 'trigger-new' as never,
-      positionId: FIXTURE_POSITION_IN_RANGE.positionId,
-      episodeId: episodeId as never,
-      breachDirection: LOWER_BOUND_BREACH,
-      triggeredAt: makeClockTimestamp(2_200),
-      confirmationEvaluatedAt: makeClockTimestamp(2_201),
-      confirmationPassed: true,
-    })).rejects.toThrow(`finalizeQualification: episode ${episodeId} is closed without an existing trigger`);
+    await expect(() =>
+      adapter.finalizeQualification(episodeId as never, {
+        triggerId: 'trigger-new' as never,
+        positionId: FIXTURE_POSITION_IN_RANGE.positionId,
+        episodeId: episodeId as never,
+        breachDirection: LOWER_BOUND_BREACH,
+        triggeredAt: makeClockTimestamp(2_200),
+        confirmationEvaluatedAt: makeClockTimestamp(2_201),
+        confirmationPassed: true,
+      }),
+    ).rejects.toThrow(
+      `finalizeQualification: episode ${episodeId} is closed without an existing trigger`,
+    );
     expect(calls.insertExitTriggers).toBe(0);
   });
 
@@ -391,20 +401,19 @@ describe('OperationalStorageAdapter', () => {
         closeReason: null,
       },
     });
-    const adapter = new OperationalStorageAdapter(
-      db,
-      new FakeIdGeneratorPort('storage'),
-    );
+    const adapter = new OperationalStorageAdapter(db, new FakeIdGeneratorPort('storage'));
 
-    await expect(() => adapter.finalizeQualification(episodeId as never, {
-      triggerId: 'trigger-new' as never,
-      positionId: FIXTURE_POSITION_IN_RANGE.positionId,
-      episodeId: 'episode-b' as never,
-      breachDirection: LOWER_BOUND_BREACH,
-      triggeredAt: makeClockTimestamp(3_200),
-      confirmationEvaluatedAt: makeClockTimestamp(3_201),
-      confirmationPassed: true,
-    })).rejects.toThrow('finalizeQualification: trigger episode mismatch');
+    await expect(() =>
+      adapter.finalizeQualification(episodeId as never, {
+        triggerId: 'trigger-new' as never,
+        positionId: FIXTURE_POSITION_IN_RANGE.positionId,
+        episodeId: 'episode-b' as never,
+        breachDirection: LOWER_BOUND_BREACH,
+        triggeredAt: makeClockTimestamp(3_200),
+        confirmationEvaluatedAt: makeClockTimestamp(3_201),
+        confirmationPassed: true,
+      }),
+    ).rejects.toThrow('finalizeQualification: trigger episode mismatch');
     expect(calls.transaction).toBe(0);
     expect(calls.insertExitTriggers).toBe(0);
   });

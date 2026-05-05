@@ -21,12 +21,24 @@ describe('colors', () => {
 
   it('has all required color keys', () => {
     const requiredKeys = [
-      'background', 'surface', 'surfaceElevated', 'surfaceRecessed',
-      'primary', 'warning', 'danger', 'breach',
-      'success', 'pending', 'terminal',
-      'text', 'textSecondary', 'textMuted',
-      'border', 'borderSubtle',
-      'downsideArrow', 'upsideArrow',
+      'background',
+      'surface',
+      'surfaceElevated',
+      'surfaceRecessed',
+      'primary',
+      'warning',
+      'danger',
+      'breach',
+      'success',
+      'pending',
+      'terminal',
+      'text',
+      'textSecondary',
+      'textMuted',
+      'border',
+      'borderSubtle',
+      'downsideArrow',
+      'upsideArrow',
     ];
     for (const key of requiredKeys) {
       expect(colors).toHaveProperty(key);

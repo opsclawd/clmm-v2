@@ -6,10 +6,19 @@ vi.mock('@react-native-async-storage/async-storage', () => {
   const mem = new Map<string, string>();
   return {
     default: {
-      setItem: vi.fn((k: string, v: string) => { mem.set(k, v); return Promise.resolve(); }),
+      setItem: vi.fn((k: string, v: string) => {
+        mem.set(k, v);
+        return Promise.resolve();
+      }),
       getItem: vi.fn((k: string) => Promise.resolve(mem.get(k) ?? null)),
-      removeItem: vi.fn((k: string) => { mem.delete(k); return Promise.resolve(); }),
-      clear: vi.fn(() => { mem.clear(); return Promise.resolve(); }),
+      removeItem: vi.fn((k: string) => {
+        mem.delete(k);
+        return Promise.resolve();
+      }),
+      clear: vi.fn(() => {
+        mem.clear();
+        return Promise.resolve();
+      }),
     },
   };
 });
@@ -30,7 +39,10 @@ vi.mock('@solana/connector', () => {
   return {
     useConnector: () =>
       useSyncExternalStore(
-        (l: () => void) => { connectorListeners.add(l); return () => connectorListeners.delete(l); },
+        (l: () => void) => {
+          connectorListeners.add(l);
+          return () => connectorListeners.delete(l);
+        },
         () => connectorState,
         () => connectorState,
       ),
@@ -71,15 +83,26 @@ afterEach(() => {
 describe('WalletBootProvider (web)', () => {
   it('starts in checking-browser-wallet for a persisted browser candidate', () => {
     walletSessionStore.setState({ connectionKind: 'browser', browserRestoreAddress: ADDR });
-    render(<WalletBootProvider><Probe /></WalletBootProvider>);
+    render(
+      <WalletBootProvider>
+        <Probe />
+      </WalletBootProvider>,
+    );
     expect(screen.getByTestId('status').textContent).toBe('checking-browser-wallet');
   });
 
   it('resolves to connected when connector reaches connected with matching account', () => {
     walletSessionStore.setState({ connectionKind: 'browser', browserRestoreAddress: ADDR });
-    render(<WalletBootProvider><Probe /></WalletBootProvider>);
+    render(
+      <WalletBootProvider>
+        <Probe />
+      </WalletBootProvider>,
+    );
     act(() => {
-      setConnector({ walletStatus: { status: 'connecting', connectorId: 'phantom' as never }, account: null });
+      setConnector({
+        walletStatus: { status: 'connecting', connectorId: 'phantom' as never },
+        account: null,
+      });
     });
     expect(screen.getByTestId('status').textContent).toBe('checking-browser-wallet');
     act(() => {
@@ -89,8 +112,16 @@ describe('WalletBootProvider (web)', () => {
   });
 
   it('sets walletAddress in store when boot resolves to connected for browser wallet', () => {
-    walletSessionStore.setState({ connectionKind: 'browser', browserRestoreAddress: ADDR, walletAddress: null });
-    render(<WalletBootProvider><Probe /></WalletBootProvider>);
+    walletSessionStore.setState({
+      connectionKind: 'browser',
+      browserRestoreAddress: ADDR,
+      walletAddress: null,
+    });
+    render(
+      <WalletBootProvider>
+        <Probe />
+      </WalletBootProvider>,
+    );
     expect(walletSessionStore.getState().walletAddress).toBeNull();
     act(() => {
       setConnector({ walletStatus: { status: 'connected', session: {} as never }, account: ADDR });
@@ -101,9 +132,16 @@ describe('WalletBootProvider (web)', () => {
 
   it('resolves to disconnected when connector returns to disconnected after being inflight', () => {
     walletSessionStore.setState({ connectionKind: 'browser', browserRestoreAddress: ADDR });
-    render(<WalletBootProvider><Probe /></WalletBootProvider>);
+    render(
+      <WalletBootProvider>
+        <Probe />
+      </WalletBootProvider>,
+    );
     act(() => {
-      setConnector({ walletStatus: { status: 'connecting', connectorId: 'phantom' as never }, account: null });
+      setConnector({
+        walletStatus: { status: 'connecting', connectorId: 'phantom' as never },
+        account: null,
+      });
     });
     act(() => {
       setConnector({ walletStatus: { status: 'disconnected' }, account: null });
@@ -113,46 +151,85 @@ describe('WalletBootProvider (web)', () => {
 
   it('resolves to disconnected after the 1500ms watchdog when the connector never moves', () => {
     walletSessionStore.setState({ connectionKind: 'browser', browserRestoreAddress: ADDR });
-    render(<WalletBootProvider><Probe /></WalletBootProvider>);
+    render(
+      <WalletBootProvider>
+        <Probe />
+      </WalletBootProvider>,
+    );
     expect(screen.getByTestId('status').textContent).toBe('checking-browser-wallet');
-    act(() => { vi.advanceTimersByTime(1500); });
+    act(() => {
+      vi.advanceTimersByTime(1500);
+    });
     expect(screen.getByTestId('status').textContent).toBe('disconnected');
   });
 
   it('resolves to disconnected when connector connects with a different account', () => {
     walletSessionStore.setState({ connectionKind: 'browser', browserRestoreAddress: ADDR });
-    render(<WalletBootProvider><Probe /></WalletBootProvider>);
+    render(
+      <WalletBootProvider>
+        <Probe />
+      </WalletBootProvider>,
+    );
     act(() => {
-      setConnector({ walletStatus: { status: 'connecting', connectorId: 'phantom' as never }, account: null });
+      setConnector({
+        walletStatus: { status: 'connecting', connectorId: 'phantom' as never },
+        account: null,
+      });
     });
     act(() => {
-      setConnector({ walletStatus: { status: 'connected', session: {} as never }, account: 'AnotherWallet1111111111111111111111111111111' });
+      setConnector({
+        walletStatus: { status: 'connected', session: {} as never },
+        account: 'AnotherWallet1111111111111111111111111111111',
+      });
     });
     expect(screen.getByTestId('status').textContent).toBe('disconnected');
   });
 
   it('returns connected for a persisted native session with no connector activity', () => {
     walletSessionStore.setState({ walletAddress: ADDR, connectionKind: 'native' });
-    render(<WalletBootProvider><Probe /></WalletBootProvider>);
+    render(
+      <WalletBootProvider>
+        <Probe />
+      </WalletBootProvider>,
+    );
     expect(screen.getByTestId('status').textContent).toBe('connected');
   });
 
   it('returns disconnected when there is no candidate', () => {
-    render(<WalletBootProvider><Probe /></WalletBootProvider>);
+    render(
+      <WalletBootProvider>
+        <Probe />
+      </WalletBootProvider>,
+    );
     expect(screen.getByTestId('status').textContent).toBe('disconnected');
   });
 
   it('returns hydrating-storage while the store has not hydrated', () => {
-    walletSessionStore.setState({ hasHydrated: false, connectionKind: 'browser', browserRestoreAddress: ADDR });
-    render(<WalletBootProvider><Probe /></WalletBootProvider>);
+    walletSessionStore.setState({
+      hasHydrated: false,
+      connectionKind: 'browser',
+      browserRestoreAddress: ADDR,
+    });
+    render(
+      <WalletBootProvider>
+        <Probe />
+      </WalletBootProvider>,
+    );
     expect(screen.getByTestId('status').textContent).toBe('hydrating-storage');
   });
 
   it('clears stale session from store when boot resolves to disconnected for browser wallet', () => {
     walletSessionStore.setState({ connectionKind: 'browser', browserRestoreAddress: ADDR });
-    render(<WalletBootProvider><Probe /></WalletBootProvider>);
+    render(
+      <WalletBootProvider>
+        <Probe />
+      </WalletBootProvider>,
+    );
     act(() => {
-      setConnector({ walletStatus: { status: 'connecting', connectorId: 'phantom' as never }, account: null });
+      setConnector({
+        walletStatus: { status: 'connecting', connectorId: 'phantom' as never },
+        account: null,
+      });
     });
     act(() => {
       setConnector({ walletStatus: { status: 'disconnected' }, account: null });
@@ -165,7 +242,11 @@ describe('WalletBootProvider (web)', () => {
 
   it('does not clear native session when boot is disconnected (native owns its own lifecycle)', () => {
     walletSessionStore.setState({ walletAddress: ADDR, connectionKind: 'native' });
-    render(<WalletBootProvider><Probe /></WalletBootProvider>);
+    render(
+      <WalletBootProvider>
+        <Probe />
+      </WalletBootProvider>,
+    );
     expect(screen.getByTestId('status').textContent).toBe('connected');
     expect(walletSessionStore.getState().walletAddress).toBe(ADDR);
   });

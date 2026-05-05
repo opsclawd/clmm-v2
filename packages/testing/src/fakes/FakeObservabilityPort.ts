@@ -1,4 +1,8 @@
-import type { ObservabilityPort, DetectionTimingRecord, DeliveryTimingRecord } from '@clmm/application';
+import type {
+  ObservabilityPort,
+  DetectionTimingRecord,
+  DeliveryTimingRecord,
+} from '@clmm/application';
 
 type LogEntry = {
   level: 'info' | 'warn' | 'error';

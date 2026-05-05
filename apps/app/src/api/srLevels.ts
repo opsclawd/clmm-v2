@@ -8,7 +8,9 @@ export class SrLevelsUnsupportedPoolError extends Error {
   }
 }
 
-export function isSrLevelsUnsupportedPoolError(error: unknown): error is SrLevelsUnsupportedPoolError {
+export function isSrLevelsUnsupportedPoolError(
+  error: unknown,
+): error is SrLevelsUnsupportedPoolError {
   return error instanceof SrLevelsUnsupportedPoolError;
 }
 
@@ -47,8 +49,10 @@ function isSrLevelsBlock(value: unknown): value is SrLevelsBlock {
     typeof value['capturedAtUnixMs'] === 'number' &&
     Number.isFinite(value['capturedAtUnixMs']) &&
     value['capturedAtUnixMs'] > 0 &&
-    Array.isArray(value['supports']) && (value['supports'] as unknown[]).every(isSrLevel) &&
-    Array.isArray(value['resistances']) && (value['resistances'] as unknown[]).every(isSrLevel)
+    Array.isArray(value['supports']) &&
+    (value['supports'] as unknown[]).every(isSrLevel) &&
+    Array.isArray(value['resistances']) &&
+    (value['resistances'] as unknown[]).every(isSrLevel)
   );
 }
 
@@ -59,7 +63,11 @@ async function classifyNotFound(poolId: string, response: Response): Promise<Err
   } catch {
     return new Error('Could not load market context: unexpected 404');
   }
-  if (isRecord(body) && typeof body['message'] === 'string' && body['message'].includes('not supported')) {
+  if (
+    isRecord(body) &&
+    typeof body['message'] === 'string' &&
+    body['message'].includes('not supported')
+  ) {
     return new SrLevelsUnsupportedPoolError(poolId);
   }
   return new Error('Could not load market context: endpoint not found');
@@ -79,7 +87,9 @@ export async function fetchCurrentSrLevels(poolId: string): Promise<SrLevelsResp
     if (isAbortError(error)) {
       throw new Error('Could not load market context: request timed out');
     }
-    throw new Error(`Could not load market context: ${error instanceof Error ? error.message : 'network error'}`);
+    throw new Error(
+      `Could not load market context: ${error instanceof Error ? error.message : 'network error'}`,
+    );
   } finally {
     clearTimeout(timeoutId);
   }

@@ -1,9 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { resumeExecutionAttempt } from './ResumeExecutionAttempt.js';
-import {
-  FakeExecutionRepository,
-  FIXTURE_POSITION_ID,
-} from '@clmm/testing';
+import { FakeExecutionRepository, FIXTURE_POSITION_ID } from '@clmm/testing';
 import { LOWER_BOUND_BREACH } from '@clmm/domain';
 import type { StoredExecutionAttempt } from '../../ports/index.js';
 

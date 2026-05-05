@@ -89,7 +89,9 @@ describe('useBrowserWalletDisconnect', () => {
 
   it('rethrows connector disconnect failure so callers can react', async () => {
     mockAdapterResult.isConnected = true;
-    mockAdapterResult.disconnectWallet = vi.fn().mockRejectedValue(new Error('Already disconnected'));
+    mockAdapterResult.disconnectWallet = vi
+      .fn()
+      .mockRejectedValue(new Error('Already disconnected'));
 
     const { useBrowserWalletDisconnect } = await import('./useBrowserWalletDisconnect');
     const { result } = renderHook(() => useBrowserWalletDisconnect());

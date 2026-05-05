@@ -40,8 +40,12 @@ import {
 } from '../inbound/jobs/tokens.js';
 
 // boundary: process.env values are untyped at runtime; validated via env schema at deploy
-const dbUrl = (process.env as Record<string, string | undefined>)['DATABASE_URL'] ?? 'postgresql://localhost/clmm';
-const rpcUrl = (process.env as Record<string, string | undefined>)['SOLANA_RPC_URL'] ?? 'https://api.mainnet-beta.solana.com';
+const dbUrl =
+  (process.env as Record<string, string | undefined>)['DATABASE_URL'] ??
+  'postgresql://localhost/clmm';
+const rpcUrl =
+  (process.env as Record<string, string | undefined>)['SOLANA_RPC_URL'] ??
+  'https://api.mainnet-beta.solana.com';
 
 const db = createDb(dbUrl);
 
@@ -65,8 +69,10 @@ const solanaPreparation = new SolanaExecutionPreparationAdapter(rpcUrl, snapshot
 const solanaSubmission = new SolanaExecutionSubmissionAdapter(rpcUrl);
 const durableNotificationEvent = new DurableNotificationEventAdapter(db, systemIds);
 const telemetry = new TelemetryAdapter();
-const regimeEngineBaseUrl = (process.env as Record<string, string | undefined>)['REGIME_ENGINE_BASE_URL'] ?? null;
-const regimeEngineInternalToken = (process.env as Record<string, string | undefined>)['REGIME_ENGINE_INTERNAL_TOKEN'] ?? null;
+const regimeEngineBaseUrl =
+  (process.env as Record<string, string | undefined>)['REGIME_ENGINE_BASE_URL'] ?? null;
+const regimeEngineInternalToken =
+  (process.env as Record<string, string | undefined>)['REGIME_ENGINE_INTERNAL_TOKEN'] ?? null;
 const regimeEngineEventAdapter: RegimeEngineEventPort = new RegimeEngineExecutionEventAdapter(
   regimeEngineBaseUrl,
   regimeEngineInternalToken,

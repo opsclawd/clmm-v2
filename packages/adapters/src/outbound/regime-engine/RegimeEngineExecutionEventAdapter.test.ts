@@ -1,7 +1,10 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import type { ObservabilityPort, ClockPort, StoredExecutionAttempt } from '@clmm/application';
 import type { PositionId, BreachEpisodeId } from '@clmm/domain';
-import { RegimeEngineExecutionEventAdapter, buildClmmExecutionEvent } from './RegimeEngineExecutionEventAdapter.js';
+import {
+  RegimeEngineExecutionEventAdapter,
+  buildClmmExecutionEvent,
+} from './RegimeEngineExecutionEventAdapter.js';
 import type { ClmmExecutionEventRequest } from './types.js';
 
 interface FakeLogEntry {
@@ -47,9 +50,15 @@ function makeAttempt(overrides: Partial<StoredExecutionAttempt> = {}): StoredExe
   return {
     attemptId: 'attempt-1',
     positionId: 'pos-1' as unknown as PositionId,
-    breachDirection: { kind: 'lower-bound-breach' } as unknown as StoredExecutionAttempt['breachDirection'],
+    breachDirection: {
+      kind: 'lower-bound-breach',
+    } as unknown as StoredExecutionAttempt['breachDirection'],
     lifecycleState: { kind: 'confirmed' } as unknown as StoredExecutionAttempt['lifecycleState'],
-    completedSteps: ['remove-liquidity', 'collect-fees', 'swap-assets'] as unknown as StoredExecutionAttempt['completedSteps'],
+    completedSteps: [
+      'remove-liquidity',
+      'collect-fees',
+      'swap-assets',
+    ] as unknown as StoredExecutionAttempt['completedSteps'],
     transactionReferences: [
       { signature: 'sig-remove', stepKind: 'remove-liquidity' },
       { signature: 'sig-collect', stepKind: 'collect-fees' },
@@ -150,7 +159,7 @@ describe('RegimeEngineExecutionEventAdapter', () => {
       await adapter.notifyExecutionEvent(makeEvent({ correlationId: 'corr-503' }));
 
       expect(global.fetch).toHaveBeenCalledTimes(3);
-      const errorLogs = fakeObs.logs.filter(l => l.level === 'error');
+      const errorLogs = fakeObs.logs.filter((l) => l.level === 'error');
       expect(errorLogs).toHaveLength(1);
       expect(errorLogs[0]!.context).toMatchObject({
         correlationId: 'corr-503',
@@ -173,7 +182,7 @@ describe('RegimeEngineExecutionEventAdapter', () => {
       await adapter.notifyExecutionEvent(makeEvent({ correlationId: 'corr-409' }));
 
       expect(global.fetch).toHaveBeenCalledOnce();
-      const infoLogs = fakeObs.logs.filter(l => l.level === 'info');
+      const infoLogs = fakeObs.logs.filter((l) => l.level === 'info');
       expect(infoLogs).toHaveLength(1);
       expect(infoLogs[0]!.context).toMatchObject({
         correlationId: 'corr-409',
@@ -193,7 +202,7 @@ describe('RegimeEngineExecutionEventAdapter', () => {
       await adapter.notifyExecutionEvent(makeEvent({ correlationId: 'corr-401' }));
 
       expect(global.fetch).toHaveBeenCalledOnce();
-      const errorLogs = fakeObs.logs.filter(l => l.level === 'error');
+      const errorLogs = fakeObs.logs.filter((l) => l.level === 'error');
       expect(errorLogs).toHaveLength(1);
       expect(errorLogs[0]!.context).toMatchObject({
         correlationId: 'corr-401',
@@ -215,7 +224,7 @@ describe('RegimeEngineExecutionEventAdapter', () => {
       await adapter.notifyExecutionEvent(makeEvent({ correlationId: 'corr-net' }));
 
       expect(global.fetch).toHaveBeenCalledTimes(3);
-      const errorLogs = fakeObs.logs.filter(l => l.level === 'error');
+      const errorLogs = fakeObs.logs.filter((l) => l.level === 'error');
       expect(errorLogs).toHaveLength(1);
       expect(errorLogs[0]!.context).toMatchObject({
         correlationId: 'corr-net',
@@ -229,9 +238,15 @@ describe('RegimeEngineExecutionEventAdapter', () => {
       vi.useFakeTimers();
 
       vi.spyOn(global, 'fetch')
-        .mockImplementationOnce(() => new Promise((_, reject) => {
-          setTimeout(() => reject(new DOMException('The operation was aborted', 'AbortError')), 5500);
-        }))
+        .mockImplementationOnce(
+          () =>
+            new Promise((_, reject) => {
+              setTimeout(
+                () => reject(new DOMException('The operation was aborted', 'AbortError')),
+                5500,
+              );
+            }),
+        )
         .mockResolvedValueOnce({ ok: true, status: 200 } as Response);
 
       const adapter = new RegimeEngineExecutionEventAdapter(
@@ -263,7 +278,7 @@ describe('RegimeEngineExecutionEventAdapter', () => {
       await adapter.notifyExecutionEvent(makeEvent());
       await adapter.notifyExecutionEvent(makeEvent());
 
-      const infoLogs = fakeObs.logs.filter(l => l.message.includes('disabled'));
+      const infoLogs = fakeObs.logs.filter((l) => l.message.includes('disabled'));
       expect(infoLogs).toHaveLength(1);
       expect(fetchSpy).not.toHaveBeenCalled();
     });
@@ -271,11 +286,15 @@ describe('RegimeEngineExecutionEventAdapter', () => {
     it('logs info once when internalToken is null', async () => {
       const fetchSpy = vi.spyOn(global, 'fetch');
 
-      const adapter = new RegimeEngineExecutionEventAdapter('https://regime.example.com', null, fakeObs.port);
+      const adapter = new RegimeEngineExecutionEventAdapter(
+        'https://regime.example.com',
+        null,
+        fakeObs.port,
+      );
 
       await adapter.notifyExecutionEvent(makeEvent());
 
-      const infoLogs = fakeObs.logs.filter(l => l.message.includes('disabled'));
+      const infoLogs = fakeObs.logs.filter((l) => l.message.includes('disabled'));
       expect(infoLogs).toHaveLength(1);
       expect(fetchSpy).not.toHaveBeenCalled();
     });
@@ -341,7 +360,11 @@ describe('buildClmmExecutionEvent', () => {
 
   it('maps upper-bound-breach + confirmed correctly', () => {
     const result = buildClmmExecutionEvent(
-      makeAttempt({ breachDirection: { kind: 'upper-bound-breach' } as unknown as StoredExecutionAttempt['breachDirection'] }),
+      makeAttempt({
+        breachDirection: {
+          kind: 'upper-bound-breach',
+        } as unknown as StoredExecutionAttempt['breachDirection'],
+      }),
       'confirmed',
       clock,
       'SOL',
@@ -388,7 +411,9 @@ describe('buildClmmExecutionEvent', () => {
 
   it('returns empty string for txSignature with empty refs on failed', () => {
     const result = buildClmmExecutionEvent(
-      makeAttempt({ transactionReferences: [] as unknown as StoredExecutionAttempt['transactionReferences'] }),
+      makeAttempt({
+        transactionReferences: [] as unknown as StoredExecutionAttempt['transactionReferences'],
+      }),
       'failed',
       clock,
       'USDC',
@@ -398,7 +423,9 @@ describe('buildClmmExecutionEvent', () => {
 
   it('returns empty string for txSignature with empty refs on confirmed', () => {
     const result = buildClmmExecutionEvent(
-      makeAttempt({ transactionReferences: [] as unknown as StoredExecutionAttempt['transactionReferences'] }),
+      makeAttempt({
+        transactionReferences: [] as unknown as StoredExecutionAttempt['transactionReferences'],
+      }),
       'confirmed',
       clock,
       'USDC',

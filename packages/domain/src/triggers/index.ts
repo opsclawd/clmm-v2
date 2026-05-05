@@ -1,8 +1,4 @@
-import type {
-  PositionId,
-  BreachDirection,
-  ClockTimestamp,
-} from '../shared/index.js';
+import type { PositionId, BreachDirection, ClockTimestamp } from '../shared/index.js';
 
 export type BreachEpisodeId = string & { readonly _brand: 'BreachEpisodeId' };
 export type ExitTriggerId = string & { readonly _brand: 'ExitTriggerId' };

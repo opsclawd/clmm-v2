@@ -29,9 +29,7 @@
 import type { WalletSigningPort } from '@clmm/application';
 import type { WalletId } from '@clmm/domain';
 
-type SignSerializedTransaction = (
-  serializedTransaction: Uint8Array,
-) => Promise<Uint8Array>;
+type SignSerializedTransaction = (serializedTransaction: Uint8Array) => Promise<Uint8Array>;
 
 export class BrowserWalletSigningAdapter implements WalletSigningPort {
   private constructor(private readonly signTx: SignSerializedTransaction) {}
@@ -44,9 +42,7 @@ export class BrowserWalletSigningAdapter implements WalletSigningPort {
     serializedPayload: Uint8Array,
     _walletId: WalletId,
   ): Promise<
-    | { kind: 'signed'; signedPayload: Uint8Array }
-    | { kind: 'declined' }
-    | { kind: 'interrupted' }
+    { kind: 'signed'; signedPayload: Uint8Array } | { kind: 'declined' } | { kind: 'interrupted' }
   > {
     try {
       const signedPayload = await this.signTx(serializedPayload);
@@ -60,10 +56,7 @@ export class BrowserWalletSigningAdapter implements WalletSigningPort {
       ) {
         return { kind: 'declined' };
       }
-      if (
-        errorMessage.includes('timeout') ||
-        errorMessage.includes('interrupted')
-      ) {
+      if (errorMessage.includes('timeout') || errorMessage.includes('interrupted')) {
         return { kind: 'interrupted' };
       }
       return { kind: 'interrupted' };

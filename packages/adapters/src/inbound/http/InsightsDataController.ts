@@ -77,7 +77,11 @@ export class InsightsDataController {
   private validateWalletId(walletIdRaw: string): string {
     if (!BASE58_REGEX.test(walletIdRaw)) {
       throw new HttpException(
-        { code: 'invalid_wallet_id', message: 'walletId must be a valid Solana address.', retryable: false },
+        {
+          code: 'invalid_wallet_id',
+          message: 'walletId must be a valid Solana address.',
+          retryable: false,
+        },
         HttpStatus.BAD_REQUEST,
       );
     }

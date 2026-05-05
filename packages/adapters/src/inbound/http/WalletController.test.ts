@@ -112,11 +112,10 @@ function bytesToBase64(bytes: Uint8Array): string {
 
 async function makeSignedChallenge(now: number) {
   const ctx = makeController({ now });
-  const keyPair = await globalThis.crypto.subtle.generateKey(
-    { name: 'Ed25519' },
-    true,
-    ['sign', 'verify'],
-  ) as unknown as { publicKey: CryptoKey; privateKey: CryptoKey };
+  const keyPair = (await globalThis.crypto.subtle.generateKey({ name: 'Ed25519' }, true, [
+    'sign',
+    'verify',
+  ])) as unknown as { publicKey: CryptoKey; privateKey: CryptoKey };
   const rawPubkey = new Uint8Array(
     await globalThis.crypto.subtle.exportKey('raw', keyPair.publicKey),
   );
@@ -371,7 +370,9 @@ describe('WalletController.monitor (tombstone)', () => {
     } catch (err) {
       expect(err).toBeInstanceOf(HttpException);
       expect((err as HttpException).getStatus()).toBe(410);
-      expect((err as HttpException).getResponse()).toMatchObject({ code: 'ENROLLMENT_UPGRADE_REQUIRED' });
+      expect((err as HttpException).getResponse()).toMatchObject({
+        code: 'ENROLLMENT_UPGRADE_REQUIRED',
+      });
     }
 
     expect(await monitoredWallets.listActiveWallets()).toHaveLength(0);
@@ -386,7 +387,9 @@ describe('WalletController.monitor (tombstone)', () => {
     } catch (err) {
       expect(err).toBeInstanceOf(HttpException);
       expect((err as HttpException).getStatus()).toBe(410);
-      expect((err as HttpException).getResponse()).toMatchObject({ code: 'ENROLLMENT_UPGRADE_REQUIRED' });
+      expect((err as HttpException).getResponse()).toMatchObject({
+        code: 'ENROLLMENT_UPGRADE_REQUIRED',
+      });
     }
 
     expect(await monitoredWallets.listActiveWallets()).toHaveLength(0);

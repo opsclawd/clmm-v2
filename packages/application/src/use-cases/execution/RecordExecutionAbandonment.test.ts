@@ -111,30 +111,26 @@ describe('RecordExecutionAbandonment', () => {
     expect(result.kind).toBe('not-found');
   });
 
-  it.each([
-    'submitted',
-    'failed',
-    'expired',
-    'confirmed',
-    'partial',
-    'abandoned',
-  ] as const)('refuses to abandon an attempt in %s state', async (state) => {
-    await executionRepo.updateAttemptState('attempt-abandon-1', { kind: state });
-    const result = await recordExecutionAbandonment({
-      attemptId: 'attempt-abandon-1',
-      positionId: FIXTURE_POSITION_ID,
-      breachDirection: LOWER_BOUND_BREACH,
-      executionRepo,
-      historyRepo,
-      clock,
-      ids,
-    });
-    expect(result.kind).toBe('already-terminal');
-    if (result.kind === 'already-terminal') {
-      expect(result.state).toBe(state);
-    }
-    expect(historyRepo.events).toHaveLength(0);
-  });
+  it.each(['submitted', 'failed', 'expired', 'confirmed', 'partial', 'abandoned'] as const)(
+    'refuses to abandon an attempt in %s state',
+    async (state) => {
+      await executionRepo.updateAttemptState('attempt-abandon-1', { kind: state });
+      const result = await recordExecutionAbandonment({
+        attemptId: 'attempt-abandon-1',
+        positionId: FIXTURE_POSITION_ID,
+        breachDirection: LOWER_BOUND_BREACH,
+        executionRepo,
+        historyRepo,
+        clock,
+        ids,
+      });
+      expect(result.kind).toBe('already-terminal');
+      if (result.kind === 'already-terminal') {
+        expect(result.state).toBe(state);
+      }
+      expect(historyRepo.events).toHaveLength(0);
+    },
+  );
 
   it('fails fast when the caller positionId mismatches the stored attempt', async () => {
     await expect(

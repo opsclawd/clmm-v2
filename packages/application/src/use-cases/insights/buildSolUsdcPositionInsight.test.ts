@@ -1,9 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { buildSolUsdcPositionInsight } from './buildSolUsdcPositionInsight.js';
-import {
-  FIXTURE_POSITION_DETAIL,
-  FIXTURE_POSITION_IN_RANGE,
-} from '@clmm/testing';
+import { FIXTURE_POSITION_DETAIL, FIXTURE_POSITION_IN_RANGE } from '@clmm/testing';
 
 describe('buildSolUsdcPositionInsight', () => {
   it('returns a SOL/USDC position insight DTO with raw fee fields and tick distances', () => {
@@ -45,8 +42,9 @@ describe('buildSolUsdcPositionInsight', () => {
     expect(result.insight.unclaimedFeesUsd).toBeNull();
     expect(result.insight.unclaimedRewardsUsd).toBe(0);
     expect(result.warnings.find((w) => w.code === 'fee_reward_usd_unavailable')).toBeDefined();
-    expect(result.warnings.find((w) => w.code === 'fee_reward_usd_unavailable')?.scope?.positionId)
-      .toBe(FIXTURE_POSITION_IN_RANGE.positionId);
+    expect(
+      result.warnings.find((w) => w.code === 'fee_reward_usd_unavailable')?.scope?.positionId,
+    ).toBe(FIXTURE_POSITION_IN_RANGE.positionId);
   });
 
   it('returns null rewards USD and a warning when a reward price is missing', () => {
@@ -118,7 +116,9 @@ describe('buildSolUsdcPositionInsight', () => {
       ]),
     });
 
-    const priceDistanceWarning = result.warnings.find((w) => w.code === 'price_distance_unavailable');
+    const priceDistanceWarning = result.warnings.find(
+      (w) => w.code === 'price_distance_unavailable',
+    );
     expect(priceDistanceWarning).toBeDefined();
     expect(priceDistanceWarning?.message).toContain('zero-width range');
   });
@@ -142,7 +142,9 @@ describe('buildSolUsdcPositionInsight', () => {
       priceMap: new Map(),
     });
 
-    expect(result.insight.currentPrice).toBe(FIXTURE_POSITION_DETAIL.position.rangeState.currentPrice);
+    expect(result.insight.currentPrice).toBe(
+      FIXTURE_POSITION_DETAIL.position.rangeState.currentPrice,
+    );
     expect(result.insight.currentPriceLabel).toBeDefined();
   });
 

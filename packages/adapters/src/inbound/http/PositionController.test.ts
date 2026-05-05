@@ -17,7 +17,11 @@ const fixturePoolDataMap = { [FIXTURE_POOL_DATA.poolId]: FIXTURE_POOL_DATA };
 
 describe('PositionController', () => {
   it('returns populated position detail with actionable trigger fields when a trigger exists', async () => {
-    const positionReadPort = new FakeSupportedPositionReadPort([FIXTURE_POSITION_IN_RANGE], fixturePoolDataMap, FIXTURE_POSITION_DETAIL);
+    const positionReadPort = new FakeSupportedPositionReadPort(
+      [FIXTURE_POSITION_IN_RANGE],
+      fixturePoolDataMap,
+      FIXTURE_POSITION_DETAIL,
+    );
     const triggerRepo = new FakeTriggerRepository();
     triggerRepo.triggers.set('trigger-position-1', {
       triggerId: 'trigger-position-1' as ExitTriggerId,
@@ -29,11 +33,7 @@ describe('PositionController', () => {
       confirmationPassed: true,
     });
 
-    const controller = new PositionController(
-      positionReadPort,
-      triggerRepo,
-      fakePricePort,
-    );
+    const controller = new PositionController(positionReadPort, triggerRepo, fakePricePort);
 
     const result = await controller.getPosition(
       FIXTURE_POSITION_IN_RANGE.walletId,
@@ -47,13 +47,13 @@ describe('PositionController', () => {
   });
 
   it('returns position detail without optional trigger fields when no trigger exists', async () => {
-    const positionReadPort = new FakeSupportedPositionReadPort([FIXTURE_POSITION_IN_RANGE], fixturePoolDataMap, FIXTURE_POSITION_DETAIL);
-    const triggerRepo = new FakeTriggerRepository();
-    const controller = new PositionController(
-      positionReadPort,
-      triggerRepo,
-      fakePricePort,
+    const positionReadPort = new FakeSupportedPositionReadPort(
+      [FIXTURE_POSITION_IN_RANGE],
+      fixturePoolDataMap,
+      FIXTURE_POSITION_DETAIL,
     );
+    const triggerRepo = new FakeTriggerRepository();
+    const controller = new PositionController(positionReadPort, triggerRepo, fakePricePort);
 
     const result = await controller.getPosition(
       FIXTURE_POSITION_IN_RANGE.walletId,
@@ -69,14 +69,13 @@ describe('PositionController', () => {
   it('throws NotFoundException when position does not exist', async () => {
     const positionReadPort = new FakeSupportedPositionReadPort([], {}, null);
     const triggerRepo = new FakeTriggerRepository();
-    const controller = new PositionController(
-      positionReadPort,
-      triggerRepo,
-      fakePricePort,
-    );
+    const controller = new PositionController(positionReadPort, triggerRepo, fakePricePort);
 
     await expect(
-      controller.getPosition(FIXTURE_POSITION_IN_RANGE.walletId, FIXTURE_POSITION_IN_RANGE.positionId),
+      controller.getPosition(
+        FIXTURE_POSITION_IN_RANGE.walletId,
+        FIXTURE_POSITION_IN_RANGE.positionId,
+      ),
     ).rejects.toBeInstanceOf(NotFoundException);
   });
 
@@ -85,7 +84,10 @@ describe('PositionController', () => {
       ...FIXTURE_POOL_DATA,
       tokenPair: { ...FIXTURE_POOL_DATA.tokenPair, decimalsA: null, decimalsB: null },
     };
-    const positionDetailNullDecimals = { ...FIXTURE_POSITION_DETAIL, poolData: poolDataNullDecimals };
+    const positionDetailNullDecimals = {
+      ...FIXTURE_POSITION_DETAIL,
+      poolData: poolDataNullDecimals,
+    };
     const positionReadPort = new FakeSupportedPositionReadPort(
       [FIXTURE_POSITION_IN_RANGE],
       { [FIXTURE_POOL_DATA.poolId]: poolDataNullDecimals },
@@ -95,12 +97,19 @@ describe('PositionController', () => {
     const controller = new PositionController(positionReadPort, triggerRepo, fakePricePort);
 
     await expect(
-      controller.getPosition(FIXTURE_POSITION_IN_RANGE.walletId, FIXTURE_POSITION_IN_RANGE.positionId),
+      controller.getPosition(
+        FIXTURE_POSITION_IN_RANGE.walletId,
+        FIXTURE_POSITION_IN_RANGE.positionId,
+      ),
     ).rejects.toBeInstanceOf(UnprocessableEntityException);
   });
 
   it('throws NotFoundException when wallet does not own the position', async () => {
-    const positionReadPort = new FakeSupportedPositionReadPort([FIXTURE_POSITION_IN_RANGE], fixturePoolDataMap, FIXTURE_POSITION_DETAIL);
+    const positionReadPort = new FakeSupportedPositionReadPort(
+      [FIXTURE_POSITION_IN_RANGE],
+      fixturePoolDataMap,
+      FIXTURE_POSITION_DETAIL,
+    );
     const triggerRepo = new FakeTriggerRepository();
     const controller = new PositionController(positionReadPort, triggerRepo, fakePricePort);
 
@@ -112,7 +121,11 @@ describe('PositionController', () => {
   });
 
   it('returns the owned position for the same wallet-position pair used by listPositions', async () => {
-    const positionReadPort = new FakeSupportedPositionReadPort([FIXTURE_POSITION_IN_RANGE], fixturePoolDataMap, FIXTURE_POSITION_DETAIL);
+    const positionReadPort = new FakeSupportedPositionReadPort(
+      [FIXTURE_POSITION_IN_RANGE],
+      fixturePoolDataMap,
+      FIXTURE_POSITION_DETAIL,
+    );
     const triggerRepo = new FakeTriggerRepository();
     const controller = new PositionController(positionReadPort, triggerRepo, fakePricePort);
 
@@ -128,7 +141,11 @@ describe('PositionController', () => {
   });
 
   it('degrades gracefully when trigger fetch fails with transient RPC error', async () => {
-    const positionReadPort = new FakeSupportedPositionReadPort([FIXTURE_POSITION_IN_RANGE], fixturePoolDataMap, FIXTURE_POSITION_DETAIL);
+    const positionReadPort = new FakeSupportedPositionReadPort(
+      [FIXTURE_POSITION_IN_RANGE],
+      fixturePoolDataMap,
+      FIXTURE_POSITION_DETAIL,
+    );
     const triggerRepo = new FakeTriggerRepository();
     triggerRepo.listActionableTriggers = async () => {
       throw new Error('SolanaError: HTTP error (429): Too Many Requests');
@@ -143,11 +160,17 @@ describe('PositionController', () => {
     expect(result.position.positionId).toBe(FIXTURE_POSITION_IN_RANGE.positionId);
     expect(result.position.hasActionableTrigger).toBe(false);
     expect(result.position.triggerId).toBeUndefined();
-    expect(result.warning).toBe('Unable to fetch trigger data. Position data temporarily unavailable.');
+    expect(result.warning).toBe(
+      'Unable to fetch trigger data. Position data temporarily unavailable.',
+    );
   });
 
   it('rethrows non-transient trigger errors from getPosition', async () => {
-    const positionReadPort = new FakeSupportedPositionReadPort([FIXTURE_POSITION_IN_RANGE], fixturePoolDataMap, FIXTURE_POSITION_DETAIL);
+    const positionReadPort = new FakeSupportedPositionReadPort(
+      [FIXTURE_POSITION_IN_RANGE],
+      fixturePoolDataMap,
+      FIXTURE_POSITION_DETAIL,
+    );
     const triggerRepo = new FakeTriggerRepository();
     triggerRepo.listActionableTriggers = async () => {
       throw new Error('Database connection pool exhausted');
@@ -155,12 +178,19 @@ describe('PositionController', () => {
     const controller = new PositionController(positionReadPort, triggerRepo, fakePricePort);
 
     await expect(
-      controller.getPosition(FIXTURE_POSITION_IN_RANGE.walletId, FIXTURE_POSITION_IN_RANGE.positionId),
+      controller.getPosition(
+        FIXTURE_POSITION_IN_RANGE.walletId,
+        FIXTURE_POSITION_IN_RANGE.positionId,
+      ),
     ).rejects.toThrow('Database connection pool exhausted');
   });
 
   it('returns empty positions with error on transient RPC failure in listPositions', async () => {
-    const positionReadPort = new FakeSupportedPositionReadPort([FIXTURE_POSITION_IN_RANGE], fixturePoolDataMap, FIXTURE_POSITION_DETAIL);
+    const positionReadPort = new FakeSupportedPositionReadPort(
+      [FIXTURE_POSITION_IN_RANGE],
+      fixturePoolDataMap,
+      FIXTURE_POSITION_DETAIL,
+    );
     positionReadPort.listSupportedPositions = async () => {
       throw new Error('Solana RPC timeout');
     };
@@ -176,20 +206,28 @@ describe('PositionController', () => {
   });
 
   it('rethrows non-transient errors from listPositions', async () => {
-    const positionReadPort = new FakeSupportedPositionReadPort([FIXTURE_POSITION_IN_RANGE], fixturePoolDataMap, FIXTURE_POSITION_DETAIL);
+    const positionReadPort = new FakeSupportedPositionReadPort(
+      [FIXTURE_POSITION_IN_RANGE],
+      fixturePoolDataMap,
+      FIXTURE_POSITION_DETAIL,
+    );
     positionReadPort.listSupportedPositions = async () => {
       throw new Error('Invariant: unknown pool type');
     };
     const triggerRepo = new FakeTriggerRepository();
     const controller = new PositionController(positionReadPort, triggerRepo, fakePricePort);
 
-    await expect(
-      controller.listPositions(FIXTURE_POSITION_IN_RANGE.walletId),
-    ).rejects.toThrow('Invariant: unknown pool type');
+    await expect(controller.listPositions(FIXTURE_POSITION_IN_RANGE.walletId)).rejects.toThrow(
+      'Invariant: unknown pool type',
+    );
   });
 
   it('enriches position summaries with hasActionableTrigger from trigger repository', async () => {
-    const positionReadPort = new FakeSupportedPositionReadPort([FIXTURE_POSITION_IN_RANGE], fixturePoolDataMap, FIXTURE_POSITION_DETAIL);
+    const positionReadPort = new FakeSupportedPositionReadPort(
+      [FIXTURE_POSITION_IN_RANGE],
+      fixturePoolDataMap,
+      FIXTURE_POSITION_DETAIL,
+    );
     const triggerRepo = new FakeTriggerRepository();
     triggerRepo.triggers.set('trigger-list-1', {
       triggerId: 'trigger-list-1' as ExitTriggerId,
@@ -211,7 +249,11 @@ describe('PositionController', () => {
   });
 
   it('returns positions with hasActionableTrigger false and error when trigger fetch fails transiently in listPositions', async () => {
-    const positionReadPort = new FakeSupportedPositionReadPort([FIXTURE_POSITION_IN_RANGE], fixturePoolDataMap, FIXTURE_POSITION_DETAIL);
+    const positionReadPort = new FakeSupportedPositionReadPort(
+      [FIXTURE_POSITION_IN_RANGE],
+      fixturePoolDataMap,
+      FIXTURE_POSITION_DETAIL,
+    );
     const triggerRepo = new FakeTriggerRepository();
     triggerRepo.listActionableTriggers = async () => {
       throw new Error('SolanaError: HTTP error (429): Too Many Requests');
@@ -223,20 +265,26 @@ describe('PositionController', () => {
     expect(result.positions).toHaveLength(1);
     expect(result.positions[0]!.hasActionableTrigger).toBe(false);
     expect(result.positions[0]!.positionId).toBe(FIXTURE_POSITION_IN_RANGE.positionId);
-    expect((result as { warning?: string }).warning).toBe('Unable to fetch trigger data. Trigger status may be incomplete.');
+    expect((result as { warning?: string }).warning).toBe(
+      'Unable to fetch trigger data. Trigger status may be incomplete.',
+    );
   });
 
   it('rethrows non-transient trigger errors from listPositions', async () => {
-    const positionReadPort = new FakeSupportedPositionReadPort([FIXTURE_POSITION_IN_RANGE], fixturePoolDataMap, FIXTURE_POSITION_DETAIL);
+    const positionReadPort = new FakeSupportedPositionReadPort(
+      [FIXTURE_POSITION_IN_RANGE],
+      fixturePoolDataMap,
+      FIXTURE_POSITION_DETAIL,
+    );
     const triggerRepo = new FakeTriggerRepository();
     triggerRepo.listActionableTriggers = async () => {
       throw new Error('Database connection pool exhausted');
     };
     const controller = new PositionController(positionReadPort, triggerRepo, fakePricePort);
 
-    await expect(
-      controller.listPositions(FIXTURE_POSITION_IN_RANGE.walletId),
-    ).rejects.toThrow('Database connection pool exhausted');
+    await expect(controller.listPositions(FIXTURE_POSITION_IN_RANGE.walletId)).rejects.toThrow(
+      'Database connection pool exhausted',
+    );
   });
 
   it('returns error when all pool metadata fetches fail in listPositions', async () => {
@@ -252,7 +300,9 @@ describe('PositionController', () => {
     const result = await controller.listPositions(FIXTURE_POSITION_IN_RANGE.walletId);
 
     expect(result.positions).toHaveLength(0);
-    expect((result as { error?: string }).error).toBe('Unable to fetch position data. Pool metadata unavailable.');
+    expect((result as { error?: string }).error).toBe(
+      'Unable to fetch position data. Pool metadata unavailable.',
+    );
   });
 
   it('never includes srLevels on the position detail payload (S/R lives behind a dedicated endpoint)', async () => {

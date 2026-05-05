@@ -16,14 +16,19 @@ export class PgBossLifecycle implements OnModuleInit, OnModuleDestroy {
   ) {}
 
   async onModuleInit(): Promise<void> {
-    this.startPromise = this.boss.start()
+    this.startPromise = this.boss
+      .start()
       .then(async () => {
         await this.boss.createQueue(ReconciliationJobHandler.JOB_NAME);
       })
       .catch((error: unknown) => {
-        this.observability.log('warn', 'pg-boss startup failed; BFF will serve HTTP but enqueue will fail until restart. Sweep job on worker catches orphans.', {
-          error: error instanceof Error ? error.message : String(error),
-        });
+        this.observability.log(
+          'warn',
+          'pg-boss startup failed; BFF will serve HTTP but enqueue will fail until restart. Sweep job on worker catches orphans.',
+          {
+            error: error instanceof Error ? error.message : String(error),
+          },
+        );
       });
   }
 

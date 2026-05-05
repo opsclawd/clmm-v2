@@ -152,7 +152,9 @@ describe('GetAwaitingSignaturePayload', () => {
       kind: 'expired',
       currentState: 'expired',
     });
-    expect((await executionRepo.getAttempt('attempt-expired'))?.lifecycleState).toEqual({ kind: 'expired' });
+    expect((await executionRepo.getAttempt('attempt-expired'))?.lifecycleState).toEqual({
+      kind: 'expired',
+    });
     expect(historyRepo.events).toContainEqual(
       expect.objectContaining({
         eventType: 'preview-expired',

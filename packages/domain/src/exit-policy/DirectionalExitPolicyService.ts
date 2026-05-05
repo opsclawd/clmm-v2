@@ -63,9 +63,7 @@ export function applyDirectionalExitPolicy(
     /* v8 ignore next 6 */
     default: {
       const _exhaustive: never = direction;
-      throw new Error(
-        `Unhandled BreachDirection: ${JSON.stringify(_exhaustive)}`,
-      );
+      throw new Error(`Unhandled BreachDirection: ${JSON.stringify(_exhaustive)}`);
     }
   }
 }

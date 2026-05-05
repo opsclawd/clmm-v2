@@ -24,7 +24,10 @@ export class RegimeEngineExecutionEventAdapter implements RegimeEngineEventPort 
   async notifyExecutionEvent(event: ClmmExecutionEventRequest): Promise<void> {
     if (!this.baseUrl || !this.internalToken) {
       if (!this.disabledLogged) {
-        this.observability.log('info', 'RegimeEngine event adapter: disabled — missing baseUrl or internalToken');
+        this.observability.log(
+          'info',
+          'RegimeEngine event adapter: disabled — missing baseUrl or internalToken',
+        );
         this.disabledLogged = true;
       }
       return;
@@ -70,7 +73,9 @@ export class RegimeEngineExecutionEventAdapter implements RegimeEngineEventPort 
         }
 
         if (attempt < MAX_ATTEMPTS - 1) {
-          await new Promise<void>(r => setTimeout(r, jitteredBackoff(BACKOFF_MS[attempt] ?? 1000)));
+          await new Promise<void>((r) =>
+            setTimeout(r, jitteredBackoff(BACKOFF_MS[attempt] ?? 1000)),
+          );
           continue;
         }
 
@@ -84,7 +89,9 @@ export class RegimeEngineExecutionEventAdapter implements RegimeEngineEventPort 
         clearTimeout(timer);
 
         if (attempt < MAX_ATTEMPTS - 1) {
-          await new Promise<void>(r => setTimeout(r, jitteredBackoff(BACKOFF_MS[attempt] ?? 1000)));
+          await new Promise<void>((r) =>
+            setTimeout(r, jitteredBackoff(BACKOFF_MS[attempt] ?? 1000)),
+          );
           continue;
         }
 
@@ -110,17 +117,19 @@ export function buildClmmExecutionEvent(
 
   let txSignature: string;
   if (finalKind === 'confirmed') {
-    const swapRef = attempt.transactionReferences.find(r => r.stepKind === 'swap-assets');
+    const swapRef = attempt.transactionReferences.find((r) => r.stepKind === 'swap-assets');
     if (swapRef) {
       txSignature = swapRef.signature;
     } else if (attempt.transactionReferences.length > 0) {
-      txSignature = attempt.transactionReferences[attempt.transactionReferences.length - 1]!.signature;
+      txSignature =
+        attempt.transactionReferences[attempt.transactionReferences.length - 1]!.signature;
     } else {
       txSignature = '';
     }
   } else {
     if (attempt.transactionReferences.length > 0) {
-      txSignature = attempt.transactionReferences[attempt.transactionReferences.length - 1]!.signature;
+      txSignature =
+        attempt.transactionReferences[attempt.transactionReferences.length - 1]!.signature;
     } else {
       txSignature = '';
     }

@@ -22,9 +22,7 @@ export class FakeRangeObservationPort implements RangeObservationPort {
   async observeRangeState(positionId: PositionId): Promise<Observation> {
     const obs = this._observations.get(positionId);
     if (!obs) {
-      throw new Error(
-        `FakeRangeObservationPort: no observation set for position ${positionId}`,
-      );
+      throw new Error(`FakeRangeObservationPort: no observation set for position ${positionId}`);
     }
     return obs;
   }

@@ -2,9 +2,7 @@ import { is, getTableName, sql } from 'drizzle-orm';
 import { PgTable } from 'drizzle-orm/pg-core';
 import type { Db } from './db.js';
 
-export type SchemaReadinessResult =
-  | { ready: true }
-  | { ready: false; missing: string[] };
+export type SchemaReadinessResult = { ready: true } | { ready: false; missing: string[] };
 
 export async function checkSchemaReadiness(
   db: Db,

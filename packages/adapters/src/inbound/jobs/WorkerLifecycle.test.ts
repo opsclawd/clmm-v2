@@ -11,10 +11,12 @@ import { PG_BOSS_INSTANCE } from './tokens.js';
 
 describe('WorkerLifecycle', () => {
   it('declares explicit injection tokens for all constructor dependencies', () => {
-    const deps = (Reflect.getMetadata(
-      SELF_DECLARED_DEPS_METADATA,
-      WorkerLifecycle,
-    ) as Array<{ index: number; param: unknown }>).sort((left, right) => left.index - right.index);
+    const deps = (
+      Reflect.getMetadata(SELF_DECLARED_DEPS_METADATA, WorkerLifecycle) as Array<{
+        index: number;
+        param: unknown;
+      }>
+    ).sort((left, right) => left.index - right.index);
 
     expect(deps).toEqual([
       { index: 0, param: PG_BOSS_INSTANCE },
@@ -70,9 +72,7 @@ describe('WorkerLifecycle', () => {
 
     expect(breachScanCallback).toBeDefined();
 
-    await breachScanCallback?.([
-      { id: 'job-1', data: {} } as Job<object>,
-    ]);
+    await breachScanCallback?.([{ id: 'job-1', data: {} } as Job<object>]);
 
     expect(breachScanHandle).toHaveBeenCalledTimes(1);
   });

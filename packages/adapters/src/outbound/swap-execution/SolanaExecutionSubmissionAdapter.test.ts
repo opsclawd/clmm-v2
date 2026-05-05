@@ -2,9 +2,15 @@ import { describe, it, expect, vi } from 'vitest';
 import { SolanaExecutionSubmissionAdapter } from './SolanaExecutionSubmissionAdapter';
 import type { TransactionReference } from '@clmm/domain';
 
-type RpcStatus = { confirmationStatus?: 'processed' | 'confirmed' | 'finalized'; err?: unknown } | null;
+type RpcStatus = {
+  confirmationStatus?: 'processed' | 'confirmed' | 'finalized';
+  err?: unknown;
+} | null;
 
-const makeRef = (hint: string, stepKind: TransactionReference['stepKind']): TransactionReference => ({
+const makeRef = (
+  hint: string,
+  stepKind: TransactionReference['stepKind'],
+): TransactionReference => ({
   signature: hint,
   stepKind,
 });
@@ -32,10 +38,12 @@ const makeAdapter = (mockRpc: ReturnType<typeof makeMockRpc>) => {
 describe('SolanaExecutionSubmissionAdapter', () => {
   describe('reconcileExecution classification', () => {
     it('returns confirmed when all references are confirmed', async () => {
-      const adapter = makeAdapter(makeMockRpc({
-        'sig1': { confirmationStatus: 'confirmed' },
-        'sig2': { confirmationStatus: 'confirmed' },
-      }));
+      const adapter = makeAdapter(
+        makeMockRpc({
+          sig1: { confirmationStatus: 'confirmed' },
+          sig2: { confirmationStatus: 'confirmed' },
+        }),
+      );
 
       const result = await adapter.reconcileExecution([
         makeRef('sig1', 'remove-liquidity'),
@@ -47,10 +55,12 @@ describe('SolanaExecutionSubmissionAdapter', () => {
     });
 
     it('returns partial when some references are confirmed and others are unresolved', async () => {
-      const adapter = makeAdapter(makeMockRpc({
-        'sig1': { confirmationStatus: 'confirmed' },
-        'sig2': null,
-      }));
+      const adapter = makeAdapter(
+        makeMockRpc({
+          sig1: { confirmationStatus: 'confirmed' },
+          sig2: null,
+        }),
+      );
 
       const result = await adapter.reconcileExecution([
         makeRef('sig1', 'swap-assets'),
@@ -62,11 +72,13 @@ describe('SolanaExecutionSubmissionAdapter', () => {
     });
 
     it('returns failed when some references fail and others are unresolved with zero confirmed', async () => {
-      const adapter = makeAdapter(makeMockRpc({
-        'sig-fail-1': { err: { err: 'Transaction failed' } },
-        'sig-pending-1': null,
-        'sig-pending-2': null,
-      }));
+      const adapter = makeAdapter(
+        makeMockRpc({
+          'sig-fail-1': { err: { err: 'Transaction failed' } },
+          'sig-pending-1': null,
+          'sig-pending-2': null,
+        }),
+      );
 
       const result = await adapter.reconcileExecution([
         makeRef('sig-fail-1', 'remove-liquidity'),
@@ -123,10 +135,12 @@ describe('SolanaExecutionSubmissionAdapter', () => {
     });
 
     it('treats err with confirmed/finalized status as failed, not confirmed', async () => {
-      const adapter = makeAdapter(makeMockRpc({
-        'sig1': { confirmationStatus: 'confirmed', err: { err: 'Transaction failed' } },
-        'sig2': { confirmationStatus: 'finalized', err: { err: 'instruction error' } },
-      }));
+      const adapter = makeAdapter(
+        makeMockRpc({
+          sig1: { confirmationStatus: 'confirmed', err: { err: 'Transaction failed' } },
+          sig2: { confirmationStatus: 'finalized', err: { err: 'instruction error' } },
+        }),
+      );
 
       const result = await adapter.reconcileExecution([
         makeRef('sig1', 'swap-assets'),
@@ -147,10 +161,11 @@ describe('SolanaExecutionSubmissionAdapter', () => {
       }));
       const adapter = makeAdapter(mockRpc);
 
-      const result = await adapter.submitExecution(
-        new Uint8Array([1, 2, 3]),
-        ['remove-liquidity', 'collect-fees', 'swap-assets'],
-      );
+      const result = await adapter.submitExecution(new Uint8Array([1, 2, 3]), [
+        'remove-liquidity',
+        'collect-fees',
+        'swap-assets',
+      ]);
 
       expect(result.references).toHaveLength(3);
       expect(result.references[0]).toEqual({ signature: fakeSig, stepKind: 'remove-liquidity' });
@@ -166,10 +181,7 @@ describe('SolanaExecutionSubmissionAdapter', () => {
       }));
       const adapter = makeAdapter(mockRpc);
 
-      const result = await adapter.submitExecution(
-        new Uint8Array([4, 5, 6]),
-        ['swap-assets'],
-      );
+      const result = await adapter.submitExecution(new Uint8Array([4, 5, 6]), ['swap-assets']);
 
       expect(result.references).toHaveLength(1);
       expect(result.references[0]).toEqual({ signature: fakeSig, stepKind: 'swap-assets' });
@@ -182,10 +194,11 @@ describe('SolanaExecutionSubmissionAdapter', () => {
       }));
       const adapter = makeAdapter(mockRpc);
 
-      const result = await adapter.submitExecution(
-        new Uint8Array([7]),
-        ['swap-assets', 'swap-assets', 'collect-fees'],
-      );
+      const result = await adapter.submitExecution(new Uint8Array([7]), [
+        'swap-assets',
+        'swap-assets',
+        'collect-fees',
+      ]);
 
       expect(result.references).toHaveLength(2);
       const stepKinds = result.references.map((r) => r.stepKind);

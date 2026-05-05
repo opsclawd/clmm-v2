@@ -151,7 +151,8 @@ export function buildSolUsdcPositionInsight(params: {
     } else {
       unclaimedRewardsUsd = null;
       const alreadyWarned = warnings.some(
-        (w) => w.code === 'fee_reward_usd_unavailable' && w.scope?.positionId === position.positionId,
+        (w) =>
+          w.code === 'fee_reward_usd_unavailable' && w.scope?.positionId === position.positionId,
       );
       if (!alreadyWarned) {
         warnings.push({

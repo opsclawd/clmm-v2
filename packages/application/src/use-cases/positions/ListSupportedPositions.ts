@@ -17,21 +17,26 @@ export async function listSupportedPositions(params: {
   const positions = await params.positionReadPort.listSupportedPositions(params.walletId);
 
   const uniquePoolIds = [...new Set(positions.map((p) => p.poolId))];
-  const poolDataMap = new Map<PoolId, Awaited<ReturnType<SupportedPositionReadPort['getPoolData']>>>();
+  const poolDataMap = new Map<
+    PoolId,
+    Awaited<ReturnType<SupportedPositionReadPort['getPoolData']>>
+  >();
 
   let poolMetadataFailures = 0;
-  await Promise.allSettled(uniquePoolIds.map(async (poolId) => {
-    try {
-      const poolData = await params.positionReadPort.getPoolData(poolId);
-      if (poolData) {
-        poolDataMap.set(poolId, poolData);
-      } else {
+  await Promise.allSettled(
+    uniquePoolIds.map(async (poolId) => {
+      try {
+        const poolData = await params.positionReadPort.getPoolData(poolId);
+        if (poolData) {
+          poolDataMap.set(poolId, poolData);
+        } else {
+          poolMetadataFailures++;
+        }
+      } catch {
         poolMetadataFailures++;
       }
-    } catch {
-      poolMetadataFailures++;
-    }
-  }));
+    }),
+  );
 
   const summaryDtos: PositionSummaryDto[] = [];
   for (const p of positions) {

@@ -2,8 +2,18 @@ import type { ExecutionRepository } from '../../ports/index.js';
 import type { PositionId, BreachDirection } from '@clmm/domain';
 
 export type ResumeExecutionAttemptResult =
-  | { kind: 'resumable'; attemptId: string; positionId: PositionId; breachDirection: BreachDirection }
-  | { kind: 'submitted-pending'; attemptId: string; positionId: PositionId; breachDirection: BreachDirection }
+  | {
+      kind: 'resumable';
+      attemptId: string;
+      positionId: PositionId;
+      breachDirection: BreachDirection;
+    }
+  | {
+      kind: 'submitted-pending';
+      attemptId: string;
+      positionId: PositionId;
+      breachDirection: BreachDirection;
+    }
   | { kind: 'not-found' }
   | { kind: 'not-resumable'; currentState: string };
 

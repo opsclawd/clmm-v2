@@ -2,9 +2,7 @@ import { describe, it, expect } from 'vitest';
 import type { WalletSigningPort } from '@clmm/application';
 import { makeWalletId } from '@clmm/domain';
 
-export function runWalletSigningPortContract(
-  factory: () => WalletSigningPort,
-): void {
+export function runWalletSigningPortContract(factory: () => WalletSigningPort): void {
   describe('WalletSigningPort contract', () => {
     it('signed result contains a non-empty signedPayload', async () => {
       const port = factory();

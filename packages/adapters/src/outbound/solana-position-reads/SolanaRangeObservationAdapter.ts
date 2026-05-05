@@ -41,7 +41,9 @@ export class SolanaRangeObservationAdapter implements RangeObservationPort {
     try {
       whirlpoolData = await fetchWhirlpool(rpc, whirlpoolAddress);
     } catch {
-      throw new Error(`SolanaRangeObservationAdapter: could not fetch whirlpool ${whirlpoolAddress}`);
+      throw new Error(
+        `SolanaRangeObservationAdapter: could not fetch whirlpool ${whirlpoolAddress}`,
+      );
     }
 
     const currentTick = whirlpoolData.data.tickCurrentIndex;

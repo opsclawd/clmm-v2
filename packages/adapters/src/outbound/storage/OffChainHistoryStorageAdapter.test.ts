@@ -1,9 +1,6 @@
 import { describe, it, expect, vi } from 'vitest';
 import { OffChainHistoryStorageAdapter } from './OffChainHistoryStorageAdapter.js';
-import {
-  FIXTURE_POSITION_ID,
-  FIXTURE_WALLET_ID,
-} from '@clmm/testing';
+import { FIXTURE_POSITION_ID, FIXTURE_WALLET_ID } from '@clmm/testing';
 import { LOWER_BOUND_BREACH, UPPER_BOUND_BREACH, makePositionId } from '@clmm/domain';
 import type { Db } from './db.js';
 
@@ -13,8 +10,18 @@ describe('OffChainHistoryStorageAdapter', () => {
     const ownershipSelect = vi.fn().mockReturnValue({
       from: vi.fn().mockReturnValue({
         where: vi.fn().mockResolvedValue([
-          { walletId: FIXTURE_WALLET_ID, positionId: FIXTURE_POSITION_ID, firstSeenAt: 900, lastSeenAt: 1000 },
-          { walletId: FIXTURE_WALLET_ID, positionId: secondPositionId, firstSeenAt: 900, lastSeenAt: 1000 },
+          {
+            walletId: FIXTURE_WALLET_ID,
+            positionId: FIXTURE_POSITION_ID,
+            firstSeenAt: 900,
+            lastSeenAt: 1000,
+          },
+          {
+            walletId: FIXTURE_WALLET_ID,
+            positionId: secondPositionId,
+            firstSeenAt: 900,
+            lastSeenAt: 1000,
+          },
         ]),
       }),
     });
@@ -45,7 +52,8 @@ describe('OffChainHistoryStorageAdapter', () => {
       }),
     });
 
-    const selectMock = vi.fn()
+    const selectMock = vi
+      .fn()
       .mockReturnValueOnce(ownershipSelect())
       .mockReturnValueOnce(historySelect());
 
@@ -79,7 +87,12 @@ describe('OffChainHistoryStorageAdapter', () => {
     const ownershipSelect = vi.fn().mockReturnValue({
       from: vi.fn().mockReturnValue({
         where: vi.fn().mockResolvedValue([
-          { walletId: FIXTURE_WALLET_ID, positionId: FIXTURE_POSITION_ID, firstSeenAt: 900, lastSeenAt: 1000 },
+          {
+            walletId: FIXTURE_WALLET_ID,
+            positionId: FIXTURE_POSITION_ID,
+            firstSeenAt: 900,
+            lastSeenAt: 1000,
+          },
         ]),
       }),
     });
@@ -101,7 +114,8 @@ describe('OffChainHistoryStorageAdapter', () => {
       }),
     });
 
-    const selectMock = vi.fn()
+    const selectMock = vi
+      .fn()
       .mockReturnValueOnce(ownershipSelect())
       .mockReturnValueOnce(historySelect());
 

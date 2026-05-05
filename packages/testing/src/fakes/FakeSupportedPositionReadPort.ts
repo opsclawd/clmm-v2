@@ -1,5 +1,12 @@
 import type { SupportedPositionReadPort } from '@clmm/application';
-import type { LiquidityPosition, PositionId, WalletId, PoolId, PoolData, PositionDetail } from '@clmm/domain';
+import type {
+  LiquidityPosition,
+  PositionId,
+  WalletId,
+  PoolId,
+  PoolData,
+  PositionDetail,
+} from '@clmm/domain';
 
 export class FakeSupportedPositionReadPort implements SupportedPositionReadPort {
   constructor(
@@ -13,10 +20,15 @@ export class FakeSupportedPositionReadPort implements SupportedPositionReadPort 
   }
 
   async getPosition(walletId: WalletId, positionId: PositionId): Promise<LiquidityPosition | null> {
-    return this._positions.find((p) => p.walletId === walletId && p.positionId === positionId) ?? null;
+    return (
+      this._positions.find((p) => p.walletId === walletId && p.positionId === positionId) ?? null
+    );
   }
 
-  async getPositionDetail(_walletId: WalletId, _positionId: PositionId): Promise<PositionDetail | null> {
+  async getPositionDetail(
+    _walletId: WalletId,
+    _positionId: PositionId,
+  ): Promise<PositionDetail | null> {
     return this._positionDetail;
   }
 

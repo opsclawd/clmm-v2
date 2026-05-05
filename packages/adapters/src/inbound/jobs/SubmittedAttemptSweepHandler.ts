@@ -1,10 +1,6 @@
 import { Inject, Injectable } from '@nestjs/common';
 import type { ExecutionRepository, ObservabilityPort } from '@clmm/application';
-import {
-  EXECUTION_REPOSITORY,
-  OBSERVABILITY_PORT,
-  PG_BOSS_INSTANCE,
-} from './tokens.js';
+import { EXECUTION_REPOSITORY, OBSERVABILITY_PORT, PG_BOSS_INSTANCE } from './tokens.js';
 import { ReconciliationJobHandler } from './ReconciliationJobHandler.js';
 import type { PgBoss } from 'pg-boss';
 
@@ -28,18 +24,26 @@ export class SubmittedAttemptSweepHandler {
       return;
     }
 
-    this.observability.log('info', `Sweep found ${submittedAttempts.length} submitted attempt(s), enqueuing reconciliation`, {
-      count: submittedAttempts.length,
-    });
+    this.observability.log(
+      'info',
+      `Sweep found ${submittedAttempts.length} submitted attempt(s), enqueuing reconciliation`,
+      {
+        count: submittedAttempts.length,
+      },
+    );
 
     for (const attempt of submittedAttempts) {
       try {
         await this.boss.send(ReconciliationJobHandler.JOB_NAME, { attemptId: attempt.attemptId });
       } catch (sendError: unknown) {
-        this.observability.log('error', `Sweep failed to enqueue reconciliation for ${attempt.attemptId}`, {
-          attemptId: attempt.attemptId,
-          error: sendError instanceof Error ? sendError.message : String(sendError),
-        });
+        this.observability.log(
+          'error',
+          `Sweep failed to enqueue reconciliation for ${attempt.attemptId}`,
+          {
+            attemptId: attempt.attemptId,
+            error: sendError instanceof Error ? sendError.message : String(sendError),
+          },
+        );
       }
     }
   }

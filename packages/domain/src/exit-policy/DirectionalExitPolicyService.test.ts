@@ -1,10 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { applyDirectionalExitPolicy } from './DirectionalExitPolicyService.js';
-import {
-  LOWER_BOUND_BREACH,
-  UPPER_BOUND_BREACH,
-  type BreachDirection,
-} from '../shared/index.js';
+import { LOWER_BOUND_BREACH, UPPER_BOUND_BREACH, type BreachDirection } from '../shared/index.js';
 
 describe('DirectionalExitPolicyService', () => {
   describe('LOWER BOUND BREACH → ExitToUSDC + SOL→USDC swap', () => {

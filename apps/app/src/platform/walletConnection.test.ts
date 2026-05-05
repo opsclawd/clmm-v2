@@ -1,8 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import {
-  mapWalletErrorToOutcome,
-  normalizeSuccessfulConnection,
-} from './walletConnection';
+import { mapWalletErrorToOutcome, normalizeSuccessfulConnection } from './walletConnection';
 
 class WalletRejectionError extends Error {
   override readonly name = 'WalletRejectionError';
@@ -20,16 +17,24 @@ class WalletError extends Error {
 
 describe('walletConnection helpers', () => {
   it('maps user rejected errors to cancelled', () => {
-    expect(mapWalletErrorToOutcome(new Error('User rejected the request'))).toEqual({ kind: 'cancelled' });
+    expect(mapWalletErrorToOutcome(new Error('User rejected the request'))).toEqual({
+      kind: 'cancelled',
+    });
   });
 
   it('classifies cancellation and interruption errors case-insensitively', () => {
-    expect(mapWalletErrorToOutcome(new Error('USER REJECTED THE REQUEST'))).toEqual({ kind: 'cancelled' });
-    expect(mapWalletErrorToOutcome(new Error('CONNECTION TIMEOUT DURING HANDOFF'))).toEqual({ kind: 'interrupted' });
+    expect(mapWalletErrorToOutcome(new Error('USER REJECTED THE REQUEST'))).toEqual({
+      kind: 'cancelled',
+    });
+    expect(mapWalletErrorToOutcome(new Error('CONNECTION TIMEOUT DURING HANDOFF'))).toEqual({
+      kind: 'interrupted',
+    });
   });
 
   it('maps interruption-style errors to interrupted', () => {
-    expect(mapWalletErrorToOutcome(new Error('Connection interrupted during handoff'))).toEqual({ kind: 'interrupted' });
+    expect(mapWalletErrorToOutcome(new Error('Connection interrupted during handoff'))).toEqual({
+      kind: 'interrupted',
+    });
   });
 
   it('maps unknown errors to failed with reason', () => {
@@ -52,7 +57,9 @@ describe('walletConnection helpers', () => {
   });
 
   it('prefers cancellation when message also suggests interruption', () => {
-    expect(mapWalletErrorToOutcome(new Error('User cancelled after connection closed unexpectedly'))).toEqual({
+    expect(
+      mapWalletErrorToOutcome(new Error('User cancelled after connection closed unexpectedly')),
+    ).toEqual({
       kind: 'cancelled',
     });
   });
@@ -91,39 +98,64 @@ describe('walletConnection helpers', () => {
     });
 
     it('maps "app not authorized" message to failed', () => {
-      expect(mapWalletErrorToOutcome(new Error('App not authorized'))).toEqual({ kind: 'failed', reason: 'App not authorized' });
+      expect(mapWalletErrorToOutcome(new Error('App not authorized'))).toEqual({
+        kind: 'failed',
+        reason: 'App not authorized',
+      });
     });
 
     it('maps "unauthorized" message to failed', () => {
-      expect(mapWalletErrorToOutcome(new Error('Unauthorized access'))).toEqual({ kind: 'failed', reason: 'Unauthorized access' });
+      expect(mapWalletErrorToOutcome(new Error('Unauthorized access'))).toEqual({
+        kind: 'failed',
+        reason: 'Unauthorized access',
+      });
     });
 
     it('maps "wallet not found" message to failed', () => {
-      expect(mapWalletErrorToOutcome(new Error('Wallet not found'))).toEqual({ kind: 'failed', reason: 'Wallet not found' });
+      expect(mapWalletErrorToOutcome(new Error('Wallet not found'))).toEqual({
+        kind: 'failed',
+        reason: 'Wallet not found',
+      });
     });
 
     it('maps "wallet not ready" message to failed', () => {
-      expect(mapWalletErrorToOutcome(new Error('Wallet not ready'))).toEqual({ kind: 'failed', reason: 'Wallet not ready' });
+      expect(mapWalletErrorToOutcome(new Error('Wallet not ready'))).toEqual({
+        kind: 'failed',
+        reason: 'Wallet not ready',
+      });
     });
 
     it('maps "unsupported chain" message to failed', () => {
-      expect(mapWalletErrorToOutcome(new Error('Unsupported chain'))).toEqual({ kind: 'failed', reason: 'Unsupported chain' });
+      expect(mapWalletErrorToOutcome(new Error('Unsupported chain'))).toEqual({
+        kind: 'failed',
+        reason: 'Unsupported chain',
+      });
     });
 
     it('maps "feature unsupported" message to failed', () => {
-      expect(mapWalletErrorToOutcome(new Error('Feature unsupported'))).toEqual({ kind: 'failed', reason: 'Feature unsupported' });
+      expect(mapWalletErrorToOutcome(new Error('Feature unsupported'))).toEqual({
+        kind: 'failed',
+        reason: 'Feature unsupported',
+      });
     });
 
     it('maps "request already pending" message to interrupted', () => {
-      expect(mapWalletErrorToOutcome(new Error('Request already pending'))).toEqual({ kind: 'interrupted' });
+      expect(mapWalletErrorToOutcome(new Error('Request already pending'))).toEqual({
+        kind: 'interrupted',
+      });
     });
 
     it('maps "mobile wallet unavailable" message to failed', () => {
-      expect(mapWalletErrorToOutcome(new Error('Mobile wallet unavailable'))).toEqual({ kind: 'failed', reason: 'Mobile wallet unavailable' });
+      expect(mapWalletErrorToOutcome(new Error('Mobile wallet unavailable'))).toEqual({
+        kind: 'failed',
+        reason: 'Mobile wallet unavailable',
+      });
     });
 
     it('maps "user closed approval sheet" message to interrupted', () => {
-      expect(mapWalletErrorToOutcome(new Error('User closed approval sheet'))).toEqual({ kind: 'interrupted' });
+      expect(mapWalletErrorToOutcome(new Error('User closed approval sheet'))).toEqual({
+        kind: 'interrupted',
+      });
     });
 
     it('maps WalletError with transaction_error type to failed', () => {

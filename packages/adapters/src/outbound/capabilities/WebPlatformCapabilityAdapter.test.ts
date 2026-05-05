@@ -32,9 +32,12 @@ describe('WebPlatformCapabilityAdapter', () => {
     (globalThis as Record<string, unknown>)['window'] = globalThis;
     vi.resetModules();
     vi.doMock('@wallet-standard/app', () => ({
-      getWallets: () => ({ get: () => [{ name: 'Phantom', chains: ['solana:mainnet', 'solana:devnet'] }] }),
+      getWallets: () => ({
+        get: () => [{ name: 'Phantom', chains: ['solana:mainnet', 'solana:devnet'] }],
+      }),
     }));
-    const { WebPlatformCapabilityAdapter: Adapter } = await import('./WebPlatformCapabilityAdapter');
+    const { WebPlatformCapabilityAdapter: Adapter } =
+      await import('./WebPlatformCapabilityAdapter');
     const adapter = new Adapter();
     setUserAgent('Mozilla/5.0 (Macintosh; Intel Mac OS X)');
 
@@ -52,7 +55,8 @@ describe('WebPlatformCapabilityAdapter', () => {
     vi.doMock('@wallet-standard/app', () => ({
       getWallets: () => ({ get: () => [{ name: 'MetaMask', chains: ['ethereum:mainnet'] }] }),
     }));
-    const { WebPlatformCapabilityAdapter: Adapter } = await import('./WebPlatformCapabilityAdapter');
+    const { WebPlatformCapabilityAdapter: Adapter } =
+      await import('./WebPlatformCapabilityAdapter');
     const adapter = new Adapter();
     setUserAgent('Mozilla/5.0 (Macintosh; Intel Mac OS X)');
 
@@ -88,7 +92,9 @@ describe('WebPlatformCapabilityAdapter', () => {
 
   it('returns true for Android Chrome MWA-plausible surface', async () => {
     const adapter = await setupFreshAdapter();
-    setUserAgent('Mozilla/5.0 (Linux; Android 14; Pixel 8) AppleWebKit/537.36 Chrome/120.0.0.0 Mobile Safari/537.36');
+    setUserAgent(
+      'Mozilla/5.0 (Linux; Android 14; Pixel 8) AppleWebKit/537.36 Chrome/120.0.0.0 Mobile Safari/537.36',
+    );
 
     const result = await adapter.getCapabilities();
     expect(result.browserWalletAvailable).toBe(true);
@@ -96,7 +102,9 @@ describe('WebPlatformCapabilityAdapter', () => {
 
   it('returns false on iOS Safari without injected wallet', async () => {
     const adapter = await setupFreshAdapter();
-    setUserAgent('Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) AppleWebKit/605.1.15 Version/17.0 Mobile Safari/604.1');
+    setUserAgent(
+      'Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) AppleWebKit/605.1.15 Version/17.0 Mobile Safari/604.1',
+    );
 
     const result = await adapter.getCapabilities();
     expect(result.browserWalletAvailable).toBe(false);
@@ -112,7 +120,9 @@ describe('WebPlatformCapabilityAdapter', () => {
 
   it('returns false on Android Brave without injected wallet', async () => {
     const adapter = await setupFreshAdapter();
-    setUserAgent('Mozilla/5.0 (Linux; Android 14; Pixel 8) AppleWebKit/537.36 Chrome/120.0.0.0 Mobile Safari/537.36 Brave/1.60');
+    setUserAgent(
+      'Mozilla/5.0 (Linux; Android 14; Pixel 8) AppleWebKit/537.36 Chrome/120.0.0.0 Mobile Safari/537.36 Brave/1.60',
+    );
 
     const result = await adapter.getCapabilities();
     expect(result.browserWalletAvailable).toBe(false);
@@ -120,7 +130,9 @@ describe('WebPlatformCapabilityAdapter', () => {
 
   it('returns false on Android Opera without injected wallet', async () => {
     const adapter = await setupFreshAdapter();
-    setUserAgent('Mozilla/5.0 (Linux; Android 14; Pixel 8) AppleWebKit/537.36 Chrome/120.0.0.0 Mobile Safari/537.36 OPR/80.0');
+    setUserAgent(
+      'Mozilla/5.0 (Linux; Android 14; Pixel 8) AppleWebKit/537.36 Chrome/120.0.0.0 Mobile Safari/537.36 OPR/80.0',
+    );
 
     const result = await adapter.getCapabilities();
     expect(result.browserWalletAvailable).toBe(false);
@@ -128,7 +140,9 @@ describe('WebPlatformCapabilityAdapter', () => {
 
   it('returns false on desktop browser without wallet', async () => {
     const adapter = await setupFreshAdapter();
-    setUserAgent('Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 Chrome/120.0.0.0 Safari/537.36');
+    setUserAgent(
+      'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 Chrome/120.0.0.0 Safari/537.36',
+    );
 
     const result = await adapter.getCapabilities();
     expect(result.browserWalletAvailable).toBe(false);
@@ -136,7 +150,9 @@ describe('WebPlatformCapabilityAdapter', () => {
 
   it('returns false on Android Edge without injected wallet', async () => {
     const adapter = await setupFreshAdapter();
-    setUserAgent('Mozilla/5.0 (Linux; Android 14; Pixel 8) AppleWebKit/537.36 Chrome/120.0.0.0 Mobile Safari/537.36 Edg/120.0');
+    setUserAgent(
+      'Mozilla/5.0 (Linux; Android 14; Pixel 8) AppleWebKit/537.36 Chrome/120.0.0.0 Mobile Safari/537.36 Edg/120.0',
+    );
 
     const result = await adapter.getCapabilities();
     expect(result.browserWalletAvailable).toBe(false);
@@ -144,7 +160,9 @@ describe('WebPlatformCapabilityAdapter', () => {
 
   it('sets isMobileWeb true for mobile user agents', async () => {
     const adapter = await setupFreshAdapter();
-    setUserAgent('Mozilla/5.0 (Linux; Android 14; Pixel 8) AppleWebKit/537.36 Chrome/120.0.0.0 Mobile Safari/537.36');
+    setUserAgent(
+      'Mozilla/5.0 (Linux; Android 14; Pixel 8) AppleWebKit/537.36 Chrome/120.0.0.0 Mobile Safari/537.36',
+    );
 
     const result = await adapter.getCapabilities();
     expect(result.isMobileWeb).toBe(true);

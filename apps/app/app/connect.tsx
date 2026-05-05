@@ -3,11 +3,13 @@ import { Platform, Linking } from 'react-native';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import { useStore } from 'zustand';
 import type { PlatformCapabilityState } from '@clmm/application/public';
-import {
-  WalletConnectScreen,
-  buildWalletConnectViewModel,
+import { WalletConnectScreen, buildWalletConnectViewModel } from '@clmm/ui';
+import type {
+  FallbackState,
+  WalletDiscoveryState,
+  DiscoveredWallet,
+  WalletConnectActions,
 } from '@clmm/ui';
-import type { FallbackState, WalletDiscoveryState, DiscoveredWallet, WalletConnectActions } from '@clmm/ui';
 import { platformCapabilityAdapter, walletPlatform } from '../src/composition/index';
 import { useBrowserWalletConnect } from '../src/platform/browserWallet/index';
 import {
@@ -20,7 +22,10 @@ import { mapWalletErrorToOutcome } from '../src/platform/walletConnection';
 import { navigateRoute } from '../src/platform/webNavigation';
 import { parseReturnTo } from '../src/wallet-boot/parseReturnTo';
 import { walletSessionStore } from '../src/state/walletSessionStore';
-import { verifyWalletEnrollment, type EnrollmentOutcome } from '../src/wallet-verify/verifyWalletEnrollment';
+import {
+  verifyWalletEnrollment,
+  type EnrollmentOutcome,
+} from '../src/wallet-verify/verifyWalletEnrollment';
 import { useConnectorKitAdapter } from '../src/platform/browserWallet/connectorKitAdapter';
 
 const NO_WALLET_MESSAGE = 'No supported browser wallet detected on this device';
@@ -50,7 +55,9 @@ function detectFallbackState(
   const connectThrewNoWallet = connectError?.message === NO_WALLET_MESSAGE;
 
   if (noWalletDetected || connectThrewNoWallet) {
-    const isMobile = /Mobi|Android|iPad/i.test(typeof navigator !== 'undefined' ? navigator.userAgent : '');
+    const isMobile = /Mobi|Android|iPad/i.test(
+      typeof navigator !== 'undefined' ? navigator.userAgent : '',
+    );
     if (isMobile) {
       return 'wallet-fallback';
     }
@@ -107,13 +114,17 @@ export default function ConnectRoute() {
     let active = true;
     void platformCapabilityAdapter
       .getCapabilities()
-      .then((caps) => { if (active) walletSessionStore.getState().setPlatformCapabilities(caps); })
+      .then((caps) => {
+        if (active) walletSessionStore.getState().setPlatformCapabilities(caps);
+      })
       .catch((error) => {
         if (!active) return;
         walletSessionStore.getState().setPlatformCapabilities(FALLBACK_PLATFORM_CAPABILITIES);
         handleConnectionError(error);
       });
-    return () => { active = false; };
+    return () => {
+      active = false;
+    };
   }, []);
 
   function handleConnectionError(error: unknown) {
@@ -157,7 +168,9 @@ export default function ConnectRoute() {
   async function completeConnect(address: string, kind: 'native' | 'browser') {
     markConnected({ walletAddress: address, connectionKind: kind });
     const liveAdapter = browserAdapterRef.current;
-    const browserSigner: import('../src/wallet-verify/signMessageWithWallet').BrowserMessageSigner | null =
+    const browserSigner:
+      | import('../src/wallet-verify/signMessageWithWallet').BrowserMessageSigner
+      | null =
       kind === 'browser'
         ? {
             isConnected: liveAdapter.isConnected,
@@ -177,48 +190,70 @@ export default function ConnectRoute() {
     navigateRoute({ router, path: returnTo, method: 'replace' });
   }
 
-  const actions: WalletConnectActions = useMemo(() => ({
-    onSelectNative: () => {
-      beginConnection();
-      void walletPlatform.connectNativeWallet()
-        .then((address) => completeConnect(address, 'native'))
-        .catch(handleConnectionError);
-    },
-    onSelectDiscoveredWallet: (walletId: string) => {
-      beginConnection();
-      void browserConnect.connect(walletId)
-        .then(({ address }) => completeConnect(address, 'browser'))
-        .catch(handleConnectionError);
-    },
-    onConnectDefaultBrowser: () => {
-      beginConnection();
-      void browserConnect.connect()
-        .then(({ address }) => completeConnect(address, 'browser'))
-        .catch(handleConnectionError);
-    },
-    onOpenPhantom: () => {
-      if (typeof window !== 'undefined') {
-        const url = buildPhantomBrowseUrl(window.location.href);
-        void Linking.openURL(url);
-      }
-    },
-    onOpenSolflare: () => {
-      if (typeof window !== 'undefined') {
-        const url = buildSolflareBrowseUrl(window.location.href);
-        void Linking.openURL(url);
-      }
-    },
-    onOpenInBrowser: () => {
-      setSocialEscapeAttempted(true);
-      if (typeof window !== 'undefined') {
-        openInExternalBrowser(window.location.href);
-      }
-    },
-    onGoBack: () => {
-      clearOutcome();
-      router.back();
-    },
-  }), [router, returnTo, browserConnect, browserAdapter, beginConnection, markConnected, markOutcome, clearOutcome, platformCapabilities, discovery, discoveredWallets, fallback, socialEscapeAttempted, isConnecting, connectionOutcome]);
+  const actions: WalletConnectActions = useMemo(
+    () => ({
+      onSelectNative: () => {
+        beginConnection();
+        void walletPlatform
+          .connectNativeWallet()
+          .then((address) => completeConnect(address, 'native'))
+          .catch(handleConnectionError);
+      },
+      onSelectDiscoveredWallet: (walletId: string) => {
+        beginConnection();
+        void browserConnect
+          .connect(walletId)
+          .then(({ address }) => completeConnect(address, 'browser'))
+          .catch(handleConnectionError);
+      },
+      onConnectDefaultBrowser: () => {
+        beginConnection();
+        void browserConnect
+          .connect()
+          .then(({ address }) => completeConnect(address, 'browser'))
+          .catch(handleConnectionError);
+      },
+      onOpenPhantom: () => {
+        if (typeof window !== 'undefined') {
+          const url = buildPhantomBrowseUrl(window.location.href);
+          void Linking.openURL(url);
+        }
+      },
+      onOpenSolflare: () => {
+        if (typeof window !== 'undefined') {
+          const url = buildSolflareBrowseUrl(window.location.href);
+          void Linking.openURL(url);
+        }
+      },
+      onOpenInBrowser: () => {
+        setSocialEscapeAttempted(true);
+        if (typeof window !== 'undefined') {
+          openInExternalBrowser(window.location.href);
+        }
+      },
+      onGoBack: () => {
+        clearOutcome();
+        router.back();
+      },
+    }),
+    [
+      router,
+      returnTo,
+      browserConnect,
+      browserAdapter,
+      beginConnection,
+      markConnected,
+      markOutcome,
+      clearOutcome,
+      platformCapabilities,
+      discovery,
+      discoveredWallets,
+      fallback,
+      socialEscapeAttempted,
+      isConnecting,
+      connectionOutcome,
+    ],
+  );
 
   return <WalletConnectScreen vm={vm} actions={actions} />;
 }

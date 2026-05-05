@@ -36,37 +36,45 @@ export function HistoryEventRow({ event }: Props): JSX.Element {
   const eventColor = getEventColor(event.eventType);
 
   return (
-    <View style={{
-      paddingVertical: 12,
-      paddingHorizontal: 16,
-      borderBottomWidth: 1,
-      borderBottomColor: colors.border,
-      flexDirection: 'row',
-      justifyContent: 'space-between',
-      alignItems: 'center',
-    }}>
+    <View
+      style={{
+        paddingVertical: 12,
+        paddingHorizontal: 16,
+        borderBottomWidth: 1,
+        borderBottomColor: colors.border,
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        alignItems: 'center',
+      }}
+    >
       <View style={{ flex: 1 }}>
-        <Text style={{
-          color: eventColor,
-          fontSize: typography.fontSize.base,
-          fontWeight: typography.fontWeight.medium,
-        }}>
+        <Text
+          style={{
+            color: eventColor,
+            fontSize: typography.fontSize.base,
+            fontWeight: typography.fontWeight.medium,
+          }}
+        >
           {formatEventType(event.eventType)}
         </Text>
         {event.transactionReference ? (
-          <Text style={{
-            color: colors.textSecondary,
-            fontSize: typography.fontSize.xs,
-            marginTop: 2,
-          }}>
+          <Text
+            style={{
+              color: colors.textSecondary,
+              fontSize: typography.fontSize.xs,
+              marginTop: 2,
+            }}
+          >
             tx: {event.transactionReference.signature.slice(0, 8)}...
           </Text>
         ) : null}
       </View>
-      <Text style={{
-        color: colors.textSecondary,
-        fontSize: typography.fontSize.sm,
-      }}>
+      <Text
+        style={{
+          color: colors.textSecondary,
+          fontSize: typography.fontSize.sm,
+        }}
+      >
         {new Date(event.occurredAt).toLocaleTimeString()}
       </Text>
     </View>

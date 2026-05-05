@@ -1,10 +1,6 @@
 import { describe, it, expect, beforeEach } from 'vitest';
 import { listActionableAlerts } from './ListActionableAlerts.js';
-import {
-  FakeTriggerRepository,
-  FIXTURE_WALLET_ID,
-  FIXTURE_POSITION_ID,
-} from '@clmm/testing';
+import { FakeTriggerRepository, FIXTURE_WALLET_ID, FIXTURE_POSITION_ID } from '@clmm/testing';
 import { LOWER_BOUND_BREACH } from '@clmm/domain';
 import type { ExitTrigger, ExitTriggerId, BreachEpisodeId } from '@clmm/domain';
 import { makeClockTimestamp } from '@clmm/domain';

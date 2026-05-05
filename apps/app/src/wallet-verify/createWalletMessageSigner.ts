@@ -1,7 +1,4 @@
-import type {
-  WalletMessageSigningPort,
-  SignMessageOutcome,
-} from '@clmm/application/public';
+import type { WalletMessageSigningPort, SignMessageOutcome } from '@clmm/application/public';
 import { signMessageWithWallet } from './signMessageWithWallet';
 import type { BrowserMessageSigner } from './signMessageWithWallet';
 import type { WalletConnectionKind } from '../state/walletSessionStore';

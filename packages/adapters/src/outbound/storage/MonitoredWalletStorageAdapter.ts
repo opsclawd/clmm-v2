@@ -38,9 +38,7 @@ export class MonitoredWalletStorageAdapter implements MonitoredWalletRepository 
 
     return rows.map((row) => ({
       walletId: row.walletId as WalletId,
-      lastScannedAt: row.lastScannedAt != null
-        ? (row.lastScannedAt as ClockTimestamp)
-        : null,
+      lastScannedAt: row.lastScannedAt != null ? (row.lastScannedAt as ClockTimestamp) : null,
     }));
   }
 

@@ -71,19 +71,27 @@ export class TriggerQualificationJobHandler {
           directionKind: data.directionKind,
         });
       } else if (result.kind === 'duplicate-suppressed') {
-        this.observability.log('info', `Duplicate trigger suppressed for episode ${data.episodeId}`, {
-          existingTriggerId: result.existingTriggerId,
-        });
+        this.observability.log(
+          'info',
+          `Duplicate trigger suppressed for episode ${data.episodeId}`,
+          {
+            existingTriggerId: result.existingTriggerId,
+          },
+        );
       } else {
         this.observability.log('info', `Trigger not qualified: ${result.reason}`, {
           positionId: data.positionId,
         });
       }
     } catch (error: unknown) {
-      this.observability.log('error', `Trigger qualification failed for position ${data.positionId}`, {
-        positionId: data.positionId,
-        error: error instanceof Error ? error.message : String(error),
-      });
+      this.observability.log(
+        'error',
+        `Trigger qualification failed for position ${data.positionId}`,
+        {
+          positionId: data.positionId,
+          error: error instanceof Error ? error.message : String(error),
+        },
+      );
       throw error; // pg-boss will retry
     }
   }

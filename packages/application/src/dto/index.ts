@@ -91,7 +91,13 @@ export type PositionDetailDto = PositionSummaryDto & {
 export type PreviewStepDto =
   | { kind: 'remove-liquidity'; estimatedAmount?: { raw: bigint; symbol: AssetSymbol } }
   | { kind: 'collect-fees'; estimatedFees?: { raw: bigint; symbol: AssetSymbol } }
-  | { kind: 'swap-assets'; fromAsset: AssetSymbol; toAsset: AssetSymbol; policyReason: string; estimatedOutput?: { raw: bigint; symbol: AssetSymbol } };
+  | {
+      kind: 'swap-assets';
+      fromAsset: AssetSymbol;
+      toAsset: AssetSymbol;
+      policyReason: string;
+      estimatedOutput?: { raw: bigint; symbol: AssetSymbol };
+    };
 
 export type ExecutionPreviewDto = {
   previewId: string;
@@ -238,16 +244,16 @@ export type SolUsdcRewardAmountDto = {
   symbol: string;
 };
 
-export type ExternalBreachDirection =
-  | 'lower-bound-breach'
-  | 'upper-bound-breach';
+export type ExternalBreachDirection = 'lower-bound-breach' | 'upper-bound-breach';
 
 // Compile-time drift guard: ExternalBreachDirection must match the kind values
 // of BreachDirection from @clmm/domain. If this type errors, the external API
 // contract has drifted from the domain invariant — update ExternalBreachDirection
 // and the toExternalBreachDirection conversion function.
 type _AssertBreachDirectionMatch = _BreachDirection['kind'] extends ExternalBreachDirection
-  ? ExternalBreachDirection extends _BreachDirection['kind'] ? true : never
+  ? ExternalBreachDirection extends _BreachDirection['kind']
+    ? true
+    : never
   : never;
 
 export type SolUsdcPositionInsightDto = {
@@ -312,10 +318,7 @@ export type SolUsdcInsightInputBundleDto = {
 };
 
 export type SolUsdcInsightErrorDto = {
-  code:
-    | 'pool_snapshot_unavailable'
-    | 'position_list_unavailable'
-    | 'position_detail_unavailable';
+  code: 'pool_snapshot_unavailable' | 'position_list_unavailable' | 'position_detail_unavailable';
   message: string;
   pair: 'SOL/USDC';
   poolId: string;

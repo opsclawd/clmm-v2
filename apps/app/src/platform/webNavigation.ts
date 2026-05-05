@@ -40,7 +40,11 @@ function isWebPlatform(): boolean {
 type WalletLike = Record<string, unknown>;
 
 function hasConnect(wallet: unknown): boolean {
-  return wallet != null && typeof wallet === 'object' && typeof (wallet as WalletLike)['connect'] === 'function';
+  return (
+    wallet != null &&
+    typeof wallet === 'object' &&
+    typeof (wallet as WalletLike)['connect'] === 'function'
+  );
 }
 
 export function hasBrowserWalletPresence(): boolean {
@@ -71,7 +75,8 @@ export function isSolanaMobileWebView(): boolean {
   try {
     if (!hasBrowserWalletPresence()) return false;
     const ua = typeof navigator !== 'undefined' ? navigator.userAgent : '';
-    const isMobile = /wv\)/.test(ua) || /iPhone/.test(ua) || /iPad/.test(ua) || /Android.*Mobile/.test(ua);
+    const isMobile =
+      /wv\)/.test(ua) || /iPhone/.test(ua) || /iPad/.test(ua) || /Android.*Mobile/.test(ua);
     const walletBrowserSignal = /Phantom|Solflare/.test(ua);
     return isMobile || walletBrowserSignal;
   } catch {
@@ -108,7 +113,11 @@ export function navigateRoute(params: {
   }
 }
 
-function navigateSoftPreferred(router: RouterLike, canonicalPath: string, method: NavigationMethod): void {
+function navigateSoftPreferred(
+  router: RouterLike,
+  canonicalPath: string,
+  method: NavigationMethod,
+): void {
   if (method === 'replace') {
     router.replace(canonicalPath);
     return;
@@ -116,7 +125,11 @@ function navigateSoftPreferred(router: RouterLike, canonicalPath: string, method
   router.push(canonicalPath);
 }
 
-function navigateHardFallback(router: RouterLike, canonicalPath: string, method: NavigationMethod): void {
+function navigateHardFallback(
+  router: RouterLike,
+  canonicalPath: string,
+  method: NavigationMethod,
+): void {
   if (isWebPlatform() && isSolanaMobileWebView()) {
     hardNavigate(canonicalPath, method);
     return;
@@ -128,7 +141,11 @@ function navigateHardFallback(router: RouterLike, canonicalPath: string, method:
   router.push(canonicalPath);
 }
 
-function navigateCapabilityDriven(router: RouterLike, canonicalPath: string, method: NavigationMethod): void {
+function navigateCapabilityDriven(
+  router: RouterLike,
+  canonicalPath: string,
+  method: NavigationMethod,
+): void {
   if (typeof console !== 'undefined' && typeof console.warn === 'function') {
     console.warn(
       "[webNavigation] strategy 'capability-driven' is a stub; falling back to 'hard-fallback' behavior. " +

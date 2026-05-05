@@ -39,7 +39,9 @@ function isPendingAttemptPlaceholder(value: string | string[] | undefined): bool
   return typeof value === 'string' && value === 'pending';
 }
 
-function canDeclineSigning(params: { displayedExecution: ExecutionAttemptDto | undefined }): boolean {
+function canDeclineSigning(params: {
+  displayedExecution: ExecutionAttemptDto | undefined;
+}): boolean {
   return params.displayedExecution?.lifecycleState.kind === 'awaiting-signature';
 }
 
@@ -85,7 +87,8 @@ function SigningRouteBody() {
   });
 
   const isPendingApprovalMode = hasPendingAttemptPlaceholder && attemptId == null;
-  const canStartPendingApproval = isPendingApprovalMode && previewId != null && walletAddress != null;
+  const canStartPendingApproval =
+    isPendingApprovalMode && previewId != null && walletAddress != null;
 
   useEffect(() => {
     if (
@@ -104,16 +107,16 @@ function SigningRouteBody() {
         walletId: walletAddress,
         ...(episodeId ? { episodeId } : {}),
       },
-        {
-          onSuccess: (approval) => {
-            navigateRoute({
-              router,
-              path: `/signing/${approval.attemptId}`,
-              method: 'replace',
-            });
-          },
+      {
+        onSuccess: (approval) => {
+          navigateRoute({
+            router,
+            path: `/signing/${approval.attemptId}`,
+            method: 'replace',
+          });
         },
-      );
+      },
+    );
   }, [
     approveMutation,
     canStartPendingApproval,
@@ -243,8 +246,12 @@ function SigningRouteBody() {
       {...(displayedExecution != null
         ? {
             lifecycleState: displayedExecution.lifecycleState,
-            ...(displayedExecution.breachDirection != null ? { breachDirection: displayedExecution.breachDirection } : {}),
-            ...(displayedExecution.retryEligible != null ? { retryEligible: displayedExecution.retryEligible } : {}),
+            ...(displayedExecution.breachDirection != null
+              ? { breachDirection: displayedExecution.breachDirection }
+              : {}),
+            ...(displayedExecution.retryEligible != null
+              ? { retryEligible: displayedExecution.retryEligible }
+              : {}),
           }
         : {})}
       declineLoading={declineMutation.isPending}
@@ -267,18 +274,18 @@ function SigningRouteBody() {
           : isPendingApprovalMode && walletAddress == null
             ? 'Connect your wallet to continue signing.'
             : approveMutation.error instanceof Error
-          ? approveMutation.error.message
-          : executionQuery.error instanceof Error
-          ? executionQuery.error.message
-          : staleExecutionQuery.error instanceof Error
-            ? staleExecutionQuery.error.message
-            : signingPayloadQuery.error instanceof Error
-              ? signingPayloadQuery.error.message
-              : signMutation.error instanceof Error
-                ? signMutation.error.message
-                : declineMutation.error instanceof Error
-                  ? declineMutation.error.message
-                  : null
+              ? approveMutation.error.message
+              : executionQuery.error instanceof Error
+                ? executionQuery.error.message
+                : staleExecutionQuery.error instanceof Error
+                  ? staleExecutionQuery.error.message
+                  : signingPayloadQuery.error instanceof Error
+                    ? signingPayloadQuery.error.message
+                    : signMutation.error instanceof Error
+                      ? signMutation.error.message
+                      : declineMutation.error instanceof Error
+                        ? declineMutation.error.message
+                        : null
       }
       statusNotice={statusNotice}
       onGoHome={() => {
@@ -291,15 +298,15 @@ function SigningRouteBody() {
       {...(isPendingApprovalMode
         ? {
             ...(triggerId != null
-                ? {
-                    onRefreshQuote: () => {
-                      navigateRoute({
-                        router,
-                        path: `/preview/${triggerId}`,
-                        method: 'replace',
-                      });
-                    },
-                  }
+              ? {
+                  onRefreshQuote: () => {
+                    navigateRoute({
+                      router,
+                      path: `/preview/${triggerId}`,
+                      method: 'replace',
+                    });
+                  },
+                }
               : {}),
           }
         : {})}
@@ -329,15 +336,21 @@ function SigningRouteBody() {
             },
           }
         : {})}
-      signingState={displayedExecution?.lifecycleState.kind === 'awaiting-signature'
-        ? (signMutation.isError ? 'error' : signMutation.isPending ? 'signing' : 'idle')
-        : 'idle'}
+      signingState={
+        displayedExecution?.lifecycleState.kind === 'awaiting-signature'
+          ? signMutation.isError
+            ? 'error'
+            : signMutation.isPending
+              ? 'signing'
+              : 'idle'
+          : 'idle'
+      }
       walletConnected={walletAddress != null}
       onSignAndExecute={() => {
         signMutation.mutate();
       }}
       {...(signMutation.error instanceof Error ? { signingError: signMutation.error.message } : {})}
-     />
+    />
   );
 }
 

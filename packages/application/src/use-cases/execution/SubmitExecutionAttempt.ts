@@ -22,7 +22,8 @@ export async function submitExecutionAttempt(params: {
   clock: ClockPort;
   ids: IdGeneratorPort;
 }): Promise<SubmitExecutionAttemptResult> {
-  const { attemptId, signedPayload, executionRepo, submissionPort, historyRepo, clock, ids } = params;
+  const { attemptId, signedPayload, executionRepo, submissionPort, historyRepo, clock, ids } =
+    params;
 
   const attempt = await executionRepo.getAttempt(attemptId);
   if (!attempt) return { kind: 'not-found' };

@@ -197,7 +197,7 @@ export function SrLevelsCard({ srLevels }: Props): JSX.Element {
           })}
 
           {/* Trigger / Invalidation */}
-          {(group.trigger || group.invalidation) ? (
+          {group.trigger || group.invalidation ? (
             <View
               style={{
                 marginTop: 10,
@@ -209,7 +209,12 @@ export function SrLevelsCard({ srLevels }: Props): JSX.Element {
             >
               {group.trigger ? (
                 <Text style={{ fontSize: typography.fontSize.xs, lineHeight: 18 }}>
-                  <Text style={{ color: colors.breachAccent, fontWeight: typography.fontWeight.semibold }}>
+                  <Text
+                    style={{
+                      color: colors.breachAccent,
+                      fontWeight: typography.fontWeight.semibold,
+                    }}
+                  >
                     Trigger
                   </Text>
                   <Text style={{ color: colors.textMuted }}> · </Text>
@@ -229,7 +234,7 @@ export function SrLevelsCard({ srLevels }: Props): JSX.Element {
           ) : null}
 
           {/* Metadata footer */}
-          {(group.source || group.timeframe || group.setupType) ? (
+          {group.source || group.timeframe || group.setupType ? (
             <View
               style={{
                 flexDirection: 'row',
@@ -250,10 +255,7 @@ export function SrLevelsCard({ srLevels }: Props): JSX.Element {
                     letterSpacing: 0.04,
                   }}
                 >
-                  Source ·{' '}
-                  <Text style={{ color: colors.textSecondary }}>
-                    {group.source}
-                  </Text>
+                  Source · <Text style={{ color: colors.textSecondary }}>{group.source}</Text>
                 </Text>
               ) : null}
               {group.timeframe ? (
@@ -265,10 +267,7 @@ export function SrLevelsCard({ srLevels }: Props): JSX.Element {
                     letterSpacing: 0.04,
                   }}
                 >
-                  TF ·{' '}
-                  <Text style={{ color: colors.textSecondary }}>
-                    {group.timeframe}
-                  </Text>
+                  TF · <Text style={{ color: colors.textSecondary }}>{group.timeframe}</Text>
                 </Text>
               ) : null}
               {group.setupType ? (
@@ -280,10 +279,7 @@ export function SrLevelsCard({ srLevels }: Props): JSX.Element {
                     letterSpacing: 0.04,
                   }}
                 >
-                  Setup ·{' '}
-                  <Text style={{ color: colors.textSecondary }}>
-                    {group.setupType}
-                  </Text>
+                  Setup · <Text style={{ color: colors.textSecondary }}>{group.setupType}</Text>
                 </Text>
               ) : null}
             </View>

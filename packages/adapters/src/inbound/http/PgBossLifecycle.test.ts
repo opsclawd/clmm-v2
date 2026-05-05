@@ -4,7 +4,8 @@ import { ReconciliationJobHandler } from '../jobs/ReconciliationJobHandler.js';
 import type { ObservabilityPort } from '@clmm/application';
 
 class FakeObservabilityPort {
-  logs: Array<{ level: string; message: string; context?: Record<string, unknown> | undefined }> = [];
+  logs: Array<{ level: string; message: string; context?: Record<string, unknown> | undefined }> =
+    [];
 
   log(level: string, message: string, context?: Record<string, unknown>): void {
     this.logs.push({ level, message, ...(context !== undefined ? { context } : {}) });
@@ -105,7 +106,9 @@ describe('PgBossLifecycle', () => {
 
   it('awaits in-flight start promise before calling stop on destroy', async () => {
     let resolveStart: () => void = () => {};
-    const startPromise = new Promise<void>((resolve) => { resolveStart = resolve; });
+    const startPromise = new Promise<void>((resolve) => {
+      resolveStart = resolve;
+    });
     const boss = {
       start: vi.fn(() => startPromise),
       stop: vi.fn(async () => {}),

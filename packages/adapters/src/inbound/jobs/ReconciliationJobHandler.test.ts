@@ -10,7 +10,10 @@ import {
   FIXTURE_POSITION_ID,
 } from '@clmm/testing';
 import { LOWER_BOUND_BREACH, UPPER_BOUND_BREACH } from '@clmm/domain';
-import type { RegimeEngineEventPort, ClmmExecutionEventRequest } from '../../outbound/regime-engine/types.js';
+import type {
+  RegimeEngineEventPort,
+  ClmmExecutionEventRequest,
+} from '../../outbound/regime-engine/types.js';
 
 type ObservabilityLog = {
   level: 'info' | 'warn' | 'error';
@@ -92,9 +95,7 @@ describe('ReconciliationJobHandler', () => {
       breachDirection: LOWER_BOUND_BREACH,
       lifecycleState: { kind: 'confirmed' },
       completedSteps: ['remove-liquidity', 'collect-fees', 'swap-assets'],
-      transactionReferences: [
-        { signature: 'sig-1', stepKind: 'remove-liquidity' },
-      ],
+      transactionReferences: [{ signature: 'sig-1', stepKind: 'remove-liquidity' }],
     });
 
     await handler.handle({ attemptId: 'attempt-2' });
@@ -210,7 +211,9 @@ describe('ReconciliationJobHandler', () => {
         transactionReferences: [{ signature: 'sig-1', stepKind: 'swap-assets' }],
       });
       submissionPort.setConfirmedSteps(['remove-liquidity', 'collect-fees', 'swap-assets']);
-      regimeEngineEventPort.notifyExecutionEvent = async () => { throw new Error('port down'); };
+      regimeEngineEventPort.notifyExecutionEvent = async () => {
+        throw new Error('port down');
+      };
 
       await expect(handler.handle({ attemptId: 'attempt-port-rejects' })).resolves.toBeUndefined();
 
@@ -243,7 +246,8 @@ describe('ReconciliationJobHandler', () => {
 
       expect(regimeEngineEventPort.events).toHaveLength(0);
       const warnLog = observability.logs.find(
-        (l: ObservabilityLog) => l.level === 'warn' && l.message.includes('not found after reconciliation'),
+        (l: ObservabilityLog) =>
+          l.level === 'warn' && l.message.includes('not found after reconciliation'),
       );
       expect(warnLog).toBeDefined();
     });

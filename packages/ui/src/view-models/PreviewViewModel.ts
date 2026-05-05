@@ -31,7 +31,11 @@ export function buildPreviewViewModel(dto: ExecutionPreviewDto): PreviewViewMode
     isExpired,
     requiresRefresh: isStale || isExpired,
     canSign: isFresh,
-    freshnessLabel: isFresh ? 'Quote is fresh' : isStale ? 'Quote is stale — refresh before signing' : 'Quote expired — must refresh',
+    freshnessLabel: isFresh
+      ? 'Quote is fresh'
+      : isStale
+        ? 'Quote is stale — refresh before signing'
+        : 'Quote expired — must refresh',
     steps: dto.steps.map((step) => {
       if (step.kind === 'remove-liquidity') return { label: 'Remove Liquidity' };
       if (step.kind === 'collect-fees') return { label: 'Collect Fees' };

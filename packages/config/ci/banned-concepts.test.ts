@@ -1,10 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { join } from 'path';
-import {
-  BANNED_PATTERNS,
-  collectSourceFiles,
-  findPatternViolations,
-} from './banned-concepts.js';
+import { BANNED_PATTERNS, collectSourceFiles, findPatternViolations } from './banned-concepts.js';
 
 const SCAN_DIRS = [
   join(__dirname, '../../../packages/domain/src'),

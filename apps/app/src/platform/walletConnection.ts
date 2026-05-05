@@ -1,29 +1,13 @@
 import type { ConnectionOutcome } from '@clmm/ui';
 import type { WalletConnectionKind } from '../state/walletSessionStore';
 
-const CANCELLATION_MATCHERS = [
-  'user rejected',
-  'declined',
-  'cancelled',
-  'canceled',
-] as const;
+const CANCELLATION_MATCHERS = ['user rejected', 'declined', 'cancelled', 'canceled'] as const;
 
-const INTERRUPTION_MATCHERS = [
-  'interrupted',
-  'timeout',
-  'closed',
-  'already pending',
-] as const;
+const INTERRUPTION_MATCHERS = ['interrupted', 'timeout', 'closed', 'already pending'] as const;
 
-const CANCELLATION_ERROR_NAMES = [
-  'walletrejectionerror',
-  'connection_error',
-] as const;
+const CANCELLATION_ERROR_NAMES = ['walletrejectionerror', 'connection_error'] as const;
 
-const INTERRUPTION_ERROR_NAMES = [
-  'configuration_error',
-  'network_error',
-] as const;
+const INTERRUPTION_ERROR_NAMES = ['configuration_error', 'network_error'] as const;
 
 function includesAny(value: string, matchers: readonly string[]): boolean {
   return matchers.some((matcher) => value.includes(matcher));
@@ -33,9 +17,7 @@ export function mapWalletErrorToOutcome(error: unknown): ConnectionOutcome {
   const message = error instanceof Error ? error.message : String(error);
   const normalizedMessage = message.toLowerCase();
 
-  const errorName = error instanceof Error
-    ? `${error.constructor.name} ${error.name}`
-    : '';
+  const errorName = error instanceof Error ? `${error.constructor.name} ${error.name}` : '';
   const errorType = (error as { type?: string } | undefined)?.type ?? '';
 
   if (includesAny(errorName.toLowerCase(), CANCELLATION_ERROR_NAMES)) {

@@ -43,10 +43,6 @@ export type TokenAmount = {
   readonly symbol: AssetSymbol;
 };
 
-export function makeTokenAmount(
-  raw: bigint,
-  decimals: number,
-  symbol: AssetSymbol,
-): TokenAmount {
+export function makeTokenAmount(raw: bigint, decimals: number, symbol: AssetSymbol): TokenAmount {
   return { raw, decimals, symbol };
 }

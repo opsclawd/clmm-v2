@@ -17,9 +17,11 @@ function fixtureBlock(): SrLevelsBlock {
   };
 }
 
-function makeAllowlist(entries: Array<[string, { symbol: string; source: string }]> = [
-  [SOL_USDC_POOL_ID, { symbol: 'SOL/USDC', source: 'mco' }],
-]): Map<string, { symbol: string; source: string }> {
+function makeAllowlist(
+  entries: Array<[string, { symbol: string; source: string }]> = [
+    [SOL_USDC_POOL_ID, { symbol: 'SOL/USDC', source: 'mco' }],
+  ],
+): Map<string, { symbol: string; source: string }> {
   return new Map(entries);
 }
 
@@ -50,7 +52,9 @@ describe('SrLevelsController', () => {
     const port: CurrentSrLevelsPort = { fetchCurrent };
     const controller = new SrLevelsController(port, makeAllowlist());
 
-    await expect(controller.getCurrent(UNSUPPORTED_POOL_ID)).rejects.toBeInstanceOf(NotFoundException);
+    await expect(controller.getCurrent(UNSUPPORTED_POOL_ID)).rejects.toBeInstanceOf(
+      NotFoundException,
+    );
     expect(fetchCurrent).not.toHaveBeenCalled();
   });
 

@@ -19,15 +19,22 @@ const MOCK_POSITION_PDA = '5Xh2nBQtrMJVYVfKf2PJy9NZUZdTAsp7D4xWLs4gDB4U';
 
 describe('SolanaPositionSnapshotReader', () => {
   const mockRpcUrl = 'https://api.mainnet-beta.solana.com';
-  let mockRpcWithOwnership: { getTokenAccountsByOwner: () => { send: () => Promise<{ value: Array<unknown> }> } };
-  let mockRpcWithoutOwnership: { getTokenAccountsByOwner: () => { send: () => Promise<{ value: Array<unknown> }> } };
+  let mockRpcWithOwnership: {
+    getTokenAccountsByOwner: () => { send: () => Promise<{ value: Array<unknown> }> };
+  };
+  let mockRpcWithoutOwnership: {
+    getTokenAccountsByOwner: () => { send: () => Promise<{ value: Array<unknown> }> };
+  };
 
   beforeEach(() => {
     vi.clearAllMocks();
-    
+
     mockRpcWithOwnership = {
       getTokenAccountsByOwner: () => ({
-        send: () => Promise.resolve({ value: [{ account: { data: { parsed: { info: { tokenAmount: { amount: '1' } } } } } }] }),
+        send: () =>
+          Promise.resolve({
+            value: [{ account: { data: { parsed: { info: { tokenAmount: { amount: '1' } } } } } }],
+          }),
       }),
     } as unknown as typeof mockRpcWithOwnership;
 
@@ -40,9 +47,12 @@ describe('SolanaPositionSnapshotReader', () => {
 
   describe('fetchSinglePosition', () => {
     it('returns LiquidityPosition when position exists and is owned by wallet', async () => {
-      const { getPositionAddress, fetchPosition, fetchWhirlpool } = await import('@orca-so/whirlpools-client');
+      const { getPositionAddress, fetchPosition, fetchWhirlpool } =
+        await import('@orca-so/whirlpools-client');
 
-      vi.mocked(getPositionAddress).mockResolvedValue([address(MOCK_POSITION_PDA)] as unknown as Awaited<ReturnType<typeof getPositionAddress>>);
+      vi.mocked(getPositionAddress).mockResolvedValue([
+        address(MOCK_POSITION_PDA),
+      ] as unknown as Awaited<ReturnType<typeof getPositionAddress>>);
       vi.mocked(fetchPosition).mockResolvedValue({
         data: {
           whirlpool: address(MOCK_WHIRLPOOL),
@@ -60,7 +70,11 @@ describe('SolanaPositionSnapshotReader', () => {
       } as unknown as Awaited<ReturnType<typeof fetchWhirlpool>>);
 
       const reader = new SolanaPositionSnapshotReader(mockRpcUrl);
-      const result = await reader.fetchSinglePosition(mockRpcWithOwnership as never, MOCK_POSITION_MINT, MOCK_WALLET);
+      const result = await reader.fetchSinglePosition(
+        mockRpcWithOwnership as never,
+        MOCK_POSITION_MINT,
+        MOCK_WALLET,
+      );
 
       expect(result).not.toBeNull();
       expect(result!.positionId).toBe(MOCK_POSITION_MINT);
@@ -74,7 +88,9 @@ describe('SolanaPositionSnapshotReader', () => {
     it('returns null when position is not owned by wallet', async () => {
       const { getPositionAddress, fetchPosition } = await import('@orca-so/whirlpools-client');
 
-      vi.mocked(getPositionAddress).mockResolvedValue([address(MOCK_POSITION_PDA)] as unknown as Awaited<ReturnType<typeof getPositionAddress>>);
+      vi.mocked(getPositionAddress).mockResolvedValue([
+        address(MOCK_POSITION_PDA),
+      ] as unknown as Awaited<ReturnType<typeof getPositionAddress>>);
       vi.mocked(fetchPosition).mockResolvedValue({
         data: {
           whirlpool: address(MOCK_WHIRLPOOL),
@@ -85,7 +101,11 @@ describe('SolanaPositionSnapshotReader', () => {
       } as unknown as Awaited<ReturnType<typeof fetchPosition>>);
 
       const reader = new SolanaPositionSnapshotReader(mockRpcUrl);
-      const result = await reader.fetchSinglePosition(mockRpcWithoutOwnership as never, MOCK_POSITION_MINT, MOCK_WALLET);
+      const result = await reader.fetchSinglePosition(
+        mockRpcWithoutOwnership as never,
+        MOCK_POSITION_MINT,
+        MOCK_WALLET,
+      );
 
       expect(result).toBeNull();
     });
@@ -93,19 +113,28 @@ describe('SolanaPositionSnapshotReader', () => {
     it('returns null when fetchPosition throws', async () => {
       const { getPositionAddress, fetchPosition } = await import('@orca-so/whirlpools-client');
 
-      vi.mocked(getPositionAddress).mockResolvedValue([address(MOCK_POSITION_PDA)] as unknown as Awaited<ReturnType<typeof getPositionAddress>>);
+      vi.mocked(getPositionAddress).mockResolvedValue([
+        address(MOCK_POSITION_PDA),
+      ] as unknown as Awaited<ReturnType<typeof getPositionAddress>>);
       vi.mocked(fetchPosition).mockRejectedValue(new Error('Failed to fetch position'));
 
       const reader = new SolanaPositionSnapshotReader(mockRpcUrl);
-      const result = await reader.fetchSinglePosition(mockRpcWithOwnership as never, MOCK_POSITION_MINT, MOCK_WALLET);
+      const result = await reader.fetchSinglePosition(
+        mockRpcWithOwnership as never,
+        MOCK_POSITION_MINT,
+        MOCK_WALLET,
+      );
 
       expect(result).toBeNull();
     });
 
     it('returns null when fetchWhirlpool throws', async () => {
-      const { getPositionAddress, fetchPosition, fetchWhirlpool } = await import('@orca-so/whirlpools-client');
+      const { getPositionAddress, fetchPosition, fetchWhirlpool } =
+        await import('@orca-so/whirlpools-client');
 
-      vi.mocked(getPositionAddress).mockResolvedValue([address(MOCK_POSITION_PDA)] as unknown as Awaited<ReturnType<typeof getPositionAddress>>);
+      vi.mocked(getPositionAddress).mockResolvedValue([
+        address(MOCK_POSITION_PDA),
+      ] as unknown as Awaited<ReturnType<typeof getPositionAddress>>);
       vi.mocked(fetchPosition).mockResolvedValue({
         data: {
           whirlpool: address(MOCK_WHIRLPOOL),
@@ -117,15 +146,22 @@ describe('SolanaPositionSnapshotReader', () => {
       vi.mocked(fetchWhirlpool).mockRejectedValue(new Error('Failed to fetch whirlpool'));
 
       const reader = new SolanaPositionSnapshotReader(mockRpcUrl);
-      const result = await reader.fetchSinglePosition(mockRpcWithOwnership as never, MOCK_POSITION_MINT, MOCK_WALLET);
+      const result = await reader.fetchSinglePosition(
+        mockRpcWithOwnership as never,
+        MOCK_POSITION_MINT,
+        MOCK_WALLET,
+      );
 
       expect(result).toBeNull();
     });
 
     it('computes below-range rangeState when current tick is below lower bound', async () => {
-      const { getPositionAddress, fetchPosition, fetchWhirlpool } = await import('@orca-so/whirlpools-client');
+      const { getPositionAddress, fetchPosition, fetchWhirlpool } =
+        await import('@orca-so/whirlpools-client');
 
-      vi.mocked(getPositionAddress).mockResolvedValue([address(MOCK_POSITION_PDA)] as unknown as Awaited<ReturnType<typeof getPositionAddress>>);
+      vi.mocked(getPositionAddress).mockResolvedValue([
+        address(MOCK_POSITION_PDA),
+      ] as unknown as Awaited<ReturnType<typeof getPositionAddress>>);
       vi.mocked(fetchPosition).mockResolvedValue({
         data: {
           whirlpool: address(MOCK_WHIRLPOOL),
@@ -143,16 +179,23 @@ describe('SolanaPositionSnapshotReader', () => {
       } as unknown as Awaited<ReturnType<typeof fetchWhirlpool>>);
 
       const reader = new SolanaPositionSnapshotReader(mockRpcUrl);
-      const result = await reader.fetchSinglePosition(mockRpcWithOwnership as never, MOCK_POSITION_MINT, MOCK_WALLET);
+      const result = await reader.fetchSinglePosition(
+        mockRpcWithOwnership as never,
+        MOCK_POSITION_MINT,
+        MOCK_WALLET,
+      );
 
       expect(result).not.toBeNull();
       expect(result!.rangeState.kind).toBe('below-range');
     });
 
     it('computes above-range rangeState when current tick is above upper bound', async () => {
-      const { getPositionAddress, fetchPosition, fetchWhirlpool } = await import('@orca-so/whirlpools-client');
+      const { getPositionAddress, fetchPosition, fetchWhirlpool } =
+        await import('@orca-so/whirlpools-client');
 
-      vi.mocked(getPositionAddress).mockResolvedValue([address(MOCK_POSITION_PDA)] as unknown as Awaited<ReturnType<typeof getPositionAddress>>);
+      vi.mocked(getPositionAddress).mockResolvedValue([
+        address(MOCK_POSITION_PDA),
+      ] as unknown as Awaited<ReturnType<typeof getPositionAddress>>);
       vi.mocked(fetchPosition).mockResolvedValue({
         data: {
           whirlpool: address(MOCK_WHIRLPOOL),
@@ -170,7 +213,11 @@ describe('SolanaPositionSnapshotReader', () => {
       } as unknown as Awaited<ReturnType<typeof fetchWhirlpool>>);
 
       const reader = new SolanaPositionSnapshotReader(mockRpcUrl);
-      const result = await reader.fetchSinglePosition(mockRpcWithOwnership as never, MOCK_POSITION_MINT, MOCK_WALLET);
+      const result = await reader.fetchSinglePosition(
+        mockRpcWithOwnership as never,
+        MOCK_POSITION_MINT,
+        MOCK_WALLET,
+      );
 
       expect(result).not.toBeNull();
       expect(result!.rangeState.kind).toBe('above-range');
@@ -180,7 +227,11 @@ describe('SolanaPositionSnapshotReader', () => {
   describe('verifyOwnership', () => {
     it('returns true when wallet owns the position mint', async () => {
       const reader = new SolanaPositionSnapshotReader(mockRpcUrl);
-      const result = await reader.verifyOwnership(mockRpcWithOwnership as never, MOCK_WALLET, MOCK_POSITION_MINT);
+      const result = await reader.verifyOwnership(
+        mockRpcWithOwnership as never,
+        MOCK_WALLET,
+        MOCK_POSITION_MINT,
+      );
 
       expect(result).toBe(true);
     });
@@ -188,7 +239,11 @@ describe('SolanaPositionSnapshotReader', () => {
     it('returns false when wallet does not own the position mint', async () => {
       const nonOwnerWallet = '9w7A9sXjC8eGdxzpcM8f7mPy8tLQGvY1z9WnK3m2LcQa' as WalletId;
       const reader = new SolanaPositionSnapshotReader(mockRpcUrl);
-      const result = await reader.verifyOwnership(mockRpcWithoutOwnership as never, nonOwnerWallet, MOCK_POSITION_MINT);
+      const result = await reader.verifyOwnership(
+        mockRpcWithoutOwnership as never,
+        nonOwnerWallet,
+        MOCK_POSITION_MINT,
+      );
 
       expect(result).toBe(false);
     });
@@ -233,20 +288,24 @@ describe('SolanaPositionSnapshotReader', () => {
       const pool1 = '7qbRF6YsyGuLUVs6Y1q64bdVrfe4ZcUUz1JRdoVNUJnm';
       const pool2 = '8qbRF6YsyGuLUVs6Y1q64bdVrfe4ZcUUz1JRdoVNUJno';
 
-      vi.mocked(fetchWhirlpool).mockImplementation(async (_rpc: unknown, addr: { toString: () => string }) => {
-        if (addr.toString() === pool2) {
-          throw new Error('Failed to fetch');
-        }
-        return { data: {
-          tickCurrentIndex: -18130,
-          sqrtPrice: 184467440737095516n,
-          tokenMintA: { toString: () => 'So11111111111111111111111111111111111111112' },
-          tokenMintB: { toString: () => 'EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v' },
-          feeRate: 1000,
-          tickSpacing: 64,
-          liquidity: 2400000000n,
-        } } as unknown as Awaited<ReturnType<typeof fetchWhirlpool>>;
-      });
+      vi.mocked(fetchWhirlpool).mockImplementation(
+        async (_rpc: unknown, addr: { toString: () => string }) => {
+          if (addr.toString() === pool2) {
+            throw new Error('Failed to fetch');
+          }
+          return {
+            data: {
+              tickCurrentIndex: -18130,
+              sqrtPrice: 184467440737095516n,
+              tokenMintA: { toString: () => 'So11111111111111111111111111111111111111112' },
+              tokenMintB: { toString: () => 'EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v' },
+              feeRate: 1000,
+              tickSpacing: 64,
+              liquidity: 2400000000n,
+            },
+          } as unknown as Awaited<ReturnType<typeof fetchWhirlpool>>;
+        },
+      );
 
       const reader = new SolanaPositionSnapshotReader(mockRpcUrl);
       const result = await reader.fetchWhirlpoolsBatched(mockRpc, [pool1, pool2]);
@@ -272,25 +331,27 @@ describe('SolanaPositionSnapshotReader', () => {
       let inFlight = 0;
       let maxInFlight = 0;
 
-      vi.mocked(fetchWhirlpool).mockImplementation(async (_rpc: unknown, addr: { toString: () => string }) => {
-        inFlight += 1;
-        maxInFlight = Math.max(maxInFlight, inFlight);
+      vi.mocked(fetchWhirlpool).mockImplementation(
+        async (_rpc: unknown, addr: { toString: () => string }) => {
+          inFlight += 1;
+          maxInFlight = Math.max(maxInFlight, inFlight);
 
-        await new Promise((resolve) => setTimeout(resolve, 5));
+          await new Promise((resolve) => setTimeout(resolve, 5));
 
-        inFlight -= 1;
-        return {
-          data: {
-            tickCurrentIndex: Number(addr.toString().slice(-1)),
-            sqrtPrice: 184467440737095516n,
-            tokenMintA: { toString: () => 'So11111111111111111111111111111111111111112' },
-            tokenMintB: { toString: () => 'EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v' },
-            feeRate: 1000,
-            tickSpacing: 64,
-            liquidity: 2400000000n,
-          },
-        } as never;
-      });
+          inFlight -= 1;
+          return {
+            data: {
+              tickCurrentIndex: Number(addr.toString().slice(-1)),
+              sqrtPrice: 184467440737095516n,
+              tokenMintA: { toString: () => 'So11111111111111111111111111111111111111112' },
+              tokenMintB: { toString: () => 'EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v' },
+              feeRate: 1000,
+              tickSpacing: 64,
+              liquidity: 2400000000n,
+            },
+          } as never;
+        },
+      );
 
       const result = await reader.fetchWhirlpoolsBatched(rpc, [
         '7qbRF6YsyGuLUVs6Y1q64bdVrfe4ZcUUz1JRdoVNUJnm',

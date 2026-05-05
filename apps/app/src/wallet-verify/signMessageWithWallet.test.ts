@@ -1,9 +1,6 @@
 /* eslint-disable @typescript-eslint/no-unsafe-return, @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-member-access */
 import { describe, it, expect, vi } from 'vitest';
-import {
-  signMessageWithWallet,
-  type BrowserMessageSigner,
-} from './signMessageWithWallet';
+import { signMessageWithWallet, type BrowserMessageSigner } from './signMessageWithWallet';
 import type { WalletConnectionKind } from '../state/walletSessionStore';
 
 vi.mock('../platform/nativeWallet', () => ({
@@ -41,7 +38,9 @@ describe('signMessageWithWallet', () => {
     });
 
     it('returns wallet-mismatch for "not return the requested authorized account"', async () => {
-      mockSignNative.mockRejectedValueOnce(new Error('Native wallet did not return the requested authorized account'));
+      mockSignNative.mockRejectedValueOnce(
+        new Error('Native wallet did not return the requested authorized account'),
+      );
       const result = await signMessageWithWallet({
         ...params,
         connectionKind: 'native',
@@ -113,7 +112,9 @@ describe('signMessageWithWallet', () => {
       const signedBytes = new Uint8Array([1, 2, 3, 4]);
       const result = await signMessageWithWallet({
         ...params,
-        browserSigner: makeBrowserSigner({ signMessageBytes: vi.fn().mockResolvedValue(signedBytes) }),
+        browserSigner: makeBrowserSigner({
+          signMessageBytes: vi.fn().mockResolvedValue(signedBytes),
+        }),
         connectionKind: 'browser',
       });
       expect(result.kind).toBe('ok');
@@ -126,7 +127,9 @@ describe('signMessageWithWallet', () => {
     it('returns rejected when signer throws a rejection error', async () => {
       const result = await signMessageWithWallet({
         ...params,
-        browserSigner: makeBrowserSigner({ signMessageBytes: vi.fn().mockRejectedValue(new Error('User rejected')) }),
+        browserSigner: makeBrowserSigner({
+          signMessageBytes: vi.fn().mockRejectedValue(new Error('User rejected')),
+        }),
         connectionKind: 'browser',
       });
       expect(result).toEqual({ kind: 'rejected' });
@@ -135,7 +138,11 @@ describe('signMessageWithWallet', () => {
     it('returns unsupported for "not available" errors', async () => {
       const result = await signMessageWithWallet({
         ...params,
-        browserSigner: makeBrowserSigner({ signMessageBytes: vi.fn().mockRejectedValue(new Error('signMessageBytes is not available')) }),
+        browserSigner: makeBrowserSigner({
+          signMessageBytes: vi
+            .fn()
+            .mockRejectedValue(new Error('signMessageBytes is not available')),
+        }),
         connectionKind: 'browser',
       });
       expect(result).toEqual({ kind: 'unsupported' });

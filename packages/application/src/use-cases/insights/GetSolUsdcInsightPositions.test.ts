@@ -10,16 +10,8 @@ import {
   FIXTURE_SOL_PRICE_QUOTE,
   FIXTURE_USDC_PRICE_QUOTE,
 } from '@clmm/testing';
-import {
-  makePoolId,
-  makePositionId,
-  makeClockTimestamp,
-} from '@clmm/domain';
-import type {
-  BreachEpisodeId,
-  ExitTriggerId,
-  PositionDetail,
-} from '@clmm/domain';
+import { makePoolId, makePositionId, makeClockTimestamp } from '@clmm/domain';
+import type { BreachEpisodeId, ExitTriggerId, PositionDetail } from '@clmm/domain';
 import type { SupportedPositionReadPort, PricePort } from '../../ports/index.js';
 
 const SOL_USDC_POOL_ID = makePoolId('Czfq3xZZDmsdGdUyrNLtRhGc47cXcZtLG4crryfu44zE');
@@ -63,7 +55,9 @@ describe('getSolUsdcInsightPositions', () => {
 
   it('returns position-list-unavailable when listSupportedPositions throws', async () => {
     const positionReadPort = {
-      listSupportedPositions: async () => { throw new Error('rpc unreachable'); },
+      listSupportedPositions: async () => {
+        throw new Error('rpc unreachable');
+      },
       getPosition: async () => null,
       getPositionDetail: async () => null,
       getPoolData: async () => poolDataFor(SOL_USDC_POOL_ID),
@@ -211,7 +205,9 @@ describe('getSolUsdcInsightPositions', () => {
 
     const triggerRepo = {
       getTrigger: async () => null,
-      listActionableTriggers: async () => { throw new Error('db down'); },
+      listActionableTriggers: async () => {
+        throw new Error('db down');
+      },
       deleteTrigger: async () => undefined,
     } as unknown as FakeTriggerRepository;
 
@@ -229,7 +225,9 @@ describe('getSolUsdcInsightPositions', () => {
       expect(result.snapshot.positions[0]!.hasActionableTrigger).toBe(false);
       expect(result.snapshot.dataQuality.partial).toBe(true);
       expect(
-        result.snapshot.dataQuality.warnings.find((w) => w.code === 'actionable_triggers_unavailable'),
+        result.snapshot.dataQuality.warnings.find(
+          (w) => w.code === 'actionable_triggers_unavailable',
+        ),
       ).toBeDefined();
     }
   });
@@ -274,7 +272,9 @@ describe('getSolUsdcInsightPositions', () => {
       getPoolData: async () => poolDataFor(SOL_USDC_POOL_ID),
     } as unknown as SupportedPositionReadPort;
     const throwingPricePort = {
-      getPrices: async () => { throw new Error('price rpc failed'); },
+      getPrices: async () => {
+        throw new Error('price rpc failed');
+      },
     } as unknown as PricePort;
 
     const result = await getSolUsdcInsightPositions({
@@ -290,7 +290,9 @@ describe('getSolUsdcInsightPositions', () => {
     if (result.kind === 'ok') {
       expect(result.snapshot.positions).toHaveLength(1);
       expect(result.snapshot.positions[0]!.unclaimedFeesUsd).toBeNull();
-      expect(result.snapshot.dataQuality.warnings.find((w) => w.code === 'fee_reward_usd_unavailable')).toBeDefined();
+      expect(
+        result.snapshot.dataQuality.warnings.find((w) => w.code === 'fee_reward_usd_unavailable'),
+      ).toBeDefined();
     }
   });
 });

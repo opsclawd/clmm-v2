@@ -1,8 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import {
-  evaluateConfirmationThreshold,
-  buildExitTrigger,
-} from './TriggerQualificationService.js';
+import { evaluateConfirmationThreshold, buildExitTrigger } from './TriggerQualificationService.js';
 import {
   makePositionId,
   makeClockTimestamp,

@@ -1,7 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import {
-  makeWalletId,
-} from '@clmm/domain';
+import { makeWalletId } from '@clmm/domain';
 import {
   scanPositionsForBreaches,
   qualifyActionableTrigger,
@@ -49,15 +47,33 @@ describe('Partial-Completion Resume Smoke Scenario', () => {
     const historyRepo = new FakeExecutionHistoryRepository();
 
     return {
-      walletId, clock, ids, positionRead, episodeRepo, swapQuote,
-      executionRepo, prepPort, signingPort, submissionPort, historyRepo,
+      walletId,
+      clock,
+      ids,
+      positionRead,
+      episodeRepo,
+      swapQuote,
+      executionRepo,
+      prepPort,
+      signingPort,
+      submissionPort,
+      historyRepo,
     };
   }
 
   async function runThroughSubmission(fakes: ReturnType<typeof buildFakes>) {
     const {
-      walletId, clock, ids, positionRead, episodeRepo, swapQuote,
-      executionRepo, prepPort, signingPort, submissionPort, historyRepo,
+      walletId,
+      clock,
+      ids,
+      positionRead,
+      episodeRepo,
+      swapQuote,
+      executionRepo,
+      prepPort,
+      signingPort,
+      submissionPort,
+      historyRepo,
     } = fakes;
 
     // 1. Scan — detect below-range position

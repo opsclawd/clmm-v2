@@ -6,9 +6,7 @@ import { describe, it, expect } from 'vitest';
 import type { TriggerRepository } from '@clmm/application';
 import type { ExitTriggerId, WalletId } from '@clmm/domain';
 
-export function runTriggerRepositoryContract(
-  factory: () => TriggerRepository,
-): void {
+export function runTriggerRepositoryContract(factory: () => TriggerRepository): void {
   describe('TriggerRepository contract', () => {
     it('returns null for unknown trigger', async () => {
       const repo = factory();

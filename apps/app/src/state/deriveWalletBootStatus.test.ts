@@ -39,19 +39,15 @@ describe('deriveWalletBootStatus', () => {
   });
 
   it('returns connected immediately for a persisted native session', () => {
-    expect(
-      deriveWalletBootStatus(
-        input({ connectionKind: 'native', walletAddress: ADDR }),
-      ),
-    ).toBe('connected');
+    expect(deriveWalletBootStatus(input({ connectionKind: 'native', walletAddress: ADDR }))).toBe(
+      'connected',
+    );
   });
 
   it('returns disconnected for native kind with null address', () => {
-    expect(
-      deriveWalletBootStatus(
-        input({ connectionKind: 'native', walletAddress: null }),
-      ),
-    ).toBe('disconnected');
+    expect(deriveWalletBootStatus(input({ connectionKind: 'native', walletAddress: null }))).toBe(
+      'disconnected',
+    );
   });
 
   it('returns checking-browser-wallet for a browser candidate while connector is initial-disconnected', () => {
@@ -174,9 +170,7 @@ describe('deriveWalletBootStatus', () => {
 
   it('returns disconnected when browser kind has no browserRestoreAddress (no candidate)', () => {
     expect(
-      deriveWalletBootStatus(
-        input({ connectionKind: 'browser', browserRestoreAddress: null }),
-      ),
+      deriveWalletBootStatus(input({ connectionKind: 'browser', browserRestoreAddress: null })),
     ).toBe('disconnected');
   });
 });

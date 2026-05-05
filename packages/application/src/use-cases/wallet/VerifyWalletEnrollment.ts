@@ -41,14 +41,11 @@ export async function verifyWalletEnrollment(params: {
       break;
   }
 
-  const enroll = await params.enrollmentApi.enrollWithCredentials(
-    params.walletId,
-    {
-      nonce: challenge.challenge.nonce,
-      message: challenge.challenge.message,
-      signature: signed.signatureBase64,
-    },
-  );
+  const enroll = await params.enrollmentApi.enrollWithCredentials(params.walletId, {
+    nonce: challenge.challenge.nonce,
+    message: challenge.challenge.message,
+    signature: signed.signatureBase64,
+  });
 
   if (enroll.kind === 'error') {
     return { kind: 'enroll-failed', code: enroll.code };

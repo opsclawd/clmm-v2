@@ -1,9 +1,5 @@
 import type { TriggerRepository } from '@clmm/application';
-import type {
-  ExitTrigger,
-  ExitTriggerId,
-  WalletId,
-} from '@clmm/domain';
+import type { ExitTrigger, ExitTriggerId, WalletId } from '@clmm/domain';
 
 export class FakeTriggerRepository implements TriggerRepository {
   readonly triggers = new Map<string, ExitTrigger>();

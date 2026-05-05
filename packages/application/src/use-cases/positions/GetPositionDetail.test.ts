@@ -46,7 +46,9 @@ describe('GetPositionDetail', () => {
       FIXTURE_POSITION_DETAIL,
     );
     const pricePort: PricePort = {
-      getPrices: async () => { throw new Error('price unavailable'); },
+      getPrices: async () => {
+        throw new Error('price unavailable');
+      },
     };
 
     const result = await getPositionDetail({

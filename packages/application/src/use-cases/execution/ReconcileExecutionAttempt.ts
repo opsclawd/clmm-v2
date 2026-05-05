@@ -23,7 +23,16 @@ export async function reconcileExecutionAttempt(params: {
   clock: ClockPort;
   ids: IdGeneratorPort;
 }): Promise<ReconcileResult> {
-  const { attemptId, positionId, breachDirection, executionRepo, submissionPort, historyRepo, clock, ids } = params;
+  const {
+    attemptId,
+    positionId,
+    breachDirection,
+    executionRepo,
+    submissionPort,
+    historyRepo,
+    clock,
+    ids,
+  } = params;
 
   const attempt = await executionRepo.getAttempt(attemptId);
   if (!attempt) throw new Error(`Attempt not found: ${attemptId}`);
@@ -36,9 +45,9 @@ export async function reconcileExecutionAttempt(params: {
     return { kind: 'partial', confirmedSteps: [...attempt.completedSteps] };
   }
 
-  const { confirmedSteps, finalState } = await submissionPort.reconcileExecution(
-    [...attempt.transactionReferences],
-  );
+  const { confirmedSteps, finalState } = await submissionPort.reconcileExecution([
+    ...attempt.transactionReferences,
+  ]);
 
   if (!finalState) {
     return { kind: 'pending' };
@@ -51,8 +60,11 @@ export async function reconcileExecutionAttempt(params: {
   });
 
   const eventType =
-    finalState.kind === 'confirmed' ? 'confirmed' :
-    finalState.kind === 'partial' ? 'partial-completion' : 'failed';
+    finalState.kind === 'confirmed'
+      ? 'confirmed'
+      : finalState.kind === 'partial'
+        ? 'partial-completion'
+        : 'failed';
 
   await historyRepo.appendEvent({
     eventId: ids.generateId(),

@@ -5,9 +5,7 @@ import type { Db } from './db.js';
 
 function makeDbWithPresentTables(present: string[]): Db {
   return {
-    execute: vi.fn(async () =>
-      present.map((table_name) => ({ table_name })),
-    ),
+    execute: vi.fn(async () => present.map((table_name) => ({ table_name }))),
   } as unknown as Db;
 }
 
@@ -99,7 +97,9 @@ describe('checkSchemaReadiness', () => {
     await checkSchemaReadiness(db, namespace);
 
     const callArgs = executeMock.mock.calls as unknown as [[unknown]];
-    const query = callArgs[0][0] as { toQuery: (config: unknown) => { sql: string; params: unknown[] } };
+    const query = callArgs[0][0] as {
+      toQuery: (config: unknown) => { sql: string; params: unknown[] };
+    };
     const built = query.toQuery({
       escapeName: (s: string) => `"${s}"`,
       escapeParam: (_: unknown, i: number) => `$${i + 1}`,

@@ -10,16 +10,8 @@ import {
   FIXTURE_SOL_PRICE_QUOTE,
   FIXTURE_USDC_PRICE_QUOTE,
 } from '@clmm/testing';
-import {
-  makePoolId,
-  makePositionId,
-  makeClockTimestamp,
-} from '@clmm/domain';
-import type {
-  BreachEpisodeId,
-  ExitTriggerId,
-  PositionDetail,
-} from '@clmm/domain';
+import { makePoolId, makePositionId, makeClockTimestamp } from '@clmm/domain';
+import type { BreachEpisodeId, ExitTriggerId, PositionDetail } from '@clmm/domain';
 import type { SrLevelsReadPort } from '../../ports/index.js';
 import type { SupportedPositionReadPort, PricePort } from '../../ports/index.js';
 import type { SrLevelsBlock } from '../../dto/index.js';
@@ -149,7 +141,9 @@ describe('getSolUsdcInsightBundle', () => {
       positionReadPort: samplePositionPort(positions),
       triggerRepo: new FakeTriggerRepository(),
       pricePort: new FakePricePort([FIXTURE_SOL_PRICE_QUOTE, FIXTURE_USDC_PRICE_QUOTE]),
-      srLevelsReadPort: makeSrPort(async () => { throw new Error('rpc'); }),
+      srLevelsReadPort: makeSrPort(async () => {
+        throw new Error('rpc');
+      }),
       now,
     });
 
@@ -186,7 +180,10 @@ describe('getSolUsdcInsightBundle', () => {
   });
 
   it('excludes alerts whose positionId is outside the filtered allowlisted set', async () => {
-    const positions = [positionInPool('pos-in', SOL_USDC_POOL_ID), positionInPool('pos-out', OTHER_POOL_ID)];
+    const positions = [
+      positionInPool('pos-in', SOL_USDC_POOL_ID),
+      positionInPool('pos-out', OTHER_POOL_ID),
+    ];
     const triggerRepo = new FakeTriggerRepository();
     triggerRepo.triggers.set('trig-out', {
       triggerId: 'trig-out' as ExitTriggerId,
@@ -264,7 +261,9 @@ describe('getSolUsdcInsightBundle', () => {
       getPoolData: async () => poolDataFor(SOL_USDC_POOL_ID),
     } as unknown as SupportedPositionReadPort;
     const throwingPricePort = {
-      getPrices: async () => { throw new Error('price rpc failed'); },
+      getPrices: async () => {
+        throw new Error('price rpc failed');
+      },
     } as unknown as PricePort;
 
     const result = await getSolUsdcInsightBundle({
@@ -282,7 +281,9 @@ describe('getSolUsdcInsightBundle', () => {
     if (result.kind === 'ok') {
       expect(result.bundle.positions).toHaveLength(1);
       expect(result.bundle.positions[0]!.unclaimedFeesUsd).toBeNull();
-      expect(result.bundle.dataQuality.warnings.find((w) => w.code === 'fee_reward_usd_unavailable')).toBeDefined();
+      expect(
+        result.bundle.dataQuality.warnings.find((w) => w.code === 'fee_reward_usd_unavailable'),
+      ).toBeDefined();
     }
   });
 });

@@ -31,10 +31,7 @@ export type WalletSessionState = {
   lastConnectedAt: number | null;
   setPlatformCapabilities: (capabilities: PlatformCapabilityState) => void;
   beginConnection: () => void;
-  markConnected: (params: {
-    walletAddress: string;
-    connectionKind: WalletConnectionKind;
-  }) => void;
+  markConnected: (params: { walletAddress: string; connectionKind: WalletConnectionKind }) => void;
   markOutcome: (outcome: NonSuccessConnectionOutcome) => void;
   disconnect: () => void;
   clearOutcome: () => void;
@@ -119,8 +116,8 @@ export function createWalletSessionStore() {
             });
           }
         },
-      }
-    )
+      },
+    ),
   );
 
   return store;

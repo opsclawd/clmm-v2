@@ -1,5 +1,9 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { approveExecutionPreview, fetchExecutionSigningPayload, submitExecution } from './executions';
+import {
+  approveExecutionPreview,
+  fetchExecutionSigningPayload,
+  submitExecution,
+} from './executions';
 
 type ExpoPublicEnv = NodeJS.ProcessEnv & {
   EXPO_PUBLIC_BFF_BASE_URL?: string;

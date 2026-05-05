@@ -116,7 +116,10 @@ export function createPreview(triggerId: string): Promise<ExecutionPreviewDto> {
 }
 
 export function fetchPreview(previewId: string): Promise<ExecutionPreviewDto> {
-  return parsePreviewResponse(fetchJson(`/previews/${previewId}`), 'Could not load execution preview');
+  return parsePreviewResponse(
+    fetchJson(`/previews/${previewId}`),
+    'Could not load execution preview',
+  );
 }
 
 export function refreshPreview(triggerId: string): Promise<ExecutionPreviewDto> {

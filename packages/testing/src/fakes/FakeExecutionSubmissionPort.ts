@@ -1,5 +1,10 @@
 import type { ExecutionSubmissionPort } from '@clmm/application';
-import type { TransactionReference, ExecutionLifecycleState, ClockTimestamp, ExecutionStep } from '@clmm/domain';
+import type {
+  TransactionReference,
+  ExecutionLifecycleState,
+  ClockTimestamp,
+  ExecutionStep,
+} from '@clmm/domain';
 import { makeClockTimestamp } from '@clmm/domain';
 
 export class FakeExecutionSubmissionPort implements ExecutionSubmissionPort {
@@ -33,9 +38,7 @@ export class FakeExecutionSubmissionPort implements ExecutionSubmissionPort {
     };
   }
 
-  async reconcileExecution(
-    _refs: TransactionReference[],
-  ): Promise<{
+  async reconcileExecution(_refs: TransactionReference[]): Promise<{
     confirmedSteps: Array<ExecutionStep['kind']>;
     finalState: ExecutionLifecycleState | null;
   }> {

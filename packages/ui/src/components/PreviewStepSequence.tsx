@@ -12,7 +12,12 @@ export function PreviewStepSequence({ direction, estimatedAmounts }: Props): JSX
       {steps.map((step) => (
         <View
           key={step.step}
-          style={{ flexDirection: 'row', padding: 8, borderBottomWidth: 1, borderBottomColor: colors.border }}
+          style={{
+            flexDirection: 'row',
+            padding: 8,
+            borderBottomWidth: 1,
+            borderBottomColor: colors.border,
+          }}
         >
           <Text style={{ color: colors.textSecondary, width: 24 }}>{step.step}.</Text>
           <View style={{ flex: 1 }}>

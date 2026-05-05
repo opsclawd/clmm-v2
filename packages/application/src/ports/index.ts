@@ -6,17 +6,8 @@ import type {
   ClockTimestamp,
   TokenAmount,
 } from '@clmm/domain';
-import type {
-  LiquidityPosition,
-  PositionDetail,
-  PoolData,
-  PriceQuote,
-} from '@clmm/domain';
-import type {
-  ExitTrigger,
-  BreachEpisodeId,
-  ExitTriggerId,
-} from '@clmm/domain';
+import type { LiquidityPosition, PositionDetail, PoolData, PriceQuote } from '@clmm/domain';
+import type { ExitTrigger, BreachEpisodeId, ExitTriggerId } from '@clmm/domain';
 import type {
   ExecutionPlan,
   ExecutionPreview,
@@ -26,11 +17,7 @@ import type {
   SwapInstruction,
   ExecutionStep,
 } from '@clmm/domain';
-import type {
-  HistoryEvent,
-  HistoryTimeline,
-  ExecutionOutcomeSummary,
-} from '@clmm/domain';
+import type { HistoryEvent, HistoryTimeline, ExecutionOutcomeSummary } from '@clmm/domain';
 import type { SrLevelsBlock } from '../dto/index.js';
 
 // --- Position read ports ---
@@ -99,9 +86,7 @@ export interface WalletSigningPort {
     serializedPayload: Uint8Array,
     walletId: WalletId,
   ): Promise<
-    | { kind: 'signed'; signedPayload: Uint8Array }
-    | { kind: 'declined' }
-    | { kind: 'interrupted' }
+    { kind: 'signed'; signedPayload: Uint8Array } | { kind: 'declined' } | { kind: 'interrupted' }
   >;
 }
 
@@ -165,8 +150,16 @@ export type StoredExecutionAttempt = ExecutionAttempt & {
 };
 
 export interface ExecutionRepository {
-  savePreview(positionId: PositionId, preview: ExecutionPreview, breachDirection: BreachDirection): Promise<{ previewId: string }>;
-  getPreview(previewId: string): Promise<{ preview: ExecutionPreview; positionId: PositionId; breachDirection: BreachDirection } | null>;
+  savePreview(
+    positionId: PositionId,
+    preview: ExecutionPreview,
+    breachDirection: BreachDirection,
+  ): Promise<{ previewId: string }>;
+  getPreview(previewId: string): Promise<{
+    preview: ExecutionPreview;
+    positionId: PositionId;
+    breachDirection: BreachDirection;
+  } | null>;
   saveAttempt(attempt: StoredExecutionAttempt): Promise<void>;
   getAttempt(attemptId: string): Promise<StoredExecutionAttempt | null>;
   savePreparedPayload(params: {
@@ -182,7 +175,9 @@ export interface ExecutionRepository {
     unsignedPayload: Uint8Array;
     expiresAt: ClockTimestamp;
   } | null>;
-  listAwaitingSignatureAttemptsByEpisode(episodeId: BreachEpisodeId): Promise<StoredExecutionAttempt[]>;
+  listAwaitingSignatureAttemptsByEpisode(
+    episodeId: BreachEpisodeId,
+  ): Promise<StoredExecutionAttempt[]>;
   listSubmittedAttempts(): Promise<StoredExecutionAttempt[]>;
   updateAttemptState(attemptId: string, state: ExecutionLifecycleState): Promise<void>;
 }
@@ -211,7 +206,11 @@ export interface ExecutionSessionRepository {
 
 export interface ExecutionHistoryRepository {
   appendEvent(event: HistoryEvent): Promise<void>;
-  recordWalletPositionOwnership(walletId: WalletId, positionId: PositionId, observedAt: number): Promise<void>;
+  recordWalletPositionOwnership(
+    walletId: WalletId,
+    positionId: PositionId,
+    observedAt: number,
+  ): Promise<void>;
   getWalletHistory(walletId: WalletId): Promise<readonly HistoryEvent[]>;
   getTimeline(positionId: PositionId): Promise<HistoryTimeline>;
   getOutcomeSummary(positionId: PositionId): Promise<ExecutionOutcomeSummary | null>;
@@ -348,8 +347,5 @@ export type SignMessageOutcome =
   | { kind: 'failed' };
 
 export interface WalletMessageSigningPort {
-  signMessage(params: {
-    walletId: string;
-    message: string;
-  }): Promise<SignMessageOutcome>;
+  signMessage(params: { walletId: string; message: string }): Promise<SignMessageOutcome>;
 }

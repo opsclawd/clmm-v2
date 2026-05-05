@@ -116,29 +116,33 @@ describe('RequestWalletSignature', () => {
   });
 
   it('throws PreviewNotFoundError when the preview record does not exist', async () => {
-    await expect(requestWalletSignature({
-      previewId: 'missing-preview',
-      walletId: FIXTURE_WALLET_ID,
-      executionRepo,
-      prepPort,
-      historyRepo,
-      clock,
-      ids,
-    })).rejects.toThrow(PreviewNotFoundError);
+    await expect(
+      requestWalletSignature({
+        previewId: 'missing-preview',
+        walletId: FIXTURE_WALLET_ID,
+        executionRepo,
+        prepPort,
+        historyRepo,
+        clock,
+        ids,
+      }),
+    ).rejects.toThrow(PreviewNotFoundError);
   });
 
   it('throws PreviewApprovalNotAllowedError when the preview is not fresh', async () => {
     clock.advance(35_000);
 
-    await expect(requestWalletSignature({
-      previewId,
-      walletId: FIXTURE_WALLET_ID,
-      executionRepo,
-      prepPort,
-      historyRepo,
-      clock,
-      ids,
-    })).rejects.toThrow(PreviewApprovalNotAllowedError);
+    await expect(
+      requestWalletSignature({
+        previewId,
+        walletId: FIXTURE_WALLET_ID,
+        executionRepo,
+        prepPort,
+        historyRepo,
+        clock,
+        ids,
+      }),
+    ).rejects.toThrow(PreviewApprovalNotAllowedError);
     expect(executionRepo.attempts.size).toBe(0);
     expect(executionRepo.preparedPayloads.size).toBe(0);
     expect(historyRepo.events).toEqual([]);
@@ -147,15 +151,17 @@ describe('RequestWalletSignature', () => {
   it('throws PreviewApprovalNotAllowedError when a fresh preview is past expiresAt by clock time', async () => {
     clock.advance(60_001);
 
-    await expect(requestWalletSignature({
-      previewId,
-      walletId: FIXTURE_WALLET_ID,
-      executionRepo,
-      prepPort,
-      historyRepo,
-      clock,
-      ids,
-    })).rejects.toThrow(PreviewApprovalNotAllowedError);
+    await expect(
+      requestWalletSignature({
+        previewId,
+        walletId: FIXTURE_WALLET_ID,
+        executionRepo,
+        prepPort,
+        historyRepo,
+        clock,
+        ids,
+      }),
+    ).rejects.toThrow(PreviewApprovalNotAllowedError);
     expect(executionRepo.attempts.size).toBe(0);
     expect(executionRepo.preparedPayloads.size).toBe(0);
     expect(historyRepo.events).toEqual([]);
@@ -164,31 +170,35 @@ describe('RequestWalletSignature', () => {
   it('throws PreviewApprovalNotAllowedError when clock time puts preview in the stale window even though stored freshness is fresh', async () => {
     clock.advance(35_000);
 
-    await expect(requestWalletSignature({
-      previewId,
-      walletId: FIXTURE_WALLET_ID,
-      executionRepo,
-      prepPort,
-      historyRepo,
-      clock,
-      ids,
-    })).rejects.toThrow(PreviewApprovalNotAllowedError);
+    await expect(
+      requestWalletSignature({
+        previewId,
+        walletId: FIXTURE_WALLET_ID,
+        executionRepo,
+        prepPort,
+        historyRepo,
+        clock,
+        ids,
+      }),
+    ).rejects.toThrow(PreviewApprovalNotAllowedError);
     expect(executionRepo.attempts.size).toBe(0);
     expect(executionRepo.preparedPayloads.size).toBe(0);
     expect(historyRepo.events).toEqual([]);
   });
 
   it('throws when trigger-derived approval omits episodeId', async () => {
-    await expect(requestWalletSignature({
-      previewId,
-      isTriggerDerivedApproval: true,
-      walletId: FIXTURE_WALLET_ID,
-      executionRepo,
-      prepPort,
-      historyRepo,
-      clock,
-      ids,
-    })).rejects.toThrow(MissingEpisodeIdForTriggerDerivedApprovalError);
+    await expect(
+      requestWalletSignature({
+        previewId,
+        isTriggerDerivedApproval: true,
+        walletId: FIXTURE_WALLET_ID,
+        executionRepo,
+        prepPort,
+        historyRepo,
+        clock,
+        ids,
+      }),
+    ).rejects.toThrow(MissingEpisodeIdForTriggerDerivedApprovalError);
 
     expect(executionRepo.attempts.size).toBe(0);
     expect(executionRepo.preparedPayloads.size).toBe(0);

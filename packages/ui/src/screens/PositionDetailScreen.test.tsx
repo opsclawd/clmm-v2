@@ -47,12 +47,7 @@ describe('PositionDetailScreen', () => {
   it('shows the preview action from the position detail payload without a separate alert prop', () => {
     const onViewPreview = vi.fn();
 
-    render(
-      <PositionDetailScreen
-        position={makePosition()}
-        onViewPreview={onViewPreview}
-      />,
-    );
+    render(<PositionDetailScreen position={makePosition()} onViewPreview={onViewPreview} />);
 
     expect(screen.getByText('View Exit Preview')).toBeTruthy();
     expect(screen.getByText('Your position is fully in SOL. Exit to USDC.')).toBeTruthy();
@@ -63,11 +58,7 @@ describe('PositionDetailScreen', () => {
   });
 
   it('renders enriched position detail fields', () => {
-    render(
-      <PositionDetailScreen
-        position={makePosition()}
-      />,
-    );
+    render(<PositionDetailScreen position={makePosition()} />);
 
     expect(screen.getByText('10 bps')).toBeTruthy();
     expect(screen.getByText('$45.00 in unclaimed fees')).toBeTruthy();
@@ -78,11 +69,7 @@ describe('PositionDetailScreen', () => {
   });
 
   it('does not render any S/R-related content (regression)', () => {
-    render(
-      <PositionDetailScreen
-        position={makePosition()}
-      />,
-    );
+    render(<PositionDetailScreen position={makePosition()} />);
 
     expect(screen.queryByText('Support & Resistance')).toBeNull();
     expect(screen.queryByText('Market Thesis')).toBeNull();

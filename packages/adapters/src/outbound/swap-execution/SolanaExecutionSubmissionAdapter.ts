@@ -9,7 +9,12 @@
 import { createSolanaRpc } from '@solana/kit';
 import type { Base64EncodedWireTransaction, Signature } from '@solana/kit';
 import type { ExecutionSubmissionPort } from '@clmm/application';
-import type { TransactionReference, ExecutionLifecycleState, ClockTimestamp, ExecutionStep } from '@clmm/domain';
+import type {
+  TransactionReference,
+  ExecutionLifecycleState,
+  ClockTimestamp,
+  ExecutionStep,
+} from '@clmm/domain';
 import { makeClockTimestamp } from '@clmm/domain';
 
 function uint8ArrayToBase64(bytes: Uint8Array): string {
@@ -35,13 +40,16 @@ export class SolanaExecutionSubmissionAdapter implements ExecutionSubmissionPort
 
     const base64 = uint8ArrayToBase64(signedPayload) as Base64EncodedWireTransaction;
 
-    const signature = await rpc.sendTransaction(base64, { encoding: 'base64', skipPreflight: true }).send();
+    const signature = await rpc
+      .sendTransaction(base64, { encoding: 'base64', skipPreflight: true })
+      .send();
 
     const sig = signature.toString();
     const uniqueStepKinds = [...new Set(plannedStepKinds)];
-    const references: TransactionReference[] = uniqueStepKinds.map(
-      (stepKind) => ({ signature: sig, stepKind }),
-    );
+    const references: TransactionReference[] = uniqueStepKinds.map((stepKind) => ({
+      signature: sig,
+      stepKind,
+    }));
 
     return {
       references,
@@ -61,10 +69,7 @@ export class SolanaExecutionSubmissionAdapter implements ExecutionSubmissionPort
     for (const sig of uniqueSignatures) {
       try {
         const status = await rpc
-          .getSignatureStatuses(
-            [sig as unknown as Signature],
-            { searchTransactionHistory: true },
-          )
+          .getSignatureStatuses([sig as unknown as Signature], { searchTransactionHistory: true })
           .send();
         const sigStatus = status.value[0];
 

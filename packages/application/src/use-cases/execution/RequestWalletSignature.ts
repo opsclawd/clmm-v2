@@ -102,11 +102,7 @@ export async function requestWalletSignature(params: {
     createdAt: now,
   });
 
-  await historyRepo.recordWalletPositionOwnership(
-    walletId,
-    previewRecord.positionId,
-    now,
-  );
+  await historyRepo.recordWalletPositionOwnership(walletId, previewRecord.positionId, now);
 
   await historyRepo.appendEvent({
     eventId: ids.generateId(),

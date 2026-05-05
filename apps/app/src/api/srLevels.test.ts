@@ -1,5 +1,9 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { fetchCurrentSrLevels, SrLevelsUnsupportedPoolError, isSrLevelsUnsupportedPoolError } from './srLevels';
+import {
+  fetchCurrentSrLevels,
+  SrLevelsUnsupportedPoolError,
+  isSrLevelsUnsupportedPoolError,
+} from './srLevels';
 
 type ExpoPublicEnv = NodeJS.ProcessEnv & {
   EXPO_PUBLIC_BFF_BASE_URL?: string;
@@ -74,8 +78,9 @@ describe('fetchCurrentSrLevels', () => {
       json: () => Promise.resolve({ message: 'Pool not supported: BadPool' }),
     }) as typeof fetch;
 
-    const error = await fetchCurrentSrLevels('Unsupported11111111111111111111111111111111')
-      .catch((reason: unknown) => reason);
+    const error = await fetchCurrentSrLevels('Unsupported11111111111111111111111111111111').catch(
+      (reason: unknown) => reason,
+    );
 
     expect(error).toBeInstanceOf(SrLevelsUnsupportedPoolError);
     expect(isSrLevelsUnsupportedPoolError(error)).toBe(true);
@@ -90,8 +95,9 @@ describe('fetchCurrentSrLevels', () => {
       json: () => Promise.resolve({ message: 'Not Found' }),
     }) as typeof fetch;
 
-    const error = await fetchCurrentSrLevels('Pool111111111111111111111111111111111111111')
-      .catch((reason: unknown) => reason);
+    const error = await fetchCurrentSrLevels('Pool111111111111111111111111111111111111111').catch(
+      (reason: unknown) => reason,
+    );
 
     expect(error).toBeInstanceOf(Error);
     expect(error).not.toBeInstanceOf(SrLevelsUnsupportedPoolError);
@@ -107,8 +113,9 @@ describe('fetchCurrentSrLevels', () => {
       json: () => Promise.reject(new SyntaxError('Unexpected token')),
     }) as typeof fetch;
 
-    const error = await fetchCurrentSrLevels('Pool111111111111111111111111111111111111111')
-      .catch((reason: unknown) => reason);
+    const error = await fetchCurrentSrLevels('Pool111111111111111111111111111111111111111').catch(
+      (reason: unknown) => reason,
+    );
 
     expect(error).toBeInstanceOf(Error);
     expect(error).not.toBeInstanceOf(SrLevelsUnsupportedPoolError);
@@ -124,8 +131,9 @@ describe('fetchCurrentSrLevels', () => {
       text: () => Promise.resolve('Service Unavailable'),
     }) as typeof fetch;
 
-    const error = await fetchCurrentSrLevels('Pool111111111111111111111111111111111111111')
-      .catch((reason: unknown) => reason);
+    const error = await fetchCurrentSrLevels('Pool111111111111111111111111111111111111111').catch(
+      (reason: unknown) => reason,
+    );
 
     expect(error).toBeInstanceOf(Error);
     expect(error).not.toBeInstanceOf(SrLevelsUnsupportedPoolError);
@@ -138,11 +146,13 @@ describe('fetchCurrentSrLevels', () => {
     globalThis.fetch = vi.fn().mockResolvedValue({
       ok: true,
       status: 200,
-      json: () => Promise.resolve({ srLevels: { briefId: 'b', supports: 'not-an-array', resistances: [] } }),
+      json: () =>
+        Promise.resolve({ srLevels: { briefId: 'b', supports: 'not-an-array', resistances: [] } }),
     }) as typeof fetch;
 
-    const error = await fetchCurrentSrLevels('Pool111111111111111111111111111111111111111')
-      .catch((reason: unknown) => reason);
+    const error = await fetchCurrentSrLevels('Pool111111111111111111111111111111111111111').catch(
+      (reason: unknown) => reason,
+    );
 
     expect(error).toBeInstanceOf(Error);
     expect(error).not.toBeInstanceOf(SrLevelsUnsupportedPoolError);
@@ -155,8 +165,9 @@ describe('fetchCurrentSrLevels', () => {
     const abortError = { name: 'AbortError', message: 'The operation was aborted.' };
     globalThis.fetch = vi.fn().mockRejectedValue(abortError) as typeof fetch;
 
-    const error = await fetchCurrentSrLevels('Pool111111111111111111111111111111111111111')
-      .catch((reason: unknown) => reason);
+    const error = await fetchCurrentSrLevels('Pool111111111111111111111111111111111111111').catch(
+      (reason: unknown) => reason,
+    );
 
     expect(error).toBeInstanceOf(Error);
     expect((error as Error).message).toContain('timed out');
@@ -168,8 +179,9 @@ describe('fetchCurrentSrLevels', () => {
     const abortLike = { name: 'AbortError' };
     globalThis.fetch = vi.fn().mockRejectedValue(abortLike) as typeof fetch;
 
-    const error = await fetchCurrentSrLevels('Pool111111111111111111111111111111111111111')
-      .catch((reason: unknown) => reason);
+    const error = await fetchCurrentSrLevels('Pool111111111111111111111111111111111111111').catch(
+      (reason: unknown) => reason,
+    );
 
     expect(error).toBeInstanceOf(Error);
     expect((error as Error).message).toContain('timed out');
@@ -181,13 +193,15 @@ describe('fetchCurrentSrLevels', () => {
     globalThis.fetch = vi.fn().mockResolvedValue({
       ok: true,
       status: 200,
-      json: () => Promise.resolve({
-        srLevels: { ...fixtureBlock(), supports: [{ price: 0 }], resistances: [] },
-      }),
+      json: () =>
+        Promise.resolve({
+          srLevels: { ...fixtureBlock(), supports: [{ price: 0 }], resistances: [] },
+        }),
     }) as typeof fetch;
 
-    const error = await fetchCurrentSrLevels('Pool111111111111111111111111111111111111111')
-      .catch((reason: unknown) => reason);
+    const error = await fetchCurrentSrLevels('Pool111111111111111111111111111111111111111').catch(
+      (reason: unknown) => reason,
+    );
 
     expect(error).toBeInstanceOf(Error);
     expect((error as Error).message).toContain('malformed');
@@ -199,13 +213,15 @@ describe('fetchCurrentSrLevels', () => {
     globalThis.fetch = vi.fn().mockResolvedValue({
       ok: true,
       status: 200,
-      json: () => Promise.resolve({
-        srLevels: { ...fixtureBlock(), capturedAtUnixMs: 0 },
-      }),
+      json: () =>
+        Promise.resolve({
+          srLevels: { ...fixtureBlock(), capturedAtUnixMs: 0 },
+        }),
     }) as typeof fetch;
 
-    const error = await fetchCurrentSrLevels('Pool111111111111111111111111111111111111111')
-      .catch((reason: unknown) => reason);
+    const error = await fetchCurrentSrLevels('Pool111111111111111111111111111111111111111').catch(
+      (reason: unknown) => reason,
+    );
 
     expect(error).toBeInstanceOf(Error);
     expect((error as Error).message).toContain('malformed');

@@ -20,8 +20,9 @@ describe('base58ToBuffer', () => {
   });
 
   it('rejects invalid base58 characters', () => {
-    expect(() => base58ToBuffer('0OIl' + VALID_32_BYTE_ADDR.slice(4), 32))
-      .toThrow(/Invalid base58/);
+    expect(() => base58ToBuffer('0OIl' + VALID_32_BYTE_ADDR.slice(4), 32)).toThrow(
+      /Invalid base58/,
+    );
   });
 
   it('rejects an empty string', () => {
@@ -72,11 +73,10 @@ function bytesToBase64(bytes: Uint8Array): string {
 }
 
 async function makeEd25519KeyPair() {
-  const keyPair = await globalThis.crypto.subtle.generateKey(
-    { name: 'Ed25519' },
-    true,
-    ['sign', 'verify'],
-  ) as unknown as { publicKey: CryptoKey; privateKey: CryptoKey };
+  const keyPair = (await globalThis.crypto.subtle.generateKey({ name: 'Ed25519' }, true, [
+    'sign',
+    'verify',
+  ])) as unknown as { publicKey: CryptoKey; privateKey: CryptoKey };
   const rawPubkey = new Uint8Array(
     await globalThis.crypto.subtle.exportKey('raw', keyPair.publicKey),
   );

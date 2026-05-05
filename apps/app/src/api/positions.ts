@@ -18,9 +18,7 @@ export type PositionsResult = {
   warning?: string;
 };
 
-export async function fetchSupportedPositions(
-  walletAddress: string,
-): Promise<PositionsResult> {
+export async function fetchSupportedPositions(walletAddress: string): Promise<PositionsResult> {
   try {
     const payload = (await fetchJson(`/positions/${walletAddress}`)) as Partial<PositionsResponse>;
 

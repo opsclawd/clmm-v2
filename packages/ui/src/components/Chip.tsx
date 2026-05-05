@@ -8,7 +8,10 @@ type Props = {
   children: React.ReactNode;
 };
 
-const toneStyles: Record<ChipTone, { text: string; border: string; dot: string; shadowColor: string }> = {
+const toneStyles: Record<
+  ChipTone,
+  { text: string; border: string; dot: string; shadowColor: string }
+> = {
   safe: {
     text: colors.safe,
     border: 'rgba(158,236,209,0.30)',

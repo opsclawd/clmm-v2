@@ -32,9 +32,7 @@ function fakeApi(overrides?: {
   };
 }
 
-function fakeSigner(overrides?: {
-  sign?: SignMessageOutcome;
-}): WalletMessageSigningPort {
+function fakeSigner(overrides?: { sign?: SignMessageOutcome }): WalletMessageSigningPort {
   const defaultResult: SignMessageOutcome = { kind: 'ok' as const, signatureBase64: 'sig==' };
   return {
     signMessage: async () => overrides?.sign ?? defaultResult,

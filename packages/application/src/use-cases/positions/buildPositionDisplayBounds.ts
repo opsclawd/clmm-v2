@@ -15,7 +15,9 @@ export type PositionDisplayBounds = {
   upperBoundLabel: string;
 };
 
-export function buildPositionDisplayBounds(input: PositionDisplayBoundsInput): PositionDisplayBounds {
+export function buildPositionDisplayBounds(
+  input: PositionDisplayBoundsInput,
+): PositionDisplayBounds {
   const lowerBoundPrice = tickToPrice(input.lowerTick, input.decimalsA, input.decimalsB);
   const upperBoundPrice = tickToPrice(input.upperTick, input.decimalsA, input.decimalsB);
   return {

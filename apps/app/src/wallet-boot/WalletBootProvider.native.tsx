@@ -25,9 +25,5 @@ export function WalletBootProvider({ children }: { children: ReactNode }) {
     [hasHydrated, connectionKind, walletAddress, browserRestoreAddress],
   );
 
-  return (
-    <WalletBootContext.Provider value={status}>
-      {children}
-    </WalletBootContext.Provider>
-  );
+  return <WalletBootContext.Provider value={status}>{children}</WalletBootContext.Provider>;
 }

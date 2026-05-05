@@ -14,7 +14,14 @@ import {
   FIXTURE_USDC_PRICE_QUOTE,
 } from '@clmm/testing';
 import { makePoolId, makePositionId, makeClockTimestamp } from '@clmm/domain';
-import type { SrLevelsReadPort, SrLevelsBlock, SupportedPositionReadPort, TriggerRepository, PricePort, ClockPort } from '@clmm/application';
+import type {
+  SrLevelsReadPort,
+  SrLevelsBlock,
+  SupportedPositionReadPort,
+  TriggerRepository,
+  PricePort,
+  ClockPort,
+} from '@clmm/application';
 import type { PositionDetail } from '@clmm/domain';
 
 const SOL_USDC_POOL_ID = 'Czfq3xZZDmsdGdUyrNLtRhGc47cXcZtLG4crryfu44zE';
@@ -50,7 +57,8 @@ const samplePort = (positions: ReturnType<typeof positionInPool>[]) =>
   ({
     listSupportedPositions: async () => positions,
     getPosition: async () => null,
-    getPositionDetail: async (_w: never, positionId: string) => detailFor(positionId, SOL_USDC_POOL_ID),
+    getPositionDetail: async (_w: never, positionId: string) =>
+      detailFor(positionId, SOL_USDC_POOL_ID),
     getPoolData: async () => poolDataFor(SOL_USDC_POOL_ID),
   }) as unknown as SupportedPositionReadPort;
 
@@ -76,15 +84,16 @@ function makeController(overrides?: {
 
 describe('InsightsDataController', () => {
   it('throws on construction if the allowlist does not have exactly one entry', () => {
-    expect(() =>
-      new InsightsDataController(
-        new FakeSupportedPositionReadPort([], {}),
-        new FakeTriggerRepository(),
-        new FakePricePort(),
-        sampleSrPort,
-        new Map(),
-        fixedClock,
-      ),
+    expect(
+      () =>
+        new InsightsDataController(
+          new FakeSupportedPositionReadPort([], {}),
+          new FakeTriggerRepository(),
+          new FakePricePort(),
+          sampleSrPort,
+          new Map(),
+          fixedClock,
+        ),
     ).toThrow(/exactly 1 allowlist entry/);
   });
 
@@ -97,7 +106,10 @@ describe('InsightsDataController', () => {
 
   it('GET pool: returns 503 with pool_snapshot_unavailable when pool data is null', async () => {
     const controller = makeController({
-      positionReadPort: new FakeSupportedPositionReadPort([], {}) as unknown as SupportedPositionReadPort,
+      positionReadPort: new FakeSupportedPositionReadPort(
+        [],
+        {},
+      ) as unknown as SupportedPositionReadPort,
       pricePort: new FakePricePort(),
     });
 
@@ -127,7 +139,9 @@ describe('InsightsDataController', () => {
 
   it('GET positions/:walletId: returns 503 with position_list_unavailable when listing fails', async () => {
     const port = {
-      listSupportedPositions: async () => { throw new Error('rpc'); },
+      listSupportedPositions: async () => {
+        throw new Error('rpc');
+      },
       getPosition: async () => null,
       getPositionDetail: async () => null,
       getPoolData: async () => poolDataFor(SOL_USDC_POOL_ID),
@@ -238,7 +252,9 @@ describe('InsightsDataController', () => {
 
   it('GET bundle/:walletId: returns 503 with position_list_unavailable when listing fails', async () => {
     const port = {
-      listSupportedPositions: async () => { throw new Error('rpc'); },
+      listSupportedPositions: async () => {
+        throw new Error('rpc');
+      },
       getPosition: async () => null,
       getPositionDetail: async () => null,
       getPoolData: async () => poolDataFor(SOL_USDC_POOL_ID),

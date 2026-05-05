@@ -44,7 +44,9 @@ describe('RecordSignatureInterruption', () => {
     });
 
     expect(result.kind).toBe('interrupted');
-    expect((await executionRepo.getAttempt('attempt-1'))?.lifecycleState.kind).toBe('awaiting-signature');
+    expect((await executionRepo.getAttempt('attempt-1'))?.lifecycleState.kind).toBe(
+      'awaiting-signature',
+    );
     expect(await executionRepo.getPreparedPayload('attempt-1')).toMatchObject({
       payloadVersion: 'v1',
       unsignedPayload: new Uint8Array([9, 8, 7]),

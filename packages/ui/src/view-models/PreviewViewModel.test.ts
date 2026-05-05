@@ -1,6 +1,11 @@
 import { describe, it, expect } from 'vitest';
 import { buildPreviewViewModel } from './PreviewViewModel.js';
-import { LOWER_BOUND_BREACH, UPPER_BOUND_BREACH, makeClockTimestamp, makePositionId } from '@clmm/application/public';
+import {
+  LOWER_BOUND_BREACH,
+  UPPER_BOUND_BREACH,
+  makeClockTimestamp,
+  makePositionId,
+} from '@clmm/application/public';
 import type { ExecutionPreviewDto } from '@clmm/application/public';
 
 function makePreviewDto(direction = LOWER_BOUND_BREACH): ExecutionPreviewDto {
@@ -8,9 +13,8 @@ function makePreviewDto(direction = LOWER_BOUND_BREACH): ExecutionPreviewDto {
     previewId: 'preview-1',
     positionId: makePositionId('pos-1'),
     breachDirection: direction,
-    postExitPosture: direction.kind === 'lower-bound-breach'
-      ? { kind: 'exit-to-usdc' }
-      : { kind: 'exit-to-sol' },
+    postExitPosture:
+      direction.kind === 'lower-bound-breach' ? { kind: 'exit-to-usdc' } : { kind: 'exit-to-sol' },
     steps: [
       { kind: 'remove-liquidity' },
       { kind: 'collect-fees' },

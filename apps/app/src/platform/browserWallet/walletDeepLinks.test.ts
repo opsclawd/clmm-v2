@@ -48,9 +48,18 @@ describe('isSocialAppWebView', () => {
   });
 
   it.each([
-    ['Safari iOS 17', 'Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.0 Mobile/15E148 Safari/604.1'],
-    ['Chrome Android', 'Mozilla/5.0 (Linux; Android 14; Pixel 8) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Mobile Safari/537.36'],
-    ['Phantom mobile browser', 'Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) Phantom/1.0'],
+    [
+      'Safari iOS 17',
+      'Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.0 Mobile/15E148 Safari/604.1',
+    ],
+    [
+      'Chrome Android',
+      'Mozilla/5.0 (Linux; Android 14; Pixel 8) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Mobile Safari/537.36',
+    ],
+    [
+      'Phantom mobile browser',
+      'Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) Phantom/1.0',
+    ],
   ])('returns false for %s UA', (_label, ua) => {
     expect(isSocialAppWebView(ua)).toBe(false);
   });

@@ -67,7 +67,11 @@ export default function PositionsRoute() {
       walletAddress={walletAddress}
       positions={positions}
       positionsLoading={positionsQuery.isLoading}
-      positionsError={positionsQuery.isError && !hasLoadedPositions ? 'Could not load supported positions for this wallet.' : null}
+      positionsError={
+        positionsQuery.isError && !hasLoadedPositions
+          ? 'Could not load supported positions for this wallet.'
+          : null
+      }
       positionsWarning={positionsWarning}
       platformCapabilities={platformCapabilities}
       srLevels={srLevelsQuery.data?.srLevels}

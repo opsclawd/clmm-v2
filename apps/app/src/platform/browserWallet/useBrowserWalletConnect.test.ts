@@ -78,7 +78,9 @@ describe('useBrowserWalletConnect', () => {
   it('returns address on successful connect', async () => {
     const phantom = createConnector('Phantom');
     mockConnectorSnapshot.connectors = [phantom];
-    mockConnectorSnapshot.connectWallet = mockConnectSuccess('PhantomAddress111111111111111111111111111');
+    mockConnectorSnapshot.connectWallet = mockConnectSuccess(
+      'PhantomAddress111111111111111111111111111',
+    );
 
     const { useBrowserWalletConnect } = await import('./useBrowserWalletConnect');
     const { result } = renderHook(() => useBrowserWalletConnect());
@@ -129,7 +131,9 @@ describe('useBrowserWalletConnect', () => {
 
     const phantom = createConnector('Phantom');
     mockConnectorSnapshot.connectors = [phantom];
-    mockConnectorSnapshot.connectWallet = mockConnectSuccess('LateWallet11111111111111111111111111111');
+    mockConnectorSnapshot.connectWallet = mockConnectSuccess(
+      'LateWallet11111111111111111111111111111',
+    );
 
     await act(async () => {
       await vi.advanceTimersByTimeAsync(WALLET_POLL_INTERVAL_MS * 2);
@@ -190,7 +194,9 @@ describe('useBrowserWalletConnect', () => {
   it('records wallet name if available', async () => {
     const phantom = createConnector('Phantom');
     mockConnectorSnapshot.connectors = [phantom];
-    mockConnectorSnapshot.connectWallet = mockConnectSuccess('PhantomAddress111111111111111111111111111');
+    mockConnectorSnapshot.connectWallet = mockConnectSuccess(
+      'PhantomAddress111111111111111111111111111',
+    );
 
     const { useBrowserWalletConnect } = await import('./useBrowserWalletConnect');
     const { result } = renderHook(() => useBrowserWalletConnect());
@@ -207,7 +213,9 @@ describe('useBrowserWalletConnect', () => {
     const ethereumOnly = createConnector('MetaMask', ['ethereum:mainnet']);
     const solanaMainnet = createConnector('Phantom', ['solana:mainnet', 'solana:devnet']);
     mockConnectorSnapshot.connectors = [ethereumOnly, solanaMainnet];
-    mockConnectorSnapshot.connectWallet = mockConnectSuccess('FilteredAddress11111111111111111111111111');
+    mockConnectorSnapshot.connectWallet = mockConnectSuccess(
+      'FilteredAddress11111111111111111111111111',
+    );
 
     const { useBrowserWalletConnect } = await import('./useBrowserWalletConnect');
     const { result } = renderHook(() => useBrowserWalletConnect());
@@ -223,9 +231,17 @@ describe('useBrowserWalletConnect', () => {
     const mwaConnector = createConnector('Phantom', ['solana:mainnet']);
     (mwaConnector as Record<string, unknown>)['id'] = 'mwa:phantom';
 
-    const walletStandardConnector = createConnector('Solflare', ['solana:mainnet', 'solana:devnet']);
-    mockConnectorSnapshot.connectors = [mwaConnector as unknown as ConnectorMetadata, walletStandardConnector];
-    mockConnectorSnapshot.connectWallet = mockConnectSuccess('MwaAddress1111111111111111111111111111');
+    const walletStandardConnector = createConnector('Solflare', [
+      'solana:mainnet',
+      'solana:devnet',
+    ]);
+    mockConnectorSnapshot.connectors = [
+      mwaConnector as unknown as ConnectorMetadata,
+      walletStandardConnector,
+    ];
+    mockConnectorSnapshot.connectWallet = mockConnectSuccess(
+      'MwaAddress1111111111111111111111111111',
+    );
 
     const { useBrowserWalletConnect } = await import('./useBrowserWalletConnect');
     const { result } = renderHook(() => useBrowserWalletConnect());
@@ -268,7 +284,9 @@ describe('useBrowserWalletConnect', () => {
     const brave = createConnector('Brave');
     const phantom = createConnector('Phantom');
     mockConnectorSnapshot.connectors = [brave, phantom];
-    mockConnectorSnapshot.connectWallet = mockConnectSuccess('PhantomAddress111111111111111111111111111');
+    mockConnectorSnapshot.connectWallet = mockConnectSuccess(
+      'PhantomAddress111111111111111111111111111',
+    );
 
     const { useBrowserWalletConnect } = await import('./useBrowserWalletConnect');
     const { result } = renderHook(() => useBrowserWalletConnect());
@@ -287,7 +305,9 @@ describe('useBrowserWalletConnect', () => {
     const brave = createConnector('Brave');
     const phantom = createConnector('Phantom');
     mockConnectorSnapshot.connectors = [brave, phantom];
-    mockConnectorSnapshot.connectWallet = mockConnectSuccess('BraveAddress1111111111111111111111111111');
+    mockConnectorSnapshot.connectWallet = mockConnectSuccess(
+      'BraveAddress1111111111111111111111111111',
+    );
 
     const { useBrowserWalletConnect } = await import('./useBrowserWalletConnect');
     const { result } = renderHook(() => useBrowserWalletConnect());
@@ -307,9 +327,9 @@ describe('useBrowserWalletConnect', () => {
     const { result } = renderHook(() => useBrowserWalletConnect());
 
     await act(async () => {
-      await expect(result.current.connect('wallet-standard:phantom' as WalletConnectorId)).rejects.toThrow(
-        'Wallet "wallet-standard:phantom" not found or not ready',
-      );
+      await expect(
+        result.current.connect('wallet-standard:phantom' as WalletConnectorId),
+      ).rejects.toThrow('Wallet "wallet-standard:phantom" not found or not ready');
     });
   });
 

@@ -1,4 +1,11 @@
-import { Controller, Get, Param, Inject, NotFoundException, UnprocessableEntityException } from '@nestjs/common';
+import {
+  Controller,
+  Get,
+  Param,
+  Inject,
+  NotFoundException,
+  UnprocessableEntityException,
+} from '@nestjs/common';
 import type {
   SupportedPositionReadPort,
   PricePort,
@@ -100,7 +107,9 @@ export class PositionController {
     try {
       const actionableTriggers = await this.triggerRepo.listActionableTriggers(wallet);
       trigger =
-        actionableTriggers.find((candidate) => candidate.positionId === result.position.positionId) ?? null;
+        actionableTriggers.find(
+          (candidate) => candidate.positionId === result.position.positionId,
+        ) ?? null;
     } catch (error: unknown) {
       if (!isTransientPositionReadFailure(error)) {
         throw error;
@@ -159,10 +168,13 @@ export class PositionController {
 
     const warnings: string[] = [];
     if (triggerError) warnings.push(triggerError);
-    if (poolMetadataFailures > 0) warnings.push('Some pool data unavailable. Position list may be incomplete.');
+    if (poolMetadataFailures > 0)
+      warnings.push('Some pool data unavailable. Position list may be incomplete.');
 
     const response: ListPositionsSuccessResponse = {
-      positions: summaryDtos.map((dto) => toPositionSummaryDto(dto, triggerPositionIds.has(dto.positionId))),
+      positions: summaryDtos.map((dto) =>
+        toPositionSummaryDto(dto, triggerPositionIds.has(dto.positionId)),
+      ),
     };
     if (warnings.length > 0) response.warning = warnings.join(' ');
     return response;

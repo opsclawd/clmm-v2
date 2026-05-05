@@ -1,19 +1,12 @@
 import type { PoolId, WalletId, PositionDetail } from '@clmm/domain';
-import type {
-  SupportedPositionReadPort,
-  TriggerRepository,
-  PricePort,
-} from '../../ports/index.js';
+import type { SupportedPositionReadPort, TriggerRepository, PricePort } from '../../ports/index.js';
 import type {
   SolUsdcPositionSnapshotDto,
   SolUsdcPositionInsightDto,
   InsightDataWarning,
   ExternalBreachDirection,
 } from '../../dto/index.js';
-import {
-  buildSolUsdcPositionInsight,
-  type PriceMapEntry,
-} from './buildSolUsdcPositionInsight.js';
+import { buildSolUsdcPositionInsight, type PriceMapEntry } from './buildSolUsdcPositionInsight.js';
 import { getSolUsdcInsightPoolSnapshot } from './GetSolUsdcInsightPoolSnapshot.js';
 import { toExternalBreachDirection } from './toExternalBreachDirection.js';
 
@@ -179,7 +172,9 @@ export async function enrichWithTriggers(params: {
       triggeredAt: t.triggeredAt,
     }));
 
-  const triggerByPositionId = new Map<string, typeof filteredTriggers[number]>(filteredTriggers.map((t) => [t.positionId as string, t]));
+  const triggerByPositionId = new Map<string, (typeof filteredTriggers)[number]>(
+    filteredTriggers.map((t) => [t.positionId as string, t]),
+  );
 
   const enriched = insights.map((p) => {
     const trig = triggerByPositionId.get(p.positionId);

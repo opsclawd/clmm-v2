@@ -2,7 +2,13 @@ import type { ExecutionRepository } from '../../ports/index.js';
 import type { ExecutionPreview, PositionId, BreachDirection } from '@clmm/domain';
 
 export type GetExecutionPreviewResult =
-  | { kind: 'found'; previewId: string; positionId: PositionId; breachDirection: BreachDirection; preview: ExecutionPreview }
+  | {
+      kind: 'found';
+      previewId: string;
+      positionId: PositionId;
+      breachDirection: BreachDirection;
+      preview: ExecutionPreview;
+    }
   | { kind: 'not-found' };
 
 export async function getExecutionPreview(params: {

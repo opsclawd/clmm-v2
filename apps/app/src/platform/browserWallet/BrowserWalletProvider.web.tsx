@@ -1,5 +1,10 @@
 import { useEffect, useState, type ReactNode } from 'react';
-import { AppProvider, getDefaultConfig, getDefaultMobileConfig, useConnector } from '@solana/connector';
+import {
+  AppProvider,
+  getDefaultConfig,
+  getDefaultMobileConfig,
+  useConnector,
+} from '@solana/connector';
 import { walletSessionStore } from '../../state/walletSessionStore';
 import { WalletBootProvider } from '../../wallet-boot/WalletBootProvider.web';
 
@@ -33,7 +38,9 @@ function BrowserWalletSessionSync() {
 
 export function BrowserWalletProvider({ children }: { children: ReactNode }) {
   const [mounted, setMounted] = useState(false);
-  useEffect(() => { setMounted(true); }, []);
+  useEffect(() => {
+    setMounted(true);
+  }, []);
 
   if (!mounted) {
     return null;

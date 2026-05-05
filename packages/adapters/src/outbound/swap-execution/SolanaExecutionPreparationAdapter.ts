@@ -31,10 +31,21 @@ import {
   prependTransactionMessageInstructions,
 } from '@solana/kit';
 import { fetchWhirlpool } from '@orca-so/whirlpools-client';
-import { closePositionInstructions, swapInstructions, setNativeMintWrappingStrategy } from '@orca-so/whirlpools';
+import {
+  closePositionInstructions,
+  swapInstructions,
+  setNativeMintWrappingStrategy,
+} from '@orca-so/whirlpools';
 import type { Instruction } from '@solana/kit';
 import type { ExecutionPreparationPort } from '@clmm/application';
-import type { ExecutionPlan, WalletId, PositionId, PoolId, ClockTimestamp, LiquidityPosition } from '@clmm/domain';
+import type {
+  ExecutionPlan,
+  WalletId,
+  PositionId,
+  PoolId,
+  ClockTimestamp,
+  LiquidityPosition,
+} from '@clmm/domain';
 import { makeClockTimestamp } from '@clmm/domain';
 import { SolanaPositionSnapshotReader } from '../solana-position-reads/SolanaPositionSnapshotReader.js';
 
@@ -128,7 +139,7 @@ export class SolanaExecutionPreparationAdapter implements ExecutionPreparationPo
   private async buildOrcaInstructions(
     rpc: ReturnType<typeof createSolanaRpc>,
     positionData: LiquidityPosition,
-    walletId: WalletId
+    walletId: WalletId,
   ): Promise<{
     instructions: Instruction[];
     tokenAmounts: { tokenA: bigint; tokenB: bigint };
@@ -198,7 +209,11 @@ export class SolanaExecutionPreparationAdapter implements ExecutionPreparationPo
     }
 
     try {
-      const quoteResponse = await this.getJupiterQuote(inputMint, outputMint, swapAmount.toString());
+      const quoteResponse = await this.getJupiterQuote(
+        inputMint,
+        outputMint,
+        swapAmount.toString(),
+      );
       const swapTransaction = await this.getJupiterSwapTransaction(quoteResponse, walletId);
 
       const encoder = getBase64Encoder();
@@ -224,12 +239,20 @@ export class SolanaExecutionPreparationAdapter implements ExecutionPreparationPo
       return { instructions };
     } catch (jupiterError) {
       const jupiterMessage =
-        jupiterError instanceof Error ? jupiterError.message : 'unknown Jupiter swap preparation error';
+        jupiterError instanceof Error
+          ? jupiterError.message
+          : 'unknown Jupiter swap preparation error';
       // eslint-disable-next-line no-console
       console.error('Jupiter swap preparation failed, attempting Orca fallback:', jupiterError);
 
       try {
-        const instructions = await this.buildOrcaSwapInstructions(rpc, poolId, walletId, inputMint, swapAmount);
+        const instructions = await this.buildOrcaSwapInstructions(
+          rpc,
+          poolId,
+          walletId,
+          inputMint,
+          swapAmount,
+        );
         if (instructions.length === 0) {
           return {
             instructions: [],
@@ -239,7 +262,8 @@ export class SolanaExecutionPreparationAdapter implements ExecutionPreparationPo
 
         return { instructions };
       } catch (orcaError) {
-        const orcaMessage = orcaError instanceof Error ? orcaError.message : 'unknown Orca fallback error';
+        const orcaMessage =
+          orcaError instanceof Error ? orcaError.message : 'unknown Orca fallback error';
         // eslint-disable-next-line no-console
         console.error('Orca fallback swap preparation failed:', orcaError);
         return {
@@ -273,7 +297,11 @@ export class SolanaExecutionPreparationAdapter implements ExecutionPreparationPo
   }
 
   // boundary: Jupiter v6 REST /quote response is untyped — no official SDK types available
-  private async getJupiterQuote(inputMint: string, outputMint: string, amount: string): Promise<unknown> {
+  private async getJupiterQuote(
+    inputMint: string,
+    outputMint: string,
+    amount: string,
+  ): Promise<unknown> {
     const errors: string[] = [];
 
     for (const base of JUPITER_SWAP_API_BASES) {
@@ -300,7 +328,10 @@ export class SolanaExecutionPreparationAdapter implements ExecutionPreparationPo
   }
 
   // boundary: Jupiter v6 REST /swap expects the raw /quote response object — no official SDK types
-  private async getJupiterSwapTransaction(quoteResponse: unknown, userPublicKey: string): Promise<string> {
+  private async getJupiterSwapTransaction(
+    quoteResponse: unknown,
+    userPublicKey: string,
+  ): Promise<string> {
     const errors: string[] = [];
 
     for (const base of JUPITER_SWAP_API_BASES) {
@@ -326,9 +357,10 @@ export class SolanaExecutionPreparationAdapter implements ExecutionPreparationPo
 
         // boundary: Jupiter REST /swap response is untyped JSON
         const data: unknown = await response.json();
-        const swapTx = data != null && typeof data === 'object' && 'swapTransaction' in data
-          ? (data as { swapTransaction?: string }).swapTransaction
-          : undefined;
+        const swapTx =
+          data != null && typeof data === 'object' && 'swapTransaction' in data
+            ? (data as { swapTransaction?: string }).swapTransaction
+            : undefined;
 
         if (typeof swapTx === 'string' && swapTx.length > 0) {
           return swapTx;

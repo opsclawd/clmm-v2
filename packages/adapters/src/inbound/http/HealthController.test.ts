@@ -30,10 +30,9 @@ describe('HealthController', () => {
     const result = await controller.health();
 
     expect(result).toEqual({ status: 'ok' });
-    expect(checkSchemaReadinessMock).toHaveBeenCalledWith(
-      fakeDb,
-      { walletChallenges: 'fake-table' },
-    );
+    expect(checkSchemaReadinessMock).toHaveBeenCalledWith(fakeDb, {
+      walletChallenges: 'fake-table',
+    });
   });
 
   it('throws 503 with missing list when schema readiness fails', async () => {
