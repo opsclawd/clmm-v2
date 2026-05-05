@@ -31,6 +31,8 @@ export { Chip } from './components/Chip.js';
 export type { ChipTone } from './components/Chip.js';
 export { SectionHeader } from './components/SectionHeader.js';
 export { PositionCard } from './components/PositionCard.js';
+export { getMonitoringDisplay } from './components/PositionCardUtils.js';
+export type { MonitoringDisplay, MonitoringTone } from './components/PositionCardUtils.js';
 
 // Wallet connection utils
 export {
@@ -56,8 +58,14 @@ export type {
 // View models — for testing and screen composition
 export { buildPreviewViewModel } from './view-models/PreviewViewModel.js';
 export { buildExecutionStateViewModel } from './view-models/ExecutionStateViewModel.js';
-export { buildPositionListViewModel } from './view-models/PositionListViewModel.js';
-export type { PositionListItemViewModel } from './view-models/PositionListViewModel.js';
+export {
+  buildPositionListViewModel,
+  asMonitoringStatus,
+} from './view-models/PositionListViewModel.js';
+export type {
+  PositionListItemViewModel,
+  MonitoringStatus,
+} from './view-models/PositionListViewModel.js';
 export { buildPositionDetailViewModel } from './view-models/PositionDetailViewModel.js';
 export { buildHistoryViewModel } from './view-models/HistoryViewModel.js';
 export { buildWalletConnectViewModel } from './view-models/WalletConnectionViewModel.js';

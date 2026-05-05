@@ -2,6 +2,19 @@ import type { PositionSummaryDto } from '@clmm/application/public';
 
 export type MonitoringStatus = 'active' | 'degraded' | 'inactive';
 
+const VALID_MONITORING_STATUSES: ReadonlySet<string> = new Set<string>([
+  'active',
+  'degraded',
+  'inactive',
+]);
+
+export function asMonitoringStatus(value: string): MonitoringStatus {
+  if (!VALID_MONITORING_STATUSES.has(value)) {
+    throw new Error(`Invalid monitoringStatus: ${value}`);
+  }
+  return value as MonitoringStatus;
+}
+
 export type PositionListItemViewModel = {
   positionId: string;
   poolId: string;
@@ -31,7 +44,7 @@ export function buildPositionListViewModel(positions: PositionSummaryDto[]): Pos
     currentPriceLabel: p.currentPriceLabel ?? `Current: ${p.currentPrice}`,
     rangeStatusKind: p.rangeState,
     hasAlert: p.hasActionableTrigger,
-    monitoringStatus: p.monitoringStatus,
+    monitoringStatus: asMonitoringStatus(p.monitoringStatus),
     lowerBoundPrice: p.lowerBoundPrice,
     upperBoundPrice: p.upperBoundPrice,
     lowerBoundLabel: p.lowerBoundLabel,

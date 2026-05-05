@@ -195,6 +195,10 @@ describe('getMonitoringDisplay', () => {
     expect(r.text).toBe('Inactive');
     expect(r.tone).toBe('faint');
   });
+
+  it('throws for an invalid monitoring status at runtime', () => {
+    expect(() => getMonitoringDisplay('unknown' as never)).toThrow('Unexpected monitoringStatus');
+  });
 });
 
 describe('getCardPlaceholderMetrics', () => {

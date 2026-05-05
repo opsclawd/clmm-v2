@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { PositionSummaryDto } from '@clmm/application/public';
-import { buildPositionListViewModel } from './PositionListViewModel.js';
+import { buildPositionListViewModel, asMonitoringStatus } from './PositionListViewModel.js';
 
 function makeSummaryDto(overrides: Partial<PositionSummaryDto> = {}): PositionSummaryDto {
   return {
@@ -67,5 +67,25 @@ describe('buildPositionListViewModel monitoringStatus mapping', () => {
   it('copies inactive monitoring status through as a typed value', () => {
     const vm = buildPositionListViewModel([makeSummaryDto({ monitoringStatus: 'inactive' })]);
     expect(vm.items[0]!.monitoringStatus).toBe('inactive');
+  });
+
+  it('throws on an invalid monitoringStatus from the DTO', () => {
+    expect(() =>
+      buildPositionListViewModel([
+        makeSummaryDto({ monitoringStatus: 'unknown' as PositionSummaryDto['monitoringStatus'] }),
+      ]),
+    ).toThrow('Invalid monitoringStatus');
+  });
+});
+
+describe('asMonitoringStatus', () => {
+  it('returns valid statuses unchanged', () => {
+    expect(asMonitoringStatus('active')).toBe('active');
+    expect(asMonitoringStatus('degraded')).toBe('degraded');
+    expect(asMonitoringStatus('inactive')).toBe('inactive');
+  });
+
+  it('throws for an invalid value', () => {
+    expect(() => asMonitoringStatus('unknown')).toThrow('Invalid monitoringStatus');
   });
 });

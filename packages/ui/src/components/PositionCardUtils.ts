@@ -87,6 +87,10 @@ export function getMonitoringDisplay(status: MonitoringStatus): MonitoringDispla
       return { text: 'Degraded', tone: 'warn' };
     case 'inactive':
       return { text: 'Inactive', tone: 'faint' };
+    default: {
+      const _exhaustive: never = status;
+      throw new Error(`Unexpected monitoringStatus: ${String(_exhaustive)}`);
+    }
   }
 }
 
