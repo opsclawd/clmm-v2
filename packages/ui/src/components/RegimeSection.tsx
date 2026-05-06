@@ -122,6 +122,17 @@ export function RegimeSection({
       >
         {vm.suitabilityLabel}
       </Text>
+      {vm.suitabilityReason ? (
+        <Text
+          style={{
+            color: colors.textSecondary,
+            fontSize: typography.fontSize.xs,
+            marginTop: 2,
+          }}
+        >
+          {vm.suitabilityReason}
+        </Text>
+      ) : null}
       <Text
         style={{
           color: colors.textBody,

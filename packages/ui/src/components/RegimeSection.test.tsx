@@ -119,6 +119,41 @@ describe('RegimeSection', () => {
     expect(screen.getByText('Refresh failed — showing last available analysis.')).toBeTruthy();
   });
 
+  it('renders suitability reason when CAUTION with reasons', () => {
+    const cautionBlock: RegimeBlock = {
+      ...testRegimeBlock,
+      clmmSuitability: {
+        status: 'CAUTION',
+        reasons: [{ severity: 'WARN', text: 'Elevated volatility' }],
+      },
+    };
+    render(
+      <RegimeSection
+        regime={cautionBlock}
+        isLoading={false}
+        isError={false}
+        isUnsupported={false}
+        now={1_700_000_000_000}
+      />,
+    );
+    expect(screen.getByText('⚠ Caution')).toBeTruthy();
+    expect(screen.getByText('Elevated volatility')).toBeTruthy();
+  });
+
+  it('does not render suitability reason when ALLOWED', () => {
+    render(
+      <RegimeSection
+        regime={testRegimeBlock}
+        isLoading={false}
+        isError={false}
+        isUnsupported={false}
+        now={1_700_000_000_000}
+      />,
+    );
+    expect(screen.getByText('✓ Suitable for CLMM')).toBeTruthy();
+    expect(screen.queryByText('Favorable conditions')).toBeNull();
+  });
+
   it('shows unavailable reason when regime is null on supported pool', () => {
     render(
       <RegimeSection

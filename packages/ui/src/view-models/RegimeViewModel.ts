@@ -10,6 +10,7 @@ export type RegimeViewModelBlock = {
   volLabel: string;
   suitabilityLabel: string;
   suitabilityStatus: ClmmSuitabilityStatus;
+  suitabilityReason: string | null;
   marketReasonSummary: string;
   freshnessLabel: string;
   isStale: boolean;
@@ -83,12 +84,22 @@ export function buildRegimeViewModelBlock(block: RegimeBlock, now: number): Regi
           .join('; ')
       : '—';
 
+  const suitabilityReasons = block.clmmSuitability.reasons;
+  const topSuitabilityReason =
+    suitabilityReasons.length > 0 &&
+    (block.clmmSuitability.status === 'CAUTION' || block.clmmSuitability.status === 'BLOCKED')
+      ? [...suitabilityReasons].sort(
+          (a, b) => (SEVERITY_ORDER[a.severity] ?? 9) - (SEVERITY_ORDER[b.severity] ?? 9),
+        )[0]!.text
+      : null;
+
   return {
     regimeLabel: mapRegimeLabel(block.regime),
     trendLabel: `Trend: ${block.trendStrength.toFixed(2)}`,
     volLabel: `Vol: ${block.volRatio.toFixed(2)}`,
     suitabilityLabel: mapSuitabilityLabel(block.clmmSuitability.status),
     suitabilityStatus: block.clmmSuitability.status,
+    suitabilityReason: topSuitabilityReason,
     marketReasonSummary,
     freshnessLabel,
     isStale,

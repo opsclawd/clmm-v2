@@ -179,4 +179,59 @@ describe('buildRegimeViewModelBlock', () => {
 
     expect(vm.isStale).toBe(false);
   });
+
+  it('shows top severity suitability reason when CAUTION', () => {
+    const vm = buildRegimeViewModelBlock(
+      makeBlock({
+        clmmSuitability: {
+          status: 'CAUTION',
+          reasons: [
+            { severity: 'INFO', text: 'Trend is still forming' },
+            { severity: 'WARN', text: 'Elevated volatility' },
+          ],
+        },
+      }),
+      1_700_000_000_000,
+    );
+
+    expect(vm.suitabilityLabel).toBe('⚠ Caution');
+    expect(vm.suitabilityReason).toBe('Elevated volatility');
+  });
+
+  it('shows top severity suitability reason when BLOCKED', () => {
+    const vm = buildRegimeViewModelBlock(
+      makeBlock({
+        clmmSuitability: {
+          status: 'BLOCKED',
+          reasons: [{ severity: 'ERROR', text: 'Extreme market dislocation' }],
+        },
+      }),
+      1_700_000_000_000,
+    );
+
+    expect(vm.suitabilityReason).toBe('Extreme market dislocation');
+  });
+
+  it('returns null suitabilityReason for ALLOWED status', () => {
+    const vm = buildRegimeViewModelBlock(
+      makeBlock({
+        clmmSuitability: {
+          status: 'ALLOWED',
+          reasons: [{ severity: 'INFO', text: 'Favorable conditions' }],
+        },
+      }),
+      1_700_000_000_000,
+    );
+
+    expect(vm.suitabilityReason).toBeNull();
+  });
+
+  it('returns null suitabilityReason for CAUTION with empty reasons', () => {
+    const vm = buildRegimeViewModelBlock(
+      makeBlock({ clmmSuitability: { status: 'CAUTION', reasons: [] } }),
+      1_700_000_000_000,
+    );
+
+    expect(vm.suitabilityReason).toBeNull();
+  });
 });
