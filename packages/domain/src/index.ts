@@ -25,3 +25,6 @@ export { applyLifecycleTransition } from './execution/ExecutionStateReducer.js';
 
 // History
 export * from './history/index.js';
+
+// Regime
+export * from './regime/index.js';
