@@ -1,3 +1,5 @@
+import type { MonitoringStatus } from '../view-models/PositionListViewModel.js';
+
 export type TokenPair = { a: string; b: string };
 
 export function splitTokenPair(label: string): TokenPair {
@@ -77,10 +79,19 @@ export function getStatusChipProps({
 export type MonitoringTone = 'safe' | 'warn' | 'faint';
 export type MonitoringDisplay = { text: string; tone: MonitoringTone };
 
-export function getMonitoringDisplay(monitoringLabel: string): MonitoringDisplay {
-  if (monitoringLabel === 'Monitoring Active') return { text: 'Live', tone: 'safe' };
-  if (monitoringLabel === 'Monitoring Degraded') return { text: 'Degraded', tone: 'warn' };
-  return { text: 'Inactive', tone: 'faint' };
+export function getMonitoringDisplay(status: MonitoringStatus): MonitoringDisplay {
+  switch (status) {
+    case 'active':
+      return { text: 'Live', tone: 'safe' };
+    case 'degraded':
+      return { text: 'Degraded', tone: 'warn' };
+    case 'inactive':
+      return { text: 'Inactive', tone: 'faint' };
+    default: {
+      const _exhaustive: never = status;
+      throw new Error(`Unexpected monitoringStatus: ${String(_exhaustive)}`);
+    }
+  }
 }
 
 export type CardPlaceholderMetrics = { tvlLabel: string; fees24hLabel: string };

@@ -1,4 +1,5 @@
 import { View, Text, TouchableOpacity } from 'react-native';
+import type { PositionListItemViewModel } from '../view-models/PositionListViewModel.js';
 import { colors, typography } from '../design-system/index.js';
 import { Chip } from './Chip.js';
 import { PairGlyph } from './PairGlyph.js';
@@ -14,17 +15,7 @@ import {
 } from './PositionCardUtils.js';
 
 type Props = {
-  poolId: string;
-  poolLabel: string;
-  currentPrice: number;
-  currentPriceLabel: string;
-  lowerBoundPrice: number;
-  upperBoundPrice: number;
-  lowerBoundLabel: string;
-  upperBoundLabel: string;
-  rangeStatusKind: 'in-range' | 'below-range' | 'above-range';
-  hasAlert: boolean;
-  monitoringLabel: string;
+  item: PositionListItemViewModel;
   onPress?: () => void;
 };
 
@@ -34,25 +25,26 @@ function monitoringDotColor(tone: 'safe' | 'warn' | 'faint'): string {
   return colors.textFaint;
 }
 
-export function PositionCard({
-  poolId,
-  poolLabel,
-  currentPrice,
-  currentPriceLabel,
-  lowerBoundPrice,
-  upperBoundPrice,
-  lowerBoundLabel,
-  upperBoundLabel,
-  rangeStatusKind,
-  hasAlert,
-  monitoringLabel,
-  onPress,
-}: Props): JSX.Element {
+export function PositionCard({ item, onPress }: Props): JSX.Element {
+  const {
+    poolId,
+    poolLabel,
+    currentPrice,
+    currentPriceLabel,
+    lowerBoundPrice,
+    upperBoundPrice,
+    lowerBoundLabel,
+    upperBoundLabel,
+    rangeStatusKind,
+    hasAlert,
+    monitoringStatus,
+  } = item;
+
   const tokens = splitTokenPair(poolLabel);
   const truncatedPoolId = formatPoolId(poolId);
   const nearEdge = isNearEdge({ currentPrice, lowerBoundPrice, upperBoundPrice });
   const chip = getStatusChipProps({ rangeStatusKind, hasAlert, nearEdge });
-  const monitoring = getMonitoringDisplay(monitoringLabel);
+  const monitoring = getMonitoringDisplay(monitoringStatus);
   const placeholders = getCardPlaceholderMetrics(poolId);
 
   const breachSide = getBreachSide(hasAlert, rangeStatusKind);
