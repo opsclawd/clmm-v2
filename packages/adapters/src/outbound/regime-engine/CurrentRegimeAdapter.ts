@@ -115,7 +115,15 @@ export class CurrentRegimeAdapter implements RegimeReadPort {
       return { kind: 'config-error' };
     }
 
-    const url = new URL(`${this.baseUrl.replace(/\/+$/, '')}/v1/regime/current`);
+    let url: URL;
+    try {
+      url = new URL(`${this.baseUrl.replace(/\/+$/, '')}/v1/regime/current`);
+    } catch {
+      this.observability.log('warn', 'Regime base URL is malformed', {
+        baseUrl: this.baseUrl,
+      });
+      return { kind: 'config-error' };
+    }
     url.searchParams.set('symbol', params.symbol);
     url.searchParams.set('source', params.source);
     url.searchParams.set('network', params.network);

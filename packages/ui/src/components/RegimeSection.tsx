@@ -83,6 +83,7 @@ export function RegimeSection({
   }
 
   const vm = buildRegimeViewModelBlock(regime, now);
+  const showDegraded = isError && !isUnsupported;
 
   return (
     <View style={cardStyle}>
@@ -132,6 +133,11 @@ export function RegimeSection({
       >
         {vm.marketReasonSummary}
       </Text>
+      {showDegraded ? (
+        <Text style={{ color: colors.warn, fontSize: typography.fontSize.xs, marginTop: 4 }}>
+          Refresh failed — showing last available analysis.
+        </Text>
+      ) : null}
     </View>
   );
 }

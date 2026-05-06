@@ -1,4 +1,8 @@
-import type { RegimeBlock, ClmmSuitabilityStatus } from '@clmm/application/public';
+import type {
+  RegimeBlock,
+  RegimeReasonSeverity,
+  ClmmSuitabilityStatus,
+} from '@clmm/application/public';
 
 export type RegimeViewModelBlock = {
   regimeLabel: string;
@@ -61,6 +65,8 @@ function mapSuitabilityLabel(status: ClmmSuitabilityStatus): string {
   }
 }
 
+const SEVERITY_ORDER: Record<RegimeReasonSeverity, number> = { ERROR: 0, WARN: 1, INFO: 2 };
+
 export function buildRegimeViewModelBlock(block: RegimeBlock, now: number): RegimeViewModelBlock {
   const { freshnessLabel, isStale } = computeFreshness(
     block.freshness.capturedAtUnixMs,
@@ -69,7 +75,12 @@ export function buildRegimeViewModelBlock(block: RegimeBlock, now: number): Regi
   );
 
   const marketReasonSummary =
-    block.marketReasons.length > 0 ? block.marketReasons.map((r) => r.text).join('; ') : '—';
+    block.marketReasons.length > 0
+      ? [...block.marketReasons]
+          .sort((a, b) => (SEVERITY_ORDER[a.severity] ?? 9) - (SEVERITY_ORDER[b.severity] ?? 9))
+          .map((r) => r.text)
+          .join('; ')
+      : '—';
 
   return {
     regimeLabel: mapRegimeLabel(block.regime),

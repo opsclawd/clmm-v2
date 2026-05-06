@@ -95,6 +95,21 @@ describe('buildRegimeViewModelBlock', () => {
     expect(vm.marketReasonSummary).toBe('High volatility; Trend weakening');
   });
 
+  it('sorts market reasons by severity (ERROR before WARN before INFO)', () => {
+    const vm = buildRegimeViewModelBlock(
+      makeBlock({
+        marketReasons: [
+          { severity: 'INFO', text: 'Momentum positive' },
+          { severity: 'ERROR', text: 'Candle gap detected' },
+          { severity: 'WARN', text: 'High volatility' },
+        ],
+      }),
+      1_700_000_000_000,
+    );
+
+    expect(vm.marketReasonSummary).toBe('Candle gap detected; High volatility; Momentum positive');
+  });
+
   it('returns em dash for empty market reasons', () => {
     const vm = buildRegimeViewModelBlock(makeBlock({ marketReasons: [] }), 1_700_000_000_000);
 

@@ -105,4 +105,17 @@ describe('RegimeSection', () => {
     const freshnessText = screen.getByText(/MCO ·.*stale/);
     expect(freshnessText).toBeTruthy();
   });
+
+  it('shows degraded banner when isError with cached regime data', () => {
+    render(
+      <RegimeSection
+        regime={testRegimeBlock}
+        isLoading={false}
+        isError
+        isUnsupported={false}
+        now={1_700_000_000_000}
+      />,
+    );
+    expect(screen.getByText('Refresh failed — showing last available analysis.')).toBeTruthy();
+  });
 });

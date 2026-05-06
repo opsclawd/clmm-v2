@@ -156,6 +156,14 @@ describe('CurrentRegimeAdapter', () => {
     expect(vi.mocked(fetch)).not.toHaveBeenCalled();
   });
 
+  it('returns kind:"config-error" when baseUrl is malformed', async () => {
+    const adapter = new CurrentRegimeAdapter('not-a-url', obs.port);
+    const result = await adapter.fetchCurrent(PARAMS);
+    expect(result.kind).toBe('config-error');
+    expect(vi.mocked(fetch)).not.toHaveBeenCalled();
+    expect(obs.logs.some((l) => l.message.includes('malformed'))).toBe(true);
+  });
+
   it('strips trailing slash from baseUrl', async () => {
     vi.mocked(fetch).mockResolvedValue(
       new Response(JSON.stringify(SAMPLE_UPSTREAM), { status: 200 }),

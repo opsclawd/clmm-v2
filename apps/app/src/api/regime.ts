@@ -34,7 +34,7 @@ function isAbortError(error: unknown): boolean {
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {
-  return typeof value === 'object' && value != null;
+  return typeof value === 'object' && value != null && !Array.isArray(value);
 }
 
 const VALID_REASON_SEVERITIES: Set<string> = new Set<RegimeReasonSeverity>([
