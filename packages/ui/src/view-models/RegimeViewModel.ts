@@ -68,11 +68,12 @@ function mapSuitabilityLabel(status: ClmmSuitabilityStatus): string {
 const SEVERITY_ORDER: Record<RegimeReasonSeverity, number> = { ERROR: 0, WARN: 1, INFO: 2 };
 
 export function buildRegimeViewModelBlock(block: RegimeBlock, now: number): RegimeViewModelBlock {
-  const { freshnessLabel, isStale } = computeFreshness(
-    block.freshness.capturedAtUnixMs,
-    now,
-    block.metadata?.source,
-  );
+  const ageStale = computeFreshness(block.freshness.capturedAtUnixMs, now, block.metadata?.source);
+  const isStale = block.freshness.hardStale || ageStale.isStale;
+  const freshnessLabel =
+    isStale && !ageStale.isStale
+      ? ageStale.freshnessLabel.replace(/( · stale)?$/, ' · stale')
+      : ageStale.freshnessLabel;
 
   const marketReasonSummary =
     block.marketReasons.length > 0

@@ -127,8 +127,8 @@ export const REGIME_POOL_ALLOWLIST_MAP = new Map<string, RegimePoolEntry>([
     'Czfq3xZZDmsdGdUyrNLtRhGc47cXcZtLG4crryfu44zE',
     {
       symbol: 'SOL/USDC',
-      source: 'mco',
-      network: 'mainnet',
+      source: 'geckoterminal',
+      network: 'solana',
       poolAddress: 'Czfq3xZZDmsdGdUyrNLtRhGc47cXcZtLG4crryfu44zE',
       timeframe: '1h',
     },

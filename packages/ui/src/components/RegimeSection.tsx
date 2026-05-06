@@ -78,6 +78,13 @@ export function RegimeSection({
         <Text style={{ color: colors.textSecondary, fontSize: typography.fontSize.sm }}>
           Regime analysis unavailable
         </Text>
+        {unavailableReason ? (
+          <Text
+            style={{ color: colors.textSecondary, fontSize: typography.fontSize.sm, marginTop: 4 }}
+          >
+            {unavailableReason}
+          </Text>
+        ) : null}
       </View>
     );
   }

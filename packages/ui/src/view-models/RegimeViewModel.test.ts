@@ -156,4 +156,27 @@ describe('buildRegimeViewModelBlock', () => {
 
     expect(vm.suitabilityStatus).toBe('CAUTION');
   });
+
+  it('marks stale when upstream hardStale is true regardless of age', () => {
+    const captured = 1_700_000_000_000;
+    const now = captured + 5 * 60_000;
+    const vm = buildRegimeViewModelBlock(
+      makeBlock({ freshness: { capturedAtUnixMs: captured, softStale: true, hardStale: true } }),
+      now,
+    );
+
+    expect(vm.isStale).toBe(true);
+    expect(vm.freshnessLabel).toContain('stale');
+  });
+
+  it('does not mark stale when upstream softStale is true but hardStale is false and age is recent', () => {
+    const captured = 1_700_000_000_000;
+    const now = captured + 5 * 60_000;
+    const vm = buildRegimeViewModelBlock(
+      makeBlock({ freshness: { capturedAtUnixMs: captured, softStale: true, hardStale: false } }),
+      now,
+    );
+
+    expect(vm.isStale).toBe(false);
+  });
 });

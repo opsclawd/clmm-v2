@@ -118,4 +118,19 @@ describe('RegimeSection', () => {
     );
     expect(screen.getByText('Refresh failed — showing last available analysis.')).toBeTruthy();
   });
+
+  it('shows unavailable reason when regime is null on supported pool', () => {
+    render(
+      <RegimeSection
+        regime={null}
+        isLoading={false}
+        isError={false}
+        isUnsupported={false}
+        unavailableReason="NO_CANDLES"
+        now={1_700_000_000_000}
+      />,
+    );
+    expect(screen.getByText('Regime analysis unavailable')).toBeTruthy();
+    expect(screen.getByText('NO_CANDLES')).toBeTruthy();
+  });
 });

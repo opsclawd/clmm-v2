@@ -87,7 +87,7 @@ function isRegimeBlock(value: unknown): value is RegimeBlock {
   if (!Array.isArray(value['marketReasons'])) return false;
   if (!(value['marketReasons'] as unknown[]).every(isRegimeReasonBlock)) return false;
   if (!isRegimeFreshnessBlock(value['freshness'])) return false;
-  if (value['metadata'] != null && typeof value['metadata'] !== 'object') return false;
+  if (value['metadata'] != null && !isRecord(value['metadata'])) return false;
   return true;
 }
 
