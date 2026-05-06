@@ -78,10 +78,9 @@ export function buildRegimeViewModelBlock(block: RegimeBlock, now: number): Regi
 
   const marketReasonSummary =
     block.marketReasons.length > 0
-      ? [...block.marketReasons]
-          .sort((a, b) => (SEVERITY_ORDER[a.severity] ?? 9) - (SEVERITY_ORDER[b.severity] ?? 9))
-          .map((r) => r.text)
-          .join('; ')
+      ? [...block.marketReasons].sort(
+          (a, b) => (SEVERITY_ORDER[a.severity] ?? 9) - (SEVERITY_ORDER[b.severity] ?? 9),
+        )[0]!.text
       : '—';
 
   const suitabilityReasons = block.clmmSuitability.reasons;

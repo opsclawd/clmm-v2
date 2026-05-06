@@ -1,4 +1,4 @@
-import { describe, it, expect, vi } from 'vitest';
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { NotFoundException } from '@nestjs/common';
 import { RegimeController } from './RegimeController.js';
 import type { RegimeReadPort, RegimeReadResult, RegimeBlock } from '@clmm/application';
@@ -9,10 +9,6 @@ const UNSUPPORTED_POOL_ID = 'Pool111111111111111111111111111111111111111';
 
 const testEntry: RegimePoolEntry = {
   symbol: 'SOL/USDC',
-  source: 'mco',
-  network: 'mainnet',
-  poolAddress: POOL_ID,
-  timeframe: '1h',
 };
 
 const testBlock: RegimeBlock = {
@@ -30,8 +26,35 @@ function makeAllowlist(
   return new Map(entries);
 }
 
+const ORIGINAL_ENV = process.env;
+
 describe('RegimeController', () => {
+  beforeEach(() => {
+    process.env = { ...ORIGINAL_ENV };
+  });
+
+  afterEach(() => {
+    process.env = ORIGINAL_ENV;
+    vi.restoreAllMocks();
+  });
+
+  function setFeedEnv(): void {
+    process.env['REGIME_ENGINE_SOURCE'] = 'geckoterminal';
+    process.env['REGIME_ENGINE_NETWORK'] = 'solana';
+    process.env['REGIME_ENGINE_POOL_ADDRESS'] = POOL_ID;
+    process.env['REGIME_ENGINE_TIMEFRAME'] = '1h';
+  }
+
+  function clearFeedEnv(): void {
+    delete process.env['REGIME_ENGINE_SOURCE'];
+    delete process.env['REGIME_ENGINE_NETWORK'];
+    delete process.env['REGIME_ENGINE_POOL_ADDRESS'];
+    delete process.env['REGIME_ENGINE_TIMEFRAME'];
+  }
+
   it('returns regime for an allowlisted pool when the port resolves a block', async () => {
+    setFeedEnv();
+
     const result: RegimeReadResult = { kind: 'block', block: testBlock };
     const fetchCurrent = vi.fn().mockResolvedValue(result);
     const port: RegimeReadPort = { fetchCurrent };
@@ -41,11 +64,11 @@ describe('RegimeController', () => {
 
     expect(response).toEqual({ regime: testBlock });
     expect(fetchCurrent).toHaveBeenCalledWith({
-      symbol: testEntry.symbol,
-      source: testEntry.source,
-      network: testEntry.network,
-      poolAddress: testEntry.poolAddress,
-      timeframe: testEntry.timeframe,
+      symbol: 'SOL/USDC',
+      source: 'geckoterminal',
+      network: 'solana',
+      poolAddress: POOL_ID,
+      timeframe: '1h',
     });
   });
 
@@ -60,7 +83,22 @@ describe('RegimeController', () => {
     expect(fetchCurrent).not.toHaveBeenCalled();
   });
 
+  it('returns config-error when REGIME_ENGINE env vars are missing', async () => {
+    clearFeedEnv();
+
+    const fetchCurrent = vi.fn();
+    const port: RegimeReadPort = { fetchCurrent };
+    const controller = new RegimeController(port, makeAllowlist());
+
+    const response = await controller.getCurrent(POOL_ID);
+
+    expect(response).toEqual({ regime: null, unavailableReason: 'config-error' });
+    expect(fetchCurrent).not.toHaveBeenCalled();
+  });
+
   it('returns regime null with not-found when the port resolves not-found', async () => {
+    setFeedEnv();
+
     const result: RegimeReadResult = { kind: 'not-found' };
     const fetchCurrent = vi.fn().mockResolvedValue(result);
     const port: RegimeReadPort = { fetchCurrent };
@@ -72,6 +110,8 @@ describe('RegimeController', () => {
   });
 
   it('returns regime null with config-error when the port resolves config-error', async () => {
+    setFeedEnv();
+
     const result: RegimeReadResult = { kind: 'config-error' };
     const fetchCurrent = vi.fn().mockResolvedValue(result);
     const port: RegimeReadPort = { fetchCurrent };
@@ -83,6 +123,8 @@ describe('RegimeController', () => {
   });
 
   it('returns regime null with upstream-error when the port resolves upstream-error', async () => {
+    setFeedEnv();
+
     const result: RegimeReadResult = { kind: 'upstream-error' };
     const fetchCurrent = vi.fn().mockResolvedValue(result);
     const port: RegimeReadPort = { fetchCurrent };

@@ -123,16 +123,7 @@ export const SR_LEVELS_POOL_ALLOWLIST_MAP = new Map<string, { symbol: string; so
 ]);
 
 export const REGIME_POOL_ALLOWLIST_MAP = new Map<string, RegimePoolEntry>([
-  [
-    'Czfq3xZZDmsdGdUyrNLtRhGc47cXcZtLG4crryfu44zE',
-    {
-      symbol: 'SOL/USDC',
-      source: 'geckoterminal',
-      network: 'solana',
-      poolAddress: 'Czfq3xZZDmsdGdUyrNLtRhGc47cXcZtLG4crryfu44zE',
-      timeframe: '1h',
-    },
-  ],
+  ['Czfq3xZZDmsdGdUyrNLtRhGc47cXcZtLG4crryfu44zE', { symbol: 'SOL/USDC' }],
 ]);
 
 @Module({

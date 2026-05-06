@@ -81,7 +81,7 @@ describe('buildRegimeViewModelBlock', () => {
     expect(vm.suitabilityLabel).toBe('? Unknown');
   });
 
-  it('joins market reason texts with semicolons', () => {
+  it('shows only the top market reason by severity', () => {
     const vm = buildRegimeViewModelBlock(
       makeBlock({
         marketReasons: [
@@ -92,10 +92,10 @@ describe('buildRegimeViewModelBlock', () => {
       1_700_000_000_000,
     );
 
-    expect(vm.marketReasonSummary).toBe('High volatility; Trend weakening');
+    expect(vm.marketReasonSummary).toBe('High volatility');
   });
 
-  it('sorts market reasons by severity (ERROR before WARN before INFO)', () => {
+  it('picks the top market reason by severity (ERROR before WARN before INFO)', () => {
     const vm = buildRegimeViewModelBlock(
       makeBlock({
         marketReasons: [
@@ -107,7 +107,7 @@ describe('buildRegimeViewModelBlock', () => {
       1_700_000_000_000,
     );
 
-    expect(vm.marketReasonSummary).toBe('Candle gap detected; High volatility; Momentum positive');
+    expect(vm.marketReasonSummary).toBe('Candle gap detected');
   });
 
   it('returns em dash for empty market reasons', () => {
