@@ -2,7 +2,7 @@ import React from 'react';
 import { afterEach, describe, expect, it } from 'vitest';
 import { cleanup, render, screen } from '@testing-library/react';
 import type { SrLevelsBlock } from '@clmm/application/public';
-import { MarketContextPanel } from './MarketContextPanel.js';
+import { SrInsightsSection } from './SrInsightsSection.js';
 
 afterEach(() => {
   cleanup();
@@ -19,10 +19,10 @@ function fixtureBlock(): SrLevelsBlock {
   };
 }
 
-describe('MarketContextPanel', () => {
+describe('SrInsightsSection', () => {
   it('renders nothing when fully idle (no data, not loading, not errored)', () => {
     const { container } = render(
-      <MarketContextPanel
+      <SrInsightsSection
         srLevels={undefined}
         isLoading={false}
         isError={false}
@@ -38,7 +38,7 @@ describe('MarketContextPanel', () => {
 
   it('renders the loading skeleton when isLoading and there is no cached data', () => {
     render(
-      <MarketContextPanel
+      <SrInsightsSection
         srLevels={undefined}
         isLoading
         isError={false}
@@ -49,12 +49,12 @@ describe('MarketContextPanel', () => {
       />,
     );
 
-    expect(screen.getByTestId('market-context-panel-skeleton')).toBeTruthy();
+    expect(screen.getByTestId('sr-insights-section-skeleton')).toBeTruthy();
   });
 
   it('renders cached data while background-fetching (isLoading with cached srLevels)', () => {
     render(
-      <MarketContextPanel
+      <SrInsightsSection
         srLevels={fixtureBlock()}
         isLoading
         isError={false}
@@ -71,7 +71,7 @@ describe('MarketContextPanel', () => {
 
   it('renders the unavailable caption when isUnsupported', () => {
     render(
-      <MarketContextPanel
+      <SrInsightsSection
         srLevels={undefined}
         isLoading={false}
         isError={false}
@@ -87,7 +87,7 @@ describe('MarketContextPanel', () => {
 
   it('renders the unavailable caption when isError without cached data', () => {
     render(
-      <MarketContextPanel
+      <SrInsightsSection
         srLevels={null}
         isLoading={false}
         isError
@@ -103,7 +103,7 @@ describe('MarketContextPanel', () => {
 
   it('renders cached data with degraded message when isError but srLevels is present', () => {
     render(
-      <MarketContextPanel
+      <SrInsightsSection
         srLevels={fixtureBlock()}
         isLoading={false}
         isError
@@ -120,7 +120,7 @@ describe('MarketContextPanel', () => {
 
   it('renders the unavailable caption when srLevels is null (transient regime-engine failure)', () => {
     render(
-      <MarketContextPanel
+      <SrInsightsSection
         srLevels={null}
         isLoading={false}
         isError={false}
@@ -136,7 +136,7 @@ describe('MarketContextPanel', () => {
 
   it('renders MarketThesisCard and SrLevelsCard when given a populated block', () => {
     render(
-      <MarketContextPanel
+      <SrInsightsSection
         srLevels={fixtureBlock()}
         isLoading={false}
         isError={false}
@@ -156,7 +156,7 @@ describe('MarketContextPanel', () => {
   it('omits MarketThesisCard when the block has no summary', () => {
     const block = { ...fixtureBlock(), summary: null };
     render(
-      <MarketContextPanel
+      <SrInsightsSection
         srLevels={block}
         isLoading={false}
         isError={false}
@@ -173,7 +173,7 @@ describe('MarketContextPanel', () => {
 
   it('renders mixed-pools unavailable message when isMixedPools is true', () => {
     render(
-      <MarketContextPanel
+      <SrInsightsSection
         srLevels={undefined}
         isLoading={false}
         isError={false}
@@ -189,7 +189,7 @@ describe('MarketContextPanel', () => {
 
   it('renders Support & Resistance before Market Thesis when both are present', () => {
     const { container } = render(
-      <MarketContextPanel
+      <SrInsightsSection
         srLevels={fixtureBlock()}
         isLoading={false}
         isError={false}

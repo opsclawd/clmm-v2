@@ -1,12 +1,13 @@
 import { View, Text, FlatList, ActivityIndicator } from 'react-native';
-import type { PositionSummaryDto, SrLevelsBlock } from '@clmm/application/public';
+import type { PositionSummaryDto, SrLevelsBlock, RegimeBlock } from '@clmm/application/public';
 import { colors, typography } from '../design-system/index.js';
 import { buildPositionListViewModel } from '../view-models/PositionListViewModel.js';
 import { DegradedCapabilityBanner } from '../components/DegradedCapabilityBanner.js';
 import { ConnectWalletEntry } from '../components/ConnectWalletEntry.js';
 import { SectionHeader } from '../components/SectionHeader.js';
 import { PositionCard } from '../components/PositionCard.js';
-import { MarketContextPanel } from '../components/MarketContextPanel.js';
+import { SrInsightsSection } from '../components/SrInsightsSection.js';
+import { RegimeSection } from '../components/RegimeSection.js';
 import { PortfolioSummaryStrip } from '../components/PortfolioSummaryStrip.js';
 import type { PlatformCapabilities } from '../components/DegradedCapabilityBannerUtils.js';
 
@@ -26,6 +27,11 @@ type Props = {
   isMixedPools?: boolean | undefined;
   poolLabel?: string | null | undefined;
   now?: number | undefined;
+  regime?: RegimeBlock | null | undefined;
+  regimeLoading?: boolean | undefined;
+  regimeError?: boolean | undefined;
+  regimeUnsupported?: boolean | undefined;
+  regimeUnavailableReason?: string | null | undefined;
 };
 
 export function PositionsListScreen({
@@ -44,6 +50,11 @@ export function PositionsListScreen({
   isMixedPools,
   poolLabel,
   now,
+  regime,
+  regimeLoading,
+  regimeError,
+  regimeUnsupported,
+  regimeUnavailableReason,
 }: Props): JSX.Element {
   const isConnected = walletAddress != null && walletAddress.length > 0;
   const hasPositions = (positions?.length ?? 0) > 0;
@@ -70,6 +81,11 @@ export function PositionsListScreen({
           isMixedPools={isMixedPools ?? false}
           poolLabel={poolLabel ?? null}
           now={now}
+          regime={regime}
+          regimeLoading={regimeLoading}
+          regimeError={regimeError}
+          regimeUnsupported={regimeUnsupported}
+          regimeUnavailableReason={regimeUnavailableReason}
         />
       ) : (
         <EmptyState />
@@ -198,6 +214,11 @@ function ConnectedPositionsList({
   isMixedPools,
   poolLabel,
   now,
+  regime,
+  regimeLoading,
+  regimeError,
+  regimeUnsupported,
+  regimeUnavailableReason,
 }: {
   positions: PositionSummaryDto[];
   onSelectPosition?: (positionId: string) => void;
@@ -208,6 +229,11 @@ function ConnectedPositionsList({
   isMixedPools: boolean;
   poolLabel: string | null;
   now?: number | undefined;
+  regime?: RegimeBlock | null | undefined;
+  regimeLoading?: boolean | undefined;
+  regimeError?: boolean | undefined;
+  regimeUnsupported?: boolean | undefined;
+  regimeUnavailableReason?: string | null | undefined;
 }) {
   const viewModel = buildPositionListViewModel(positions);
 
@@ -224,15 +250,25 @@ function ConnectedPositionsList({
         </View>
       }
       ListFooterComponent={
-        <MarketContextPanel
-          srLevels={srLevels}
-          isLoading={srLevelsLoading ?? false}
-          isError={srLevelsError ?? false}
-          isUnsupported={srLevelsUnsupported ?? false}
-          isMixedPools={isMixedPools}
-          poolLabel={poolLabel}
-          now={now ?? Date.now()}
-        />
+        <>
+          <SrInsightsSection
+            srLevels={srLevels}
+            isLoading={srLevelsLoading ?? false}
+            isError={srLevelsError ?? false}
+            isUnsupported={srLevelsUnsupported ?? false}
+            isMixedPools={isMixedPools}
+            poolLabel={poolLabel}
+            now={now ?? Date.now()}
+          />
+          <RegimeSection
+            regime={regime}
+            isLoading={regimeLoading ?? false}
+            isError={regimeError ?? false}
+            isUnsupported={regimeUnsupported ?? false}
+            unavailableReason={regimeUnavailableReason ?? null}
+            now={now ?? Date.now()}
+          />
+        </>
       }
       renderItem={({ item }) => (
         <PositionCard item={item} onPress={() => onSelectPosition?.(item.positionId)} />

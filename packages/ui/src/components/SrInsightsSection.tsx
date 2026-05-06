@@ -15,7 +15,7 @@ type Props = {
   now: number;
 };
 
-export function MarketContextPanel({
+export function SrInsightsSection({
   srLevels,
   isLoading,
   isError,
@@ -71,7 +71,7 @@ export function MarketContextPanel({
   if (isLoading && srLevels == null) {
     return (
       <View
-        testID="market-context-panel-skeleton"
+        testID="sr-insights-section-skeleton"
         style={{
           marginHorizontal: 16,
           marginTop: 14,

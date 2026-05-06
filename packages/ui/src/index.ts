@@ -33,6 +33,7 @@ export { SectionHeader } from './components/SectionHeader.js';
 export { PositionCard } from './components/PositionCard.js';
 export { getMonitoringDisplay } from './components/PositionCardUtils.js';
 export type { MonitoringDisplay, MonitoringTone } from './components/PositionCardUtils.js';
+export { RegimeSection } from './components/RegimeSection.js';
 
 // Wallet connection utils
 export {
@@ -74,6 +75,7 @@ export type {
   WalletConnectViewModel,
   WalletSettingsViewModel,
 } from './view-models/WalletConnectionViewModel.js';
+export { buildRegimeViewModelBlock } from './view-models/RegimeViewModel.js';
 
 // Presenters
 export { presentPositionDetail } from './presenters/PositionDetailPresenter.js';
