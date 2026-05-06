@@ -35,11 +35,11 @@ export class RegimeController {
       case 'block':
         return { regime: result.block };
       case 'not-found':
-        return { regime: null, unavailableReason: 'NO_CANDLES' };
+        return { regime: null, unavailableReason: 'not-found' };
       case 'config-error':
-        return { regime: null, unavailableReason: 'CONFIG_ERROR' };
+        return { regime: null, unavailableReason: 'config-error' };
       case 'upstream-error':
-        return { regime: null, unavailableReason: 'UPSTREAM_ERROR' };
+        return { regime: null, unavailableReason: 'upstream-error' };
     }
   }
 }

@@ -60,7 +60,7 @@ describe('RegimeController', () => {
     expect(fetchCurrent).not.toHaveBeenCalled();
   });
 
-  it('returns regime null with NO_CANDLES when the port resolves not-found', async () => {
+  it('returns regime null with not-found when the port resolves not-found', async () => {
     const result: RegimeReadResult = { kind: 'not-found' };
     const fetchCurrent = vi.fn().mockResolvedValue(result);
     const port: RegimeReadPort = { fetchCurrent };
@@ -68,10 +68,10 @@ describe('RegimeController', () => {
 
     const response = await controller.getCurrent(POOL_ID);
 
-    expect(response).toEqual({ regime: null, unavailableReason: 'NO_CANDLES' });
+    expect(response).toEqual({ regime: null, unavailableReason: 'not-found' });
   });
 
-  it('returns regime null with CONFIG_ERROR when the port resolves config-error', async () => {
+  it('returns regime null with config-error when the port resolves config-error', async () => {
     const result: RegimeReadResult = { kind: 'config-error' };
     const fetchCurrent = vi.fn().mockResolvedValue(result);
     const port: RegimeReadPort = { fetchCurrent };
@@ -79,10 +79,10 @@ describe('RegimeController', () => {
 
     const response = await controller.getCurrent(POOL_ID);
 
-    expect(response).toEqual({ regime: null, unavailableReason: 'CONFIG_ERROR' });
+    expect(response).toEqual({ regime: null, unavailableReason: 'config-error' });
   });
 
-  it('returns regime null with UPSTREAM_ERROR when the port resolves upstream-error', async () => {
+  it('returns regime null with upstream-error when the port resolves upstream-error', async () => {
     const result: RegimeReadResult = { kind: 'upstream-error' };
     const fetchCurrent = vi.fn().mockResolvedValue(result);
     const port: RegimeReadPort = { fetchCurrent };
@@ -90,6 +90,6 @@ describe('RegimeController', () => {
 
     const response = await controller.getCurrent(POOL_ID);
 
-    expect(response).toEqual({ regime: null, unavailableReason: 'UPSTREAM_ERROR' });
+    expect(response).toEqual({ regime: null, unavailableReason: 'upstream-error' });
   });
 });

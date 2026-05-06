@@ -31,7 +31,7 @@ type Props = {
   regimeLoading?: boolean | undefined;
   regimeError?: boolean | undefined;
   regimeUnsupported?: boolean | undefined;
-  regimeUnavailableReason?: string | null | undefined;
+  regimeUnavailableReason?: 'not-found' | 'config-error' | 'upstream-error' | null | undefined;
 };
 
 export function PositionsListScreen({
@@ -233,7 +233,7 @@ function ConnectedPositionsList({
   regimeLoading?: boolean | undefined;
   regimeError?: boolean | undefined;
   regimeUnsupported?: boolean | undefined;
-  regimeUnavailableReason?: string | null | undefined;
+  regimeUnavailableReason?: 'not-found' | 'config-error' | 'upstream-error' | null | undefined;
 }) {
   const viewModel = buildPositionListViewModel(positions);
 

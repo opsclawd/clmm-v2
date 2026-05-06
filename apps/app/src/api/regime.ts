@@ -19,7 +19,7 @@ export function isRegimeUnsupportedPoolError(error: unknown): error is RegimeUns
   return error instanceof RegimeUnsupportedPoolError;
 }
 
-export type RegimeUnavailableReason = 'NO_CANDLES' | 'CONFIG_ERROR' | 'UPSTREAM_ERROR';
+export type RegimeUnavailableReason = 'not-found' | 'config-error' | 'upstream-error';
 
 export type RegimeResponse = {
   regime: RegimeBlock | null;
@@ -94,7 +94,7 @@ function isRegimeBlock(value: unknown): value is RegimeBlock {
 function isRegimeUnavailableReason(value: unknown): value is RegimeUnavailableReason {
   return (
     typeof value === 'string' &&
-    (value === 'NO_CANDLES' || value === 'CONFIG_ERROR' || value === 'UPSTREAM_ERROR')
+    (value === 'not-found' || value === 'config-error' || value === 'upstream-error')
   );
 }
 

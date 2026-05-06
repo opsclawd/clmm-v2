@@ -57,19 +57,19 @@ describe('RegimeSection', () => {
     expect(screen.getByText('Regime analysis unavailable')).toBeTruthy();
   });
 
-  it('shows unavailable reason when provided', () => {
+  it('shows mapped unavailable copy for not-found reason', () => {
     render(
       <RegimeSection
         regime={undefined}
         isLoading={false}
         isError={false}
         isUnsupported
-        unavailableReason="Pool not supported"
+        unavailableReason="not-found"
         now={1_700_000_000_000}
       />,
     );
     expect(screen.getByText('Regime analysis unavailable')).toBeTruthy();
-    expect(screen.getByText('Pool not supported')).toBeTruthy();
+    expect(screen.getByText('Market data not available yet')).toBeTruthy();
   });
 
   it('renders regime label, suitability, trend/vol, freshness with valid regime block', () => {
@@ -154,18 +154,32 @@ describe('RegimeSection', () => {
     expect(screen.queryByText('Favorable conditions')).toBeNull();
   });
 
-  it('shows unavailable reason when regime is null on supported pool', () => {
+  it('shows mapped unavailable copy when regime is null on supported pool', () => {
     render(
       <RegimeSection
         regime={null}
         isLoading={false}
         isError={false}
         isUnsupported={false}
-        unavailableReason="NO_CANDLES"
+        unavailableReason="not-found"
         now={1_700_000_000_000}
       />,
     );
     expect(screen.getByText('Regime analysis unavailable')).toBeTruthy();
-    expect(screen.getByText('NO_CANDLES')).toBeTruthy();
+    expect(screen.getByText('Market data not available yet')).toBeTruthy();
+  });
+
+  it('maps upstream-error to generic unavailable copy', () => {
+    render(
+      <RegimeSection
+        regime={null}
+        isLoading={false}
+        isError={false}
+        isUnsupported={false}
+        unavailableReason="upstream-error"
+        now={1_700_000_000_000}
+      />,
+    );
+    expect(screen.getByText('Market context unavailable')).toBeTruthy();
   });
 });

@@ -92,13 +92,13 @@ describe('fetchCurrentRegime', () => {
     globalThis.fetch = vi.fn().mockResolvedValue({
       ok: true,
       status: 200,
-      json: () => Promise.resolve({ regime: null, unavailableReason: 'NO_CANDLES' }),
+      json: () => Promise.resolve({ regime: null, unavailableReason: 'not-found' }),
     }) as typeof fetch;
 
     const result = await fetchCurrentRegime(POOL_ID);
 
     expect(result.regime).toBeNull();
-    expect(result.unavailableReason).toBe('NO_CANDLES');
+    expect(result.unavailableReason).toBe('not-found');
   });
 
   it('throws on 200 with a malformed regime block', async () => {

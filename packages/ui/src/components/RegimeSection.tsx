@@ -3,14 +3,27 @@ import type { RegimeBlock } from '@clmm/application/public';
 import { colors, typography } from '../design-system/index.js';
 import { buildRegimeViewModelBlock } from '../view-models/RegimeViewModel.js';
 
+type RegimeUnavailableReason = 'not-found' | 'config-error' | 'upstream-error';
+
 type Props = {
   regime: RegimeBlock | null | undefined;
   isLoading: boolean;
   isError: boolean;
   isUnsupported: boolean;
-  unavailableReason?: string | null;
+  unavailableReason?: RegimeUnavailableReason | null;
   now: number;
 };
+
+function mapUnavailableCopy(reason: RegimeUnavailableReason): string {
+  switch (reason) {
+    case 'not-found':
+      return 'Market data not available yet';
+    case 'config-error':
+      return 'Market context unavailable';
+    case 'upstream-error':
+      return 'Market context unavailable';
+  }
+}
 
 const cardStyle = {
   marginHorizontal: 16,
@@ -65,7 +78,7 @@ export function RegimeSection({
           <Text
             style={{ color: colors.textSecondary, fontSize: typography.fontSize.sm, marginTop: 4 }}
           >
-            {unavailableReason}
+            {mapUnavailableCopy(unavailableReason)}
           </Text>
         ) : null}
       </View>
@@ -82,7 +95,7 @@ export function RegimeSection({
           <Text
             style={{ color: colors.textSecondary, fontSize: typography.fontSize.sm, marginTop: 4 }}
           >
-            {unavailableReason}
+            {mapUnavailableCopy(unavailableReason)}
           </Text>
         ) : null}
       </View>
