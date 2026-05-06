@@ -7,6 +7,7 @@ import { PreviewController } from './PreviewController.js';
 import { ExecutionController } from './ExecutionController.js';
 import { WalletController } from './WalletController.js';
 import { SrLevelsController } from './SrLevelsController.js';
+import { RegimeController } from './RegimeController.js';
 import { InsightsDataController } from './InsightsDataController.js';
 import { PgBossLifecycle } from './PgBossLifecycle.js';
 import { OperationalStorageAdapter } from '../../outbound/storage/OperationalStorageAdapter.js';
@@ -24,11 +25,13 @@ import { SolanaExecutionSubmissionAdapter } from '../../outbound/swap-execution/
 import { TelemetryAdapter } from '../../outbound/observability/TelemetryAdapter.js';
 import { RegimeEngineExecutionEventAdapter } from '../../outbound/regime-engine/RegimeEngineExecutionEventAdapter.js';
 import { CurrentSrLevelsAdapter } from '../../outbound/regime-engine/CurrentSrLevelsAdapter.js';
+import { CurrentRegimeAdapter } from '../../outbound/regime-engine/CurrentRegimeAdapter.js';
 import { JupiterPriceAdapter } from '../../outbound/price/JupiterPriceAdapter.js';
 // InsightsApiKeyGuard is used via @UseGuards on InsightsDataController and
 // registered as a provider here for NestJS DI to resolve its dependencies.
 import { InsightsApiKeyGuard } from './InsightsApiKeyGuard.js';
 import type { RegimeEngineEventPort } from '../../outbound/regime-engine/types.js';
+import type { RegimePoolEntry } from './RegimeFeedConfig.js';
 import { createDb } from '../../outbound/storage/db.js';
 import { createPgBossProvider } from '../jobs/PgBossProvider.js';
 import { ReconciliationJobHandler } from '../jobs/ReconciliationJobHandler.js';
@@ -56,6 +59,8 @@ import {
   SR_LEVELS_READ_PORT,
   INSIGHTS_API_KEY,
   DB,
+  REGIME_READ_PORT,
+  REGIME_POOL_ALLOWLIST,
 } from './tokens.js';
 
 // boundary: process.env values are untyped at runtime; validated via env schema at deploy
@@ -105,6 +110,7 @@ const regimeEngineEventAdapter: RegimeEngineEventPort = new RegimeEngineExecutio
   telemetry,
 );
 const currentSrLevelsAdapter = new CurrentSrLevelsAdapter(regimeEngineBaseUrl, telemetry);
+const currentRegimeAdapter = new CurrentRegimeAdapter(regimeEngineBaseUrl, telemetry);
 const jupiterPrice = new JupiterPriceAdapter();
 const reconciliationJobPort = {
   async enqueue(attemptId: string): Promise<void> {
@@ -116,11 +122,16 @@ export const SR_LEVELS_POOL_ALLOWLIST_MAP = new Map<string, { symbol: string; so
   ['Czfq3xZZDmsdGdUyrNLtRhGc47cXcZtLG4crryfu44zE', { symbol: 'SOL/USDC', source: 'mco' }],
 ]);
 
+export const REGIME_POOL_ALLOWLIST_MAP = new Map<string, RegimePoolEntry>([
+  ['Czfq3xZZDmsdGdUyrNLtRhGc47cXcZtLG4crryfu44zE', { symbol: 'SOL/USDC' }],
+]);
+
 @Module({
   controllers: [
     HealthController,
     PositionController,
     SrLevelsController,
+    RegimeController,
     InsightsDataController,
     AlertController,
     PreviewController,
@@ -144,6 +155,8 @@ export const SR_LEVELS_POOL_ALLOWLIST_MAP = new Map<string, { symbol: string; so
     // TODO: Remove CURRENT_SR_LEVELS_PORT once SrLevelsController migrates to SR_LEVELS_READ_PORT.
     { provide: CURRENT_SR_LEVELS_PORT, useValue: currentSrLevelsAdapter },
     { provide: SR_LEVELS_READ_PORT, useValue: currentSrLevelsAdapter },
+    { provide: REGIME_READ_PORT, useValue: currentRegimeAdapter },
+    { provide: REGIME_POOL_ALLOWLIST, useValue: REGIME_POOL_ALLOWLIST_MAP },
     { provide: OBSERVABILITY_PORT, useValue: telemetry },
     { provide: PG_BOSS_INSTANCE, useValue: boss },
     { provide: RECONCILIATION_JOB_PORT, useValue: reconciliationJobPort },

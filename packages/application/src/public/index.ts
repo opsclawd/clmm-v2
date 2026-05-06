@@ -17,6 +17,12 @@ export type {
   EntryContextDto,
   SrLevel,
   SrLevelsBlock,
+  RegimeBlock,
+  RegimeReason,
+  RegimeReasonSeverity,
+  RegimeFreshness,
+  RegimeClmmSuitability,
+  RegimeMetadata,
 } from '../dto/index.js';
 
 // Port types needed by UI (capability + permission state)
@@ -73,6 +79,8 @@ export type {
   BreachDirection,
   ExecutionLifecycleState,
   DirectionalExitPolicyResult,
+  MarketRegime,
+  ClmmSuitabilityStatus,
 } from '@clmm/domain';
 
 export {

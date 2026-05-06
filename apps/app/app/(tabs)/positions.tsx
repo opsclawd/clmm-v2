@@ -4,11 +4,13 @@ import { PositionsListScreen } from '@clmm/ui';
 import { useStore } from 'zustand';
 import { fetchSupportedPositions } from '../../src/api/positions';
 import { fetchCurrentSrLevels, SrLevelsUnsupportedPoolError } from '../../src/api/srLevels';
+import { fetchCurrentRegime, RegimeUnsupportedPoolError } from '../../src/api/regime';
 import { walletSessionStore } from '../../src/state/walletSessionStore';
 import type { PositionListItemViewModel } from '@clmm/ui';
 import { navigateRoute } from '../../src/platform/webNavigation';
 
 const SR_LEVELS_STALE_TIME_MS = 5 * 60 * 1000;
+const REGIME_STALE_TIME_MS = 5 * 60 * 1000;
 
 function deriveUniquePool(positions: { poolId: string; tokenPairLabel: string }[] | undefined): {
   poolId: string | null;
@@ -59,8 +61,23 @@ export default function PositionsRoute() {
     retryDelay: 1000,
   });
 
+  const regimeQuery = useQuery({
+    queryKey: ['regime-current', poolId],
+    queryFn: () => fetchCurrentRegime(poolId!),
+    enabled: poolId != null,
+    staleTime: REGIME_STALE_TIME_MS,
+    refetchOnWindowFocus: false,
+    refetchOnMount: true,
+    retry: (failureCount, error) =>
+      !(error instanceof RegimeUnsupportedPoolError) && failureCount < 1,
+    retryDelay: 1000,
+  });
+
   const srLevelsUnsupported = srLevelsQuery.error instanceof SrLevelsUnsupportedPoolError;
   const srLevelsError = srLevelsQuery.isError && !srLevelsUnsupported;
+
+  const regimeUnsupported = regimeQuery.error instanceof RegimeUnsupportedPoolError;
+  const regimeError = regimeQuery.isError && !regimeUnsupported;
 
   return (
     <PositionsListScreen
@@ -78,6 +95,11 @@ export default function PositionsRoute() {
       srLevelsLoading={srLevelsQuery.isLoading && srLevelsQuery.fetchStatus !== 'idle'}
       srLevelsError={srLevelsError}
       srLevelsUnsupported={srLevelsUnsupported}
+      regime={regimeQuery.data?.regime}
+      regimeLoading={regimeQuery.isLoading && regimeQuery.fetchStatus !== 'idle'}
+      regimeError={regimeError}
+      regimeUnsupported={regimeUnsupported}
+      regimeUnavailableReason={regimeQuery.data?.unavailableReason ?? null}
       isMixedPools={isMixedPools}
       poolLabel={poolLabel}
       onConnectWallet={() =>

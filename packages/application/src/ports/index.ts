@@ -18,7 +18,7 @@ import type {
   ExecutionStep,
 } from '@clmm/domain';
 import type { HistoryEvent, HistoryTimeline, ExecutionOutcomeSummary } from '@clmm/domain';
-import type { SrLevelsBlock } from '../dto/index.js';
+import type { SrLevelsBlock, RegimeBlock } from '../dto/index.js';
 
 // --- Position read ports ---
 
@@ -265,6 +265,29 @@ export interface IdGeneratorPort {
 
 export interface SrLevelsReadPort {
   fetchCurrent(symbol: string, source: string): Promise<SrLevelsBlock | null>;
+}
+
+// --- Regime read port (application-owned; CurrentRegimeAdapter implements) ---
+//
+// Returned outcome is a discriminated union so the BFF controller can map
+// directly to the documented `unavailableReason` codes without parsing
+// adapter logs or HTTP details. Production code paths must never throw
+// for expected upstream unavailability.
+
+export type RegimeReadResult =
+  | { kind: 'block'; block: RegimeBlock }
+  | { kind: 'not-found' }
+  | { kind: 'config-error' }
+  | { kind: 'upstream-error' };
+
+export interface RegimeReadPort {
+  fetchCurrent(params: {
+    symbol: string;
+    source: string;
+    network: string;
+    poolAddress: string;
+    timeframe: string;
+  }): Promise<RegimeReadResult>;
 }
 
 // --- Wallet ownership challenge port ---
