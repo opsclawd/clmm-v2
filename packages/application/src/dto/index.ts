@@ -326,3 +326,12 @@ export type SolUsdcInsightErrorDto = {
   positionId?: string;
   retryable: true;
 };
+
+export type {
+  RegimeReasonSeverity,
+  RegimeReason,
+  RegimeFreshness,
+  RegimeClmmSuitability,
+  RegimeMetadata,
+  RegimeBlock,
+} from './regime.js';
