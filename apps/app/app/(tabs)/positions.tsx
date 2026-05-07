@@ -5,7 +5,7 @@ import { useStore } from 'zustand';
 import { fetchSupportedPositions } from '../../src/api/positions';
 import { fetchCurrentSrLevels, SrLevelsUnsupportedPoolError } from '../../src/api/srLevels';
 import { fetchCurrentRegime, RegimeUnsupportedPoolError } from '../../src/api/regime';
-import { fetchCurrentSrTheses, SrThesesUnsupportedPoolError } from '../../src/api/srTheses.js';
+import { fetchCurrentSrTheses, SrThesesUnsupportedPoolError } from '../../src/api/srTheses';
 import { walletSessionStore } from '../../src/state/walletSessionStore';
 import type { PositionListItemViewModel } from '@clmm/ui';
 import { navigateRoute } from '../../src/platform/webNavigation';
