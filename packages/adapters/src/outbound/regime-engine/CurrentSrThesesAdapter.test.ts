@@ -353,4 +353,39 @@ describe('CurrentSrThesesAdapter', () => {
     if (result.kind !== 'block') return;
     expect(result.block.theses[0]!.bias).toBeNull();
   });
+
+  it('rejects block with malformed brief sourceRecordedAtIso (number)', async () => {
+    const malformed = {
+      ...SAMPLE_BLOCK,
+      brief: { ...SAMPLE_BLOCK.brief, sourceRecordedAtIso: 1234567890 },
+    };
+    vi.mocked(fetch).mockResolvedValue(new Response(JSON.stringify(malformed), { status: 200 }));
+    const adapter = new CurrentSrThesesAdapter('https://regime.example.com', obs.port);
+    const result = await adapter.fetchCurrent('SOL/USDC', 'openclaw');
+    expect(result.kind).toBe('upstream-error');
+  });
+
+  it('rejects block with malformed brief summary (array)', async () => {
+    const malformed = {
+      ...SAMPLE_BLOCK,
+      brief: { ...SAMPLE_BLOCK.brief, summary: ['bad'] },
+    };
+    vi.mocked(fetch).mockResolvedValue(new Response(JSON.stringify(malformed), { status: 200 }));
+    const adapter = new CurrentSrThesesAdapter('https://regime.example.com', obs.port);
+    const result = await adapter.fetchCurrent('SOL/USDC', 'openclaw');
+    expect(result.kind).toBe('upstream-error');
+  });
+
+  it('accepts block with brief sourceRecordedAtIso as null', async () => {
+    const valid = {
+      ...SAMPLE_BLOCK,
+      brief: { ...SAMPLE_BLOCK.brief, sourceRecordedAtIso: null },
+    };
+    vi.mocked(fetch).mockResolvedValue(new Response(JSON.stringify(valid), { status: 200 }));
+    const adapter = new CurrentSrThesesAdapter('https://regime.example.com', obs.port);
+    const result = await adapter.fetchCurrent('SOL/USDC', 'openclaw');
+    expect(result.kind).toBe('block');
+    if (result.kind !== 'block') return;
+    expect(result.block.brief.sourceRecordedAtIso).toBeNull();
+  });
 });

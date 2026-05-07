@@ -111,10 +111,13 @@ function parseBlock(data: unknown): SrThesesBlock | null {
   if (!isRecord(briefRaw)) return null;
   const briefId = briefRaw['briefId'];
   if (typeof briefId !== 'string') return null;
+  const sourceRecordedAtIso = nullableString(briefRaw['sourceRecordedAtIso']);
+  const summary = nullableString(briefRaw['summary']);
+  if (sourceRecordedAtIso === undefined || summary === undefined) return null;
   const brief = {
     briefId,
-    sourceRecordedAtIso: nullableString(briefRaw['sourceRecordedAtIso']) ?? null,
-    summary: nullableString(briefRaw['summary']) ?? null,
+    sourceRecordedAtIso,
+    summary,
   };
   const thesesRaw = data['theses'];
   if (!Array.isArray(thesesRaw)) return null;
