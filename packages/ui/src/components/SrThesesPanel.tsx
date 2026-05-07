@@ -58,7 +58,7 @@ export function SrThesesPanel({ vm }: Props): JSX.Element {
       ) : null}
 
       {cardsToRender.map((card, idx) => (
-        <SrThesisCard key={`${card.sourceHandle}-${card.timestampLabel ?? idx}`} card={card} />
+        <SrThesisCard key={`thesis-${idx}`} card={card} />
       ))}
 
       {!expanded && vm.remainingCount > 0 ? (
