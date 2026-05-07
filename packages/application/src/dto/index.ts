@@ -335,3 +335,5 @@ export type {
   RegimeMetadata,
   RegimeBlock,
 } from './regime.js';
+
+export type { SrThesisDto, SrThesesBlock } from './srTheses.js';
