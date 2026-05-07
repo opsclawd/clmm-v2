@@ -90,23 +90,6 @@ function isUnavailableReason(value: unknown): value is SrThesesUnavailableReason
   );
 }
 
-async function classifyNotFound(poolId: string, response: Response): Promise<Error> {
-  let body: unknown;
-  try {
-    body = await response.json();
-  } catch {
-    return new Error('Could not load S/R theses: unexpected 404');
-  }
-  if (
-    isRecord(body) &&
-    typeof body['message'] === 'string' &&
-    body['message'].includes('not supported')
-  ) {
-    return new SrThesesUnsupportedPoolError(poolId);
-  }
-  return new Error('Could not load S/R theses: endpoint not found');
-}
-
 export async function fetchCurrentSrTheses(poolId: string): Promise<SrThesesResponse> {
   const controller = new AbortController();
   const timeoutId = setTimeout(() => controller.abort(), FETCH_TIMEOUT_MS);
@@ -118,22 +101,37 @@ export async function fetchCurrentSrTheses(poolId: string): Promise<SrThesesResp
       { signal: controller.signal },
     );
   } catch (error: unknown) {
+    clearTimeout(timeoutId);
     if (isAbortError(error)) {
       throw new Error('Could not load S/R theses: request timed out');
     }
     throw new Error(
       `Could not load S/R theses: ${error instanceof Error ? error.message : 'network error'}`,
     );
-  } finally {
-    clearTimeout(timeoutId);
   }
 
   if (response.status === 404) {
-    throw await classifyNotFound(poolId, response);
+    let body: unknown;
+    try {
+      body = await response.json();
+    } catch {
+      clearTimeout(timeoutId);
+      throw new Error('Could not load S/R theses: unexpected 404');
+    }
+    clearTimeout(timeoutId);
+    if (
+      isRecord(body) &&
+      typeof body['message'] === 'string' &&
+      body['message'].includes('not supported')
+    ) {
+      throw new SrThesesUnsupportedPoolError(poolId);
+    }
+    throw new Error('Could not load S/R theses: endpoint not found');
   }
 
   if (!response.ok) {
     const detail = await response.text().catch(() => `HTTP ${response.status}`);
+    clearTimeout(timeoutId);
     throw new Error(`Could not load S/R theses: ${detail || response.statusText}`);
   }
 
@@ -141,8 +139,10 @@ export async function fetchCurrentSrTheses(poolId: string): Promise<SrThesesResp
   try {
     body = await response.json();
   } catch {
+    clearTimeout(timeoutId);
     throw new Error('Could not load S/R theses: response body was not valid JSON');
   }
+  clearTimeout(timeoutId);
 
   if (!isRecord(body)) {
     throw new Error('Could not load S/R theses: malformed response');
