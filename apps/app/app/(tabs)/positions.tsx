@@ -6,6 +6,7 @@ import { fetchSupportedPositions } from '../../src/api/positions';
 import { fetchCurrentSrLevels, SrLevelsUnsupportedPoolError } from '../../src/api/srLevels';
 import { fetchCurrentRegime, RegimeUnsupportedPoolError } from '../../src/api/regime';
 import { fetchCurrentSrTheses, SrThesesUnsupportedPoolError } from '../../src/api/srTheses';
+import { fetchCurrentPolicyInsight } from '../../src/api/policyInsights';
 import { walletSessionStore } from '../../src/state/walletSessionStore';
 import type { PositionListItemViewModel } from '@clmm/ui';
 import { navigateRoute } from '../../src/platform/webNavigation';
@@ -13,6 +14,8 @@ import { navigateRoute } from '../../src/platform/webNavigation';
 const SR_LEVELS_STALE_TIME_MS = 5 * 60 * 1000;
 const REGIME_STALE_TIME_MS = 5 * 60 * 1000;
 const SR_THESES_STALE_TIME_MS = 5 * 60 * 1000;
+const POLICY_INSIGHTS_STALE_TIME_MS = 5 * 60 * 1000;
+const SOL_USDC_SUPPORTED_POOL_ID = 'Czfq3xZZDmsdGdUyrNLtRhGc47cXcZtLG4crryfu44zE';
 
 function deriveUniquePool(positions: { poolId: string; tokenPairLabel: string }[] | undefined): {
   poolId: string | null;
@@ -51,6 +54,9 @@ export default function PositionsRoute() {
 
   const { poolId, poolLabel, isMixedPools } = deriveUniquePool(positions);
 
+  const policyInsightsEnabled =
+    hasLoadedPositions && !isMixedPools && poolId === SOL_USDC_SUPPORTED_POOL_ID;
+
   const srLevelsQuery = useQuery({
     queryKey: ['sr-levels-current', poolId],
     queryFn: () => fetchCurrentSrLevels(poolId!),
@@ -84,6 +90,17 @@ export default function PositionsRoute() {
     refetchOnMount: true,
     retry: (failureCount, error) =>
       !(error instanceof SrThesesUnsupportedPoolError) && failureCount < 1,
+    retryDelay: 1000,
+  });
+
+  const policyInsightsQuery = useQuery({
+    queryKey: ['policy-insights-current', 'SOL/USDC'],
+    queryFn: fetchCurrentPolicyInsight,
+    enabled: policyInsightsEnabled,
+    staleTime: POLICY_INSIGHTS_STALE_TIME_MS,
+    refetchOnWindowFocus: false,
+    refetchOnMount: true,
+    retry: (failureCount: number) => failureCount < 1,
     retryDelay: 1000,
   });
 
@@ -122,6 +139,13 @@ export default function PositionsRoute() {
       srThesesError={srThesesError}
       srThesesUnsupported={srThesesUnsupported}
       srThesesUnavailableReason={srThesesQuery.data?.unavailableReason ?? null}
+      policyInsight={policyInsightsQuery.data?.policyInsight}
+      policyInsightsLoading={
+        policyInsightsQuery.isLoading && policyInsightsQuery.fetchStatus !== 'idle'
+      }
+      policyInsightsError={policyInsightsQuery.isError}
+      policyInsightsEnabled={policyInsightsEnabled}
+      policyInsightsUnavailableReason={policyInsightsQuery.data?.unavailableReason ?? null}
       isMixedPools={isMixedPools}
       poolLabel={poolLabel}
       onConnectWallet={() =>
