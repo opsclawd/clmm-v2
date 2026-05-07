@@ -1,5 +1,5 @@
 ---
-title: "S/R Levels Card Redesign v2: Grouped View-Models, Note Parsing, and Component Extraction"
+title: 'S/R Levels Card Redesign v2: Grouped View-Models, Note Parsing, and Component Extraction'
 date: 2026-04-27
 category: design-patterns
 module: packages/ui
@@ -7,11 +7,11 @@ problem_type: best_practice
 component: development_workflow
 severity: low
 applies_when:
-  - "Redesigning a screen section with complex presentation logic"
-  - "A screen component grows beyond ~30 lines for a single subsection"
-  - "View-model data shape does not match the desired UI layout"
-  - "Presentation logic (sorting, tone computation, note formatting) is mixed with rendering"
-  - "Free-text backend data contains structured metadata that the UI needs to display explicitly"
+  - 'Redesigning a screen section with complex presentation logic'
+  - 'A screen component grows beyond ~30 lines for a single subsection'
+  - 'View-model data shape does not match the desired UI layout'
+  - 'Presentation logic (sorting, tone computation, note formatting) is mixed with rendering'
+  - 'Free-text backend data contains structured metadata that the UI needs to display explicitly'
 tags:
   - ui-redesign
   - view-model
@@ -39,6 +39,8 @@ The S/R (Support & Resistance) levels section evolved from a simple flat list (v
 
 **Where this pattern lives now:** S/R was extracted from the position-detail endpoint into a pool-scoped BFF endpoint (see [S/R position-to-pool extraction](../best-practices/sr-levels-position-to-pool-extraction-2026-04-27.md)). The view-model logic moved from `PositionDetailViewModel` into its own `SrLevelsViewModel` module, and the UI moved from `PositionDetailScreen` to `MarketContextPanel` on the Positions list page. The design patterns below are still valid — only the file locations and screen context have changed.
 
+**Superseded by v2:** The v2 S/R theses path (`SrThesesBlock`) provides structured fields (bias, setupType, trigger, invalidation, entryZone, targets, sourceHandle, sourceReliability) directly in the DTO, making the `parseNotes()` approach unnecessary for v2 data. The v2 thesis data is rendered by `SrThesesPanel` > `SrThesisCard` components, while v1 chart-level data continues to use `parseNotes()` in `SrLevelsCard`. See [Parallel v2 read path alongside v1](../best-practices/parallel-v2-read-path-alongside-v1-2026-05-07.md) for the v2 architecture.
+
 ## Guidance
 
 ### 1. Parse Unstructured Notes into Structured View-Model Fields
@@ -58,7 +60,10 @@ function parseNotes(notes: string | undefined): {
   remaining: string;
 } {
   if (!notes) return { remaining: '' };
-  const parts = notes.split('|').map((s) => s.trim()).filter(Boolean);
+  const parts = notes
+    .split('|')
+    .map((s) => s.trim())
+    .filter(Boolean);
   // ... parse source, timeframe, bias, setupType from first section
   // ... parse trigger and invalidation from remaining sections
   return { source, timeframe, bias, setupType, trigger, invalidation, remaining };
@@ -134,7 +139,7 @@ type Props = {
 export function MarketContextPanel({ srLevels, isLoading, isError, isUnsupported, now }: Props) {
   const showUnavailable = isError || isUnsupported || srLevels === null;
   if (showUnavailable && srLevels == null) return <UnavailableCaption />;
-  if (!isLoading && srLevels === undefined) return null;  // not yet fetched
+  if (!isLoading && srLevels === undefined) return null; // not yet fetched
   if (isLoading && srLevels == null) return <Skeleton />;
   const vm = buildSrLevelsViewModelBlock(srLevels, now);
   return (
@@ -172,7 +177,7 @@ const srLevelsQuery = useQuery({
   srLevelsLoading={srLevelsQuery.isLoading && srLevelsQuery.fetchStatus !== 'idle'}
   srLevelsError={srLevelsError}
   srLevelsUnsupported={srLevelsUnsupported}
-/>
+/>;
 ```
 
 ## Why This Matters
