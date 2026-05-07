@@ -25,6 +25,15 @@ export type {
   RegimeFreshness,
   RegimeClmmSuitability,
   RegimeMetadata,
+  PolicyInsightBlock,
+  PolicyInsightClmmPolicy,
+  PolicyInsightLevels,
+  PolicyInsightFreshness,
+  PolicyInsightRecommendedAction,
+  PolicyInsightConfidence,
+  PolicyInsightRiskLevel,
+  PolicyInsightDataQuality,
+  PolicyInsightStatus,
 } from '../dto/index.js';
 
 // Port types needed by UI (capability + permission state)
