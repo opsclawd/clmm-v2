@@ -328,4 +328,29 @@ describe('CurrentSrThesesAdapter', () => {
     expect(t.sourceUrl).toBeNull();
     expect(t.notes).toBeNull();
   });
+
+  it('rejects thesis with non-string nullable field (bias=123)', async () => {
+    const malformed = {
+      ...SAMPLE_BLOCK,
+      theses: [{ ...SAMPLE_THESIS, bias: 123 }],
+    };
+    vi.mocked(fetch).mockResolvedValue(new Response(JSON.stringify(malformed), { status: 200 }));
+    const adapter = new CurrentSrThesesAdapter('https://regime.example.com', obs.port);
+    const result = await adapter.fetchCurrent('SOL/USDC', 'openclaw');
+    expect(result.kind).toBe('upstream-error');
+  });
+
+  it('rejects thesis with missing nullable field that should be null (bias absent)', async () => {
+    const { bias: _bias, ...thesisWithoutBias } = SAMPLE_THESIS;
+    const missing = {
+      ...SAMPLE_BLOCK,
+      theses: [thesisWithoutBias],
+    };
+    vi.mocked(fetch).mockResolvedValue(new Response(JSON.stringify(missing), { status: 200 }));
+    const adapter = new CurrentSrThesesAdapter('https://regime.example.com', obs.port);
+    const result = await adapter.fetchCurrent('SOL/USDC', 'openclaw');
+    expect(result.kind).toBe('block');
+    if (result.kind !== 'block') return;
+    expect(result.block.theses[0]!.bias).toBeNull();
+  });
 });

@@ -13,10 +13,10 @@ function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null && !Array.isArray(value);
 }
 
-function nullableString(value: unknown): string | null {
+function nullableString(value: unknown): string | null | undefined {
   if (value == null) return null;
   if (typeof value === 'string') return value;
-  return null;
+  return undefined;
 }
 
 function stringArray(value: unknown): string[] | null {
@@ -43,27 +43,56 @@ function parseThesis(raw: unknown): SrThesisDto | null {
   const resistanceLevels = stringArray(raw['resistanceLevels']);
   const targets = stringArray(raw['targets']);
   if (!supportLevels || !resistanceLevels || !targets) return null;
+  const bias = nullableString(raw['bias']);
+  const setupType = nullableString(raw['setupType']);
+  const entryZone = nullableString(raw['entryZone']);
+  const invalidation = nullableString(raw['invalidation']);
+  const trigger = nullableString(raw['trigger']);
+  const chartReference = nullableString(raw['chartReference']);
+  const sourceChannel = nullableString(raw['sourceChannel']);
+  const sourceReliability = nullableString(raw['sourceReliability']);
+  const rawThesisText = nullableString(raw['rawThesisText']);
+  const collectedAt = nullableString(raw['collectedAt']);
+  const publishedAt = nullableString(raw['publishedAt']);
+  const sourceUrl = nullableString(raw['sourceUrl']);
+  const notes = nullableString(raw['notes']);
+  if (
+    bias === undefined ||
+    setupType === undefined ||
+    entryZone === undefined ||
+    invalidation === undefined ||
+    trigger === undefined ||
+    chartReference === undefined ||
+    sourceChannel === undefined ||
+    sourceReliability === undefined ||
+    rawThesisText === undefined ||
+    collectedAt === undefined ||
+    publishedAt === undefined ||
+    sourceUrl === undefined ||
+    notes === undefined
+  )
+    return null;
   return {
     asset,
     timeframe,
-    bias: nullableString(raw['bias']),
-    setupType: nullableString(raw['setupType']),
+    bias,
+    setupType,
     supportLevels,
     resistanceLevels,
-    entryZone: nullableString(raw['entryZone']),
+    entryZone,
     targets,
-    invalidation: nullableString(raw['invalidation']),
-    trigger: nullableString(raw['trigger']),
-    chartReference: nullableString(raw['chartReference']),
+    invalidation,
+    trigger,
+    chartReference,
     sourceHandle,
-    sourceChannel: nullableString(raw['sourceChannel']),
+    sourceChannel,
     sourceKind,
-    sourceReliability: nullableString(raw['sourceReliability']),
-    rawThesisText: nullableString(raw['rawThesisText']),
-    collectedAt: nullableString(raw['collectedAt']),
-    publishedAt: nullableString(raw['publishedAt']),
-    sourceUrl: nullableString(raw['sourceUrl']),
-    notes: nullableString(raw['notes']),
+    sourceReliability,
+    rawThesisText,
+    collectedAt,
+    publishedAt,
+    sourceUrl,
+    notes,
   };
 }
 
@@ -84,8 +113,8 @@ function parseBlock(data: unknown): SrThesesBlock | null {
   if (typeof briefId !== 'string') return null;
   const brief = {
     briefId,
-    sourceRecordedAtIso: nullableString(briefRaw['sourceRecordedAtIso']),
-    summary: nullableString(briefRaw['summary']),
+    sourceRecordedAtIso: nullableString(briefRaw['sourceRecordedAtIso']) ?? null,
+    summary: nullableString(briefRaw['summary']) ?? null,
   };
   const thesesRaw = data['theses'];
   if (!Array.isArray(thesesRaw)) return null;
@@ -173,9 +202,8 @@ export class CurrentSrThesesAdapter implements SrThesesReadPort {
     } catch (error: unknown) {
       const message = error instanceof Error ? error.message : String(error);
       this.observability.log('warn', 'SR theses fetch network error', { message });
-      return { kind: 'retryable', reason: 'network' };
-    } finally {
       clearTimeout(timeout);
+      return { kind: 'retryable', reason: 'network' };
     }
 
     if (response.status === 200) {
@@ -183,9 +211,11 @@ export class CurrentSrThesesAdapter implements SrThesesReadPort {
       try {
         body = await response.json();
       } catch {
+        clearTimeout(timeout);
         this.observability.log('warn', 'SR theses response was not valid JSON');
         return { kind: 'retryable', reason: 'invalid-json' };
       }
+      clearTimeout(timeout);
       const block = parseBlock(body);
       if (!block) {
         this.observability.log('warn', 'SR theses response failed shape validation');
@@ -196,6 +226,8 @@ export class CurrentSrThesesAdapter implements SrThesesReadPort {
       }
       return { kind: 'block', block };
     }
+
+    clearTimeout(timeout);
 
     if (response.status === 404) {
       return { kind: 'not-found' };
