@@ -337,3 +337,15 @@ export type {
 } from './regime.js';
 
 export type { SrThesisDto, SrThesesBlock } from './srTheses.js';
+
+export type {
+  PolicyInsightBlock,
+  PolicyInsightClmmPolicy,
+  PolicyInsightLevels,
+  PolicyInsightFreshness,
+  PolicyInsightRecommendedAction,
+  PolicyInsightConfidence,
+  PolicyInsightRiskLevel,
+  PolicyInsightDataQuality,
+  PolicyInsightStatus,
+} from './policyInsights.js';
