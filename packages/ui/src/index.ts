@@ -76,6 +76,13 @@ export type {
   WalletSettingsViewModel,
 } from './view-models/WalletConnectionViewModel.js';
 export { buildRegimeViewModelBlock } from './view-models/RegimeViewModel.js';
+export { buildSrThesesViewModel } from './view-models/SrThesesViewModel.js';
+export type {
+  SrThesesViewModel,
+  SrThesisCardViewModel,
+  SrThesisOverlayModel,
+  SrThesisBiasTone,
+} from './view-models/SrThesesViewModel.js';
 
 // Presenters
 export { presentPositionDetail } from './presenters/PositionDetailPresenter.js';
