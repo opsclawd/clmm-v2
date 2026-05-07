@@ -26,6 +26,8 @@ import { TelemetryAdapter } from '../../outbound/observability/TelemetryAdapter.
 import { RegimeEngineExecutionEventAdapter } from '../../outbound/regime-engine/RegimeEngineExecutionEventAdapter.js';
 import { CurrentSrLevelsAdapter } from '../../outbound/regime-engine/CurrentSrLevelsAdapter.js';
 import { CurrentRegimeAdapter } from '../../outbound/regime-engine/CurrentRegimeAdapter.js';
+import { CurrentSrThesesAdapter } from '../../outbound/regime-engine/CurrentSrThesesAdapter.js';
+import { SrThesesController } from './SrThesesController.js';
 import { JupiterPriceAdapter } from '../../outbound/price/JupiterPriceAdapter.js';
 // InsightsApiKeyGuard is used via @UseGuards on InsightsDataController and
 // registered as a provider here for NestJS DI to resolve its dependencies.
@@ -61,6 +63,8 @@ import {
   DB,
   REGIME_READ_PORT,
   REGIME_POOL_ALLOWLIST,
+  SR_THESES_READ_PORT,
+  SR_THESES_POOL_ALLOWLIST,
 } from './tokens.js';
 
 // boundary: process.env values are untyped at runtime; validated via env schema at deploy
@@ -111,6 +115,7 @@ const regimeEngineEventAdapter: RegimeEngineEventPort = new RegimeEngineExecutio
 );
 const currentSrLevelsAdapter = new CurrentSrLevelsAdapter(regimeEngineBaseUrl, telemetry);
 const currentRegimeAdapter = new CurrentRegimeAdapter(regimeEngineBaseUrl, telemetry);
+const currentSrThesesAdapter = new CurrentSrThesesAdapter(regimeEngineBaseUrl, telemetry);
 const jupiterPrice = new JupiterPriceAdapter();
 const reconciliationJobPort = {
   async enqueue(attemptId: string): Promise<void> {
@@ -126,12 +131,17 @@ export const REGIME_POOL_ALLOWLIST_MAP = new Map<string, RegimePoolEntry>([
   ['Czfq3xZZDmsdGdUyrNLtRhGc47cXcZtLG4crryfu44zE', { symbol: 'SOL/USDC' }],
 ]);
 
+export const SR_THESES_POOL_ALLOWLIST_MAP = new Map<string, { symbol: string; source: string }>([
+  ['Czfq3xZZDmsdGdUyrNLtRhGc47cXcZtLG4crryfu44zE', { symbol: 'SOL/USDC', source: 'openclaw' }],
+]);
+
 @Module({
   controllers: [
     HealthController,
     PositionController,
     SrLevelsController,
     RegimeController,
+    SrThesesController,
     InsightsDataController,
     AlertController,
     PreviewController,
@@ -157,6 +167,8 @@ export const REGIME_POOL_ALLOWLIST_MAP = new Map<string, RegimePoolEntry>([
     { provide: SR_LEVELS_READ_PORT, useValue: currentSrLevelsAdapter },
     { provide: REGIME_READ_PORT, useValue: currentRegimeAdapter },
     { provide: REGIME_POOL_ALLOWLIST, useValue: REGIME_POOL_ALLOWLIST_MAP },
+    { provide: SR_THESES_READ_PORT, useValue: currentSrThesesAdapter },
+    { provide: SR_THESES_POOL_ALLOWLIST, useValue: SR_THESES_POOL_ALLOWLIST_MAP },
     { provide: OBSERVABILITY_PORT, useValue: telemetry },
     { provide: PG_BOSS_INSTANCE, useValue: boss },
     { provide: RECONCILIATION_JOB_PORT, useValue: reconciliationJobPort },
