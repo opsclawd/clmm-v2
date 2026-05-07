@@ -5,12 +5,14 @@ import { useStore } from 'zustand';
 import { fetchSupportedPositions } from '../../src/api/positions';
 import { fetchCurrentSrLevels, SrLevelsUnsupportedPoolError } from '../../src/api/srLevels';
 import { fetchCurrentRegime, RegimeUnsupportedPoolError } from '../../src/api/regime';
+import { fetchCurrentSrTheses, SrThesesUnsupportedPoolError } from '../../src/api/srTheses';
 import { walletSessionStore } from '../../src/state/walletSessionStore';
 import type { PositionListItemViewModel } from '@clmm/ui';
 import { navigateRoute } from '../../src/platform/webNavigation';
 
 const SR_LEVELS_STALE_TIME_MS = 5 * 60 * 1000;
 const REGIME_STALE_TIME_MS = 5 * 60 * 1000;
+const SR_THESES_STALE_TIME_MS = 5 * 60 * 1000;
 
 function deriveUniquePool(positions: { poolId: string; tokenPairLabel: string }[] | undefined): {
   poolId: string | null;
@@ -73,11 +75,26 @@ export default function PositionsRoute() {
     retryDelay: 1000,
   });
 
+  const srThesesQuery = useQuery({
+    queryKey: ['sr-theses-current', poolId],
+    queryFn: () => fetchCurrentSrTheses(poolId!),
+    enabled: poolId != null,
+    staleTime: SR_THESES_STALE_TIME_MS,
+    refetchOnWindowFocus: false,
+    refetchOnMount: true,
+    retry: (failureCount, error) =>
+      !(error instanceof SrThesesUnsupportedPoolError) && failureCount < 1,
+    retryDelay: 1000,
+  });
+
   const srLevelsUnsupported = srLevelsQuery.error instanceof SrLevelsUnsupportedPoolError;
   const srLevelsError = srLevelsQuery.isError && !srLevelsUnsupported;
 
   const regimeUnsupported = regimeQuery.error instanceof RegimeUnsupportedPoolError;
   const regimeError = regimeQuery.isError && !regimeUnsupported;
+
+  const srThesesUnsupported = srThesesQuery.error instanceof SrThesesUnsupportedPoolError;
+  const srThesesError = srThesesQuery.isError && !srThesesUnsupported;
 
   return (
     <PositionsListScreen
@@ -100,6 +117,11 @@ export default function PositionsRoute() {
       regimeError={regimeError}
       regimeUnsupported={regimeUnsupported}
       regimeUnavailableReason={regimeQuery.data?.unavailableReason ?? null}
+      srTheses={srThesesQuery.data?.srTheses}
+      srThesesLoading={srThesesQuery.isLoading && srThesesQuery.fetchStatus !== 'idle'}
+      srThesesError={srThesesError}
+      srThesesUnsupported={srThesesUnsupported}
+      srThesesUnavailableReason={srThesesQuery.data?.unavailableReason ?? null}
       isMixedPools={isMixedPools}
       poolLabel={poolLabel}
       onConnectWallet={() =>
