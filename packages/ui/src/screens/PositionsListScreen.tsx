@@ -1,5 +1,10 @@
 import { View, Text, FlatList, ActivityIndicator } from 'react-native';
-import type { PositionSummaryDto, SrLevelsBlock, RegimeBlock } from '@clmm/application/public';
+import type {
+  PositionSummaryDto,
+  SrLevelsBlock,
+  SrThesesBlock,
+  RegimeBlock,
+} from '@clmm/application/public';
 import { colors, typography } from '../design-system/index.js';
 import { buildPositionListViewModel } from '../view-models/PositionListViewModel.js';
 import { DegradedCapabilityBanner } from '../components/DegradedCapabilityBanner.js';
@@ -27,6 +32,11 @@ type Props = {
   isMixedPools?: boolean | undefined;
   poolLabel?: string | null | undefined;
   now?: number | undefined;
+  srTheses?: SrThesesBlock | null | undefined;
+  srThesesLoading?: boolean | undefined;
+  srThesesError?: boolean | undefined;
+  srThesesUnsupported?: boolean | undefined;
+  srThesesUnavailableReason?: 'not-found' | 'config-error' | 'upstream-error' | null | undefined;
   regime?: RegimeBlock | null | undefined;
   regimeLoading?: boolean | undefined;
   regimeError?: boolean | undefined;
@@ -47,6 +57,11 @@ export function PositionsListScreen({
   srLevelsLoading,
   srLevelsError,
   srLevelsUnsupported,
+  srTheses,
+  srThesesLoading,
+  srThesesError,
+  srThesesUnsupported,
+  srThesesUnavailableReason,
   isMixedPools,
   poolLabel,
   now,
@@ -78,6 +93,11 @@ export function PositionsListScreen({
           srLevelsLoading={srLevelsLoading}
           srLevelsError={srLevelsError}
           srLevelsUnsupported={srLevelsUnsupported}
+          srTheses={srTheses}
+          srThesesLoading={srThesesLoading}
+          srThesesError={srThesesError}
+          srThesesUnsupported={srThesesUnsupported}
+          srThesesUnavailableReason={srThesesUnavailableReason}
           isMixedPools={isMixedPools ?? false}
           poolLabel={poolLabel ?? null}
           now={now}
@@ -211,6 +231,11 @@ function ConnectedPositionsList({
   srLevelsLoading,
   srLevelsError,
   srLevelsUnsupported,
+  srTheses,
+  srThesesLoading,
+  srThesesError,
+  srThesesUnsupported,
+  srThesesUnavailableReason,
   isMixedPools,
   poolLabel,
   now,
@@ -226,6 +251,11 @@ function ConnectedPositionsList({
   srLevelsLoading?: boolean | undefined;
   srLevelsError?: boolean | undefined;
   srLevelsUnsupported?: boolean | undefined;
+  srTheses?: SrThesesBlock | null | undefined;
+  srThesesLoading?: boolean | undefined;
+  srThesesError?: boolean | undefined;
+  srThesesUnsupported?: boolean | undefined;
+  srThesesUnavailableReason?: 'not-found' | 'config-error' | 'upstream-error' | null | undefined;
   isMixedPools: boolean;
   poolLabel: string | null;
   now?: number | undefined;
@@ -259,6 +289,11 @@ function ConnectedPositionsList({
             isMixedPools={isMixedPools}
             poolLabel={poolLabel}
             now={now ?? Date.now()}
+            srTheses={srTheses}
+            srThesesLoading={srThesesLoading ?? false}
+            srThesesError={srThesesError ?? false}
+            srThesesUnsupported={srThesesUnsupported ?? false}
+            srThesesUnavailableReason={srThesesUnavailableReason ?? null}
           />
           <RegimeSection
             regime={regime}

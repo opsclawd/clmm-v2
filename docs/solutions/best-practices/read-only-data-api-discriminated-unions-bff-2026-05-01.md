@@ -1,5 +1,5 @@
 ---
-title: "Read-only data API with discriminated unions in a clean-architecture BFF"
+title: 'Read-only data API with discriminated unions in a clean-architecture BFF'
 date: 2026-05-01
 category: best-practices
 module: packages/application, packages/adapters
@@ -7,16 +7,18 @@ problem_type: best_practice
 component: service_object
 severity: medium
 applies_when:
-  - "Building read-only data API endpoints that compose multiple data sources with partial-failure semantics"
-  - "Mapping application-layer discriminated unions to HTTP status codes in a controller"
-  - "Structurally duplicating types across package boundaries to preserve dependency direction"
-  - "Designing enrichment composition where non-critical data fails safely without blocking the primary response"
-  - "Adding configurable cache TTLs or timeouts via environment variables with safe parsers"
-  - "Validating service configuration at boot time rather than at request time"
+  - 'Building read-only data API endpoints that compose multiple data sources with partial-failure semantics'
+  - 'Mapping application-layer discriminated unions to HTTP status codes in a controller'
+  - 'Structurally duplicating types across package boundaries to preserve dependency direction'
+  - 'Designing enrichment composition where non-critical data fails safely without blocking the primary response'
+  - 'Adding configurable cache TTLs or timeouts via environment variables with safe parsers'
+  - 'Validating service configuration at boot time rather than at request time'
 related_components:
   - packages/application/src/use-cases/insights
   - packages/adapters/src/inbound/http/InsightsDataController.ts
   - packages/adapters/src/outbound/regime-engine/CurrentSrLevelsAdapter.ts
+  - packages/adapters/src/outbound/regime-engine/CurrentSrThesesAdapter.ts
+  - packages/adapters/src/inbound/http/SrThesesController.ts
 tags:
   - discriminated-union
   - clean-architecture
@@ -68,7 +70,9 @@ export class InsightsDataController {
   @Get('positions/:walletId')
   async getPositions(@Param('walletId') walletIdRaw: string) {
     this.validateWalletId(walletIdRaw);
-    const result = await getSolUsdcInsightPositions({ /* ... */ });
+    const result = await getSolUsdcInsightPositions({
+      /* ... */
+    });
     if (result.kind === 'pool-unavailable') {
       throw this.poolUnavailable();
     }
@@ -84,7 +88,11 @@ export class InsightsDataController {
   private validateWalletId(walletId: string): void {
     if (!InsightsDataController.BASE58_REGEX.test(walletId)) {
       throw new HttpException(
-        { code: 'invalid_wallet_id', message: 'walletId must be a valid Solana base58 address.', retryable: false },
+        {
+          code: 'invalid_wallet_id',
+          message: 'walletId must be a valid Solana base58 address.',
+          retryable: false,
+        },
         HttpStatus.BAD_REQUEST,
       );
     }
@@ -114,7 +122,9 @@ export interface CurrentSrLevelsPort {
 }
 
 export class CurrentSrLevelsAdapter implements CurrentSrLevelsPort, SrLevelsReadPort {
-  async fetchCurrent(symbol: string, source: string): Promise<SrLevelsBlock | null> { /* ... */ }
+  async fetchCurrent(symbol: string, source: string): Promise<SrLevelsBlock | null> {
+    /* ... */
+  }
 }
 ```
 
@@ -175,7 +185,7 @@ return {
     source: 'orca',
     observedAtUnixMs,
     pool: poolResult.pool,
-    srLevels,  // null on failure — never a primary failure
+    srLevels, // null on failure — never a primary failure
     positions: triggerEnrichment.insights,
     alerts: triggerEnrichment.filteredTriggers,
     dataQuality: { partial: warnings.length > 0, warnings },
@@ -194,7 +204,9 @@ Trigger enrichment applies a two-step filter: first fetch all triggers, then kee
 // The directional invariant (LowerBoundBreach -> SOL->USDC, UpperBoundBreach -> USDC->SOL)
 // lives only in DirectionalExitPolicyService. This function projects the discriminated-union
 // kind to the external string literal — it does NOT re-derive direction.
-export function toExternalBreachDirection(breachDirection: BreachDirection): ExternalBreachDirection {
+export function toExternalBreachDirection(
+  breachDirection: BreachDirection,
+): ExternalBreachDirection {
   return breachDirection.kind;
 }
 ```
@@ -233,7 +245,12 @@ Every invalid input — undefined, empty, zero, negative, NaN, non-numeric — f
 const poolDataCacheTtlMs = parsePoolDataCacheTtlMs(
   (process.env as Record<string, string | undefined>)['CLMM_POOL_DATA_CACHE_TTL_MS'],
 );
-const orcaPositionRead = new OrcaPositionReadAdapter(rpcUrl, snapshotReader, db, poolDataCacheTtlMs);
+const orcaPositionRead = new OrcaPositionReadAdapter(
+  rpcUrl,
+  snapshotReader,
+  db,
+  poolDataCacheTtlMs,
+);
 ```
 
 ### 8. Validate configuration at construction time, not request time
@@ -279,8 +296,11 @@ export type InsightDataQualityDto = {
 };
 
 export type InsightDataWarning = {
-  code: 'sr_levels_unavailable' | 'actionable_triggers_unavailable'
-     | 'fee_reward_usd_unavailable' | 'price_distance_unavailable';
+  code:
+    | 'sr_levels_unavailable'
+    | 'actionable_triggers_unavailable'
+    | 'fee_reward_usd_unavailable'
+    | 'price_distance_unavailable';
   message: string;
   scope?: { poolId?: string; positionId?: string };
 };
@@ -338,7 +358,14 @@ export class InsightsDataController {
   @Get('positions/:walletId')
   async getPositions(@Param('walletId') walletIdRaw: string) {
     this.validateWalletId(walletIdRaw);
-    const result = await getSolUsdcInsightPositions({ walletId, poolId, positionReadPort, triggerRepo, pricePort, now });
+    const result = await getSolUsdcInsightPositions({
+      walletId,
+      poolId,
+      positionReadPort,
+      triggerRepo,
+      pricePort,
+      now,
+    });
     if (result.kind === 'pool-unavailable') {
       throw this.poolUnavailable();
     }
@@ -354,7 +381,11 @@ export class InsightsDataController {
   private validateWalletId(walletId: string): void {
     if (!InsightsDataController.BASE58_REGEX.test(walletId)) {
       throw new HttpException(
-        { code: 'invalid_wallet_id', message: 'walletId must be a valid Solana base58 address.', retryable: false },
+        {
+          code: 'invalid_wallet_id',
+          message: 'walletId must be a valid Solana base58 address.',
+          retryable: false,
+        },
         HttpStatus.BAD_REQUEST,
       );
     }
@@ -425,7 +456,12 @@ export function parsePoolDataCacheTtlMs(raw: string | undefined): number {
 const poolDataCacheTtlMs = parsePoolDataCacheTtlMs(
   (process.env as Record<string, string | undefined>)['CLMM_POOL_DATA_CACHE_TTL_MS'],
 );
-const orcaPositionRead = new OrcaPositionReadAdapter(rpcUrl, snapshotReader, db, poolDataCacheTtlMs);
+const orcaPositionRead = new OrcaPositionReadAdapter(
+  rpcUrl,
+  snapshotReader,
+  db,
+  poolDataCacheTtlMs,
+);
 ```
 
 Test cases cover all edge cases:
@@ -449,7 +485,8 @@ export class InsightsDataController {
   private readonly srLevelsLookup: { symbol: string; source: string };
 
   constructor(
-    @Inject(SUPPORTED_POSITION_READ_PORT) private readonly positionReadPort: SupportedPositionReadPort,
+    @Inject(SUPPORTED_POSITION_READ_PORT)
+    private readonly positionReadPort: SupportedPositionReadPort,
     @Inject(TRIGGER_REPOSITORY) private readonly triggerRepo: TriggerRepository,
     @Inject(PRICE_PORT) private readonly pricePort: PricePort,
     @Inject(SR_LEVELS_READ_PORT) private readonly srLevelsReadPort: SrLevelsReadPort,

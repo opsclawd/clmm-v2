@@ -17,6 +17,8 @@ export type {
   EntryContextDto,
   SrLevel,
   SrLevelsBlock,
+  SrThesisDto,
+  SrThesesBlock,
   RegimeBlock,
   RegimeReason,
   RegimeReasonSeverity,
