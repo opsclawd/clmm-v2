@@ -20,6 +20,15 @@ type Props = {
   card: SrThesisCardViewModel;
 };
 
+function isSafeUrl(url: string): boolean {
+  try {
+    const parsed = new URL(url);
+    return parsed.protocol === 'http:' || parsed.protocol === 'https:';
+  } catch {
+    return false;
+  }
+}
+
 export function SrThesisCard({ card }: Props): JSX.Element {
   const [rawExpanded, setRawExpanded] = useState(false);
   const biasColor = toneColor(card.biasTone);
@@ -113,7 +122,7 @@ export function SrThesisCard({ card }: Props): JSX.Element {
             {card.timestampLabel}
           </Text>
         ) : null}
-        {card.sourceUrl ? (
+        {card.sourceUrl && isSafeUrl(card.sourceUrl) ? (
           <Pressable
             accessibilityRole="link"
             onPress={() => {

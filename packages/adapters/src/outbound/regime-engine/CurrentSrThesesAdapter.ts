@@ -7,7 +7,7 @@ import type {
 } from '@clmm/application';
 
 const FETCH_TIMEOUT_MS = 2000;
-const RETRY_DELAY_MS = 200;
+const RETRY_DELAY_MS = 1000;
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null && !Array.isArray(value);
@@ -77,7 +77,7 @@ function parseBlock(data: unknown): SrThesesBlock | null {
   if (typeof symbol !== 'string') return null;
   if (typeof capturedAtIso !== 'string') return null;
   const capturedAtUnixMs = Date.parse(capturedAtIso);
-  if (!Number.isFinite(capturedAtUnixMs)) return null;
+  if (!Number.isFinite(capturedAtUnixMs) || capturedAtUnixMs <= 0) return null;
   const briefRaw = data['brief'];
   if (!isRecord(briefRaw)) return null;
   const briefId = briefRaw['briefId'];
@@ -206,7 +206,12 @@ export class CurrentSrThesesAdapter implements SrThesesReadPort {
       return { kind: 'config-error' };
     }
 
-    if (response.status === 503 || response.status >= 500) {
+    if (
+      response.status === 429 ||
+      response.status === 408 ||
+      response.status === 503 ||
+      response.status >= 500
+    ) {
       this.observability.log('warn', 'SR theses upstream non-2xx (retryable)', {
         status: response.status,
       });

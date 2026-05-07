@@ -232,6 +232,54 @@ describe('CurrentSrThesesAdapter', () => {
     expect(result.block.theses[0]!.sourceReliability).toBe('tier-experimental-2026');
   });
 
+  it('returns kind:"upstream-fatal" on 401 without retry', async () => {
+    vi.mocked(fetch).mockResolvedValue(new Response(null, { status: 401 }));
+    const adapter = new CurrentSrThesesAdapter('https://regime.example.com', obs.port);
+    const result = await adapter.fetchCurrent('SOL/USDC', 'openclaw');
+    expect(result.kind).toBe('upstream-error');
+    expect(fetch).toHaveBeenCalledTimes(1);
+  });
+
+  it('returns kind:"upstream-fatal" on 403 without retry', async () => {
+    vi.mocked(fetch).mockResolvedValue(new Response(null, { status: 403 }));
+    const adapter = new CurrentSrThesesAdapter('https://regime.example.com', obs.port);
+    const result = await adapter.fetchCurrent('SOL/USDC', 'openclaw');
+    expect(result.kind).toBe('upstream-error');
+    expect(fetch).toHaveBeenCalledTimes(1);
+  });
+
+  it('returns kind:"upstream-fatal" on 405 without retry', async () => {
+    vi.mocked(fetch).mockResolvedValue(new Response(null, { status: 405 }));
+    const adapter = new CurrentSrThesesAdapter('https://regime.example.com', obs.port);
+    const result = await adapter.fetchCurrent('SOL/USDC', 'openclaw');
+    expect(result.kind).toBe('upstream-error');
+    expect(fetch).toHaveBeenCalledTimes(1);
+  });
+
+  it('retries once on 429 Too Many Requests', async () => {
+    vi.mocked(fetch).mockResolvedValue(new Response(null, { status: 429 }));
+    const adapter = new CurrentSrThesesAdapter('https://regime.example.com', obs.port);
+    const result = await adapter.fetchCurrent('SOL/USDC', 'openclaw');
+    expect(result.kind).toBe('upstream-error');
+    expect(fetch).toHaveBeenCalledTimes(2);
+  });
+
+  it('retries once on 408 Request Timeout', async () => {
+    vi.mocked(fetch).mockResolvedValue(new Response(null, { status: 408 }));
+    const adapter = new CurrentSrThesesAdapter('https://regime.example.com', obs.port);
+    const result = await adapter.fetchCurrent('SOL/USDC', 'openclaw');
+    expect(result.kind).toBe('upstream-error');
+    expect(fetch).toHaveBeenCalledTimes(2);
+  });
+
+  it('rejects capturedAtIso that parses to unix epoch 0', async () => {
+    const epochZero = { ...SAMPLE_BLOCK, capturedAtIso: '1970-01-01T00:00:00.000Z' };
+    vi.mocked(fetch).mockResolvedValue(new Response(JSON.stringify(epochZero), { status: 200 }));
+    const adapter = new CurrentSrThesesAdapter('https://regime.example.com', obs.port);
+    const result = await adapter.fetchCurrent('SOL/USDC', 'openclaw');
+    expect(result.kind).toBe('upstream-error');
+  });
+
   it('preserves nullable fields as null (not stripped)', async () => {
     const allNulls = {
       ...SAMPLE_BLOCK,

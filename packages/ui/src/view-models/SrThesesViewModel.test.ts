@@ -127,6 +127,63 @@ describe('buildSrThesesViewModel', () => {
     expect(range.cards[0]!.biasTone).toBe('warn');
   });
 
+  it('maps bias aliases bull/long/bear/short/neutral/chop/choppy to correct tones', () => {
+    const cases: [string, string][] = [
+      ['bull', 'safe'],
+      ['long', 'safe'],
+      ['bear', 'breach'],
+      ['short', 'breach'],
+      ['neutral', 'warn'],
+      ['chop', 'warn'],
+      ['choppy', 'warn'],
+    ];
+    for (const [bias, expectedTone] of cases) {
+      const vm = buildSrThesesViewModel(makeBlock([makeThesis({ bias })]), NOW);
+      expect(vm.cards[0]!.biasTone).toBe(expectedTone);
+    }
+  });
+
+  it('returns graceful empty view model for empty theses array', () => {
+    const vm = buildSrThesesViewModel(makeBlock([]), NOW);
+    expect(vm.cards).toEqual([]);
+    expect(vm.visibleCards).toEqual([]);
+    expect(vm.remainingCount).toBe(0);
+    expect(vm.selectedCard.asset).toBe('SOL/USDC');
+    expect(vm.overlay.supports).toEqual([]);
+  });
+
+  it('computes freshness at boundaries', () => {
+    const capturedAt = Date.parse('2026-05-07T10:00:00Z');
+    const fiftyNineMinutes = capturedAt + 59 * 60_000;
+    const oneHourOneMin = capturedAt + 61 * 60_000;
+    const block59 = makeBlock([makeThesis()], '2026-05-07T10:00:00Z');
+    const vm59 = buildSrThesesViewModel(block59, fiftyNineMinutes);
+    expect(vm59.freshnessLabel).toContain('m ago');
+    const vm61 = buildSrThesesViewModel(
+      makeBlock([makeThesis()], '2026-05-07T10:00:00Z'),
+      oneHourOneMin,
+    );
+    expect(vm61.freshnessLabel).toContain('h ago');
+    expect(vm61.freshnessLabel).not.toContain('stale');
+  });
+
+  it('marks freshness as stale at 48h boundary', () => {
+    const capturedAt = Date.parse('2026-05-05T10:00:00Z');
+    const justUnder48h = capturedAt + 47 * 60 * 60_000 + 59 * 60_000;
+    const justOver48h = capturedAt + 48 * 60 * 60_000 + 1 * 60_000;
+    const vmUnder = buildSrThesesViewModel(
+      makeBlock([makeThesis()], '2026-05-05T10:00:00Z'),
+      justUnder48h,
+    );
+    expect(vmUnder.isStale).toBe(false);
+    const vmOver = buildSrThesesViewModel(
+      makeBlock([makeThesis()], '2026-05-05T10:00:00Z'),
+      justOver48h,
+    );
+    expect(vmOver.isStale).toBe(true);
+    expect(vmOver.freshnessLabel).toContain('stale');
+  });
+
   it('shows only the first 3 cards by default and reports remaining count', () => {
     const five = Array.from({ length: 5 }, (_unused, i) =>
       makeThesis({ publishedAt: `2026-05-0${i + 1}T00:00:00Z`, sourceHandle: `t${i}` }),

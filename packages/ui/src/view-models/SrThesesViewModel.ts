@@ -20,7 +20,7 @@ export type SrThesisCardViewModel = {
   sourceUrl: string | null;
   chartReference: string | null;
   rawThesisText: string | null;
-  rawThesisCollapsedByDefault: true;
+  rawThesisCollapsedByDefault: boolean;
   timestampLabel: string | null;
   notes: string | null;
 };
@@ -193,6 +193,42 @@ function overlayFor(thesis: SrThesisDto): SrThesisOverlayModel {
 }
 
 export function buildSrThesesViewModel(block: SrThesesBlock, now: number): SrThesesViewModel {
+  if (block.theses.length === 0) {
+    const { freshnessLabel, isStale } = computeFreshness(block.capturedAtUnixMs, now);
+    return {
+      briefSummary: block.brief.summary,
+      sourceLabel: block.source,
+      freshnessLabel,
+      isStale,
+      cards: [],
+      visibleCards: [],
+      remainingCount: 0,
+      selectedThesisIndex: 0,
+      selectedCard: {
+        asset: block.symbol,
+        timeframe: '',
+        bias: null,
+        biasTone: 'neutral',
+        setupType: null,
+        supportLevels: [],
+        resistanceLevels: [],
+        entryZone: null,
+        targets: [],
+        invalidation: null,
+        trigger: null,
+        sourceHandle: '',
+        sourceKind: '',
+        sourceReliability: null,
+        sourceUrl: null,
+        chartReference: null,
+        rawThesisText: null,
+        rawThesisCollapsedByDefault: true,
+        timestampLabel: null,
+        notes: null,
+      },
+      overlay: { supports: [], resistances: [], targets: [], invalidation: null, entryZone: null },
+    };
+  }
   const { freshnessLabel, isStale } = computeFreshness(block.capturedAtUnixMs, now);
 
   type Ranked = { thesis: SrThesisDto; tsMs: number; unparseable: boolean };

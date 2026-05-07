@@ -351,4 +351,44 @@ describe('SrInsightsSection', () => {
     );
     expect(screen.getByText('Refresh failed - showing last available analysis.')).toBeTruthy();
   });
+
+  it('renders v2 loading skeleton when srThesesLoading and no v1/v2 data', () => {
+    render(
+      <SrInsightsSection
+        srLevels={null}
+        isLoading={false}
+        isError={false}
+        isUnsupported={false}
+        isMixedPools={false}
+        poolLabel={null}
+        now={Date.parse('2026-05-07T12:00:00Z')}
+        srTheses={null}
+        srThesesLoading
+        srThesesError={false}
+        srThesesUnsupported={false}
+        srThesesUnavailableReason={null}
+      />,
+    );
+    expect(screen.getByTestId('sr-insights-section-skeleton')).toBeTruthy();
+  });
+
+  it('renders unavailable message when srThesesUnsupported is true', () => {
+    render(
+      <SrInsightsSection
+        srLevels={null}
+        isLoading={false}
+        isError={false}
+        isUnsupported={false}
+        isMixedPools={false}
+        poolLabel={null}
+        now={Date.parse('2026-05-07T12:00:00Z')}
+        srTheses={null}
+        srThesesLoading={false}
+        srThesesError={false}
+        srThesesUnsupported
+        srThesesUnavailableReason={null}
+      />,
+    );
+    expect(screen.getByText('S/R analysis unavailable')).toBeTruthy();
+  });
 });

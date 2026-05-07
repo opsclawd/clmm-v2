@@ -34,8 +34,7 @@ const cardStyle = {
   borderColor: colors.border,
 } as const;
 
-function unavailableCopy(reason: SrThesesUnavailableReason | null | undefined, hasV1Data: boolean) {
-  if (hasV1Data) return null;
+function unavailableCopy(reason: SrThesesUnavailableReason | null | undefined) {
   if (reason === 'not-found') return 'No S/R analysis available yet';
   if (reason === 'config-error' || reason === 'upstream-error') return 'S/R analysis unavailable';
   return null;
@@ -133,7 +132,7 @@ export function SrInsightsSection({
     );
   }
 
-  const v2Copy = unavailableCopy(srThesesUnavailableReason, false);
+  const v2Copy = unavailableCopy(srThesesUnavailableReason);
   if (v2Copy != null) {
     return (
       <View style={cardStyle}>
