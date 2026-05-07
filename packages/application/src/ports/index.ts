@@ -18,7 +18,7 @@ import type {
   ExecutionStep,
 } from '@clmm/domain';
 import type { HistoryEvent, HistoryTimeline, ExecutionOutcomeSummary } from '@clmm/domain';
-import type { SrLevelsBlock, RegimeBlock } from '../dto/index.js';
+import type { SrLevelsBlock, RegimeBlock, SrThesesBlock } from '../dto/index.js';
 
 // --- Position read ports ---
 
@@ -265,6 +265,23 @@ export interface IdGeneratorPort {
 
 export interface SrLevelsReadPort {
   fetchCurrent(symbol: string, source: string): Promise<SrLevelsBlock | null>;
+}
+
+// --- V2 S/R theses read port (application-owned; CurrentSrThesesAdapter implements) ---
+//
+// Like RegimeReadResult, this is a discriminated union so the BFF controller
+// can map directly to documented `unavailableReason` codes. Adapters MUST
+// return one of these kinds for expected upstream conditions instead of
+// throwing.
+
+export type SrThesesReadResult =
+  | { kind: 'block'; block: SrThesesBlock }
+  | { kind: 'not-found' }
+  | { kind: 'config-error' }
+  | { kind: 'upstream-error' };
+
+export interface SrThesesReadPort {
+  fetchCurrent(symbol: string, source: string): Promise<SrThesesReadResult>;
 }
 
 // --- Regime read port (application-owned; CurrentRegimeAdapter implements) ---
