@@ -526,4 +526,49 @@ describe('PositionsListScreen', () => {
     expect(screen.getByText('Support & Resistance')).toBeTruthy();
     expect(screen.queryByText('V2 brief.')).toBeNull();
   });
+
+  it('renders PolicyInsights unavailable copy when enabled with not-found reason', () => {
+    render(
+      <PositionsListScreen
+        walletAddress="wallet-1"
+        positions={[makePosition()]}
+        policyInsight={null}
+        policyInsightsLoading={false}
+        policyInsightsError={false}
+        policyInsightsEnabled
+        policyInsightsUnavailableReason="not-found"
+      />,
+    );
+    expect(screen.getByText('No policy insight available yet.')).toBeTruthy();
+  });
+
+  it('does not render PolicyInsightsSection when not enabled', () => {
+    render(
+      <PositionsListScreen
+        walletAddress="wallet-1"
+        positions={[makePosition()]}
+        policyInsight={null}
+        policyInsightsLoading={false}
+        policyInsightsError={false}
+        policyInsightsEnabled={false}
+        policyInsightsUnavailableReason="not-found"
+      />,
+    );
+    expect(screen.queryByText('No policy insight available yet.')).toBeNull();
+  });
+
+  it('renders PolicyInsights unavailable when in error with upstream-error', () => {
+    render(
+      <PositionsListScreen
+        walletAddress="wallet-1"
+        positions={[makePosition()]}
+        policyInsight={null}
+        policyInsightsLoading={false}
+        policyInsightsError
+        policyInsightsEnabled
+        policyInsightsUnavailableReason="upstream-error"
+      />,
+    );
+    expect(screen.getByText('Policy insights unavailable.')).toBeTruthy();
+  });
 });
