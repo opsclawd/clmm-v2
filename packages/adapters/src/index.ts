@@ -20,4 +20,4 @@ export { OperationalStorageAdapter } from './outbound/storage/OperationalStorage
 export { OffChainHistoryStorageAdapter } from './outbound/storage/OffChainHistoryStorageAdapter';
 export { TelemetryAdapter } from './outbound/observability/TelemetryAdapter';
 export { JupiterPriceAdapter } from './outbound/price/JupiterPriceAdapter';
-export { CurrentSrThesesAdapter } from './outbound/regime-engine/CurrentSrThesesAdapter';
+export { CurrentSrThesesAdapter } from './outbound/regime-engine/CurrentSrThesesAdapter.js';
