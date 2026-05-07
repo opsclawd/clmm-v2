@@ -1,7 +1,7 @@
 import React from 'react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { cleanup, fireEvent, render, screen } from '@testing-library/react';
-import type { PositionSummaryDto } from '@clmm/application/public';
+import type { PositionSummaryDto, SrThesesBlock } from '@clmm/application/public';
 import { PositionsListScreen } from './PositionsListScreen.js';
 
 afterEach(() => {
@@ -260,21 +260,21 @@ describe('PositionsListScreen', () => {
     render(<PositionsListScreen walletAddress={null} />);
 
     expect(screen.queryByText('Market Thesis')).toBeNull();
-    expect(screen.queryByText('Market context unavailable')).toBeNull();
+    expect(screen.queryByText('S/R analysis unavailable')).toBeNull();
   });
 
   it('hides the market context panel while positions are loading', () => {
     render(<PositionsListScreen walletAddress="wallet-1" positionsLoading />);
 
     expect(screen.queryByText('Market Thesis')).toBeNull();
-    expect(screen.queryByText('Market context unavailable')).toBeNull();
+    expect(screen.queryByText('S/R analysis unavailable')).toBeNull();
   });
 
   it('hides the market context panel when there are no positions', () => {
     render(<PositionsListScreen walletAddress="wallet-1" positions={[]} />);
 
     expect(screen.queryByText('Market Thesis')).toBeNull();
-    expect(screen.queryByText('Market context unavailable')).toBeNull();
+    expect(screen.queryByText('S/R analysis unavailable')).toBeNull();
   });
 
   it('renders the unavailable caption when S/R is unsupported but positions render', () => {
@@ -286,7 +286,7 @@ describe('PositionsListScreen', () => {
       />,
     );
 
-    expect(screen.getByText('Market context unavailable')).toBeTruthy();
+    expect(screen.getByText('S/R analysis unavailable')).toBeTruthy();
     expect(screen.getByText('Active positions')).toBeTruthy();
   });
 
@@ -321,7 +321,7 @@ describe('PositionsListScreen', () => {
       />,
     );
 
-    expect(screen.getByText('Market context unavailable')).toBeTruthy();
+    expect(screen.getByText('S/R analysis unavailable')).toBeTruthy();
   });
 
   it('renders the positions list when S/R is loading (non-blocking)', () => {
@@ -446,5 +446,84 @@ describe('PositionsListScreen', () => {
     expect(screen.getByText('USDC 100.00')).toBeTruthy();
     expect(screen.getByText('USDC 200.00')).toBeTruthy();
     expect(screen.getByText('USDC 142.35')).toBeTruthy();
+  });
+
+  const SAMPLE_THESES_BLOCK: SrThesesBlock = {
+    schemaVersion: '2.0',
+    source: 'regime-engine',
+    symbol: 'SOL/USDC',
+    brief: {
+      briefId: 'brief-v2-1',
+      sourceRecordedAtIso: null,
+      summary: 'V2 brief.',
+    },
+    capturedAtIso: '2026-05-07T12:00:00Z',
+    capturedAtUnixMs: Date.parse('2026-05-07T12:00:00Z'),
+    theses: [
+      {
+        asset: 'SOL',
+        timeframe: '4h',
+        bias: 'bullish',
+        setupType: 'continuation',
+        supportLevels: ['130'],
+        resistanceLevels: ['150'],
+        entryZone: null,
+        targets: ['160'],
+        invalidation: '125',
+        trigger: null,
+        chartReference: null,
+        sourceHandle: 'analyst42',
+        sourceChannel: null,
+        sourceKind: 'human',
+        sourceReliability: null,
+        rawThesisText: null,
+        collectedAt: null,
+        publishedAt: null,
+        sourceUrl: null,
+        notes: null,
+      },
+    ],
+  };
+
+  it('renders v2 thesis panel when srTheses is provided', () => {
+    render(
+      <PositionsListScreen
+        walletAddress="wallet-1"
+        positions={[makePosition()]}
+        srTheses={SAMPLE_THESES_BLOCK}
+        srThesesLoading={false}
+        srThesesError={false}
+        srThesesUnsupported={false}
+        srThesesUnavailableReason={null}
+      />,
+    );
+
+    expect(screen.getByText('V2 brief.')).toBeTruthy();
+    expect(screen.queryByText('Support & Resistance')).toBeNull();
+  });
+
+  it('falls back to v1 SrLevelsCard when srTheses is null with not-found reason', () => {
+    render(
+      <PositionsListScreen
+        walletAddress="wallet-1"
+        positions={[makePosition()]}
+        srLevels={{
+          briefId: 'brief-1',
+          sourceRecordedAtIso: null,
+          summary: 'Bullish continuation.',
+          capturedAtUnixMs: 1_745_712_000_000,
+          supports: [{ price: 132 }],
+          resistances: [{ price: 148 }],
+        }}
+        srTheses={null}
+        srThesesLoading={false}
+        srThesesError={false}
+        srThesesUnsupported={false}
+        srThesesUnavailableReason="not-found"
+      />,
+    );
+
+    expect(screen.getByText('Support & Resistance')).toBeTruthy();
+    expect(screen.queryByText('V2 brief.')).toBeNull();
   });
 });
