@@ -85,43 +85,77 @@ function isLevels(value: unknown): value is PolicyInsightLevels {
   return true;
 }
 
-function isFreshness(value: unknown, fallbackIso?: string): value is PolicyInsightFreshness {
-  if (!isRecord(value)) return false;
-  if (typeof value['stale'] !== 'boolean') return false;
+function parseFreshness(value: unknown, fallbackIso?: string): PolicyInsightFreshness | null {
+  if (!isRecord(value)) return null;
+  if (typeof value['stale'] !== 'boolean') return null;
+  const stale = value['stale'];
   const capturedAtUnixMsRaw = value['capturedAtUnixMs'];
-  if (typeof capturedAtUnixMsRaw === 'number' && Number.isFinite(capturedAtUnixMsRaw)) return true;
-  const capturedAtIso = value['capturedAtIso'];
-  if (typeof capturedAtIso === 'string' && Number.isFinite(Date.parse(capturedAtIso))) return true;
-  if (typeof fallbackIso === 'string' && Number.isFinite(Date.parse(fallbackIso))) return true;
-  return false;
+  let capturedAtUnixMs: number | null = null;
+  if (typeof capturedAtUnixMsRaw === 'number' && Number.isFinite(capturedAtUnixMsRaw)) {
+    capturedAtUnixMs = capturedAtUnixMsRaw;
+  } else {
+    const capturedAtIso = value['capturedAtIso'];
+    if (typeof capturedAtIso === 'string') {
+      const parsed = Date.parse(capturedAtIso);
+      if (Number.isFinite(parsed)) capturedAtUnixMs = parsed;
+    }
+    if (capturedAtUnixMs === null && typeof fallbackIso === 'string') {
+      const parsed = Date.parse(fallbackIso);
+      if (Number.isFinite(parsed)) capturedAtUnixMs = parsed;
+    }
+  }
+  if (capturedAtUnixMs === null) return null;
+  return { capturedAtUnixMs, stale };
 }
 
-function isPolicyInsightBlock(value: unknown): value is PolicyInsightBlock {
-  if (!isRecord(value)) return false;
-  if (value['schemaVersion'] !== '1.0') return false;
-  if (value['pair'] !== 'SOL/USDC') return false;
-  if (value['source'] !== 'openclaw') return false;
-  if (typeof value['asOf'] !== 'string') return false;
-  if (typeof value['runId'] !== 'string') return false;
-  if (!VALID_STATUSES.has(value['status'] as string)) return false;
-  if (typeof value['marketRegime'] !== 'string') return false;
-  if (typeof value['fundamentalRegime'] !== 'string') return false;
-  if (!VALID_ACTIONS.has(value['recommendedAction'] as string)) return false;
-  if (!VALID_CONFIDENCES.has(value['confidence'] as string)) return false;
-  if (!VALID_RISK_LEVELS.has(value['riskLevel'] as string)) return false;
-  if (!VALID_DATA_QUALITIES.has(value['dataQuality'] as string)) return false;
-  if (!isClmmPolicy(value['clmmPolicy'])) return false;
-  if (!isLevels(value['levels'])) return false;
-  if (!isStringArray(value['reasoning'])) return false;
-  if (!isStringArray(value['sourceRefs'])) return false;
-  if (typeof value['expiresAt'] !== 'string') return false;
-  if (typeof value['payloadHash'] !== 'string') return false;
-  if (typeof value['receivedAtIso'] !== 'string') return false;
-  if (
-    !isFreshness(value['freshness'], typeof value['asOf'] === 'string' ? value['asOf'] : undefined)
-  )
-    return false;
-  return true;
+function parsePolicyInsightBlock(value: unknown): PolicyInsightBlock | null {
+  if (!isRecord(value)) return null;
+  if (value['schemaVersion'] !== '1.0') return null;
+  if (value['pair'] !== 'SOL/USDC') return null;
+  if (value['source'] !== 'openclaw') return null;
+  if (typeof value['asOf'] !== 'string') return null;
+  if (typeof value['runId'] !== 'string') return null;
+  if (!VALID_STATUSES.has(value['status'] as string)) return null;
+  if (typeof value['marketRegime'] !== 'string') return null;
+  if (typeof value['fundamentalRegime'] !== 'string') return null;
+  if (!VALID_ACTIONS.has(value['recommendedAction'] as string)) return null;
+  if (!VALID_CONFIDENCES.has(value['confidence'] as string)) return null;
+  if (!VALID_RISK_LEVELS.has(value['riskLevel'] as string)) return null;
+  if (!VALID_DATA_QUALITIES.has(value['dataQuality'] as string)) return null;
+  if (!isClmmPolicy(value['clmmPolicy'])) return null;
+  if (!isLevels(value['levels'])) return null;
+  if (!isStringArray(value['reasoning'])) return null;
+  if (!isStringArray(value['sourceRefs'])) return null;
+  if (typeof value['expiresAt'] !== 'string') return null;
+  if (typeof value['payloadHash'] !== 'string') return null;
+  if (typeof value['receivedAtIso'] !== 'string') return null;
+  const freshness = parseFreshness(
+    value['freshness'],
+    typeof value['asOf'] === 'string' ? value['asOf'] : undefined,
+  );
+  if (!freshness) return null;
+  return {
+    schemaVersion: '1.0',
+    pair: 'SOL/USDC',
+    asOf: value['asOf'],
+    source: 'openclaw',
+    runId: value['runId'],
+    status: value['status'] as PolicyInsightStatus,
+    marketRegime: value['marketRegime'],
+    fundamentalRegime: value['fundamentalRegime'],
+    recommendedAction: value['recommendedAction'] as PolicyInsightRecommendedAction,
+    confidence: value['confidence'] as PolicyInsightConfidence,
+    riskLevel: value['riskLevel'] as PolicyInsightRiskLevel,
+    dataQuality: value['dataQuality'] as PolicyInsightDataQuality,
+    clmmPolicy: value['clmmPolicy'],
+    levels: value['levels'],
+    reasoning: value['reasoning'],
+    sourceRefs: value['sourceRefs'],
+    expiresAt: value['expiresAt'],
+    payloadHash: value['payloadHash'],
+    receivedAtIso: value['receivedAtIso'],
+    freshness,
+  };
 }
 
 function isUnavailableReason(value: unknown): value is PolicyInsightsUnavailableReason {
@@ -172,16 +206,17 @@ export async function fetchCurrentPolicyInsight(
       throw new Error('Could not load policy insights: malformed response');
     }
 
-    const policyInsight = body['policyInsight'];
+    const policyInsightRaw = body['policyInsight'];
     const unavailableReason = isUnavailableReason(body['unavailableReason'])
       ? body['unavailableReason']
       : undefined;
 
-    if (policyInsight === null) {
+    if (policyInsightRaw === null) {
       return { policyInsight: null, unavailableReason };
     }
 
-    if (!isPolicyInsightBlock(policyInsight)) {
+    const policyInsight = parsePolicyInsightBlock(policyInsightRaw);
+    if (!policyInsight) {
       throw new Error('Could not load policy insights: malformed policyInsight block');
     }
 
