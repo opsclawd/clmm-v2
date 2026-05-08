@@ -3,6 +3,7 @@ import type {
   RegimeReason,
   RegimeReasonSeverity,
   ClmmSuitabilityStatus,
+  MarketRegime,
 } from '@clmm/application/public';
 
 export type RegimeDetailRow = {
@@ -33,7 +34,7 @@ export type RegimeViewModelBlock = {
 
 const SEVERITY_ORDER: Record<RegimeReasonSeverity, number> = { ERROR: 0, WARN: 1, INFO: 2 };
 
-const REGIME_LABELS: Record<string, string> = {
+const REGIME_LABELS: Record<MarketRegime, string> = {
   UP: '▲ Uptrend regime',
   DOWN: '▼ Downtrend regime',
   CHOP: '◆ Choppy regime',

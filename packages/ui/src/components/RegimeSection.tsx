@@ -192,7 +192,12 @@ export function RegimeSection({
           </View>
         </View>
       ) : null}
-      <Pressable onPress={() => setExpanded((prev) => !prev)} style={{ marginTop: 8 }}>
+      <Pressable
+        onPress={() => setExpanded((prev) => !prev)}
+        style={{ marginTop: 8 }}
+        accessibilityRole="button"
+        accessibilityLabel={expanded ? 'Hide regime details' : 'Show regime details'}
+      >
         <Text style={{ color: colors.textSecondary, fontSize: typography.fontSize.xs }}>
           {expanded ? 'Hide details' : 'Show details'}
         </Text>
