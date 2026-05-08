@@ -24,8 +24,13 @@ function restoreBffBaseUrl(): void {
 function fixtureBlock() {
   return {
     regime: 'UP',
-    trendStrength: 1.5,
-    volRatio: 0.8,
+    telemetry: {
+      realizedVolShort: 0.007,
+      realizedVolLong: 0.0107,
+      volRatio: 1.06,
+      trendStrength: 0.00018,
+      compression: 0.0092,
+    },
     clmmSuitability: {
       status: 'ALLOWED',
       reasons: [{ severity: 'INFO', text: 'Trend is clear' }],
@@ -35,11 +40,15 @@ function fixtureBlock() {
       { severity: 'INFO', text: 'Momentum positive' },
     ],
     freshness: {
-      capturedAtUnixMs: 1_745_712_000_000,
+      generatedAtUnixMs: 1_745_712_000_000,
+      lastCandleUnixMs: 1_745_712_000_000 - 87 * 60_000,
+      ageSeconds: 87 * 60,
       softStale: false,
       hardStale: false,
+      softStaleSeconds: 75 * 60,
+      hardStaleSeconds: 90 * 60,
     },
-    metadata: { source: 'MCO', network: 'mainnet', symbol: 'SOL/USDC', timeframe: '1h' },
+    metadata: { source: 'geckoterminal', network: 'solana', symbol: 'SOL/USDC', timeframe: '1h' },
   };
 }
 
@@ -120,5 +129,85 @@ describe('fetchCurrentRegime', () => {
     const err = new RegimeUnsupportedPoolError('test-pool');
     expect(isRegimeUnsupportedPoolError(err)).toBe(true);
     expect(isRegimeUnsupportedPoolError(new Error('other'))).toBe(false);
+  });
+
+  it('throws when the response uses the deprecated top-level trendStrength shape', async () => {
+    env.EXPO_PUBLIC_BFF_BASE_URL = 'https://bff.example.test';
+
+    const oldShape = {
+      regime: 'UP',
+      trendStrength: 0.75,
+      volRatio: 1.2,
+      clmmSuitability: { status: 'ALLOWED', reasons: [] },
+      marketReasons: [],
+      freshness: { capturedAtUnixMs: 1_745_712_000_000, softStale: false, hardStale: false },
+    };
+
+    globalThis.fetch = vi.fn().mockResolvedValue({
+      ok: true,
+      status: 200,
+      json: () => Promise.resolve({ regime: oldShape }),
+    }) as typeof fetch;
+
+    const error = await fetchCurrentRegime(POOL_ID).catch((reason: unknown) => reason);
+    expect(error).toBeInstanceOf(Error);
+    expect((error as Error).message).toContain('malformed regime block');
+  });
+
+  it('throws when the response uses the deprecated capturedAtUnixMs freshness shape', async () => {
+    env.EXPO_PUBLIC_BFF_BASE_URL = 'https://bff.example.test';
+
+    const block = fixtureBlock();
+    const broken: Record<string, unknown> = {
+      ...block,
+      freshness: { capturedAtUnixMs: 1_745_712_000_000, softStale: false, hardStale: false },
+    };
+
+    globalThis.fetch = vi.fn().mockResolvedValue({
+      ok: true,
+      status: 200,
+      json: () => Promise.resolve({ regime: broken }),
+    }) as typeof fetch;
+
+    const error = await fetchCurrentRegime(POOL_ID).catch((reason: unknown) => reason);
+    expect(error).toBeInstanceOf(Error);
+    expect((error as Error).message).toContain('malformed regime block');
+  });
+
+  it('throws when metadata is missing required fields', async () => {
+    env.EXPO_PUBLIC_BFF_BASE_URL = 'https://bff.example.test';
+
+    const block = fixtureBlock();
+    const broken: Record<string, unknown> = { ...block, metadata: { source: 'geckoterminal' } };
+
+    globalThis.fetch = vi.fn().mockResolvedValue({
+      ok: true,
+      status: 200,
+      json: () => Promise.resolve({ regime: broken }),
+    }) as typeof fetch;
+
+    const error = await fetchCurrentRegime(POOL_ID).catch((reason: unknown) => reason);
+    expect(error).toBeInstanceOf(Error);
+    expect((error as Error).message).toContain('malformed regime block');
+  });
+
+  it('throws when optional metadata fields have wrong types', async () => {
+    env.EXPO_PUBLIC_BFF_BASE_URL = 'https://bff.example.test';
+
+    const block = fixtureBlock();
+    const broken: Record<string, unknown> = {
+      ...block,
+      metadata: { ...block.metadata, configVersion: {}, engineVersion: 123 },
+    };
+
+    globalThis.fetch = vi.fn().mockResolvedValue({
+      ok: true,
+      status: 200,
+      json: () => Promise.resolve({ regime: broken }),
+    }) as typeof fetch;
+
+    const error = await fetchCurrentRegime(POOL_ID).catch((reason: unknown) => reason);
+    expect(error).toBeInstanceOf(Error);
+    expect((error as Error).message).toContain('malformed regime block');
   });
 });

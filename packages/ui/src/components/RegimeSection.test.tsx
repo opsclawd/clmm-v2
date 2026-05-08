@@ -1,6 +1,6 @@
 import React from 'react';
 import { afterEach, describe, expect, it } from 'vitest';
-import { cleanup, render, screen } from '@testing-library/react';
+import { cleanup, fireEvent, render, screen } from '@testing-library/react';
 import type { RegimeBlock } from '@clmm/application/public';
 import { RegimeSection } from './RegimeSection.js';
 
@@ -8,13 +8,43 @@ afterEach(() => {
   cleanup();
 });
 
-const testRegimeBlock: RegimeBlock = {
-  regime: 'UP',
-  trendStrength: 0.75,
-  volRatio: 1.2,
-  clmmSuitability: { status: 'ALLOWED', reasons: [] },
-  marketReasons: [{ severity: 'INFO', text: 'Constructive trend' }],
-  freshness: { capturedAtUnixMs: 1_700_000_000_000, softStale: false, hardStale: false },
+const GENERATED = 1_700_000_000_000;
+const LAST_CANDLE = GENERATED - 87 * 60_000;
+
+const baseBlock: RegimeBlock = {
+  regime: 'CHOP',
+  telemetry: {
+    realizedVolShort: 0.007,
+    realizedVolLong: 0.0107,
+    volRatio: 1.06,
+    trendStrength: 0.00018,
+    compression: 0.0092,
+  },
+  clmmSuitability: {
+    status: 'CAUTION',
+    reasons: [{ severity: 'WARN', text: 'Latest candle is past soft-stale threshold' }],
+  },
+  marketReasons: [],
+  freshness: {
+    generatedAtUnixMs: GENERATED,
+    lastCandleUnixMs: LAST_CANDLE,
+    ageSeconds: 87 * 60,
+    softStale: true,
+    hardStale: false,
+    softStaleSeconds: 75 * 60,
+    hardStaleSeconds: 90 * 60,
+  },
+  metadata: {
+    source: 'geckoterminal',
+    network: 'solana',
+    symbol: 'SOL/USDC',
+    timeframe: '1h',
+    sourceTimeframe: '15m',
+    sourceCandleCount: 346,
+    candleCount: 86,
+    derivedTimeframe: '1h',
+    aggregationVersion: 'ohlcv-agg-v1',
+  },
 };
 
 describe('RegimeSection', () => {
@@ -25,7 +55,7 @@ describe('RegimeSection', () => {
         isLoading={false}
         isError={false}
         isUnsupported={false}
-        now={1_700_000_000_000}
+        now={GENERATED}
       />,
     );
     expect(container.firstChild).toBeNull();
@@ -38,148 +68,146 @@ describe('RegimeSection', () => {
         isLoading
         isError={false}
         isUnsupported={false}
-        now={1_700_000_000_000}
+        now={GENERATED}
       />,
     );
     expect(screen.getByTestId('regime-section-skeleton')).toBeTruthy();
   });
 
-  it('shows unavailable message when unsupported with no regime data', () => {
+  it('shows unavailable copy with not-found reason', () => {
     render(
       <RegimeSection
-        regime={undefined}
+        regime={null}
         isLoading={false}
         isError={false}
-        isUnsupported
-        now={1_700_000_000_000}
-      />,
-    );
-    expect(screen.getByText('Regime analysis unavailable')).toBeTruthy();
-  });
-
-  it('shows mapped unavailable copy for not-found reason', () => {
-    render(
-      <RegimeSection
-        regime={undefined}
-        isLoading={false}
-        isError={false}
-        isUnsupported
+        isUnsupported={false}
         unavailableReason="not-found"
-        now={1_700_000_000_000}
+        now={GENERATED}
       />,
     );
-    expect(screen.getByText('Regime analysis unavailable')).toBeTruthy();
     expect(screen.getByText('Market data not available yet')).toBeTruthy();
   });
 
-  it('renders regime label, suitability, trend/vol, freshness with valid regime block', () => {
+  it('renders unavailable copy when isUnsupported with no regime data', () => {
     render(
       <RegimeSection
-        regime={testRegimeBlock}
+        regime={undefined}
+        isLoading={false}
+        isError={false}
+        isUnsupported
+        now={GENERATED}
+      />,
+    );
+    expect(screen.getByText('Regime analysis unavailable')).toBeTruthy();
+  });
+
+  it('renders regime label, suitability, data quality, source, and primary reason in collapsed mode', () => {
+    render(
+      <RegimeSection
+        regime={baseBlock}
         isLoading={false}
         isError={false}
         isUnsupported={false}
-        now={1_700_000_000_000}
+        now={GENERATED + 12 * 60_000}
       />,
     );
-    expect(screen.getByText('▲ Uptrend')).toBeTruthy();
-    expect(screen.getByText('✓ Suitable for CLMM')).toBeTruthy();
-    expect(screen.getByText('Trend: 0.75 · Vol: 1.20')).toBeTruthy();
-    expect(screen.getByText('Constructive trend')).toBeTruthy();
+    expect(screen.getByText('◆ Choppy regime')).toBeTruthy();
+    expect(screen.getByText(/CLMM caution/)).toBeTruthy();
+    expect(screen.getByText(/data soft-?stale/i)).toBeTruthy();
+    expect(screen.getByText(/Latest candle is 99m old/)).toBeTruthy();
+    expect(screen.getByText(/Trend flat · Vol ratio 1\.06x/)).toBeTruthy();
+    expect(screen.getByText(/Generated 12m ago/)).toBeTruthy();
+    expect(screen.getByText(/GeckoTerminal · SOL\/USDC · 1h/)).toBeTruthy();
+    expect(screen.getByText('Show details')).toBeTruthy();
   });
 
-  it('shows stale indicator when isStale is true', () => {
-    const staleBlock: RegimeBlock = {
-      ...testRegimeBlock,
-      freshness: { capturedAtUnixMs: 1_700_000_000_000, softStale: true, hardStale: true },
+  it('renders only one reason in collapsed mode', () => {
+    const block: RegimeBlock = {
+      ...baseBlock,
+      clmmSuitability: {
+        status: 'CAUTION',
+        reasons: [
+          { severity: 'WARN', text: 'Latest candle is past soft-stale threshold' },
+          { severity: 'INFO', text: 'Momentum still constructive' },
+        ],
+      },
+      marketReasons: [{ severity: 'INFO', text: 'Volume tapering' }],
     };
     render(
       <RegimeSection
-        regime={staleBlock}
+        regime={block}
         isLoading={false}
         isError={false}
         isUnsupported={false}
-        now={1_700_000_000_000 + 50 * 3600_000}
+        now={GENERATED}
       />,
     );
-    const freshnessText = screen.getByText(/MCO ·.*stale/);
-    expect(freshnessText).toBeTruthy();
+    expect(screen.queryByText('Momentum still constructive')).toBeNull();
+    expect(screen.queryByText('Volume tapering')).toBeNull();
   });
 
-  it('shows degraded banner when isError with cached regime data', () => {
+  it('toggles to expanded mode with Show details and renders structured rows', () => {
     render(
       <RegimeSection
-        regime={testRegimeBlock}
+        regime={baseBlock}
+        isLoading={false}
+        isError={false}
+        isUnsupported={false}
+        now={GENERATED}
+      />,
+    );
+    fireEvent.click(screen.getByText('Show details'));
+    expect(screen.getByText('Hide details')).toBeTruthy();
+    expect(screen.getByText('Reasons')).toBeTruthy();
+    expect(screen.getByText('Latest candle is past soft-stale threshold')).toBeTruthy();
+    expect(screen.getByText('Trend strength')).toBeTruthy();
+    expect(screen.getByText('Realized vol short')).toBeTruthy();
+    expect(screen.getByText('Volatility ratio')).toBeTruthy();
+    expect(screen.getByText('Compression')).toBeTruthy();
+    expect(screen.getByText('Samples')).toBeTruthy();
+    expect(screen.getByText('Source candles')).toBeTruthy();
+    expect(screen.getByText('Soft stale threshold')).toBeTruthy();
+    expect(screen.getByText('Hard stale threshold')).toBeTruthy();
+  });
+
+  it('renders all display reasons in expanded mode', () => {
+    const block: RegimeBlock = {
+      ...baseBlock,
+      clmmSuitability: {
+        status: 'CAUTION',
+        reasons: [
+          { severity: 'WARN', text: 'Latest candle is past soft-stale threshold' },
+          { severity: 'INFO', text: 'Momentum still constructive' },
+        ],
+      },
+      marketReasons: [{ severity: 'INFO', text: 'Volume tapering' }],
+    };
+    render(
+      <RegimeSection
+        regime={block}
+        isLoading={false}
+        isError={false}
+        isUnsupported={false}
+        now={GENERATED}
+      />,
+    );
+    fireEvent.click(screen.getByText('Show details'));
+    expect(screen.getByText('Reasons')).toBeTruthy();
+    expect(screen.getByText('Latest candle is past soft-stale threshold')).toBeTruthy();
+    expect(screen.getByText('Momentum still constructive')).toBeTruthy();
+    expect(screen.getByText('Volume tapering')).toBeTruthy();
+  });
+
+  it('renders the degraded banner when isError with cached regime data', () => {
+    render(
+      <RegimeSection
+        regime={baseBlock}
         isLoading={false}
         isError
         isUnsupported={false}
-        now={1_700_000_000_000}
+        now={GENERATED}
       />,
     );
     expect(screen.getByText('Refresh failed — showing last available analysis.')).toBeTruthy();
-  });
-
-  it('renders suitability reason when CAUTION with reasons', () => {
-    const cautionBlock: RegimeBlock = {
-      ...testRegimeBlock,
-      clmmSuitability: {
-        status: 'CAUTION',
-        reasons: [{ severity: 'WARN', text: 'Elevated volatility' }],
-      },
-    };
-    render(
-      <RegimeSection
-        regime={cautionBlock}
-        isLoading={false}
-        isError={false}
-        isUnsupported={false}
-        now={1_700_000_000_000}
-      />,
-    );
-    expect(screen.getByText('⚠ Caution')).toBeTruthy();
-    expect(screen.getByText('Elevated volatility')).toBeTruthy();
-  });
-
-  it('does not render suitability reason when ALLOWED', () => {
-    render(
-      <RegimeSection
-        regime={testRegimeBlock}
-        isLoading={false}
-        isError={false}
-        isUnsupported={false}
-        now={1_700_000_000_000}
-      />,
-    );
-    expect(screen.getByText('✓ Suitable for CLMM')).toBeTruthy();
-    expect(screen.queryByText('Favorable conditions')).toBeNull();
-  });
-
-  it('shows mapped unavailable copy when regime is null on supported pool', () => {
-    render(
-      <RegimeSection
-        regime={null}
-        isLoading={false}
-        isError={false}
-        isUnsupported={false}
-        unavailableReason="not-found"
-        now={1_700_000_000_000}
-      />,
-    );
-    expect(screen.getByText('Regime analysis unavailable')).toBeTruthy();
-    expect(screen.getByText('Market data not available yet')).toBeTruthy();
-  });
-
-  it('maps upstream-error to generic unavailable copy', () => {
-    render(
-      <RegimeSection
-        regime={null}
-        isLoading={false}
-        isError={false}
-        isUnsupported={false}
-        unavailableReason="upstream-error"
-        now={1_700_000_000_000}
-      />,
-    );
-    expect(screen.getByText('Market context unavailable')).toBeTruthy();
   });
 });

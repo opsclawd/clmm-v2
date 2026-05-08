@@ -2,236 +2,359 @@ import { describe, expect, it } from 'vitest';
 import type { RegimeBlock } from '@clmm/application/public';
 import { buildRegimeViewModelBlock } from './RegimeViewModel.js';
 
+const GENERATED = 1_700_000_000_000;
+const LAST_CANDLE = GENERATED - 87 * 60_000;
+
 function makeBlock(overrides: Partial<RegimeBlock> = {}): RegimeBlock {
   return {
-    regime: 'UP',
-    trendStrength: 0.75,
-    volRatio: 1.2,
-    clmmSuitability: {
-      status: 'ALLOWED',
-      reasons: [],
+    regime: 'CHOP',
+    telemetry: {
+      realizedVolShort: 0.007,
+      realizedVolLong: 0.0107,
+      volRatio: 1.06,
+      trendStrength: 0.00018,
+      compression: 0.0092,
     },
+    clmmSuitability: { status: 'CAUTION', reasons: [] },
     marketReasons: [],
     freshness: {
-      capturedAtUnixMs: 1_700_000_000_000,
-      softStale: false,
+      generatedAtUnixMs: GENERATED,
+      lastCandleUnixMs: LAST_CANDLE,
+      ageSeconds: 87 * 60,
+      softStale: true,
       hardStale: false,
+      softStaleSeconds: 75 * 60,
+      hardStaleSeconds: 90 * 60,
+    },
+    metadata: {
+      source: 'geckoterminal',
+      network: 'solana',
+      symbol: 'SOL/USDC',
+      timeframe: '1h',
     },
     ...overrides,
   };
 }
 
-describe('buildRegimeViewModelBlock', () => {
-  it('maps UP regime to ▲ Uptrend with trend and vol labels', () => {
-    const vm = buildRegimeViewModelBlock(
-      makeBlock({ regime: 'UP', trendStrength: 0.65, volRatio: 1.1 }),
-      1_700_000_000_000 + 5 * 60_000,
-    );
-
-    expect(vm.regimeLabel).toBe('▲ Uptrend');
-    expect(vm.trendLabel).toBe('Trend: 0.65');
-    expect(vm.volLabel).toBe('Vol: 1.10');
-  });
-
-  it('maps DOWN regime to ▼ Downtrend', () => {
-    const vm = buildRegimeViewModelBlock(makeBlock({ regime: 'DOWN' }), 1_700_000_000_000);
-
-    expect(vm.regimeLabel).toBe('▼ Downtrend');
-  });
-
-  it('maps CHOP regime to ◆ Choppy', () => {
-    const vm = buildRegimeViewModelBlock(makeBlock({ regime: 'CHOP' }), 1_700_000_000_000);
-
-    expect(vm.regimeLabel).toBe('◆ Choppy');
-  });
-
-  it('maps ALLOWED suitability to ✓ Suitable for CLMM', () => {
-    const vm = buildRegimeViewModelBlock(
-      makeBlock({ clmmSuitability: { status: 'ALLOWED', reasons: [] } }),
-      1_700_000_000_000,
-    );
-
-    expect(vm.suitabilityLabel).toBe('✓ Suitable for CLMM');
-  });
-
-  it('maps CAUTION suitability to ⚠ Caution', () => {
-    const vm = buildRegimeViewModelBlock(
-      makeBlock({ clmmSuitability: { status: 'CAUTION', reasons: [] } }),
-      1_700_000_000_000,
-    );
-
-    expect(vm.suitabilityLabel).toBe('⚠ Caution');
-  });
-
-  it('maps BLOCKED suitability to ✗ Not recommended', () => {
-    const vm = buildRegimeViewModelBlock(
-      makeBlock({ clmmSuitability: { status: 'BLOCKED', reasons: [] } }),
-      1_700_000_000_000,
-    );
-
-    expect(vm.suitabilityLabel).toBe('✗ Not recommended');
-  });
-
-  it('maps UNKNOWN suitability to ? Unknown', () => {
-    const vm = buildRegimeViewModelBlock(
-      makeBlock({ clmmSuitability: { status: 'UNKNOWN', reasons: [] } }),
-      1_700_000_000_000,
-    );
-
-    expect(vm.suitabilityLabel).toBe('? Unknown');
-  });
-
-  it('shows only the top market reason by severity', () => {
+describe('buildRegimeViewModelBlock — data quality', () => {
+  it('classifies Fresh when neither flag is set', () => {
     const vm = buildRegimeViewModelBlock(
       makeBlock({
-        marketReasons: [
-          { severity: 'WARN', text: 'High volatility' },
-          { severity: 'INFO', text: 'Trend weakening' },
-        ],
+        freshness: {
+          generatedAtUnixMs: GENERATED,
+          lastCandleUnixMs: LAST_CANDLE,
+          ageSeconds: 60,
+          softStale: false,
+          hardStale: false,
+          softStaleSeconds: 75 * 60,
+          hardStaleSeconds: 90 * 60,
+        },
       }),
-      1_700_000_000_000,
+      GENERATED + 60_000,
     );
-
-    expect(vm.marketReasonSummary).toBe('High volatility');
+    expect(vm.dataQualityLabel).toMatch(/fresh/i);
+    expect(vm.dataQualityTone).toBe('success');
   });
 
-  it('picks the top market reason by severity (ERROR before WARN before INFO)', () => {
+  it('classifies Soft-stale when softStale is true and hardStale is false', () => {
+    const vm = buildRegimeViewModelBlock(makeBlock(), GENERATED + 60_000);
+    expect(vm.dataQualityLabel).toMatch(/soft-?stale/i);
+    expect(vm.dataQualityTone).toBe('warning');
+  });
+
+  it('classifies Hard-stale when hardStale is true (regardless of softStale)', () => {
+    const vm = buildRegimeViewModelBlock(
+      makeBlock({
+        freshness: {
+          generatedAtUnixMs: GENERATED,
+          lastCandleUnixMs: LAST_CANDLE,
+          ageSeconds: 95 * 60,
+          softStale: true,
+          hardStale: true,
+          softStaleSeconds: 75 * 60,
+          hardStaleSeconds: 90 * 60,
+        },
+      }),
+      GENERATED + 60_000,
+    );
+    expect(vm.dataQualityLabel).toMatch(/hard-?stale/i);
+    expect(vm.dataQualityTone).toBe('danger');
+  });
+
+  it('classifies Hard-stale when only hardStale is true (false softStale ignored)', () => {
+    const vm = buildRegimeViewModelBlock(
+      makeBlock({
+        freshness: {
+          generatedAtUnixMs: GENERATED,
+          lastCandleUnixMs: LAST_CANDLE,
+          ageSeconds: 95 * 60,
+          softStale: false,
+          hardStale: true,
+          softStaleSeconds: 75 * 60,
+          hardStaleSeconds: 90 * 60,
+        },
+      }),
+      GENERATED + 60_000,
+    );
+    expect(vm.dataQualityLabel).toMatch(/hard-?stale/i);
+    expect(vm.dataQualityTone).toBe('danger');
+  });
+
+  it('does NOT mark stale based on local 48h rule when upstream flags are false', () => {
+    const vm = buildRegimeViewModelBlock(
+      makeBlock({
+        freshness: {
+          generatedAtUnixMs: GENERATED - 49 * 3_600_000,
+          lastCandleUnixMs: GENERATED - 49 * 3_600_000 - 60_000,
+          ageSeconds: 60,
+          softStale: false,
+          hardStale: false,
+          softStaleSeconds: 75 * 60,
+          hardStaleSeconds: 90 * 60,
+        },
+      }),
+      GENERATED,
+    );
+    expect(vm.dataQualityTone).toBe('success');
+  });
+});
+
+describe('buildRegimeViewModelBlock — labels', () => {
+  it('uses the spec suitability copy (CAUTION)', () => {
+    const vm = buildRegimeViewModelBlock(
+      makeBlock({ clmmSuitability: { status: 'CAUTION', reasons: [] } }),
+      GENERATED,
+    );
+    expect(vm.suitabilityLabel).toBe('CLMM caution');
+  });
+
+  it('uses the spec suitability copy (ALLOWED)', () => {
+    const vm = buildRegimeViewModelBlock(
+      makeBlock({ clmmSuitability: { status: 'ALLOWED', reasons: [] } }),
+      GENERATED,
+    );
+    expect(vm.suitabilityLabel).toBe('CLMM suitable');
+  });
+
+  it('uses the spec suitability copy (BLOCKED)', () => {
+    const vm = buildRegimeViewModelBlock(
+      makeBlock({ clmmSuitability: { status: 'BLOCKED', reasons: [] } }),
+      GENERATED,
+    );
+    expect(vm.suitabilityLabel).toBe('CLMM not recommended');
+  });
+
+  it('uses the spec suitability copy (UNKNOWN)', () => {
+    const vm = buildRegimeViewModelBlock(
+      makeBlock({ clmmSuitability: { status: 'UNKNOWN', reasons: [] } }),
+      GENERATED,
+    );
+    expect(vm.suitabilityLabel).toBe('CLMM suitability unknown');
+  });
+
+  it('renders source label from metadata.source (no MCO fallback)', () => {
+    const vm = buildRegimeViewModelBlock(makeBlock(), GENERATED);
+    expect(vm.sourceLabel).toBe('GeckoTerminal · SOL/USDC · 1h');
+  });
+
+  it('formats generatedAge using elapsed time', () => {
+    const vm = buildRegimeViewModelBlock(makeBlock(), GENERATED + 12 * 60_000);
+    expect(vm.generatedAgeLabel).toBe('Generated 12m ago');
+  });
+
+  it('formats latestCandleAge from live clock (now - lastCandleUnixMs)', () => {
+    const vm = buildRegimeViewModelBlock(makeBlock(), GENERATED);
+    expect(vm.latestCandleAgeLabel).toBe('Latest candle is 87m old');
+  });
+
+  it('computes candle age from live clock, not cached ageSeconds', () => {
+    const block = makeBlock({
+      freshness: {
+        generatedAtUnixMs: GENERATED - 2 * 3_600_000,
+        lastCandleUnixMs: GENERATED - 2 * 3_600_000 - 30 * 60_000,
+        ageSeconds: 30 * 60,
+        softStale: true,
+        hardStale: false,
+        softStaleSeconds: 75 * 60,
+        hardStaleSeconds: 90 * 60,
+      },
+    });
+    const now = GENERATED;
+    const vm = buildRegimeViewModelBlock(block, now);
+    expect(vm.latestCandleAgeLabel).toBe('Latest candle is 150m old');
+  });
+
+  it('renders compact telemetry with qualitative trend label and vol ratio', () => {
+    const vm = buildRegimeViewModelBlock(makeBlock(), GENERATED);
+    expect(vm.compactTelemetryLabel).toBe('Trend flat · Vol ratio 1.06x');
+  });
+
+  it('does not render Trend strength as a 0–1 ratio in any label', () => {
+    const vm = buildRegimeViewModelBlock(makeBlock(), GENERATED);
+    expect(vm.compactTelemetryLabel).not.toContain('/ 1.00');
+    expect(vm.expandedTelemetryRows.find((r) => r.label === 'Trend strength')?.value).not.toContain(
+      '/ 1.00',
+    );
+  });
+});
+
+describe('buildRegimeViewModelBlock — display reasons', () => {
+  it('sorts reasons by severity ERROR > WARN > INFO', () => {
     const vm = buildRegimeViewModelBlock(
       makeBlock({
         marketReasons: [
           { severity: 'INFO', text: 'Momentum positive' },
           { severity: 'ERROR', text: 'Candle gap detected' },
-          { severity: 'WARN', text: 'High volatility' },
+          { severity: 'WARN', text: 'Elevated volatility' },
         ],
       }),
-      1_700_000_000_000,
+      GENERATED,
     );
-
-    expect(vm.marketReasonSummary).toBe('Candle gap detected');
+    expect(vm.displayReasons.map((r) => r.text)).toEqual([
+      'Candle gap detected',
+      'Elevated volatility',
+      'Momentum positive',
+    ]);
   });
 
-  it('returns em dash for empty market reasons', () => {
-    const vm = buildRegimeViewModelBlock(makeBlock({ marketReasons: [] }), 1_700_000_000_000);
-
-    expect(vm.marketReasonSummary).toBe('—');
-  });
-
-  it('renders freshness label with minutes for a fresh block', () => {
-    const captured = 1_700_000_000_000;
-    const now = captured + 5 * 60_000;
+  it('uses source order as a tie-breaker within the same severity', () => {
     const vm = buildRegimeViewModelBlock(
-      makeBlock({ freshness: { capturedAtUnixMs: captured, softStale: false, hardStale: false } }),
-      now,
+      makeBlock({
+        marketReasons: [
+          { severity: 'WARN', text: 'First warn' },
+          { severity: 'WARN', text: 'Second warn' },
+        ],
+      }),
+      GENERATED,
     );
-
-    expect(vm.freshnessLabel).toBe('MCO · 5m ago');
-    expect(vm.isStale).toBe(false);
+    expect(vm.displayReasons.map((r) => r.text)).toEqual(['First warn', 'Second warn']);
   });
 
-  it('marks stale when captured more than 48 hours ago', () => {
-    const captured = 1_700_000_000_000;
-    const now = captured + 49 * 3_600_000;
-    const vm = buildRegimeViewModelBlock(
-      makeBlock({ freshness: { capturedAtUnixMs: captured, softStale: true, hardStale: false } }),
-      now,
-    );
-
-    expect(vm.isStale).toBe(true);
-    expect(vm.freshnessLabel).toContain('stale');
-  });
-
-  it('uses metadata source in freshness label when present', () => {
-    const captured = 1_700_000_000_000;
-    const now = captured + 10 * 60_000;
-    const vm = buildRegimeViewModelBlock(makeBlock({ metadata: { source: 'MCO-v2' } }), now);
-
-    expect(vm.freshnessLabel).toBe('MCO-v2 · 10m ago');
-  });
-
-  it('passes through suitability status', () => {
-    const vm = buildRegimeViewModelBlock(
-      makeBlock({ clmmSuitability: { status: 'CAUTION', reasons: [] } }),
-      1_700_000_000_000,
-    );
-
-    expect(vm.suitabilityStatus).toBe('CAUTION');
-  });
-
-  it('marks stale when upstream hardStale is true regardless of age', () => {
-    const captured = 1_700_000_000_000;
-    const now = captured + 5 * 60_000;
-    const vm = buildRegimeViewModelBlock(
-      makeBlock({ freshness: { capturedAtUnixMs: captured, softStale: true, hardStale: true } }),
-      now,
-    );
-
-    expect(vm.isStale).toBe(true);
-    expect(vm.freshnessLabel).toContain('stale');
-  });
-
-  it('does not mark stale when upstream softStale is true but hardStale is false and age is recent', () => {
-    const captured = 1_700_000_000_000;
-    const now = captured + 5 * 60_000;
-    const vm = buildRegimeViewModelBlock(
-      makeBlock({ freshness: { capturedAtUnixMs: captured, softStale: true, hardStale: false } }),
-      now,
-    );
-
-    expect(vm.isStale).toBe(false);
-  });
-
-  it('shows top severity suitability reason when CAUTION', () => {
+  it('dedupes by code when present', () => {
     const vm = buildRegimeViewModelBlock(
       makeBlock({
         clmmSuitability: {
           status: 'CAUTION',
-          reasons: [
-            { severity: 'INFO', text: 'Trend is still forming' },
-            { severity: 'WARN', text: 'Elevated volatility' },
-          ],
+          reasons: [{ severity: 'WARN', text: 'A', code: 'X' }],
         },
+        marketReasons: [{ severity: 'WARN', text: 'B', code: 'X' }],
       }),
-      1_700_000_000_000,
+      GENERATED,
     );
-
-    expect(vm.suitabilityLabel).toBe('⚠ Caution');
-    expect(vm.suitabilityReason).toBe('Elevated volatility');
+    expect(vm.displayReasons.length).toBe(1);
   });
 
-  it('shows top severity suitability reason when BLOCKED', () => {
+  it('dedupes by normalized text when code is absent', () => {
     const vm = buildRegimeViewModelBlock(
       makeBlock({
         clmmSuitability: {
-          status: 'BLOCKED',
-          reasons: [{ severity: 'ERROR', text: 'Extreme market dislocation' }],
+          status: 'CAUTION',
+          reasons: [{ severity: 'WARN', text: 'Elevated  Volatility' }],
         },
+        marketReasons: [{ severity: 'WARN', text: 'elevated volatility' }],
       }),
-      1_700_000_000_000,
+      GENERATED,
     );
-
-    expect(vm.suitabilityReason).toBe('Extreme market dislocation');
+    expect(vm.displayReasons.length).toBe(1);
   });
 
-  it('returns null suitabilityReason for ALLOWED status', () => {
+  it('collapses any code containing STALE or text containing stale into one freshness reason', () => {
     const vm = buildRegimeViewModelBlock(
       makeBlock({
         clmmSuitability: {
-          status: 'ALLOWED',
-          reasons: [{ severity: 'INFO', text: 'Favorable conditions' }],
+          status: 'CAUTION',
+          reasons: [{ severity: 'WARN', text: 'Data is soft-stale', code: 'DATA_SOFT_STALE' }],
         },
+        marketReasons: [
+          { severity: 'WARN', text: 'Stale signals due to old candles' },
+          { severity: 'WARN', text: 'Latest candle is past hard-stale threshold' },
+        ],
       }),
-      1_700_000_000_000,
+      GENERATED,
     );
-
-    expect(vm.suitabilityReason).toBeNull();
+    const stale = vm.displayReasons.filter((r) => /stale/i.test(r.text));
+    expect(stale.length).toBe(1);
   });
 
-  it('returns null suitabilityReason for CAUTION with empty reasons', () => {
+  it('exposes exactly one primaryDisplayReason', () => {
     const vm = buildRegimeViewModelBlock(
-      makeBlock({ clmmSuitability: { status: 'CAUTION', reasons: [] } }),
-      1_700_000_000_000,
+      makeBlock({
+        marketReasons: [
+          { severity: 'INFO', text: 'Momentum positive' },
+          { severity: 'WARN', text: 'Elevated volatility' },
+        ],
+      }),
+      GENERATED,
     );
+    expect(vm.primaryDisplayReason?.text).toBe('Elevated volatility');
+  });
 
-    expect(vm.suitabilityReason).toBeNull();
+  it('returns null primaryDisplayReason when no reasons exist', () => {
+    const vm = buildRegimeViewModelBlock(makeBlock({ marketReasons: [] }), GENERATED);
+    expect(vm.primaryDisplayReason).toBeNull();
+  });
+});
+
+describe('buildRegimeViewModelBlock — expanded rows', () => {
+  it('expandedTelemetryRows includes all five telemetry numbers', () => {
+    const vm = buildRegimeViewModelBlock(makeBlock(), GENERATED);
+    const labels = vm.expandedTelemetryRows.map((r) => r.label);
+    expect(labels).toEqual(
+      expect.arrayContaining([
+        'Trend strength',
+        'Realized vol short',
+        'Realized vol long',
+        'Volatility ratio',
+        'Compression',
+      ]),
+    );
+  });
+
+  it('expandedSampleRows includes samples and provenance', () => {
+    const vm = buildRegimeViewModelBlock(
+      makeBlock({
+        metadata: {
+          source: 'geckoterminal',
+          network: 'solana',
+          symbol: 'SOL/USDC',
+          timeframe: '1h',
+          sourceTimeframe: '15m',
+          sourceCandleCount: 346,
+          candleCount: 86,
+          derivedTimeframe: '1h',
+          aggregationVersion: 'ohlcv-agg-v1',
+        },
+      }),
+      GENERATED,
+    );
+    const sampleRows = vm.expandedSampleRows.map((r) => r.label);
+    expect(sampleRows).toEqual(
+      expect.arrayContaining(['Samples', 'Source candles', 'Derived timeframe', 'Aggregation']),
+    );
+  });
+
+  it('expandedFreshnessRows includes both thresholds and the latest-candle clock', () => {
+    const vm = buildRegimeViewModelBlock(makeBlock(), GENERATED);
+    const labels = vm.expandedFreshnessRows.map((r) => r.label);
+    expect(labels).toEqual(
+      expect.arrayContaining(['Latest candle', 'Soft stale threshold', 'Hard stale threshold']),
+    );
+  });
+
+  it('expandedFreshnessRows computes candle age from live clock, not cached ageSeconds', () => {
+    const block = makeBlock({
+      freshness: {
+        generatedAtUnixMs: GENERATED - 2 * 3_600_000,
+        lastCandleUnixMs: GENERATED - 2 * 3_600_000 - 30 * 60_000,
+        ageSeconds: 30 * 60,
+        softStale: true,
+        hardStale: false,
+        softStaleSeconds: 75 * 60,
+        hardStaleSeconds: 90 * 60,
+      },
+    });
+    const vm = buildRegimeViewModelBlock(block, GENERATED);
+    const candleRow = vm.expandedFreshnessRows.find((r) => r.label === 'Latest candle');
+    expect(candleRow?.value).toBe('150m old');
   });
 });

@@ -9,9 +9,21 @@ export type RegimeReason = {
 };
 
 export type RegimeFreshness = {
-  capturedAtUnixMs: number;
+  generatedAtUnixMs: number;
+  lastCandleUnixMs: number;
+  ageSeconds: number;
   softStale: boolean;
   hardStale: boolean;
+  softStaleSeconds: number;
+  hardStaleSeconds: number;
+};
+
+export type RegimeTelemetry = {
+  realizedVolShort: number;
+  realizedVolLong: number;
+  volRatio: number;
+  trendStrength: number;
+  compression: number;
 };
 
 export type RegimeClmmSuitability = {
@@ -20,18 +32,24 @@ export type RegimeClmmSuitability = {
 };
 
 export type RegimeMetadata = {
-  source?: string;
-  network?: string;
-  symbol?: string;
-  timeframe?: string;
+  source: string;
+  network: string;
+  symbol: string;
+  timeframe: string;
+  sourceTimeframe?: string;
+  sourceCandleCount?: number;
+  candleCount?: number;
+  derivedTimeframe?: string;
+  aggregationVersion?: string;
+  engineVersion?: string;
+  configVersion?: string;
 };
 
 export type RegimeBlock = {
   regime: MarketRegime;
-  trendStrength: number;
-  volRatio: number;
+  telemetry: RegimeTelemetry;
   clmmSuitability: RegimeClmmSuitability;
   marketReasons: RegimeReason[];
   freshness: RegimeFreshness;
-  metadata?: RegimeMetadata;
+  metadata: RegimeMetadata;
 };

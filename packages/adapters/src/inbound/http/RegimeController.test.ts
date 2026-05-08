@@ -13,11 +13,30 @@ const testEntry: RegimePoolEntry = {
 
 const testBlock: RegimeBlock = {
   regime: 'UP',
-  trendStrength: 0.75,
-  volRatio: 1.2,
+  telemetry: {
+    realizedVolShort: 0.007,
+    realizedVolLong: 0.0107,
+    volRatio: 1.06,
+    trendStrength: 0.00018,
+    compression: 0.0092,
+  },
   clmmSuitability: { status: 'ALLOWED', reasons: [] },
   marketReasons: [],
-  freshness: { capturedAtUnixMs: 1700000000000, softStale: false, hardStale: false },
+  freshness: {
+    generatedAtUnixMs: 1_700_000_000_000,
+    lastCandleUnixMs: 1_700_000_000_000 - 87 * 60_000,
+    ageSeconds: 87 * 60,
+    softStale: false,
+    hardStale: false,
+    softStaleSeconds: 75 * 60,
+    hardStaleSeconds: 90 * 60,
+  },
+  metadata: {
+    source: 'geckoterminal',
+    network: 'solana',
+    symbol: 'SOL/USDC',
+    timeframe: '1h',
+  },
 };
 
 function makeAllowlist(
