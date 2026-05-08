@@ -314,5 +314,29 @@ describe('OrcaPositionFeeRewardQuoteHelper', () => {
         expect(ri.amountOwed).toBe(0n);
       }
     });
+
+    it('returns unavailable with reason "fee-quote-failed" when an unexpected error escapes the inner catch blocks', async () => {
+      const { getTickArrayStartTickIndex } = await import('@orca-so/whirlpools-core');
+
+      // getTickArrayStartTickIndex is called before any inner try/catch — if it throws,
+      // the outer catch in quote() must classify it as fee-quote-failed rather than rejecting.
+      vi.mocked(getTickArrayStartTickIndex).mockImplementation(() => {
+        throw new Error('unsupported tick index derivation');
+      });
+
+      const helper = new OrcaPositionFeeRewardQuoteHelper();
+      const result = await helper.quote({
+        rpc: mockRpc,
+        position: makePosition(),
+        whirlpool: makeWhirlpool(),
+        whirlpoolAddress: MOCK_WHIRLPOOL,
+      });
+
+      expect(result.kind).toBe('unavailable');
+      if (result.kind !== 'unavailable') throw new Error('expected unavailable');
+      expect(result.reason).toBe('fee-quote-failed');
+      expect(result.errorName).toBe('Error');
+      expect(result.errorMessage).toBe('unsupported tick index derivation');
+    });
   });
 });

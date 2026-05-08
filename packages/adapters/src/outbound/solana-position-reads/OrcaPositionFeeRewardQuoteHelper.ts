@@ -80,6 +80,14 @@ function describeError(err: unknown): { errorName?: string; errorMessage?: strin
 
 export class OrcaPositionFeeRewardQuoteHelper {
   async quote(args: QuoteArgs): Promise<FeeRewardQuoteResult> {
+    try {
+      return await this.#quote(args);
+    } catch (err) {
+      return { kind: 'unavailable', reason: 'fee-quote-failed', ...describeError(err) };
+    }
+  }
+
+  async #quote(args: QuoteArgs): Promise<FeeRewardQuoteResult> {
     const { rpc, position, whirlpool, whirlpoolAddress } = args;
 
     const lowerStart = getTickArrayStartTickIndex(position.tickLowerIndex, whirlpool.tickSpacing);
