@@ -1,7 +1,8 @@
-import { View, Text, ActivityIndicator } from 'react-native';
+import { useState } from 'react';
+import { View, Text, ActivityIndicator, Pressable } from 'react-native';
 import type { RegimeBlock } from '@clmm/application/public';
 import { colors, typography } from '../design-system/index.js';
-import { buildRegimeViewModelBlock } from '../view-models/RegimeViewModel.js';
+import { buildRegimeViewModelBlock, type RegimeDetailRow } from '../view-models/RegimeViewModel.js';
 
 type RegimeUnavailableReason = 'not-found' | 'config-error' | 'upstream-error';
 
@@ -14,17 +15,6 @@ type Props = {
   now: number;
 };
 
-function mapUnavailableCopy(reason: RegimeUnavailableReason): string {
-  switch (reason) {
-    case 'not-found':
-      return 'Market data not available yet';
-    case 'config-error':
-      return 'Market context unavailable';
-    case 'upstream-error':
-      return 'Market context unavailable';
-  }
-}
-
 const cardStyle = {
   marginHorizontal: 16,
   marginTop: 14,
@@ -35,17 +25,56 @@ const cardStyle = {
   borderColor: colors.border,
 } as const;
 
-function suitabilityColor(status: string): string {
-  switch (status) {
-    case 'ALLOWED':
-      return colors.safe;
-    case 'CAUTION':
-      return colors.warn;
-    case 'BLOCKED':
-      return colors.breachAccent;
-    default:
-      return colors.textTertiary;
+function mapUnavailableCopy(reason: RegimeUnavailableReason): string {
+  switch (reason) {
+    case 'not-found':
+      return 'Market data not available yet';
+    case 'config-error':
+    case 'upstream-error':
+      return 'Market context unavailable';
   }
+}
+
+function toneColor(
+  tone: 'default' | 'muted' | 'warning' | 'danger' | 'success' | undefined,
+): string {
+  switch (tone) {
+    case 'success':
+      return colors.safe;
+    case 'warning':
+      return colors.warn;
+    case 'danger':
+      return colors.breachAccent;
+    case 'muted':
+      return colors.textTertiary;
+    default:
+      return colors.textBody;
+  }
+}
+
+function DetailRows({ rows }: { rows: RegimeDetailRow[] }): JSX.Element {
+  return (
+    <View>
+      {rows.map((row) => (
+        <View
+          key={row.label}
+          style={{ flexDirection: 'row', justifyContent: 'space-between', marginTop: 2 }}
+        >
+          <Text
+            style={{
+              color: colors.textSecondary,
+              fontSize: typography.fontSize.xs,
+            }}
+          >
+            {row.label}
+          </Text>
+          <Text style={{ color: toneColor(row.tone), fontSize: typography.fontSize.xs }}>
+            {row.value}
+          </Text>
+        </View>
+      ))}
+    </View>
+  );
 }
 
 export function RegimeSection({
@@ -56,6 +85,8 @@ export function RegimeSection({
   unavailableReason,
   now,
 }: Props): JSX.Element | null {
+  const [expanded, setExpanded] = useState(false);
+
   if (!isLoading && regime === undefined && !isError && !isUnsupported) {
     return null;
   }
@@ -68,23 +99,6 @@ export function RegimeSection({
     );
   }
 
-  if (isUnsupported && regime == null) {
-    return (
-      <View style={cardStyle}>
-        <Text style={{ color: colors.textSecondary, fontSize: typography.fontSize.sm }}>
-          Regime analysis unavailable
-        </Text>
-        {unavailableReason ? (
-          <Text
-            style={{ color: colors.textSecondary, fontSize: typography.fontSize.sm, marginTop: 4 }}
-          >
-            {mapUnavailableCopy(unavailableReason)}
-          </Text>
-        ) : null}
-      </View>
-    );
-  }
-
   if (regime == null) {
     return (
       <View style={cardStyle}>
@@ -93,7 +107,11 @@ export function RegimeSection({
         </Text>
         {unavailableReason ? (
           <Text
-            style={{ color: colors.textSecondary, fontSize: typography.fontSize.sm, marginTop: 4 }}
+            style={{
+              color: colors.textSecondary,
+              fontSize: typography.fontSize.sm,
+              marginTop: 4,
+            }}
           >
             {mapUnavailableCopy(unavailableReason)}
           </Text>
@@ -118,52 +136,67 @@ export function RegimeSection({
       </Text>
       <Text
         style={{
-          color: vm.isStale ? colors.warn : colors.textTertiary,
-          fontSize: typography.fontSize.xs,
-          marginTop: 2,
-        }}
-      >
-        {vm.freshnessLabel}
-        {vm.isStale ? ' · stale' : ''}
-      </Text>
-      <Text
-        style={{
-          color: suitabilityColor(vm.suitabilityStatus),
+          color: toneColor(vm.suitabilityTone),
           fontSize: typography.fontSize.sm,
-          marginTop: 6,
+          marginTop: 4,
         }}
       >
-        {vm.suitabilityLabel}
+        {vm.suitabilityLabel} · data {vm.dataQualityLabel.toLowerCase()}
       </Text>
-      {vm.suitabilityReason ? (
+      {vm.primaryDisplayReason ? (
         <Text
           style={{
-            color: colors.textSecondary,
+            color: colors.textBody,
             fontSize: typography.fontSize.xs,
-            marginTop: 2,
+            marginTop: 4,
           }}
         >
-          {vm.suitabilityReason}
+          {vm.primaryDisplayReason.text}
         </Text>
       ) : null}
       <Text
         style={{
           color: colors.textBody,
-          fontSize: typography.fontSize.sm,
+          fontSize: typography.fontSize.xs,
           marginTop: 4,
         }}
       >
-        {vm.trendLabel} · {vm.volLabel}
+        {vm.latestCandleAgeLabel}
       </Text>
       <Text
         style={{
           color: colors.textBody,
-          fontSize: typography.fontSize.sm,
+          fontSize: typography.fontSize.xs,
           marginTop: 4,
         }}
       >
-        {vm.marketReasonSummary}
+        {vm.compactTelemetryLabel}
       </Text>
+      <Text
+        style={{
+          color: colors.textTertiary,
+          fontSize: typography.fontSize.xs,
+          marginTop: 4,
+        }}
+      >
+        {vm.generatedAgeLabel} · Source: {vm.sourceLabel}
+      </Text>
+      {expanded ? (
+        <View style={{ marginTop: 8 }}>
+          <DetailRows rows={vm.expandedTelemetryRows} />
+          <View style={{ marginTop: 8 }}>
+            <DetailRows rows={vm.expandedSampleRows} />
+          </View>
+          <View style={{ marginTop: 8 }}>
+            <DetailRows rows={vm.expandedFreshnessRows} />
+          </View>
+        </View>
+      ) : null}
+      <Pressable onPress={() => setExpanded((prev) => !prev)} style={{ marginTop: 8 }}>
+        <Text style={{ color: colors.textSecondary, fontSize: typography.fontSize.xs }}>
+          {expanded ? 'Hide details' : 'Show details'}
+        </Text>
+      </Pressable>
       {showDegraded ? (
         <Text style={{ color: colors.warn, fontSize: typography.fontSize.xs, marginTop: 4 }}>
           Refresh failed — showing last available analysis.
