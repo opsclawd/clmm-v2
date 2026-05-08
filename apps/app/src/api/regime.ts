@@ -100,11 +100,26 @@ function isRegimeTelemetryBlock(value: unknown): boolean {
   return true;
 }
 
+function isOptionalString(value: unknown): boolean {
+  return value === undefined || typeof value === 'string';
+}
+
+function isOptionalPositiveNumber(value: unknown): boolean {
+  return value === undefined || (typeof value === 'number' && Number.isFinite(value) && value > 0);
+}
+
 function isRegimeMetadataBlock(value: unknown): boolean {
   if (!isRecord(value)) return false;
   for (const key of ['source', 'network', 'symbol', 'timeframe']) {
-    if (typeof value[key] !== 'string' || (value[key]).length === 0) return false;
+    if (typeof value[key] !== 'string' || value[key].length === 0) return false;
   }
+  if (!isOptionalString(value['sourceTimeframe'])) return false;
+  if (!isOptionalPositiveNumber(value['sourceCandleCount'])) return false;
+  if (!isOptionalPositiveNumber(value['candleCount'])) return false;
+  if (!isOptionalString(value['derivedTimeframe'])) return false;
+  if (!isOptionalString(value['aggregationVersion'])) return false;
+  if (!isOptionalString(value['engineVersion'])) return false;
+  if (!isOptionalString(value['configVersion'])) return false;
   return true;
 }
 

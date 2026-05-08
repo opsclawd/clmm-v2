@@ -190,4 +190,24 @@ describe('fetchCurrentRegime', () => {
     expect(error).toBeInstanceOf(Error);
     expect((error as Error).message).toContain('malformed regime block');
   });
+
+  it('throws when optional metadata fields have wrong types', async () => {
+    env.EXPO_PUBLIC_BFF_BASE_URL = 'https://bff.example.test';
+
+    const block = fixtureBlock();
+    const broken: Record<string, unknown> = {
+      ...block,
+      metadata: { ...block.metadata, configVersion: {}, engineVersion: 123 },
+    };
+
+    globalThis.fetch = vi.fn().mockResolvedValue({
+      ok: true,
+      status: 200,
+      json: () => Promise.resolve({ regime: broken }),
+    }) as typeof fetch;
+
+    const error = await fetchCurrentRegime(POOL_ID).catch((reason: unknown) => reason);
+    expect(error).toBeInstanceOf(Error);
+    expect((error as Error).message).toContain('malformed regime block');
+  });
 });
