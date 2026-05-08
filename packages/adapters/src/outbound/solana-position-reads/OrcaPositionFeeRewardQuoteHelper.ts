@@ -62,7 +62,6 @@ type OrcaWhirlpool = {
 export type QuoteArgs = {
   readonly rpc: Rpc;
   readonly position: OrcaPosition;
-  readonly positionMint: string;
   readonly whirlpool: OrcaWhirlpool;
   readonly whirlpoolAddress: Address | string;
 };

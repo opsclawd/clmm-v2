@@ -209,7 +209,6 @@ export class SolanaPositionSnapshotReader {
     const quote = await this.quoteHelper.quote({
       rpc,
       position: pos as never,
-      positionMint: positionId,
       whirlpool: w as never,
       whirlpoolAddress,
     });

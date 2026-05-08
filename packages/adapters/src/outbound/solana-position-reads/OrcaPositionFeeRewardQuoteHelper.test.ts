@@ -18,7 +18,6 @@ vi.mock('@orca-so/whirlpools-core', () => ({
 }));
 
 const MOCK_WHIRLPOOL = '7qbRF6YsyGuLUVs6Y1q64bdVrfe4ZcUUz1JRdoVNUJnm';
-const MOCK_POSITION_MINT = '2Wgh4mq6rp1q6H1G6K3ZsR3LBdqT5qVJb5KfF3U7Y2hX';
 const SOL_MINT = 'So11111111111111111111111111111111111111112';
 const USDC_MINT = 'EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v';
 
@@ -130,7 +129,6 @@ describe('OrcaPositionFeeRewardQuoteHelper', () => {
       const result = await helper.quote({
         rpc: mockRpc,
         position: makePosition(),
-        positionMint: MOCK_POSITION_MINT,
         whirlpool: makeWhirlpool(),
         whirlpoolAddress: MOCK_WHIRLPOOL,
       });
@@ -162,7 +160,6 @@ describe('OrcaPositionFeeRewardQuoteHelper', () => {
       const result = await helper.quote({
         rpc: mockRpc,
         position: makePosition(),
-        positionMint: MOCK_POSITION_MINT,
         whirlpool: makeWhirlpool(),
         whirlpoolAddress: MOCK_WHIRLPOOL,
       });
@@ -193,7 +190,6 @@ describe('OrcaPositionFeeRewardQuoteHelper', () => {
       const result = await helper.quote({
         rpc: mockRpc,
         position: makePosition(),
-        positionMint: MOCK_POSITION_MINT,
         whirlpool: makeWhirlpool(),
         whirlpoolAddress: MOCK_WHIRLPOOL,
       });
@@ -225,7 +221,6 @@ describe('OrcaPositionFeeRewardQuoteHelper', () => {
       const result = await helper.quote({
         rpc: mockRpc,
         position: makePosition(),
-        positionMint: MOCK_POSITION_MINT,
         whirlpool: makeWhirlpool(),
         whirlpoolAddress: MOCK_WHIRLPOOL,
       });
@@ -263,7 +258,6 @@ describe('OrcaPositionFeeRewardQuoteHelper', () => {
       const result = await helper.quote({
         rpc: mockRpc,
         position: makePosition(),
-        positionMint: MOCK_POSITION_MINT,
         whirlpool: makeWhirlpool(),
         whirlpoolAddress: MOCK_WHIRLPOOL,
       });
@@ -301,7 +295,6 @@ describe('OrcaPositionFeeRewardQuoteHelper', () => {
       const result = await helper.quote({
         rpc: mockRpc,
         position: makePosition(),
-        positionMint: MOCK_POSITION_MINT,
         whirlpool: makeWhirlpool({
           rewardInfos: [
             { mint: { toString: () => '' } },
