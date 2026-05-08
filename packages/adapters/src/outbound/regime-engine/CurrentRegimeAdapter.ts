@@ -29,13 +29,13 @@ function parseReasons(raw: unknown): RegimeReason[] | null {
   for (const item of raw) {
     if (!isRecord(item)) return null;
     const sev = item['severity'];
-    const text = item['text'];
+    const message = item['message'];
     if (typeof sev !== 'string' || !VALID_SEVERITIES.has(sev as RegimeReasonSeverity)) return null;
-    if (typeof text !== 'string') return null;
+    if (typeof message !== 'string') return null;
     const code = item['code'];
     out.push({
       severity: sev as RegimeReasonSeverity,
-      text,
+      text: message,
       ...(typeof code === 'string' ? { code } : {}),
     });
   }
@@ -48,8 +48,10 @@ function parseUpstream(data: unknown): RegimeBlock | null {
   const regime = data['regime'];
   if (typeof regime !== 'string' || !VALID_REGIMES.has(regime as MarketRegime)) return null;
 
-  const trendStrength = data['trendStrength'];
-  const volRatio = data['volRatio'];
+  const telemetry = data['telemetry'];
+  if (!isRecord(telemetry)) return null;
+  const trendStrength = telemetry['trendStrength'];
+  const volRatio = telemetry['volRatio'];
   if (typeof trendStrength !== 'number' || !Number.isFinite(trendStrength)) return null;
   if (typeof volRatio !== 'number' || !Number.isFinite(volRatio)) return null;
 
@@ -66,12 +68,12 @@ function parseUpstream(data: unknown): RegimeBlock | null {
 
   const freshness = data['freshness'];
   if (!isRecord(freshness)) return null;
-  const capturedAtIso = freshness['capturedAtIso'];
+  const generatedAtIso = freshness['generatedAtIso'];
   const softStale = freshness['softStale'];
   const hardStale = freshness['hardStale'];
-  if (typeof capturedAtIso !== 'string') return null;
+  if (typeof generatedAtIso !== 'string') return null;
   if (typeof softStale !== 'boolean' || typeof hardStale !== 'boolean') return null;
-  const capturedAtUnixMs = Date.parse(capturedAtIso);
+  const capturedAtUnixMs = Date.parse(generatedAtIso);
   if (!Number.isFinite(capturedAtUnixMs)) return null;
 
   const metadataRaw = data['metadata'];
@@ -191,9 +193,12 @@ export class CurrentRegimeAdapter implements RegimeReadPort {
     try {
       const body = (await response.json()) as unknown;
       if (!isRecord(body)) return null;
+      const err = body['error'];
       const out: { code?: string; message?: string } = {};
-      if (typeof body['code'] === 'string') out.code = body['code'];
-      if (typeof body['message'] === 'string') out.message = body['message'];
+      if (isRecord(err)) {
+        if (typeof err['code'] === 'string') out.code = err['code'];
+        if (typeof err['message'] === 'string') out.message = err['message'];
+      }
       return out;
     } catch {
       return null;
