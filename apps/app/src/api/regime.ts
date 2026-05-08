@@ -70,24 +70,53 @@ function isRegimeClmmSuitabilityBlock(value: unknown): value is RegimeClmmSuitab
 
 function isRegimeFreshnessBlock(value: unknown): value is RegimeFreshness {
   if (!isRecord(value)) return false;
-  const captured = value['capturedAtUnixMs'];
-  if (typeof captured !== 'number' || !Number.isFinite(captured) || captured <= 0) return false;
+  const generated = value['generatedAtUnixMs'];
+  const last = value['lastCandleUnixMs'];
+  const age = value['ageSeconds'];
+  const softSec = value['softStaleSeconds'];
+  const hardSec = value['hardStaleSeconds'];
+  if (typeof generated !== 'number' || !Number.isFinite(generated) || generated <= 0) return false;
+  if (typeof last !== 'number' || !Number.isFinite(last) || last <= 0) return false;
+  if (typeof age !== 'number' || !Number.isFinite(age) || age < 0) return false;
   if (typeof value['softStale'] !== 'boolean') return false;
   if (typeof value['hardStale'] !== 'boolean') return false;
+  if (typeof softSec !== 'number' || !Number.isFinite(softSec) || softSec <= 0) return false;
+  if (typeof hardSec !== 'number' || !Number.isFinite(hardSec) || hardSec <= softSec) return false;
+  return true;
+}
+
+function isRegimeTelemetryBlock(value: unknown): boolean {
+  if (!isRecord(value)) return false;
+  for (const key of [
+    'realizedVolShort',
+    'realizedVolLong',
+    'volRatio',
+    'trendStrength',
+    'compression',
+  ]) {
+    const v = value[key];
+    if (typeof v !== 'number' || !Number.isFinite(v)) return false;
+  }
+  return true;
+}
+
+function isRegimeMetadataBlock(value: unknown): boolean {
+  if (!isRecord(value)) return false;
+  for (const key of ['source', 'network', 'symbol', 'timeframe']) {
+    if (typeof value[key] !== 'string' || (value[key]).length === 0) return false;
+  }
   return true;
 }
 
 function isRegimeBlock(value: unknown): value is RegimeBlock {
   if (!isRecord(value)) return false;
   if (!VALID_MARKET_REGIMES.has(value['regime'] as string)) return false;
-  if (typeof value['trendStrength'] !== 'number' || !Number.isFinite(value['trendStrength']))
-    return false;
-  if (typeof value['volRatio'] !== 'number' || !Number.isFinite(value['volRatio'])) return false;
+  if (!isRegimeTelemetryBlock(value['telemetry'])) return false;
   if (!isRegimeClmmSuitabilityBlock(value['clmmSuitability'])) return false;
   if (!Array.isArray(value['marketReasons'])) return false;
   if (!(value['marketReasons'] as unknown[]).every(isRegimeReasonBlock)) return false;
   if (!isRegimeFreshnessBlock(value['freshness'])) return false;
-  if (value['metadata'] != null && !isRecord(value['metadata'])) return false;
+  if (!isRegimeMetadataBlock(value['metadata'])) return false;
   return true;
 }
 
