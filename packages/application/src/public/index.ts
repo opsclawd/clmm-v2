@@ -23,6 +23,7 @@ export type {
   RegimeReason,
   RegimeReasonSeverity,
   RegimeFreshness,
+  RegimeTelemetry,
   RegimeClmmSuitability,
   RegimeMetadata,
   PolicyInsightBlock,

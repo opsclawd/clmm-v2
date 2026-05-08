@@ -331,6 +331,7 @@ export type {
   RegimeReasonSeverity,
   RegimeReason,
   RegimeFreshness,
+  RegimeTelemetry,
   RegimeClmmSuitability,
   RegimeMetadata,
   RegimeBlock,
