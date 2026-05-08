@@ -89,7 +89,8 @@ const systemIds: IdGeneratorPort = {
   generateId: () => `${Date.now()}-${++_idCounter}`,
 };
 
-const snapshotReader = new SolanaPositionSnapshotReader(rpcUrl);
+const telemetryEarly = new TelemetryAdapter();
+const snapshotReader = new SolanaPositionSnapshotReader(rpcUrl, telemetryEarly);
 const poolDataCacheTtlMs = parsePoolDataCacheTtlMs(
   (process.env as Record<string, string | undefined>)['CLMM_POOL_DATA_CACHE_TTL_MS'],
 );
@@ -106,7 +107,7 @@ const solanaPreparation = new SolanaExecutionPreparationAdapter(rpcUrl, snapshot
 const solanaSubmission = new SolanaExecutionSubmissionAdapter(rpcUrl);
 const monitoredWalletStorage = new MonitoredWalletStorageAdapter(db);
 const walletChallengeStorage = new WalletChallengePostgresAdapter(db);
-const telemetry = new TelemetryAdapter();
+const telemetry = telemetryEarly;
 const regimeEngineBaseUrl =
   (process.env as Record<string, string | undefined>)['REGIME_ENGINE_BASE_URL'] ?? null;
 const regimeEngineInternalToken =

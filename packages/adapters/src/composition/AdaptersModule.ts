@@ -58,7 +58,8 @@ const systemIds: IdGeneratorPort = {
   generateId: () => `${Date.now()}-${++_idCounter}`,
 };
 
-const snapshotReader = new SolanaPositionSnapshotReader(rpcUrl);
+const telemetryEarly = new TelemetryAdapter();
+const snapshotReader = new SolanaPositionSnapshotReader(rpcUrl, telemetryEarly);
 const orcaPositionRead = new OrcaPositionReadAdapter(rpcUrl, snapshotReader, db);
 const rangeObservation = new SolanaRangeObservationAdapter(rpcUrl);
 const operationalStorage = new OperationalStorageAdapter(db, systemIds);
@@ -68,7 +69,7 @@ const notificationDedupStorage = new NotificationDedupStorageAdapter(db);
 const solanaPreparation = new SolanaExecutionPreparationAdapter(rpcUrl, snapshotReader);
 const solanaSubmission = new SolanaExecutionSubmissionAdapter(rpcUrl);
 const durableNotificationEvent = new DurableNotificationEventAdapter(db, systemIds);
-const telemetry = new TelemetryAdapter();
+const telemetry = telemetryEarly;
 const regimeEngineBaseUrl =
   (process.env as Record<string, string | undefined>)['REGIME_ENGINE_BASE_URL'] ?? null;
 const regimeEngineInternalToken =
