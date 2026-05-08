@@ -18,6 +18,12 @@ export type PolicyInsightRiskLevel = 'normal' | 'elevated' | 'critical';
 export type PolicyInsightDataQuality = 'complete' | 'partial' | 'stale';
 export type PolicyInsightStatus = 'FRESH' | 'STALE';
 
+export type PolicyInsightsUnavailableReason =
+  | 'not-found'
+  | 'store-unavailable'
+  | 'config-error'
+  | 'upstream-error';
+
 export type PolicyInsightClmmPolicy = {
   posture: string;
   rangeBias: string;

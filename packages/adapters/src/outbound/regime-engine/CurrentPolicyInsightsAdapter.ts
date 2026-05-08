@@ -9,7 +9,7 @@ import type {
   PolicyInsightRecommendedAction,
   PolicyInsightRiskLevel,
   PolicyInsightStatus,
-  PolicyInsightReadResult,
+  PolicyInsightsReadResult,
   PolicyInsightsReadPort,
 } from '@clmm/application';
 
@@ -70,6 +70,7 @@ function parseClmmPolicy(raw: unknown): PolicyInsightClmmPolicy | null {
   if (typeof maxCapitalDeploymentPct !== 'number' || !Number.isFinite(maxCapitalDeploymentPct)) {
     return null;
   }
+  if (maxCapitalDeploymentPct < 0 || maxCapitalDeploymentPct > 1) return null;
   return { posture, rangeBias, rebalanceSensitivity, maxCapitalDeploymentPct };
 }
 
@@ -174,7 +175,7 @@ export class CurrentPolicyInsightsAdapter implements PolicyInsightsReadPort {
     private readonly observability: ObservabilityPort,
   ) {}
 
-  async fetchCurrent(): Promise<PolicyInsightReadResult> {
+  async fetchCurrent(): Promise<PolicyInsightsReadResult> {
     if (!this.baseUrl) {
       this.observability.log(
         'warn',
@@ -193,54 +194,65 @@ export class CurrentPolicyInsightsAdapter implements PolicyInsightsReadPort {
       return { kind: 'config-error' };
     }
 
+    if (url.protocol !== 'http:' && url.protocol !== 'https:') {
+      this.observability.log('warn', 'PolicyInsights base URL uses disallowed protocol', {
+        protocol: url.protocol,
+      });
+      return { kind: 'config-error' };
+    }
+
     const controller = new AbortController();
     const timeout = setTimeout(() => controller.abort(), FETCH_TIMEOUT_MS);
 
-    let response: Response;
     try {
-      response = await fetch(url.toString(), { signal: controller.signal });
-    } catch (error: unknown) {
-      const message = error instanceof Error ? error.message : String(error);
-      this.observability.log('warn', 'PolicyInsights fetch network error', { message });
+      let response: Response;
+      try {
+        response = await fetch(url.toString(), { signal: controller.signal });
+      } catch (error: unknown) {
+        const message = error instanceof Error ? error.message : String(error);
+        this.observability.log('warn', 'PolicyInsights fetch network error', { message });
+        return { kind: 'upstream-error' };
+      }
+
+      if (response.status === 200) {
+        let body: unknown;
+        try {
+          body = await response.json();
+        } catch {
+          this.observability.log('warn', 'PolicyInsights response was not valid JSON');
+          return { kind: 'upstream-error' };
+        }
+        const block = parseUpstream(body);
+        if (!block) {
+          this.observability.log('warn', 'PolicyInsights response failed shape validation');
+          return { kind: 'upstream-error' };
+        }
+        return { kind: 'block', block };
+      }
+
+      if (response.status === 404) {
+        const envelope = await this.readErrorEnvelope(response);
+        if (!envelope || envelope.code === 'INSIGHT_NOT_FOUND' || envelope.code == null) {
+          return { kind: 'not-found' };
+        }
+        this.observability.log('warn', 'PolicyInsights upstream 404 with unexpected code', {
+          envelope,
+        });
+        return { kind: 'not-found' };
+      }
+
+      if (response.status === 503) {
+        this.observability.log('warn', 'PolicyInsights upstream 503 store unavailable');
+        return { kind: 'store-unavailable' };
+      }
+
+      this.observability.log('warn', 'PolicyInsights upstream non-2xx', {
+        status: response.status,
+      });
       return { kind: 'upstream-error' };
     } finally {
       clearTimeout(timeout);
     }
-
-    if (response.status === 200) {
-      let body: unknown;
-      try {
-        body = await response.json();
-      } catch {
-        this.observability.log('warn', 'PolicyInsights response was not valid JSON');
-        return { kind: 'upstream-error' };
-      }
-      const block = parseUpstream(body);
-      if (!block) {
-        this.observability.log('warn', 'PolicyInsights response failed shape validation');
-        return { kind: 'upstream-error' };
-      }
-      return { kind: 'block', block };
-    }
-
-    if (response.status === 404) {
-      const envelope = await this.readErrorEnvelope(response);
-      if (!envelope || envelope.code === 'INSIGHT_NOT_FOUND' || envelope.code == null) {
-        return { kind: 'not-found' };
-      }
-      this.observability.log('warn', 'PolicyInsights upstream 404 with unexpected code', {
-        envelope,
-      });
-      return { kind: 'not-found' };
-    }
-
-    if (response.status === 503) {
-      this.observability.log('warn', 'PolicyInsights upstream 503 store unavailable');
-      return { kind: 'store-unavailable' };
-    }
-
-    this.observability.log('warn', 'PolicyInsights upstream non-2xx', { status: response.status });
-    return { kind: 'upstream-error' };
   }
 
   private async readErrorEnvelope(

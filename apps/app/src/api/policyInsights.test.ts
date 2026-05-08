@@ -157,6 +157,22 @@ describe('fetchCurrentPolicyInsight', () => {
     expect((error as Error).message).toContain('malformed policyInsight block');
   });
 
+  it('throws on 200 with negative maxCapitalDeploymentPct', async () => {
+    env.EXPO_PUBLIC_BFF_BASE_URL = 'https://bff.example.test';
+    const block = fixtureBlock();
+    (block.clmmPolicy as unknown as Record<string, unknown>)['maxCapitalDeploymentPct'] = -0.5;
+    globalThis.fetch = vi.fn().mockResolvedValue({
+      ok: true,
+      status: 200,
+      json: () => Promise.resolve({ policyInsight: block }),
+    }) as typeof fetch;
+
+    const error = await fetchCurrentPolicyInsight().catch((reason: unknown) => reason);
+
+    expect(error).toBeInstanceOf(Error);
+    expect((error as Error).message).toContain('malformed policyInsight block');
+  });
+
   it('throws on 200 with malformed levels', async () => {
     env.EXPO_PUBLIC_BFF_BASE_URL = 'https://bff.example.test';
     const block = fixtureBlock();
@@ -212,9 +228,76 @@ describe('fetchCurrentPolicyInsight', () => {
     expect((error as Error).message).toContain('not valid JSON');
   });
 
-  it('does not accept a poolId parameter', () => {
-    type Args = Parameters<typeof fetchCurrentPolicyInsight>;
-    const _empty: Args = [] as const;
-    expect(_empty.length).toBe(0);
+  it('aborts immediately when external signal is already aborted', async () => {
+    env.EXPO_PUBLIC_BFF_BASE_URL = 'https://bff.example.test';
+    const controller = new AbortController();
+    controller.abort();
+
+    globalThis.fetch = vi.fn().mockImplementation((_url: string, init?: RequestInit) => {
+      if (init?.signal?.aborted) {
+        const err = new DOMException('The operation was aborted', 'AbortError');
+        return Promise.reject(err);
+      }
+      return Promise.resolve({
+        ok: true,
+        status: 200,
+        json: () => Promise.resolve({ policyInsight: fixtureBlock() }),
+      });
+    }) as typeof fetch;
+
+    const error = await fetchCurrentPolicyInsight(controller.signal).catch(
+      (reason: unknown) => reason,
+    );
+    expect(error).toBeInstanceOf(Error);
+    expect((error as Error).message).toContain('Could not load policy insights');
+  });
+
+  it('aborts fetch when external signal fires during request', async () => {
+    env.EXPO_PUBLIC_BFF_BASE_URL = 'https://bff.example.test';
+    const controller = new AbortController();
+
+    globalThis.fetch = vi.fn().mockImplementation((_url: string, init?: RequestInit) => {
+      return new Promise((_resolve, reject) => {
+        init?.signal?.addEventListener('abort', () => {
+          reject(new DOMException('The operation was aborted', 'AbortError'));
+        });
+      });
+    }) as typeof fetch;
+
+    const resultPromise = fetchCurrentPolicyInsight(controller.signal);
+
+    controller.abort();
+
+    const result = await resultPromise.catch((reason: unknown) => reason);
+    expect(result).toBeInstanceOf(Error);
+    expect((result as Error).message).toContain('Could not load policy insights');
+  });
+
+  it('throws on 200 with non-record (array) body', async () => {
+    env.EXPO_PUBLIC_BFF_BASE_URL = 'https://bff.example.test';
+    globalThis.fetch = vi.fn().mockResolvedValue({
+      ok: true,
+      status: 200,
+      json: () => Promise.resolve([{ foo: 'bar' }]),
+    }) as typeof fetch;
+
+    const error = await fetchCurrentPolicyInsight().catch((reason: unknown) => reason);
+    expect(error).toBeInstanceOf(Error);
+    expect((error as Error).message).toContain('malformed response');
+  });
+
+  it('accepts optional external signal without error when not aborted', async () => {
+    env.EXPO_PUBLIC_BFF_BASE_URL = 'https://bff.example.test';
+    const controller = new AbortController();
+    const block = fixtureBlock();
+
+    globalThis.fetch = vi.fn().mockResolvedValue({
+      ok: true,
+      status: 200,
+      json: () => Promise.resolve({ policyInsight: block }),
+    }) as typeof fetch;
+
+    const result = await fetchCurrentPolicyInsight(controller.signal);
+    expect(result.policyInsight).toEqual(block);
   });
 });

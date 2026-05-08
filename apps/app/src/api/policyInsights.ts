@@ -1,21 +1,16 @@
-import type {
-  PolicyInsightBlock,
-  PolicyInsightClmmPolicy,
-  PolicyInsightConfidence,
-  PolicyInsightDataQuality,
-  PolicyInsightFreshness,
-  PolicyInsightLevels,
-  PolicyInsightRecommendedAction,
-  PolicyInsightRiskLevel,
-  PolicyInsightStatus,
+import {
+  type PolicyInsightBlock,
+  type PolicyInsightClmmPolicy,
+  type PolicyInsightConfidence,
+  type PolicyInsightDataQuality,
+  type PolicyInsightFreshness,
+  type PolicyInsightLevels,
+  type PolicyInsightRecommendedAction,
+  type PolicyInsightRiskLevel,
+  type PolicyInsightStatus,
+  type PolicyInsightsUnavailableReason,
 } from '@clmm/application/public';
 import { getBffBaseUrl } from './http.js';
-
-export type PolicyInsightsUnavailableReason =
-  | 'not-found'
-  | 'store-unavailable'
-  | 'config-error'
-  | 'upstream-error';
 
 export type PolicyInsightsResponse = {
   policyInsight: PolicyInsightBlock | null;
@@ -79,6 +74,7 @@ function isClmmPolicy(value: unknown): value is PolicyInsightClmmPolicy {
   if (typeof value['rebalanceSensitivity'] !== 'string') return false;
   const pct = value['maxCapitalDeploymentPct'];
   if (typeof pct !== 'number' || !Number.isFinite(pct)) return false;
+  if (pct < 0 || pct > 1) return false;
   return true;
 }
 
@@ -89,12 +85,15 @@ function isLevels(value: unknown): value is PolicyInsightLevels {
   return true;
 }
 
-function isFreshness(value: unknown): value is PolicyInsightFreshness {
+function isFreshness(value: unknown, fallbackIso?: string): value is PolicyInsightFreshness {
   if (!isRecord(value)) return false;
-  if (typeof value['capturedAtUnixMs'] !== 'number') return false;
-  if (!Number.isFinite(value['capturedAtUnixMs'])) return false;
   if (typeof value['stale'] !== 'boolean') return false;
-  return true;
+  const capturedAtUnixMsRaw = value['capturedAtUnixMs'];
+  if (typeof capturedAtUnixMsRaw === 'number' && Number.isFinite(capturedAtUnixMsRaw)) return true;
+  const capturedAtIso = value['capturedAtIso'];
+  if (typeof capturedAtIso === 'string' && Number.isFinite(Date.parse(capturedAtIso))) return true;
+  if (typeof fallbackIso === 'string' && Number.isFinite(Date.parse(fallbackIso))) return true;
+  return false;
 }
 
 function isPolicyInsightBlock(value: unknown): value is PolicyInsightBlock {
@@ -118,7 +117,10 @@ function isPolicyInsightBlock(value: unknown): value is PolicyInsightBlock {
   if (typeof value['expiresAt'] !== 'string') return false;
   if (typeof value['payloadHash'] !== 'string') return false;
   if (typeof value['receivedAtIso'] !== 'string') return false;
-  if (!isFreshness(value['freshness'])) return false;
+  if (
+    !isFreshness(value['freshness'], typeof value['asOf'] === 'string' ? value['asOf'] : undefined)
+  )
+    return false;
   return true;
 }
 
@@ -126,56 +128,66 @@ function isUnavailableReason(value: unknown): value is PolicyInsightsUnavailable
   return typeof value === 'string' && VALID_REASONS.has(value);
 }
 
-export async function fetchCurrentPolicyInsight(): Promise<PolicyInsightsResponse> {
+export async function fetchCurrentPolicyInsight(
+  externalSignal?: AbortSignal,
+): Promise<PolicyInsightsResponse> {
   const controller = new AbortController();
   const timeoutId = setTimeout(() => controller.abort(), FETCH_TIMEOUT_MS);
 
-  let response: Response;
-  try {
-    response = await fetch(`${getBffBaseUrl()}/policy-insights/sol-usdc/current`, {
-      signal: controller.signal,
-    });
-  } catch (error: unknown) {
+  if (externalSignal?.aborted) {
     clearTimeout(timeoutId);
-    if (isAbortError(error)) {
-      throw new Error('Could not load policy insights: request timed out');
+    controller.abort();
+  }
+  const onExternalAbort = () => {
+    clearTimeout(timeoutId);
+    controller.abort();
+  };
+  externalSignal?.addEventListener('abort', onExternalAbort, { once: true });
+
+  try {
+    let response: Response;
+    try {
+      response = await fetch(`${getBffBaseUrl()}/policy-insights/sol-usdc/current`, {
+        signal: controller.signal,
+      });
+    } catch (error: unknown) {
+      if (isAbortError(error)) {
+        throw new Error('Could not load policy insights: request timed out');
+      }
+      throw new Error('Could not load policy insights: network error');
     }
-    throw new Error(
-      `Could not load policy insights: ${error instanceof Error ? error.message : 'network error'}`,
-    );
-  }
 
-  if (!response.ok) {
-    const detail = await response.text().catch(() => `HTTP ${response.status}`);
+    if (!response.ok) {
+      throw new Error(`Could not load policy insights: HTTP ${response.status}`);
+    }
+
+    let body: unknown;
+    try {
+      body = await response.json();
+    } catch {
+      throw new Error('Could not load policy insights: response body was not valid JSON');
+    }
+
+    if (!isRecord(body)) {
+      throw new Error('Could not load policy insights: malformed response');
+    }
+
+    const policyInsight = body['policyInsight'];
+    const unavailableReason = isUnavailableReason(body['unavailableReason'])
+      ? body['unavailableReason']
+      : undefined;
+
+    if (policyInsight === null) {
+      return { policyInsight: null, unavailableReason };
+    }
+
+    if (!isPolicyInsightBlock(policyInsight)) {
+      throw new Error('Could not load policy insights: malformed policyInsight block');
+    }
+
+    return { policyInsight, unavailableReason };
+  } finally {
     clearTimeout(timeoutId);
-    throw new Error(`Could not load policy insights: ${detail || response.statusText}`);
+    externalSignal?.removeEventListener('abort', onExternalAbort);
   }
-
-  let body: unknown;
-  try {
-    body = await response.json();
-  } catch {
-    clearTimeout(timeoutId);
-    throw new Error('Could not load policy insights: response body was not valid JSON');
-  }
-  clearTimeout(timeoutId);
-
-  if (!isRecord(body)) {
-    throw new Error('Could not load policy insights: malformed response');
-  }
-
-  const policyInsight = body['policyInsight'];
-  const unavailableReason = isUnavailableReason(body['unavailableReason'])
-    ? body['unavailableReason']
-    : undefined;
-
-  if (policyInsight === null) {
-    return { policyInsight: null, unavailableReason };
-  }
-
-  if (!isPolicyInsightBlock(policyInsight)) {
-    throw new Error('Could not load policy insights: malformed policyInsight block');
-  }
-
-  return { policyInsight, unavailableReason };
 }

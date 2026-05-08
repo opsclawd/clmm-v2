@@ -322,7 +322,7 @@ export interface RegimeReadPort {
 // a known availability state — the BFF surfaces it separately so UI copy
 // can stay accurate.
 
-export type PolicyInsightReadResult =
+export type PolicyInsightsReadResult =
   | { kind: 'block'; block: PolicyInsightBlock }
   | { kind: 'not-found' }
   | { kind: 'store-unavailable' }
@@ -330,7 +330,7 @@ export type PolicyInsightReadResult =
   | { kind: 'upstream-error' };
 
 export interface PolicyInsightsReadPort {
-  fetchCurrent(): Promise<PolicyInsightReadResult>;
+  fetchCurrent(): Promise<PolicyInsightsReadResult>;
 }
 
 // --- Wallet ownership challenge port ---

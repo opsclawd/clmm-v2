@@ -2,7 +2,7 @@ import { describe, it, expect, vi } from 'vitest';
 import { PolicyInsightsController } from './PolicyInsightsController.js';
 import type {
   PolicyInsightsReadPort,
-  PolicyInsightReadResult,
+  PolicyInsightsReadResult,
   PolicyInsightBlock,
 } from '@clmm/application';
 
@@ -39,7 +39,7 @@ function fixtureBlock(): PolicyInsightBlock {
 describe('PolicyInsightsController', () => {
   it('returns { policyInsight: block } when port resolves a block', async () => {
     const block = fixtureBlock();
-    const result: PolicyInsightReadResult = { kind: 'block', block };
+    const result: PolicyInsightsReadResult = { kind: 'block', block };
     const fetchCurrent = vi.fn().mockResolvedValue(result);
     const port: PolicyInsightsReadPort = { fetchCurrent };
     const controller = new PolicyInsightsController(port);
@@ -51,7 +51,7 @@ describe('PolicyInsightsController', () => {
   });
 
   it('maps not-found to { policyInsight: null, unavailableReason: "not-found" }', async () => {
-    const result: PolicyInsightReadResult = { kind: 'not-found' };
+    const result: PolicyInsightsReadResult = { kind: 'not-found' };
     const fetchCurrent = vi.fn().mockResolvedValue(result);
     const port: PolicyInsightsReadPort = { fetchCurrent };
     const controller = new PolicyInsightsController(port);
@@ -60,7 +60,7 @@ describe('PolicyInsightsController', () => {
   });
 
   it('maps store-unavailable to { policyInsight: null, unavailableReason: "store-unavailable" }', async () => {
-    const result: PolicyInsightReadResult = { kind: 'store-unavailable' };
+    const result: PolicyInsightsReadResult = { kind: 'store-unavailable' };
     const fetchCurrent = vi.fn().mockResolvedValue(result);
     const port: PolicyInsightsReadPort = { fetchCurrent };
     const controller = new PolicyInsightsController(port);
@@ -69,7 +69,7 @@ describe('PolicyInsightsController', () => {
   });
 
   it('maps config-error to { policyInsight: null, unavailableReason: "config-error" }', async () => {
-    const result: PolicyInsightReadResult = { kind: 'config-error' };
+    const result: PolicyInsightsReadResult = { kind: 'config-error' };
     const fetchCurrent = vi.fn().mockResolvedValue(result);
     const port: PolicyInsightsReadPort = { fetchCurrent };
     const controller = new PolicyInsightsController(port);
@@ -78,7 +78,7 @@ describe('PolicyInsightsController', () => {
   });
 
   it('maps upstream-error to { policyInsight: null, unavailableReason: "upstream-error" }', async () => {
-    const result: PolicyInsightReadResult = { kind: 'upstream-error' };
+    const result: PolicyInsightsReadResult = { kind: 'upstream-error' };
     const fetchCurrent = vi.fn().mockResolvedValue(result);
     const port: PolicyInsightsReadPort = { fetchCurrent };
     const controller = new PolicyInsightsController(port);

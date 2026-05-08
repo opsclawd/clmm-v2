@@ -193,6 +193,36 @@ describe('PolicyInsightsSection', () => {
     expect(screen.getByTestId('policy-insights-degraded')).toBeTruthy();
   });
 
+  it('renders unavailable card when isError is true with no unavailableReason', () => {
+    render(
+      <PolicyInsightsSection
+        policyInsight={null}
+        isLoading={false}
+        isError
+        isEnabled
+        unavailableReason={null}
+        now={NOW}
+      />,
+    );
+    expect(screen.getByTestId('policy-insights-unavailable')).toBeTruthy();
+    expect(screen.getByText('Policy insights unavailable.')).toBeTruthy();
+  });
+
+  it('renders unavailable card when isError is true with upstream-error reason', () => {
+    render(
+      <PolicyInsightsSection
+        policyInsight={null}
+        isLoading={false}
+        isError
+        isEnabled
+        unavailableReason="upstream-error"
+        now={NOW}
+      />,
+    );
+    expect(screen.getByTestId('policy-insights-unavailable')).toBeTruthy();
+    expect(screen.getByText('Policy insights unavailable.')).toBeTruthy();
+  });
+
   it('renders a skeleton when loading with no data', () => {
     render(
       <PolicyInsightsSection

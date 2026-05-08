@@ -34,6 +34,7 @@ export type {
   PolicyInsightRiskLevel,
   PolicyInsightDataQuality,
   PolicyInsightStatus,
+  PolicyInsightsUnavailableReason,
 } from '../dto/index.js';
 
 // Port types needed by UI (capability + permission state)

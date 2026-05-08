@@ -179,6 +179,26 @@ describe('CurrentPolicyInsightsAdapter', () => {
     expect(result.kind).toBe('upstream-error');
   });
 
+  it('returns kind:"upstream-error" when clmmPolicy maxCapitalDeploymentPct > 1', async () => {
+    vi.mocked(fetch).mockResolvedValue(
+      new Response(
+        JSON.stringify({
+          ...SAMPLE_UPSTREAM,
+          clmmPolicy: {
+            posture: 'wide',
+            rangeBias: 'symmetric',
+            rebalanceSensitivity: 'low',
+            maxCapitalDeploymentPct: 1.5,
+          },
+        }),
+        { status: 200 },
+      ),
+    );
+    const adapter = new CurrentPolicyInsightsAdapter('https://regime.example.com', obs.port);
+    const result = await adapter.fetchCurrent();
+    expect(result.kind).toBe('upstream-error');
+  });
+
   it('returns kind:"upstream-error" on malformed levels', async () => {
     vi.mocked(fetch).mockResolvedValue(
       new Response(
@@ -223,6 +243,13 @@ describe('CurrentPolicyInsightsAdapter', () => {
 
   it('returns kind:"config-error" when baseUrl is malformed', async () => {
     const adapter = new CurrentPolicyInsightsAdapter('not a url', obs.port);
+    const result = await adapter.fetchCurrent();
+    expect(result.kind).toBe('config-error');
+    expect(vi.mocked(fetch)).not.toHaveBeenCalled();
+  });
+
+  it('returns kind:"config-error" when baseUrl uses disallowed protocol', async () => {
+    const adapter = new CurrentPolicyInsightsAdapter('ftp://example.com', obs.port);
     const result = await adapter.fetchCurrent();
     expect(result.kind).toBe('config-error');
     expect(vi.mocked(fetch)).not.toHaveBeenCalled();

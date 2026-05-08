@@ -1,5 +1,5 @@
 import { Controller, Get, Inject } from '@nestjs/common';
-import type { PolicyInsightsReadPort, PolicyInsightReadResult } from '@clmm/application';
+import type { PolicyInsightsReadPort, PolicyInsightsReadResult } from '@clmm/application';
 import { POLICY_INSIGHTS_READ_PORT } from './tokens.js';
 
 @Controller('policy-insights')
@@ -15,7 +15,7 @@ export class PolicyInsightsController {
     return this.mapResult(result);
   }
 
-  private mapResult(result: PolicyInsightReadResult) {
+  private mapResult(result: PolicyInsightsReadResult) {
     switch (result.kind) {
       case 'block':
         return { policyInsight: result.block };

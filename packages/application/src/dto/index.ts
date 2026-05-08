@@ -348,4 +348,5 @@ export type {
   PolicyInsightRiskLevel,
   PolicyInsightDataQuality,
   PolicyInsightStatus,
+  PolicyInsightsUnavailableReason,
 } from './policyInsights.js';

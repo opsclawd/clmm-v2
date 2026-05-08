@@ -95,7 +95,7 @@ export default function PositionsRoute() {
 
   const policyInsightsQuery = useQuery({
     queryKey: ['policy-insights-current', 'SOL/USDC'],
-    queryFn: fetchCurrentPolicyInsight,
+    queryFn: ({ signal }) => fetchCurrentPolicyInsight(signal),
     enabled: policyInsightsEnabled,
     staleTime: POLICY_INSIGHTS_STALE_TIME_MS,
     refetchOnWindowFocus: false,

@@ -1,13 +1,10 @@
 import { View, Text, ActivityIndicator } from 'react-native';
-import type { PolicyInsightBlock } from '@clmm/application/public';
+import {
+  type PolicyInsightBlock,
+  type PolicyInsightsUnavailableReason,
+} from '@clmm/application/public';
 import { colors, typography } from '../design-system/index.js';
 import { buildPolicyInsightsViewModel } from '../view-models/PolicyInsightsViewModel.js';
-
-type PolicyInsightsUnavailableReason =
-  | 'not-found'
-  | 'store-unavailable'
-  | 'config-error'
-  | 'upstream-error';
 
 type Props = {
   policyInsight: PolicyInsightBlock | null | undefined;
@@ -69,9 +66,9 @@ export function PolicyInsightsSection({
   }
 
   if (policyInsight == null) {
-    if (!unavailableReason) return null;
+    if (!unavailableReason && !isError) return null;
     return (
-      <View style={cardStyle}>
+      <View testID="policy-insights-unavailable" style={cardStyle}>
         <Text
           style={{
             color: colors.textPrimary,
@@ -84,7 +81,7 @@ export function PolicyInsightsSection({
         <Text
           style={{ color: colors.textSecondary, fontSize: typography.fontSize.sm, marginTop: 4 }}
         >
-          {unavailableCopy(unavailableReason)}
+          {unavailableReason ? unavailableCopy(unavailableReason) : 'Policy insights unavailable.'}
         </Text>
       </View>
     );
@@ -94,6 +91,7 @@ export function PolicyInsightsSection({
   return (
     <View
       testID="policy-insights-card"
+      accessibilityLabel={`Policy insights: ${vm.severity} severity`}
       style={{ ...cardStyle, borderColor: severityBorder(vm.severity) }}
     >
       <Text
@@ -109,6 +107,8 @@ export function PolicyInsightsSection({
         {vm.subtitle}
       </Text>
       <Text
+        testID="policy-insights-action"
+        accessibilityLabel={`Action: ${vm.actionLabel}`}
         style={{
           color: colors.textPrimary,
           fontSize: typography.fontSize.md,
@@ -121,36 +121,67 @@ export function PolicyInsightsSection({
       {vm.isStale ? (
         <Text
           testID="policy-insights-stale-warning"
+          accessibilityLabel="Stale policy insight"
           style={{ color: colors.warn, fontSize: typography.fontSize.xs, marginTop: 2 }}
         >
           Stale — last update {vm.freshnessLabel}
         </Text>
       ) : (
         <Text
+          testID="policy-insights-freshness"
+          accessibilityLabel={`Freshness: ${vm.freshnessLabel}`}
           style={{ color: colors.textTertiary, fontSize: typography.fontSize.xs, marginTop: 2 }}
         >
           {vm.freshnessLabel}
         </Text>
       )}
-      <Text style={{ color: colors.textBody, fontSize: typography.fontSize.sm, marginTop: 6 }}>
+      <Text
+        testID="policy-insights-posture"
+        accessibilityLabel={vm.postureLabel}
+        style={{ color: colors.textBody, fontSize: typography.fontSize.sm, marginTop: 6 }}
+      >
         {vm.postureLabel}
       </Text>
-      <Text style={{ color: colors.textBody, fontSize: typography.fontSize.sm, marginTop: 2 }}>
+      <Text
+        testID="policy-insights-range-bias"
+        accessibilityLabel={vm.rangeBiasLabel}
+        style={{ color: colors.textBody, fontSize: typography.fontSize.sm, marginTop: 2 }}
+      >
         {vm.rangeBiasLabel}
       </Text>
-      <Text style={{ color: colors.textBody, fontSize: typography.fontSize.sm, marginTop: 2 }}>
+      <Text
+        testID="policy-insights-rebalance-sensitivity"
+        accessibilityLabel={vm.rebalanceSensitivityLabel}
+        style={{ color: colors.textBody, fontSize: typography.fontSize.sm, marginTop: 2 }}
+      >
         {vm.rebalanceSensitivityLabel}
       </Text>
-      <Text style={{ color: colors.textBody, fontSize: typography.fontSize.sm, marginTop: 2 }}>
+      <Text
+        testID="policy-insights-max-capital"
+        accessibilityLabel={`Max capital: ${vm.maxDeploymentLabel}`}
+        style={{ color: colors.textBody, fontSize: typography.fontSize.sm, marginTop: 2 }}
+      >
         Max capital: {vm.maxDeploymentLabel}
       </Text>
-      <Text style={{ color: colors.textBody, fontSize: typography.fontSize.sm, marginTop: 6 }}>
+      <Text
+        testID="policy-insights-risk"
+        accessibilityLabel={vm.riskLabel}
+        style={{ color: colors.textBody, fontSize: typography.fontSize.sm, marginTop: 6 }}
+      >
         {vm.riskLabel}
       </Text>
-      <Text style={{ color: colors.textBody, fontSize: typography.fontSize.sm, marginTop: 2 }}>
+      <Text
+        testID="policy-insights-confidence"
+        accessibilityLabel={vm.confidenceLabel}
+        style={{ color: colors.textBody, fontSize: typography.fontSize.sm, marginTop: 2 }}
+      >
         {vm.confidenceLabel}
       </Text>
-      <Text style={{ color: colors.textBody, fontSize: typography.fontSize.sm, marginTop: 2 }}>
+      <Text
+        testID="policy-insights-data-quality"
+        accessibilityLabel={vm.dataQualityLabel}
+        style={{ color: colors.textBody, fontSize: typography.fontSize.sm, marginTop: 2 }}
+      >
         {vm.dataQualityLabel}
       </Text>
       {vm.reasoning.map((reason, idx) => (
