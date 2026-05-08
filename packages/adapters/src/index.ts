@@ -21,3 +21,4 @@ export { OffChainHistoryStorageAdapter } from './outbound/storage/OffChainHistor
 export { TelemetryAdapter } from './outbound/observability/TelemetryAdapter';
 export { JupiterPriceAdapter } from './outbound/price/JupiterPriceAdapter';
 export { CurrentSrThesesAdapter } from './outbound/regime-engine/CurrentSrThesesAdapter';
+export { CurrentPolicyInsightsAdapter } from './outbound/regime-engine/CurrentPolicyInsightsAdapter';

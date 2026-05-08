@@ -34,6 +34,7 @@ export { PositionCard } from './components/PositionCard.js';
 export { getMonitoringDisplay } from './components/PositionCardUtils.js';
 export type { MonitoringDisplay, MonitoringTone } from './components/PositionCardUtils.js';
 export { RegimeSection } from './components/RegimeSection.js';
+export { PolicyInsightsSection } from './components/PolicyInsightsSection.js';
 
 // Wallet connection utils
 export {
@@ -76,6 +77,11 @@ export type {
   WalletSettingsViewModel,
 } from './view-models/WalletConnectionViewModel.js';
 export { buildRegimeViewModelBlock } from './view-models/RegimeViewModel.js';
+export { buildPolicyInsightsViewModel } from './view-models/PolicyInsightsViewModel.js';
+export type {
+  PolicyInsightsViewModel,
+  PolicyInsightsSeverity,
+} from './view-models/PolicyInsightsViewModel.js';
 export { buildSrThesesViewModel } from './view-models/SrThesesViewModel.js';
 export type {
   SrThesesViewModel,

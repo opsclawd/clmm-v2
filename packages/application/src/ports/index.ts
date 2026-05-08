@@ -18,7 +18,12 @@ import type {
   ExecutionStep,
 } from '@clmm/domain';
 import type { HistoryEvent, HistoryTimeline, ExecutionOutcomeSummary } from '@clmm/domain';
-import type { SrLevelsBlock, RegimeBlock, SrThesesBlock } from '../dto/index.js';
+import type {
+  SrLevelsBlock,
+  RegimeBlock,
+  SrThesesBlock,
+  PolicyInsightBlock,
+} from '../dto/index.js';
 
 // --- Position read ports ---
 
@@ -305,6 +310,27 @@ export interface RegimeReadPort {
     poolAddress: string;
     timeframe: string;
   }): Promise<RegimeReadResult>;
+}
+
+// --- PolicyInsights read port (application-owned; CurrentPolicyInsightsAdapter implements) ---
+//
+// Returned outcome is a discriminated union so the BFF controller can map
+// directly to the documented `unavailableReason` codes without parsing
+// adapter logs or HTTP details. Production code paths must never throw
+// for expected upstream unavailability. `store-unavailable` is distinct
+// from `upstream-error` because PolicyInsights upstream documents 503 as
+// a known availability state — the BFF surfaces it separately so UI copy
+// can stay accurate.
+
+export type PolicyInsightsReadResult =
+  | { kind: 'block'; block: PolicyInsightBlock }
+  | { kind: 'not-found' }
+  | { kind: 'store-unavailable' }
+  | { kind: 'config-error' }
+  | { kind: 'upstream-error' };
+
+export interface PolicyInsightsReadPort {
+  fetchCurrent(): Promise<PolicyInsightsReadResult>;
 }
 
 // --- Wallet ownership challenge port ---

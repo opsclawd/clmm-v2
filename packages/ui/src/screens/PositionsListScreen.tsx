@@ -4,6 +4,7 @@ import type {
   SrLevelsBlock,
   SrThesesBlock,
   RegimeBlock,
+  PolicyInsightBlock,
 } from '@clmm/application/public';
 import { colors, typography } from '../design-system/index.js';
 import { buildPositionListViewModel } from '../view-models/PositionListViewModel.js';
@@ -13,6 +14,7 @@ import { SectionHeader } from '../components/SectionHeader.js';
 import { PositionCard } from '../components/PositionCard.js';
 import { SrInsightsSection } from '../components/SrInsightsSection.js';
 import { RegimeSection } from '../components/RegimeSection.js';
+import { PolicyInsightsSection } from '../components/PolicyInsightsSection.js';
 import { PortfolioSummaryStrip } from '../components/PortfolioSummaryStrip.js';
 import type { PlatformCapabilities } from '../components/DegradedCapabilityBannerUtils.js';
 
@@ -42,6 +44,17 @@ type Props = {
   regimeError?: boolean | undefined;
   regimeUnsupported?: boolean | undefined;
   regimeUnavailableReason?: 'not-found' | 'config-error' | 'upstream-error' | null | undefined;
+  policyInsight?: PolicyInsightBlock | null | undefined;
+  policyInsightsLoading?: boolean | undefined;
+  policyInsightsError?: boolean | undefined;
+  policyInsightsEnabled?: boolean | undefined;
+  policyInsightsUnavailableReason?:
+    | 'not-found'
+    | 'store-unavailable'
+    | 'config-error'
+    | 'upstream-error'
+    | null
+    | undefined;
 };
 
 export function PositionsListScreen({
@@ -70,6 +83,11 @@ export function PositionsListScreen({
   regimeError,
   regimeUnsupported,
   regimeUnavailableReason,
+  policyInsight,
+  policyInsightsLoading,
+  policyInsightsError,
+  policyInsightsEnabled,
+  policyInsightsUnavailableReason,
 }: Props): JSX.Element {
   const isConnected = walletAddress != null && walletAddress.length > 0;
   const hasPositions = (positions?.length ?? 0) > 0;
@@ -106,6 +124,11 @@ export function PositionsListScreen({
           regimeError={regimeError}
           regimeUnsupported={regimeUnsupported}
           regimeUnavailableReason={regimeUnavailableReason}
+          policyInsight={policyInsight}
+          policyInsightsLoading={policyInsightsLoading}
+          policyInsightsError={policyInsightsError}
+          policyInsightsEnabled={policyInsightsEnabled}
+          policyInsightsUnavailableReason={policyInsightsUnavailableReason}
         />
       ) : (
         <EmptyState />
@@ -244,6 +267,11 @@ function ConnectedPositionsList({
   regimeError,
   regimeUnsupported,
   regimeUnavailableReason,
+  policyInsight,
+  policyInsightsLoading,
+  policyInsightsError,
+  policyInsightsEnabled,
+  policyInsightsUnavailableReason,
 }: {
   positions: PositionSummaryDto[];
   onSelectPosition?: (positionId: string) => void;
@@ -264,6 +292,17 @@ function ConnectedPositionsList({
   regimeError?: boolean | undefined;
   regimeUnsupported?: boolean | undefined;
   regimeUnavailableReason?: 'not-found' | 'config-error' | 'upstream-error' | null | undefined;
+  policyInsight?: PolicyInsightBlock | null | undefined;
+  policyInsightsLoading?: boolean | undefined;
+  policyInsightsError?: boolean | undefined;
+  policyInsightsEnabled?: boolean | undefined;
+  policyInsightsUnavailableReason?:
+    | 'not-found'
+    | 'store-unavailable'
+    | 'config-error'
+    | 'upstream-error'
+    | null
+    | undefined;
 }) {
   const viewModel = buildPositionListViewModel(positions);
 
@@ -301,6 +340,14 @@ function ConnectedPositionsList({
             isError={regimeError ?? false}
             isUnsupported={regimeUnsupported ?? false}
             unavailableReason={regimeUnavailableReason ?? null}
+            now={now ?? Date.now()}
+          />
+          <PolicyInsightsSection
+            policyInsight={policyInsight}
+            isLoading={policyInsightsLoading ?? false}
+            isError={policyInsightsError ?? false}
+            isEnabled={policyInsightsEnabled ?? false}
+            unavailableReason={policyInsightsUnavailableReason ?? null}
             now={now ?? Date.now()}
           />
         </>
