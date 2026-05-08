@@ -136,12 +136,15 @@ export function RegimeSection({
       </Text>
       <Text
         style={{
-          color: toneColor(vm.suitabilityTone),
           fontSize: typography.fontSize.sm,
           marginTop: 4,
         }}
       >
-        {vm.suitabilityLabel} · data {vm.dataQualityLabel.toLowerCase()}
+        <Text style={{ color: toneColor(vm.suitabilityTone) }}>{vm.suitabilityLabel}</Text>
+        <Text style={{ color: colors.textSecondary }}> · </Text>
+        <Text style={{ color: toneColor(vm.dataQualityTone) }}>
+          data {vm.dataQualityLabel.toLowerCase()}
+        </Text>
       </Text>
       {!expanded && vm.primaryDisplayReason ? (
         <Text
