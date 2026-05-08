@@ -56,22 +56,18 @@ function pickStringTopThenNested(
   return undefined;
 }
 
-function pickNestedString(
-  metadata: Record<string, unknown> | null,
-  key: string,
-): string | undefined {
-  if (!metadata) return undefined;
-  const value = metadata[key];
-  return typeof value === 'string' && value.length > 0 ? value : undefined;
-}
-
-function pickNestedNumber(
+function pickNumberTopThenNested(
+  data: Record<string, unknown>,
   metadata: Record<string, unknown> | null,
   key: string,
 ): number | undefined {
-  if (!metadata) return undefined;
-  const value = metadata[key];
-  return typeof value === 'number' && Number.isFinite(value) ? value : undefined;
+  const top = data[key];
+  if (typeof top === 'number' && Number.isFinite(top)) return top;
+  if (metadata) {
+    const nested = metadata[key];
+    if (typeof nested === 'number' && Number.isFinite(nested)) return nested;
+  }
+  return undefined;
 }
 
 function parseTelemetry(raw: unknown): RegimeBlock['telemetry'] | null {
@@ -152,12 +148,12 @@ function parseUpstream(data: unknown): RegimeBlock | null {
   if (!source || !network || !symbol || !timeframe) return null;
 
   const sourceTimeframe = pickStringTopThenNested(data, metadata, 'sourceTimeframe');
-  const sourceCandleCount = pickNestedNumber(metadata, 'sourceCandleCount');
-  const candleCount = pickNestedNumber(metadata, 'candleCount');
-  const derivedTimeframe = pickNestedString(metadata, 'derivedTimeframe');
-  const aggregationVersion = pickNestedString(metadata, 'aggregationVersion');
-  const engineVersion = pickNestedString(metadata, 'engineVersion');
-  const configVersion = pickNestedString(metadata, 'configVersion');
+  const sourceCandleCount = pickNumberTopThenNested(data, metadata, 'sourceCandleCount');
+  const candleCount = pickNumberTopThenNested(data, metadata, 'candleCount');
+  const derivedTimeframe = pickStringTopThenNested(data, metadata, 'derivedTimeframe');
+  const aggregationVersion = pickStringTopThenNested(data, metadata, 'aggregationVersion');
+  const engineVersion = pickStringTopThenNested(data, metadata, 'engineVersion');
+  const configVersion = pickStringTopThenNested(data, metadata, 'configVersion');
 
   return {
     regime: regime as MarketRegime,

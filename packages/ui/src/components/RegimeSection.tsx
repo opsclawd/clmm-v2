@@ -143,7 +143,7 @@ export function RegimeSection({
       >
         {vm.suitabilityLabel} · data {vm.dataQualityLabel.toLowerCase()}
       </Text>
-      {vm.primaryDisplayReason ? (
+      {!expanded && vm.primaryDisplayReason ? (
         <Text
           style={{
             color: colors.textBody,
@@ -181,6 +181,31 @@ export function RegimeSection({
       >
         {vm.generatedAgeLabel} · Source: {vm.sourceLabel}
       </Text>
+      {expanded && vm.displayReasons.length > 0 ? (
+        <View style={{ marginTop: 8 }}>
+          <Text
+            style={{
+              color: colors.textSecondary,
+              fontSize: typography.fontSize.xs,
+              fontWeight: typography.fontWeight.semibold,
+            }}
+          >
+            Reasons
+          </Text>
+          {vm.displayReasons.map((reason) => (
+            <Text
+              key={`${reason.severity}-${reason.text}`}
+              style={{
+                color: colors.textBody,
+                fontSize: typography.fontSize.xs,
+                marginTop: 2,
+              }}
+            >
+              {reason.text}
+            </Text>
+          ))}
+        </View>
+      ) : null}
       {expanded ? (
         <View style={{ marginTop: 8 }}>
           <DetailRows rows={vm.expandedTelemetryRows} />

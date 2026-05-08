@@ -305,6 +305,65 @@ describe('CurrentRegimeAdapter', () => {
     expect(result.block.metadata.network).toBe('solana');
   });
 
+  it('uses top-level optional metadata fields with nested fallback', async () => {
+    const upstream = {
+      ...SAMPLE_UPSTREAM,
+      sourceCandleCount: 500,
+      candleCount: 120,
+      derivedTimeframe: '4h',
+      aggregationVersion: 'ohlcv-agg-v2',
+      engineVersion: 'regime-engine-v2',
+      configVersion: 'regime-config-v4',
+      metadata: {
+        ...SAMPLE_UPSTREAM.metadata,
+        sourceCandleCount: 999,
+        candleCount: 999,
+        derivedTimeframe: 'NESTED-SHOULD-LOSE',
+        aggregationVersion: 'NESTED-SHOULD-LOSE',
+        engineVersion: 'NESTED-SHOULD-LOSE',
+        configVersion: 'NESTED-SHOULD-LOSE',
+      },
+    };
+    vi.mocked(fetch).mockResolvedValue(new Response(JSON.stringify(upstream), { status: 200 }));
+    const adapter = new CurrentRegimeAdapter('https://regime.example.com', obs.port);
+    const result = await adapter.fetchCurrent(PARAMS);
+    expect(result.kind).toBe('block');
+    if (result.kind !== 'block') return;
+    expect(result.block.metadata.sourceCandleCount).toBe(500);
+    expect(result.block.metadata.candleCount).toBe(120);
+    expect(result.block.metadata.derivedTimeframe).toBe('4h');
+    expect(result.block.metadata.aggregationVersion).toBe('ohlcv-agg-v2');
+    expect(result.block.metadata.engineVersion).toBe('regime-engine-v2');
+    expect(result.block.metadata.configVersion).toBe('regime-config-v4');
+  });
+
+  it('falls back to nested metadata for optional fields when top-level is absent', async () => {
+    const upstream = {
+      ...SAMPLE_UPSTREAM,
+      metadata: {
+        source: 'geckoterminal',
+        network: 'solana',
+        symbol: 'SOL/USDC',
+        timeframe: '1h',
+        sourceCandleCount: 346,
+        candleCount: 86,
+        derivedTimeframe: '1h',
+        aggregationVersion: 'ohlcv-agg-v1',
+        engineVersion: 'regime-engine-v1.4.0',
+        configVersion: 'regime-config-v3',
+      },
+    };
+    vi.mocked(fetch).mockResolvedValue(new Response(JSON.stringify(upstream), { status: 200 }));
+    const adapter = new CurrentRegimeAdapter('https://regime.example.com', obs.port);
+    const result = await adapter.fetchCurrent(PARAMS);
+    expect(result.kind).toBe('block');
+    if (result.kind !== 'block') return;
+    expect(result.block.metadata.sourceCandleCount).toBe(346);
+    expect(result.block.metadata.candleCount).toBe(86);
+    expect(result.block.metadata.derivedTimeframe).toBe('1h');
+    expect(result.block.metadata.aggregationVersion).toBe('ohlcv-agg-v1');
+  });
+
   it('rejects when required metadata cannot be resolved from either layer', async () => {
     const upstream = {
       regime: SAMPLE_UPSTREAM.regime,

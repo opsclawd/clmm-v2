@@ -158,6 +158,8 @@ describe('RegimeSection', () => {
     );
     fireEvent.click(screen.getByText('Show details'));
     expect(screen.getByText('Hide details')).toBeTruthy();
+    expect(screen.getByText('Reasons')).toBeTruthy();
+    expect(screen.getByText('Latest candle is past soft-stale threshold')).toBeTruthy();
     expect(screen.getByText('Trend strength')).toBeTruthy();
     expect(screen.getByText('Realized vol short')).toBeTruthy();
     expect(screen.getByText('Volatility ratio')).toBeTruthy();
@@ -166,6 +168,34 @@ describe('RegimeSection', () => {
     expect(screen.getByText('Source candles')).toBeTruthy();
     expect(screen.getByText('Soft stale threshold')).toBeTruthy();
     expect(screen.getByText('Hard stale threshold')).toBeTruthy();
+  });
+
+  it('renders all display reasons in expanded mode', () => {
+    const block: RegimeBlock = {
+      ...baseBlock,
+      clmmSuitability: {
+        status: 'CAUTION',
+        reasons: [
+          { severity: 'WARN', text: 'Latest candle is past soft-stale threshold' },
+          { severity: 'INFO', text: 'Momentum still constructive' },
+        ],
+      },
+      marketReasons: [{ severity: 'INFO', text: 'Volume tapering' }],
+    };
+    render(
+      <RegimeSection
+        regime={block}
+        isLoading={false}
+        isError={false}
+        isUnsupported={false}
+        now={GENERATED}
+      />,
+    );
+    fireEvent.click(screen.getByText('Show details'));
+    expect(screen.getByText('Reasons')).toBeTruthy();
+    expect(screen.getByText('Latest candle is past soft-stale threshold')).toBeTruthy();
+    expect(screen.getByText('Momentum still constructive')).toBeTruthy();
+    expect(screen.getByText('Volume tapering')).toBeTruthy();
   });
 
   it('renders the degraded banner when isError with cached regime data', () => {
