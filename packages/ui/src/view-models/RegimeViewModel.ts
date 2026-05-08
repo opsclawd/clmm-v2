@@ -1,106 +1,233 @@
 import type {
   RegimeBlock,
+  RegimeReason,
   RegimeReasonSeverity,
   ClmmSuitabilityStatus,
 } from '@clmm/application/public';
 
-export type RegimeViewModelBlock = {
-  regimeLabel: string;
-  trendLabel: string;
-  volLabel: string;
-  suitabilityLabel: string;
-  suitabilityStatus: ClmmSuitabilityStatus;
-  suitabilityReason: string | null;
-  marketReasonSummary: string;
-  freshnessLabel: string;
-  isStale: boolean;
+export type RegimeDetailRow = {
+  label: string;
+  value: string;
+  tone?: 'default' | 'muted' | 'warning' | 'danger' | 'success';
 };
 
-const MS_PER_MINUTE = 60_000;
-const MS_PER_HOUR = 3_600_000;
-const STALE_THRESHOLD_MS = 48 * MS_PER_HOUR;
+export type RegimeDataQualityTone = 'success' | 'warning' | 'danger';
 
-function computeFreshness(
-  capturedAtUnixMs: number,
-  now: number,
-  source?: string,
-): { freshnessLabel: string; isStale: boolean } {
-  const prefix = source ?? 'MCO';
-  const ageMs = Math.max(0, now - capturedAtUnixMs);
-  if (ageMs < MS_PER_HOUR) {
-    const minutes = Math.max(1, Math.round(ageMs / MS_PER_MINUTE));
-    return { freshnessLabel: `${prefix} · ${minutes}m ago`, isStale: false };
-  }
-  const hours = Math.round(ageMs / MS_PER_HOUR);
-  if (ageMs < STALE_THRESHOLD_MS) {
-    return { freshnessLabel: `${prefix} · ${hours}h ago`, isStale: false };
-  }
-  return { freshnessLabel: `${prefix} · ${hours}h ago · stale`, isStale: true };
-}
-
-function mapRegimeLabel(regime: string): string {
-  switch (regime) {
-    case 'UP':
-      return '▲ Uptrend';
-    case 'DOWN':
-      return '▼ Downtrend';
-    case 'CHOP':
-      return '◆ Choppy';
-    default:
-      return regime;
-  }
-}
-
-function mapSuitabilityLabel(status: ClmmSuitabilityStatus): string {
-  switch (status) {
-    case 'ALLOWED':
-      return '✓ Suitable for CLMM';
-    case 'CAUTION':
-      return '⚠ Caution';
-    case 'BLOCKED':
-      return '✗ Not recommended';
-    case 'UNKNOWN':
-      return '? Unknown';
-    default:
-      return status;
-  }
-}
+export type RegimeViewModelBlock = {
+  regimeLabel: string;
+  suitabilityLabel: string;
+  suitabilityStatus: ClmmSuitabilityStatus;
+  suitabilityTone: RegimeDataQualityTone | 'muted';
+  dataQualityLabel: string;
+  dataQualityTone: RegimeDataQualityTone;
+  generatedAgeLabel: string;
+  latestCandleAgeLabel: string;
+  sourceLabel: string;
+  compactTelemetryLabel: string;
+  primaryDisplayReason: RegimeReason | null;
+  displayReasons: RegimeReason[];
+  expandedTelemetryRows: RegimeDetailRow[];
+  expandedSampleRows: RegimeDetailRow[];
+  expandedFreshnessRows: RegimeDetailRow[];
+};
 
 const SEVERITY_ORDER: Record<RegimeReasonSeverity, number> = { ERROR: 0, WARN: 1, INFO: 2 };
 
+const REGIME_LABELS: Record<string, string> = {
+  UP: '▲ Uptrend regime',
+  DOWN: '▼ Downtrend regime',
+  CHOP: '◆ Choppy regime',
+};
+
+const SUITABILITY_LABELS: Record<ClmmSuitabilityStatus, string> = {
+  ALLOWED: 'CLMM suitable',
+  CAUTION: 'CLMM caution',
+  BLOCKED: 'CLMM not recommended',
+  UNKNOWN: 'CLMM suitability unknown',
+};
+
+const SOURCE_DISPLAY: Record<string, string> = {
+  geckoterminal: 'GeckoTerminal',
+};
+
+function classifyDataQuality(
+  softStale: boolean,
+  hardStale: boolean,
+): { label: string; tone: RegimeDataQualityTone } {
+  if (hardStale) return { label: 'Hard-stale', tone: 'danger' };
+  if (softStale) return { label: 'Soft-stale', tone: 'warning' };
+  return { label: 'Fresh', tone: 'success' };
+}
+
+function suitabilityTone(status: ClmmSuitabilityStatus): RegimeDataQualityTone | 'muted' {
+  switch (status) {
+    case 'ALLOWED':
+      return 'success';
+    case 'CAUTION':
+      return 'warning';
+    case 'BLOCKED':
+      return 'danger';
+    default:
+      return 'muted';
+  }
+}
+
+function formatMinutesAgo(elapsedMs: number): string {
+  const minutes = Math.max(0, Math.round(elapsedMs / 60_000));
+  return `${minutes}m`;
+}
+
+function formatSecondsThreshold(seconds: number): string {
+  const minutes = Math.round(seconds / 60);
+  if (minutes < 60) return `${minutes}m`;
+  const hours = Math.round(minutes / 60);
+  return `${hours}h`;
+}
+
+function trendQualitative(strength: number): string {
+  const abs = Math.abs(strength);
+  if (abs < 0.001) return 'Trend flat';
+  if (strength > 0) return 'Trend up';
+  return 'Trend down';
+}
+
+function displaySource(source: string): string {
+  const lower = source.toLowerCase();
+  return SOURCE_DISPLAY[lower] ?? source;
+}
+
+function normalizeText(text: string): string {
+  return text.trim().toLowerCase().replace(/\s+/g, ' ');
+}
+
+function dedupeKey(reason: RegimeReason): string {
+  if (reason.code && reason.code.toUpperCase().includes('STALE')) return 'stale-category';
+  if (normalizeText(reason.text).includes('stale')) return 'stale-category';
+  if (reason.code) return `code:${reason.code}`;
+  return `text:${normalizeText(reason.text)}`;
+}
+
+function buildDisplayReasons(block: RegimeBlock): RegimeReason[] {
+  const merged: { reason: RegimeReason; sourceIndex: number }[] = [];
+  for (const r of block.clmmSuitability.reasons) {
+    merged.push({ reason: r, sourceIndex: merged.length });
+  }
+  for (const r of block.marketReasons) {
+    merged.push({ reason: r, sourceIndex: merged.length });
+  }
+  merged.sort((a, b) => {
+    const sev = (SEVERITY_ORDER[a.reason.severity] ?? 9) - (SEVERITY_ORDER[b.reason.severity] ?? 9);
+    if (sev !== 0) return sev;
+    return a.sourceIndex - b.sourceIndex;
+  });
+  const seen = new Set<string>();
+  const out: RegimeReason[] = [];
+  for (const { reason } of merged) {
+    const key = dedupeKey(reason);
+    if (seen.has(key)) continue;
+    seen.add(key);
+    out.push(reason);
+  }
+  return out;
+}
+
+function formatPercent(value: number): string {
+  return `${(value * 100).toFixed(2)}%`;
+}
+
+function formatRatio(value: number): string {
+  return `${value.toFixed(2)}x`;
+}
+
+function buildTelemetryRows(block: RegimeBlock): RegimeDetailRow[] {
+  return [
+    { label: 'Trend strength', value: block.telemetry.trendStrength.toFixed(5) },
+    { label: 'Realized vol short', value: formatPercent(block.telemetry.realizedVolShort) },
+    { label: 'Realized vol long', value: formatPercent(block.telemetry.realizedVolLong) },
+    { label: 'Volatility ratio', value: formatRatio(block.telemetry.volRatio) },
+    { label: 'Compression', value: formatPercent(block.telemetry.compression) },
+  ];
+}
+
+function buildSampleRows(block: RegimeBlock): RegimeDetailRow[] {
+  const rows: RegimeDetailRow[] = [];
+  if (block.metadata.candleCount !== undefined) {
+    rows.push({ label: 'Samples', value: `${block.metadata.candleCount} closed candles` });
+  }
+  if (block.metadata.sourceCandleCount !== undefined && block.metadata.sourceTimeframe) {
+    rows.push({
+      label: 'Source candles',
+      value: `${block.metadata.sourceCandleCount} x ${block.metadata.sourceTimeframe}`,
+    });
+  }
+  if (block.metadata.derivedTimeframe) {
+    rows.push({ label: 'Derived timeframe', value: block.metadata.derivedTimeframe });
+  }
+  if (block.metadata.aggregationVersion) {
+    rows.push({ label: 'Aggregation', value: block.metadata.aggregationVersion });
+  }
+  if (block.metadata.engineVersion) {
+    rows.push({ label: 'Engine', value: block.metadata.engineVersion });
+  }
+  if (block.metadata.configVersion) {
+    rows.push({ label: 'Config', value: block.metadata.configVersion });
+  }
+  return rows;
+}
+
+function buildFreshnessRows(block: RegimeBlock): RegimeDetailRow[] {
+  return [
+    {
+      label: 'Latest candle',
+      value: `${formatMinutesAgo(block.freshness.ageSeconds * 1000)} old`,
+      tone: block.freshness.hardStale
+        ? 'danger'
+        : block.freshness.softStale
+          ? 'warning'
+          : 'default',
+    },
+    {
+      label: 'Soft stale threshold',
+      value: formatSecondsThreshold(block.freshness.softStaleSeconds),
+      tone: 'muted',
+    },
+    {
+      label: 'Hard stale threshold',
+      value: formatSecondsThreshold(block.freshness.hardStaleSeconds),
+      tone: 'muted',
+    },
+  ];
+}
+
 export function buildRegimeViewModelBlock(block: RegimeBlock, now: number): RegimeViewModelBlock {
-  const ageStale = computeFreshness(block.freshness.capturedAtUnixMs, now, block.metadata?.source);
-  const isStale = block.freshness.hardStale || ageStale.isStale;
-  const freshnessLabel =
-    isStale && !ageStale.isStale
-      ? ageStale.freshnessLabel.replace(/( · stale)?$/, ' · stale')
-      : ageStale.freshnessLabel;
+  const dataQuality = classifyDataQuality(block.freshness.softStale, block.freshness.hardStale);
+  const generatedElapsedMs = Math.max(0, now - block.freshness.generatedAtUnixMs);
+  const generatedAgeLabel = `Generated ${formatMinutesAgo(generatedElapsedMs)} ago`;
+  const latestCandleAgeLabel = `Latest candle is ${formatMinutesAgo(
+    block.freshness.ageSeconds * 1000,
+  )} old`;
+  const sourceLabel = `${displaySource(block.metadata.source)} · ${block.metadata.symbol} · ${block.metadata.timeframe}`;
+  const compactTelemetryLabel = `${trendQualitative(block.telemetry.trendStrength)} · Vol ratio ${formatRatio(
+    block.telemetry.volRatio,
+  )}`;
 
-  const marketReasonSummary =
-    block.marketReasons.length > 0
-      ? [...block.marketReasons].sort(
-          (a, b) => (SEVERITY_ORDER[a.severity] ?? 9) - (SEVERITY_ORDER[b.severity] ?? 9),
-        )[0]!.text
-      : '—';
-
-  const suitabilityReasons = block.clmmSuitability.reasons;
-  const topSuitabilityReason =
-    suitabilityReasons.length > 0 &&
-    (block.clmmSuitability.status === 'CAUTION' || block.clmmSuitability.status === 'BLOCKED')
-      ? [...suitabilityReasons].sort(
-          (a, b) => (SEVERITY_ORDER[a.severity] ?? 9) - (SEVERITY_ORDER[b.severity] ?? 9),
-        )[0]!.text
-      : null;
+  const displayReasons = buildDisplayReasons(block);
 
   return {
-    regimeLabel: mapRegimeLabel(block.regime),
-    trendLabel: `Trend: ${block.trendStrength.toFixed(2)}`,
-    volLabel: `Vol: ${block.volRatio.toFixed(2)}`,
-    suitabilityLabel: mapSuitabilityLabel(block.clmmSuitability.status),
+    regimeLabel: REGIME_LABELS[block.regime] ?? block.regime,
+    suitabilityLabel: SUITABILITY_LABELS[block.clmmSuitability.status],
     suitabilityStatus: block.clmmSuitability.status,
-    suitabilityReason: topSuitabilityReason,
-    marketReasonSummary,
-    freshnessLabel,
-    isStale,
+    suitabilityTone: suitabilityTone(block.clmmSuitability.status),
+    dataQualityLabel: dataQuality.label,
+    dataQualityTone: dataQuality.tone,
+    generatedAgeLabel,
+    latestCandleAgeLabel,
+    sourceLabel,
+    compactTelemetryLabel,
+    primaryDisplayReason: displayReasons[0] ?? null,
+    displayReasons,
+    expandedTelemetryRows: buildTelemetryRows(block),
+    expandedSampleRows: buildSampleRows(block),
+    expandedFreshnessRows: buildFreshnessRows(block),
   };
 }
