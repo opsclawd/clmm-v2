@@ -138,9 +138,9 @@ function parseUpstream(data: unknown): RegimeBlock | null {
   )
     return null;
   const generatedAtUnixMs = Date.parse(generatedAtIso);
-  if (!Number.isFinite(generatedAtUnixMs)) return null;
+  if (!Number.isFinite(generatedAtUnixMs) || generatedAtUnixMs <= 0) return null;
   const lastCandleUnixMs = Date.parse(lastCandleIso);
-  if (!Number.isFinite(lastCandleUnixMs)) return null;
+  if (!Number.isFinite(lastCandleUnixMs) || lastCandleUnixMs <= 0) return null;
 
   const metadataRaw = data['metadata'];
   const metadata = isRecord(metadataRaw) ? metadataRaw : null;
