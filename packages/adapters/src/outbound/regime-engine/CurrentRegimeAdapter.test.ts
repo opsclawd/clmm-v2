@@ -364,6 +364,26 @@ describe('CurrentRegimeAdapter', () => {
     expect(result.block.metadata.aggregationVersion).toBe('ohlcv-agg-v1');
   });
 
+  it('treats non-positive optional number metadata as absent', async () => {
+    const upstream = {
+      ...SAMPLE_UPSTREAM,
+      sourceCandleCount: 0,
+      candleCount: -5,
+      metadata: {
+        ...SAMPLE_UPSTREAM.metadata,
+        sourceCandleCount: 0,
+        candleCount: -5,
+      },
+    };
+    vi.mocked(fetch).mockResolvedValue(new Response(JSON.stringify(upstream), { status: 200 }));
+    const adapter = new CurrentRegimeAdapter('https://regime.example.com', obs.port);
+    const result = await adapter.fetchCurrent(PARAMS);
+    expect(result.kind).toBe('block');
+    if (result.kind !== 'block') return;
+    expect(result.block.metadata.sourceCandleCount).toBeUndefined();
+    expect(result.block.metadata.candleCount).toBeUndefined();
+  });
+
   it('rejects when required metadata cannot be resolved from either layer', async () => {
     const upstream = {
       regime: SAMPLE_UPSTREAM.regime,

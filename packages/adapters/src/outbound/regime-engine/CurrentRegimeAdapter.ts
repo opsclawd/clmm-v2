@@ -62,10 +62,10 @@ function pickNumberTopThenNested(
   key: string,
 ): number | undefined {
   const top = data[key];
-  if (typeof top === 'number' && Number.isFinite(top)) return top;
+  if (typeof top === 'number' && Number.isFinite(top) && top > 0) return top;
   if (metadata) {
     const nested = metadata[key];
-    if (typeof nested === 'number' && Number.isFinite(nested)) return nested;
+    if (typeof nested === 'number' && Number.isFinite(nested) && nested > 0) return nested;
   }
   return undefined;
 }
