@@ -77,7 +77,7 @@ Pair-scoped routes scale by adding new pair-literal endpoints (`sol-usdc/current
 The upstream API documents 503 as a known state: the data store backing the policy engine is temporarily unavailable. This is semantically different from a generic `upstream-error` (5xx, timeouts, malformed responses) and from `not-found` (404, no insight has been produced yet). Each maps to distinct UI copy:
 
 ```typescript
-export type PolicyInsightReadResult =
+export type PolicyInsightsReadResult =
   | { kind: 'block'; block: PolicyInsightBlock }
   | { kind: 'not-found' }
   | { kind: 'store-unavailable' }
@@ -100,7 +100,7 @@ Without `store-unavailable` as a separate kind, the UI would show generic "unava
 Unlike `CurrentSrThesesAdapter` (which retries once on 5xx/timeout), `CurrentPolicyInsightsAdapter` does not retry any request. The policy engine runs on an asynchronous schedule; if it just returned 503 or 404, retrying within seconds is unlikely to produce different results, and it adds load to a service that may already be stressed.
 
 ```typescript
-async fetchCurrent(): Promise<PolicyInsightReadResult> {
+async fetchCurrent(): Promise<PolicyInsightsReadResult> {
   if (!this.baseUrl) return { kind: 'config-error' };
 
   let response: Response;
@@ -286,7 +286,7 @@ export class PolicyInsightsController {
 ### Discriminated union with store-unavailable kind
 
 ```typescript
-export type PolicyInsightReadResult =
+export type PolicyInsightsReadResult =
   | { kind: 'block'; block: PolicyInsightBlock }
   | { kind: 'not-found' }
   | { kind: 'store-unavailable' }
