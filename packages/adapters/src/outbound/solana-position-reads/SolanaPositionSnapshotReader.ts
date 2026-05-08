@@ -5,21 +5,22 @@
  * This reader is used for detailed position inspection and is not responsible for
  * determining breach direction or exit posture - that lives in packages/domain.
  *
- * Docs: @solana/kit v6, @orca-so/whirlpools-client
+ * Live fee/reward computation for fetchPositionDetail is delegated to
+ * OrcaPositionFeeRewardQuoteHelper. Checkpointed fields on the Orca position
+ * account are NEVER mapped into returned PositionFees; quote failures fail
+ * closed (return null) and emit a single structured warning via the
+ * ObservabilityPort, when one is supplied.
+ *
+ * Docs: @solana/kit v6, @orca-so/whirlpools-client v6.2.1
  */
 import { createSolanaRpc, address } from '@solana/kit';
 import { getPositionAddress, fetchPosition, fetchWhirlpool } from '@orca-so/whirlpools-client';
 
-import type {
-  LiquidityPosition,
-  WalletId,
-  PositionId,
-  PoolData,
-  PositionFees,
-  PositionRewardInfo,
-} from '@clmm/domain';
+import type { ObservabilityPort } from '@clmm/application';
+import type { LiquidityPosition, WalletId, PositionId, PoolData, PositionFees } from '@clmm/domain';
 import { makePoolId, makeClockTimestamp, evaluateRangeState } from '@clmm/domain';
 import { KNOWN_TOKENS } from '../price/known-tokens.js';
+import { OrcaPositionFeeRewardQuoteHelper } from './OrcaPositionFeeRewardQuoteHelper.js';
 
 export type WhirlpoolData = {
   tickCurrentIndex: number;
@@ -32,7 +33,11 @@ export type WhirlpoolData = {
 };
 
 export class SolanaPositionSnapshotReader {
-  constructor(private readonly rpcUrl: string) {}
+  constructor(
+    private readonly rpcUrl: string,
+    private readonly observability?: ObservabilityPort,
+    private readonly quoteHelper: OrcaPositionFeeRewardQuoteHelper = new OrcaPositionFeeRewardQuoteHelper(),
+  ) {}
 
   getRpc() {
     return createSolanaRpc(this.rpcUrl);
@@ -151,86 +156,101 @@ export class SolanaPositionSnapshotReader {
     fees: PositionFees;
     positionLiquidity: bigint;
   } | null> {
+    let positionMint;
+    let positionAddress;
+    let positionAccount;
     try {
-      const positionMint = address(positionId);
-      const [positionAddress] = await getPositionAddress(positionMint);
-      const positionAccount = await fetchPosition(rpc, positionAddress);
-      const pos = positionAccount.data;
-
-      const isOwner = await this.verifyOwnership(rpc, walletId, positionId);
-      if (!isOwner) {
-        return null;
-      }
-
-      const whirlpoolAddress = pos.whirlpool;
-      const whirlpoolAccount = await fetchWhirlpool(rpc, whirlpoolAddress);
-      const w = whirlpoolAccount.data;
-
-      const poolIdStr = whirlpoolAddress.toString();
-      const mintA = w.tokenMintA.toString();
-      const mintB = w.tokenMintB.toString();
-      const knownA = KNOWN_TOKENS[mintA];
-      const knownB = KNOWN_TOKENS[mintB];
-
-      const poolData: PoolData = {
-        poolId: makePoolId(poolIdStr),
-        tokenPair: {
-          mintA,
-          mintB,
-          symbolA: knownA?.symbol ?? mintA,
-          symbolB: knownB?.symbol ?? mintB,
-          decimalsA: knownA?.decimals ?? null,
-          decimalsB: knownB?.decimals ?? null,
-        },
-        sqrtPrice: w.sqrtPrice,
-        feeRate: w.feeRate,
-        tickSpacing: w.tickSpacing,
-        liquidity: w.liquidity,
-        tickCurrentIndex: w.tickCurrentIndex,
-      };
-
-      const rewardInfos: PositionRewardInfo[] = pos.rewardInfos.map((ri, idx) => {
-        const poolReward = w.rewardInfos[idx];
-        const rewardMint = poolReward?.mint?.toString() ?? '';
-        const known = KNOWN_TOKENS[rewardMint];
-        return {
-          mint: rewardMint,
-          amountOwed: ri.amountOwed,
-          decimals: known?.decimals ?? null,
-        };
-      });
-
-      const fees: PositionFees = {
-        feeOwedA: pos.feeOwedA,
-        feeOwedB: pos.feeOwedB,
-        rewardInfos,
-      };
-
-      const bounds = {
-        lowerBound: pos.tickLowerIndex,
-        upperBound: pos.tickUpperIndex,
-      };
-
-      const rangeState = evaluateRangeState(bounds, w.tickCurrentIndex);
-
-      const position: LiquidityPosition = {
-        positionId,
-        walletId,
-        poolId: makePoolId(poolIdStr),
-        bounds,
-        lastObservedAt: makeClockTimestamp(Date.now()),
-        rangeState,
-        monitoringReadiness: { kind: 'active' },
-      };
-
-      return {
-        position,
-        poolData,
-        fees,
-        positionLiquidity: pos.liquidity,
-      };
+      positionMint = address(positionId);
+      [positionAddress] = await getPositionAddress(positionMint);
+      positionAccount = await fetchPosition(rpc, positionAddress);
     } catch {
       return null;
     }
+    const pos = positionAccount.data;
+
+    const isOwner = await this.verifyOwnership(rpc, walletId, positionId);
+    if (!isOwner) {
+      return null;
+    }
+
+    let whirlpoolAddress;
+    let whirlpoolAccount;
+    try {
+      whirlpoolAddress = pos.whirlpool;
+      whirlpoolAccount = await fetchWhirlpool(rpc, whirlpoolAddress);
+    } catch {
+      return null;
+    }
+    const w = whirlpoolAccount.data;
+
+    const poolIdStr = whirlpoolAddress.toString();
+    const mintA = w.tokenMintA.toString();
+    const mintB = w.tokenMintB.toString();
+    const knownA = KNOWN_TOKENS[mintA];
+    const knownB = KNOWN_TOKENS[mintB];
+
+    const poolData: PoolData = {
+      poolId: makePoolId(poolIdStr),
+      tokenPair: {
+        mintA,
+        mintB,
+        symbolA: knownA?.symbol ?? mintA,
+        symbolB: knownB?.symbol ?? mintB,
+        decimalsA: knownA?.decimals ?? null,
+        decimalsB: knownB?.decimals ?? null,
+      },
+      sqrtPrice: w.sqrtPrice,
+      feeRate: w.feeRate,
+      tickSpacing: w.tickSpacing,
+      liquidity: w.liquidity,
+      tickCurrentIndex: w.tickCurrentIndex,
+    };
+
+    const quote = await this.quoteHelper.quote({
+      rpc,
+      position: pos as never,
+      positionMint: positionId,
+      whirlpool: w as never,
+      whirlpoolAddress,
+    });
+
+    if (quote.kind !== 'ok') {
+      this.observability?.log('warn', 'orca_position_fee_reward_quote_unavailable', {
+        positionId,
+        walletId,
+        poolId: poolIdStr,
+        lowerTick: pos.tickLowerIndex,
+        upperTick: pos.tickUpperIndex,
+        tickSpacing: w.tickSpacing,
+        reason: quote.reason,
+        ...(quote.errorName !== undefined ? { errorName: quote.errorName } : {}),
+        ...(quote.errorMessage !== undefined ? { errorMessage: quote.errorMessage } : {}),
+      });
+      return null;
+    }
+
+    const bounds = {
+      lowerBound: pos.tickLowerIndex,
+      upperBound: pos.tickUpperIndex,
+    };
+
+    const rangeState = evaluateRangeState(bounds, w.tickCurrentIndex);
+
+    const position: LiquidityPosition = {
+      positionId,
+      walletId,
+      poolId: makePoolId(poolIdStr),
+      bounds,
+      lastObservedAt: makeClockTimestamp(Date.now()),
+      rangeState,
+      monitoringReadiness: { kind: 'active' },
+    };
+
+    return {
+      position,
+      poolData,
+      fees: quote.fees,
+      positionLiquidity: pos.liquidity,
+    };
   }
 }

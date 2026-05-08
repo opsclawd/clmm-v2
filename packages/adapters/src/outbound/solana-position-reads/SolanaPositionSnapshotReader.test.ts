@@ -365,4 +365,162 @@ describe('SolanaPositionSnapshotReader', () => {
       expect(maxInFlight).toBeLessThanOrEqual(2);
     });
   });
+
+  describe('fetchPositionDetail', () => {
+    const SOL_MINT = 'So11111111111111111111111111111111111111112';
+    const USDC_MINT = 'EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v';
+
+    function setupHappyMocks() {
+      return import('@orca-so/whirlpools-client').then(
+        ({ getPositionAddress, fetchPosition, fetchWhirlpool }) => {
+          vi.mocked(getPositionAddress).mockResolvedValue([
+            address(MOCK_POSITION_PDA),
+          ] as unknown as Awaited<ReturnType<typeof getPositionAddress>>);
+          vi.mocked(fetchPosition).mockResolvedValue({
+            data: {
+              whirlpool: address(MOCK_WHIRLPOOL),
+              tickLowerIndex: -18304,
+              tickUpperIndex: -17956,
+              liquidity: 1000n,
+              feeGrowthCheckpointA: 0n,
+              feeGrowthCheckpointB: 0n,
+              feeOwedA: 9999n,
+              feeOwedB: 8888n,
+              positionMint: address(MOCK_POSITION_MINT),
+              rewardInfos: [
+                { amountOwed: 7777n, growthInsideCheckpoint: 0n },
+                { amountOwed: 0n, growthInsideCheckpoint: 0n },
+                { amountOwed: 0n, growthInsideCheckpoint: 0n },
+              ],
+            },
+          } as unknown as Awaited<ReturnType<typeof fetchPosition>>);
+          vi.mocked(fetchWhirlpool).mockResolvedValue({
+            data: {
+              tickCurrentIndex: -18130,
+              sqrtPrice: 184467440737095516n,
+              tokenMintA: { toString: () => SOL_MINT },
+              tokenMintB: { toString: () => USDC_MINT },
+              feeRate: 1000,
+              tickSpacing: 64,
+              liquidity: 2400000000n,
+              rewardInfos: [
+                { mint: { toString: () => SOL_MINT } },
+                { mint: { toString: () => '11111111111111111111111111111111' } },
+                { mint: { toString: () => '11111111111111111111111111111111' } },
+              ],
+            },
+          } as unknown as Awaited<ReturnType<typeof fetchWhirlpool>>);
+        },
+      );
+    }
+
+    it('returns detail with live fees from helper when quote succeeds', async () => {
+      await setupHappyMocks();
+
+      const helper = {
+        quote: vi.fn().mockResolvedValue({
+          kind: 'ok',
+          fees: {
+            feeOwedA: 12345n,
+            feeOwedB: 67890n,
+            rewardInfos: [{ mint: SOL_MINT, amountOwed: 11111n, decimals: 9 }],
+          },
+        }),
+      };
+      const reader = new SolanaPositionSnapshotReader(mockRpcUrl, undefined, helper as never);
+      const result = await reader.fetchPositionDetail(
+        mockRpcWithOwnership as never,
+        MOCK_POSITION_MINT,
+        MOCK_WALLET,
+      );
+
+      expect(result).not.toBeNull();
+      expect(result!.fees.feeOwedA).toBe(12345n);
+      expect(result!.fees.feeOwedB).toBe(67890n);
+      expect(helper.quote).toHaveBeenCalledTimes(1);
+    });
+
+    it('returns null and logs orca_position_fee_reward_quote_unavailable warn when helper returns unavailable', async () => {
+      await setupHappyMocks();
+
+      const helper = {
+        quote: vi.fn().mockResolvedValue({
+          kind: 'unavailable',
+          reason: 'fee-quote-failed',
+          errorName: 'Error',
+          errorMessage: 'wasm overflow',
+        }),
+      };
+      const observability = {
+        log: vi.fn(),
+        recordTiming: vi.fn(),
+        recordDetectionTiming: vi.fn(),
+        recordDeliveryTiming: vi.fn(),
+      };
+      const reader = new SolanaPositionSnapshotReader(
+        mockRpcUrl,
+        observability as never,
+        helper as never,
+      );
+      const result = await reader.fetchPositionDetail(
+        mockRpcWithOwnership as never,
+        MOCK_POSITION_MINT,
+        MOCK_WALLET,
+      );
+
+      expect(result).toBeNull();
+      expect(observability.log).toHaveBeenCalledTimes(1);
+      expect(observability.log).toHaveBeenCalledWith(
+        'warn',
+        'orca_position_fee_reward_quote_unavailable',
+        expect.objectContaining({
+          positionId: MOCK_POSITION_MINT,
+          walletId: MOCK_WALLET,
+          poolId: MOCK_WHIRLPOOL,
+          lowerTick: -18304,
+          upperTick: -17956,
+          tickSpacing: 64,
+          reason: 'fee-quote-failed',
+          errorName: 'Error',
+          errorMessage: 'wasm overflow',
+        }),
+      );
+    });
+
+    it('does not fall back to checkpointed pos.feeOwedA / pos.feeOwedB / pos.rewardInfos[].amountOwed on quote failure', async () => {
+      await setupHappyMocks();
+
+      const helper = {
+        quote: vi.fn().mockResolvedValue({
+          kind: 'unavailable',
+          reason: 'tick-array-fetch-failed',
+        }),
+      };
+      const observability = {
+        log: vi.fn(),
+        recordTiming: vi.fn(),
+        recordDetectionTiming: vi.fn(),
+        recordDeliveryTiming: vi.fn(),
+      };
+      const reader = new SolanaPositionSnapshotReader(
+        mockRpcUrl,
+        observability as never,
+        helper as never,
+      );
+      const result = await reader.fetchPositionDetail(
+        mockRpcWithOwnership as never,
+        MOCK_POSITION_MINT,
+        MOCK_WALLET,
+      );
+
+      expect(result).toBeNull();
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-return
+      const replacer = (_k: string, v: unknown): unknown =>
+        typeof v === 'bigint' ? v.toString() : v;
+      const stringified = JSON.stringify(observability.log.mock.calls, replacer);
+      expect(stringified).not.toContain('9999');
+      expect(stringified).not.toContain('8888');
+      expect(stringified).not.toContain('7777');
+    });
+  });
 });
