@@ -42,18 +42,64 @@ function parseReasons(raw: unknown): RegimeReason[] | null {
   return out;
 }
 
+function pickStringTopThenNested(
+  data: Record<string, unknown>,
+  metadata: Record<string, unknown> | null,
+  key: string,
+): string | undefined {
+  const top = data[key];
+  if (typeof top === 'string' && top.length > 0) return top;
+  if (metadata) {
+    const nested = metadata[key];
+    if (typeof nested === 'string' && nested.length > 0) return nested;
+  }
+  return undefined;
+}
+
+function pickNestedString(
+  metadata: Record<string, unknown> | null,
+  key: string,
+): string | undefined {
+  if (!metadata) return undefined;
+  const value = metadata[key];
+  return typeof value === 'string' && value.length > 0 ? value : undefined;
+}
+
+function pickNestedNumber(
+  metadata: Record<string, unknown> | null,
+  key: string,
+): number | undefined {
+  if (!metadata) return undefined;
+  const value = metadata[key];
+  return typeof value === 'number' && Number.isFinite(value) ? value : undefined;
+}
+
+function parseTelemetry(raw: unknown): RegimeBlock['telemetry'] | null {
+  if (!isRecord(raw)) return null;
+  const required = [
+    'realizedVolShort',
+    'realizedVolLong',
+    'volRatio',
+    'trendStrength',
+    'compression',
+  ] as const;
+  const out: Record<string, number> = {};
+  for (const key of required) {
+    const value = raw[key];
+    if (typeof value !== 'number' || !Number.isFinite(value)) return null;
+    out[key] = value;
+  }
+  return out as RegimeBlock['telemetry'];
+}
+
 function parseUpstream(data: unknown): RegimeBlock | null {
   if (!isRecord(data)) return null;
 
   const regime = data['regime'];
   if (typeof regime !== 'string' || !VALID_REGIMES.has(regime as MarketRegime)) return null;
 
-  const telemetry = data['telemetry'];
-  if (!isRecord(telemetry)) return null;
-  const trendStrength = telemetry['trendStrength'];
-  const volRatio = telemetry['volRatio'];
-  if (typeof trendStrength !== 'number' || !Number.isFinite(trendStrength)) return null;
-  if (typeof volRatio !== 'number' || !Number.isFinite(volRatio)) return null;
+  const telemetry = parseTelemetry(data['telemetry']);
+  if (!telemetry) return null;
 
   const suit = data['clmmSuitability'];
   if (!isRecord(suit)) return null;
@@ -69,33 +115,77 @@ function parseUpstream(data: unknown): RegimeBlock | null {
   const freshness = data['freshness'];
   if (!isRecord(freshness)) return null;
   const generatedAtIso = freshness['generatedAtIso'];
+  const lastCandleIso = freshness['lastCandleIso'];
+  const ageSeconds = freshness['ageSeconds'];
   const softStale = freshness['softStale'];
   const hardStale = freshness['hardStale'];
+  const softStaleSeconds = freshness['softStaleSeconds'];
+  const hardStaleSeconds = freshness['hardStaleSeconds'];
   if (typeof generatedAtIso !== 'string') return null;
+  if (typeof lastCandleIso !== 'string') return null;
   if (typeof softStale !== 'boolean' || typeof hardStale !== 'boolean') return null;
-  const capturedAtUnixMs = Date.parse(generatedAtIso);
-  if (!Number.isFinite(capturedAtUnixMs)) return null;
+  if (typeof ageSeconds !== 'number' || !Number.isFinite(ageSeconds) || ageSeconds < 0) return null;
+  if (
+    typeof softStaleSeconds !== 'number' ||
+    !Number.isFinite(softStaleSeconds) ||
+    softStaleSeconds <= 0
+  )
+    return null;
+  if (
+    typeof hardStaleSeconds !== 'number' ||
+    !Number.isFinite(hardStaleSeconds) ||
+    hardStaleSeconds <= softStaleSeconds
+  )
+    return null;
+  const generatedAtUnixMs = Date.parse(generatedAtIso);
+  if (!Number.isFinite(generatedAtUnixMs)) return null;
+  const lastCandleUnixMs = Date.parse(lastCandleIso);
+  if (!Number.isFinite(lastCandleUnixMs)) return null;
 
   const metadataRaw = data['metadata'];
-  const metadata = isRecord(metadataRaw)
-    ? {
-        ...(typeof metadataRaw['source'] === 'string' ? { source: metadataRaw['source'] } : {}),
-        ...(typeof metadataRaw['network'] === 'string' ? { network: metadataRaw['network'] } : {}),
-        ...(typeof metadataRaw['symbol'] === 'string' ? { symbol: metadataRaw['symbol'] } : {}),
-        ...(typeof metadataRaw['timeframe'] === 'string'
-          ? { timeframe: metadataRaw['timeframe'] }
-          : {}),
-      }
-    : undefined;
+  const metadata = isRecord(metadataRaw) ? metadataRaw : null;
+
+  const source = pickStringTopThenNested(data, metadata, 'source');
+  const network = pickStringTopThenNested(data, metadata, 'network');
+  const symbol = pickStringTopThenNested(data, metadata, 'symbol');
+  const timeframe = pickStringTopThenNested(data, metadata, 'timeframe');
+  if (!source || !network || !symbol || !timeframe) return null;
+
+  const sourceTimeframe = pickStringTopThenNested(data, metadata, 'sourceTimeframe');
+  const sourceCandleCount = pickNestedNumber(metadata, 'sourceCandleCount');
+  const candleCount = pickNestedNumber(metadata, 'candleCount');
+  const derivedTimeframe = pickNestedString(metadata, 'derivedTimeframe');
+  const aggregationVersion = pickNestedString(metadata, 'aggregationVersion');
+  const engineVersion = pickNestedString(metadata, 'engineVersion');
+  const configVersion = pickNestedString(metadata, 'configVersion');
 
   return {
     regime: regime as MarketRegime,
-    trendStrength,
-    volRatio,
+    telemetry,
     clmmSuitability: { status: status as ClmmSuitabilityStatus, reasons: suitReasons },
     marketReasons,
-    freshness: { capturedAtUnixMs, softStale, hardStale },
-    ...(metadata ? { metadata } : {}),
+    freshness: {
+      generatedAtUnixMs,
+      lastCandleUnixMs,
+      ageSeconds,
+      softStale,
+      hardStale,
+      softStaleSeconds,
+      hardStaleSeconds,
+    },
+    metadata: {
+      source,
+      network,
+      symbol,
+      timeframe,
+      ...(sourceTimeframe !== undefined ? { sourceTimeframe } : {}),
+      ...(sourceCandleCount !== undefined ? { sourceCandleCount } : {}),
+      ...(candleCount !== undefined ? { candleCount } : {}),
+      ...(derivedTimeframe !== undefined ? { derivedTimeframe } : {}),
+      ...(aggregationVersion !== undefined ? { aggregationVersion } : {}),
+      ...(engineVersion !== undefined ? { engineVersion } : {}),
+      ...(configVersion !== undefined ? { configVersion } : {}),
+    },
   };
 }
 
