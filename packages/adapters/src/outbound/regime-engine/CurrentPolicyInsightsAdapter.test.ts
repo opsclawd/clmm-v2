@@ -104,9 +104,13 @@ describe('CurrentPolicyInsightsAdapter', () => {
 
   it('returns kind:"not-found" on 404 with INSIGHT_NOT_FOUND code', async () => {
     vi.mocked(fetch).mockResolvedValue(
-      new Response(JSON.stringify({ code: 'INSIGHT_NOT_FOUND', message: 'not yet' }), {
-        status: 404,
-      }),
+      new Response(
+        JSON.stringify({
+          schemaVersion: '1.0',
+          error: { code: 'INSIGHT_NOT_FOUND', message: 'not yet', details: [] },
+        }),
+        { status: 404 },
+      ),
     );
     const adapter = new CurrentPolicyInsightsAdapter('https://regime.example.com', obs.port);
     const result = await adapter.fetchCurrent();

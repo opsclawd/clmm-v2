@@ -31,15 +31,20 @@ const PARAMS = {
 
 const SAMPLE_UPSTREAM = {
   regime: 'UP',
-  trendStrength: 0.62,
-  volRatio: 1.08,
+  telemetry: {
+    realizedVolShort: 0.007,
+    realizedVolLong: 0.02,
+    volRatio: 1.08,
+    trendStrength: 0.62,
+    compression: 0.02,
+  },
   clmmSuitability: {
     status: 'ALLOWED',
-    reasons: [{ severity: 'INFO', text: 'Trend supports range LP', code: 'CLMM_OK' }],
+    reasons: [{ severity: 'INFO', message: 'Trend supports range LP', code: 'CLMM_OK' }],
   },
-  marketReasons: [{ severity: 'INFO', text: 'Constructive trend', code: 'TREND_OK' }],
+  marketReasons: [{ severity: 'INFO', message: 'Constructive trend', code: 'TREND_OK' }],
   freshness: {
-    capturedAtIso: '2026-05-06T12:00:00Z',
+    generatedAtIso: '2026-05-06T12:00:00Z',
     softStale: false,
     hardStale: false,
   },
@@ -96,27 +101,59 @@ describe('CurrentRegimeAdapter', () => {
     expect(calledUrl).toContain('timeframe=1h');
   });
 
-  it('returns kind:"not-found" when upstream returns 404 CANDLES_NOT_FOUND', async () => {
+  it('returns kind:"not-found" when upstream returns 404 with nested error envelope', async () => {
     vi.mocked(fetch).mockResolvedValue(
-      new Response(JSON.stringify({ code: 'CANDLES_NOT_FOUND', message: 'no candles' }), {
-        status: 404,
-      }),
+      new Response(
+        JSON.stringify({
+          schemaVersion: '1.0',
+          error: { code: 'CANDLES_NOT_FOUND', message: 'No candles found', details: [] },
+        }),
+        { status: 404 },
+      ),
     );
     const adapter = new CurrentRegimeAdapter('https://regime.example.com', obs.port);
     const result = await adapter.fetchCurrent(PARAMS);
     expect(result.kind).toBe('not-found');
   });
 
-  it('returns kind:"config-error" when upstream returns 400 VALIDATION_ERROR', async () => {
+  it('returns kind:"config-error" when upstream returns 400 with nested error envelope', async () => {
     vi.mocked(fetch).mockResolvedValue(
-      new Response(JSON.stringify({ code: 'VALIDATION_ERROR', message: 'bad symbol' }), {
-        status: 400,
-      }),
+      new Response(
+        JSON.stringify({
+          schemaVersion: '1.0',
+          error: { code: 'VALIDATION_ERROR', message: 'bad symbol', details: [] },
+        }),
+        { status: 400 },
+      ),
     );
     const adapter = new CurrentRegimeAdapter('https://regime.example.com', obs.port);
     const result = await adapter.fetchCurrent(PARAMS);
     expect(result.kind).toBe('config-error');
     expect(obs.logs.some((l) => l.message.includes('VALIDATION_ERROR'))).toBe(true);
+  });
+
+  it('returns kind:"upstream-error" on 404 with unrecognized error code', async () => {
+    vi.mocked(fetch).mockResolvedValue(
+      new Response(
+        JSON.stringify({
+          schemaVersion: '1.0',
+          error: { code: 'UNKNOWN_CODE', message: 'something', details: [] },
+        }),
+        { status: 404 },
+      ),
+    );
+    const adapter = new CurrentRegimeAdapter('https://regime.example.com', obs.port);
+    const result = await adapter.fetchCurrent(PARAMS);
+    expect(result.kind).toBe('upstream-error');
+  });
+
+  it('returns kind:"upstream-error" on 404 with unparseable error envelope', async () => {
+    vi.mocked(fetch).mockResolvedValue(
+      new Response(JSON.stringify({ schemaVersion: '1.0' }), { status: 404 }),
+    );
+    const adapter = new CurrentRegimeAdapter('https://regime.example.com', obs.port);
+    const result = await adapter.fetchCurrent(PARAMS);
+    expect(result.kind).toBe('upstream-error');
   });
 
   it('returns kind:"upstream-error" on 5xx', async () => {
@@ -172,5 +209,17 @@ describe('CurrentRegimeAdapter', () => {
     await adapter.fetchCurrent(PARAMS);
     const calledUrl = (fetch as ReturnType<typeof vi.fn>).mock.calls[0]![0] as string;
     expect(calledUrl).toMatch(/^https:\/\/regime\.example\.com\/v1\/regime\/current\?/);
+  });
+
+  it('maps upstream message field to DTO text in reasons', async () => {
+    vi.mocked(fetch).mockResolvedValue(
+      new Response(JSON.stringify(SAMPLE_UPSTREAM), { status: 200 }),
+    );
+    const adapter = new CurrentRegimeAdapter('https://regime.example.com', obs.port);
+    const result = await adapter.fetchCurrent(PARAMS);
+    expect(result.kind).toBe('block');
+    if (result.kind !== 'block') return;
+    expect(result.block.clmmSuitability.reasons[0]!.text).toBe('Trend supports range LP');
+    expect(result.block.marketReasons[0]!.text).toBe('Constructive trend');
   });
 });

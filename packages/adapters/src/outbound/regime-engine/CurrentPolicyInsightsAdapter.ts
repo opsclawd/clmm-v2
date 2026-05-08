@@ -261,11 +261,12 @@ export class CurrentPolicyInsightsAdapter implements PolicyInsightsReadPort {
     try {
       const body: unknown = await response.json();
       if (!isRecord(body)) return null;
+      const err = body['error'];
       const out: { code?: string; message?: string } = {};
-      const codeRaw = body['code'];
-      const messageRaw = body['message'];
-      if (typeof codeRaw === 'string') out.code = codeRaw;
-      if (typeof messageRaw === 'string') out.message = messageRaw;
+      if (isRecord(err)) {
+        if (typeof err['code'] === 'string') out.code = err['code'];
+        if (typeof err['message'] === 'string') out.message = err['message'];
+      }
       return out;
     } catch {
       return null;
