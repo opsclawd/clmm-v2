@@ -31,12 +31,17 @@ const PARAMS = {
 
 const SAMPLE_UPSTREAM = {
   regime: 'UP',
+  source: 'geckoterminal',
+  network: 'solana',
+  symbol: 'SOL/USDC',
+  timeframe: '1h',
+  sourceTimeframe: '15m',
   telemetry: {
     realizedVolShort: 0.007,
-    realizedVolLong: 0.02,
-    volRatio: 1.08,
-    trendStrength: 0.62,
-    compression: 0.02,
+    realizedVolLong: 0.0107,
+    volRatio: 1.06,
+    trendStrength: 0.00018,
+    compression: 0.0092,
   },
   clmmSuitability: {
     status: 'ALLOWED',
@@ -45,14 +50,20 @@ const SAMPLE_UPSTREAM = {
   marketReasons: [{ severity: 'INFO', message: 'Constructive trend', code: 'TREND_OK' }],
   freshness: {
     generatedAtIso: '2026-05-06T12:00:00Z',
-    softStale: false,
+    lastCandleIso: '2026-05-06T10:33:00Z',
+    ageSeconds: 87 * 60,
+    softStale: true,
     hardStale: false,
+    softStaleSeconds: 75 * 60,
+    hardStaleSeconds: 90 * 60,
   },
   metadata: {
-    source: 'geckoterminal',
-    network: 'solana',
-    symbol: 'SOL/USDC',
-    timeframe: '1h',
+    sourceCandleCount: 346,
+    candleCount: 86,
+    derivedTimeframe: '1h',
+    aggregationVersion: 'ohlcv-agg-v1',
+    engineVersion: 'regime-engine-v1.4.0',
+    configVersion: 'regime-config-v3',
   },
 };
 
@@ -79,12 +90,32 @@ describe('CurrentRegimeAdapter', () => {
     expect(result.kind).toBe('block');
     if (result.kind !== 'block') return;
     expect(result.block.regime).toBe('UP');
-    expect(result.block.trendStrength).toBe(0.62);
-    expect(result.block.volRatio).toBe(1.08);
+    expect(result.block.telemetry).toEqual({
+      realizedVolShort: 0.007,
+      realizedVolLong: 0.0107,
+      volRatio: 1.06,
+      trendStrength: 0.00018,
+      compression: 0.0092,
+    });
     expect(result.block.clmmSuitability.status).toBe('ALLOWED');
-    expect(result.block.freshness.capturedAtUnixMs).toBe(Date.parse('2026-05-06T12:00:00Z'));
-    expect(result.block.freshness.softStale).toBe(false);
+    expect(result.block.freshness.generatedAtUnixMs).toBe(Date.parse('2026-05-06T12:00:00Z'));
+    expect(result.block.freshness.lastCandleUnixMs).toBe(Date.parse('2026-05-06T10:33:00Z'));
+    expect(result.block.freshness.ageSeconds).toBe(87 * 60);
+    expect(result.block.freshness.softStale).toBe(true);
     expect(result.block.freshness.hardStale).toBe(false);
+    expect(result.block.freshness.softStaleSeconds).toBe(75 * 60);
+    expect(result.block.freshness.hardStaleSeconds).toBe(90 * 60);
+    expect(result.block.metadata.source).toBe('geckoterminal');
+    expect(result.block.metadata.network).toBe('solana');
+    expect(result.block.metadata.symbol).toBe('SOL/USDC');
+    expect(result.block.metadata.timeframe).toBe('1h');
+    expect(result.block.metadata.sourceTimeframe).toBe('15m');
+    expect(result.block.metadata.sourceCandleCount).toBe(346);
+    expect(result.block.metadata.candleCount).toBe(86);
+    expect(result.block.metadata.derivedTimeframe).toBe('1h');
+    expect(result.block.metadata.aggregationVersion).toBe('ohlcv-agg-v1');
+    expect(result.block.metadata.engineVersion).toBe('regime-engine-v1.4.0');
+    expect(result.block.metadata.configVersion).toBe('regime-config-v3');
   });
 
   it('sends all five required upstream query params', async () => {
@@ -172,7 +203,9 @@ describe('CurrentRegimeAdapter', () => {
 
   it('returns kind:"upstream-error" on malformed body shape', async () => {
     vi.mocked(fetch).mockResolvedValue(
-      new Response(JSON.stringify({ regime: 'INVALID', trendStrength: 'oops' }), { status: 200 }),
+      new Response(JSON.stringify({ regime: 'INVALID', telemetry: { trendStrength: 'oops' } }), {
+        status: 200,
+      }),
     );
     const adapter = new CurrentRegimeAdapter('https://regime.example.com', obs.port);
     const result = await adapter.fetchCurrent(PARAMS);
@@ -221,5 +254,149 @@ describe('CurrentRegimeAdapter', () => {
     if (result.kind !== 'block') return;
     expect(result.block.clmmSuitability.reasons[0]!.text).toBe('Trend supports range LP');
     expect(result.block.marketReasons[0]!.text).toBe('Constructive trend');
+  });
+
+  it('uses top-level metadata fields and overrides nested metadata', async () => {
+    const upstream = {
+      ...SAMPLE_UPSTREAM,
+      source: 'geckoterminal',
+      network: 'solana',
+      symbol: 'SOL/USDC',
+      timeframe: '1h',
+      metadata: {
+        ...SAMPLE_UPSTREAM.metadata,
+        source: 'NESTED-SHOULD-LOSE',
+        network: 'NESTED-SHOULD-LOSE',
+        symbol: 'NESTED-SHOULD-LOSE',
+        timeframe: 'NESTED-SHOULD-LOSE',
+      },
+    };
+    vi.mocked(fetch).mockResolvedValue(new Response(JSON.stringify(upstream), { status: 200 }));
+    const adapter = new CurrentRegimeAdapter('https://regime.example.com', obs.port);
+    const result = await adapter.fetchCurrent(PARAMS);
+    expect(result.kind).toBe('block');
+    if (result.kind !== 'block') return;
+    expect(result.block.metadata.source).toBe('geckoterminal');
+    expect(result.block.metadata.network).toBe('solana');
+    expect(result.block.metadata.symbol).toBe('SOL/USDC');
+    expect(result.block.metadata.timeframe).toBe('1h');
+  });
+
+  it('falls back to nested metadata when top-level metadata is absent', async () => {
+    const upstream = {
+      regime: SAMPLE_UPSTREAM.regime,
+      telemetry: SAMPLE_UPSTREAM.telemetry,
+      clmmSuitability: SAMPLE_UPSTREAM.clmmSuitability,
+      marketReasons: SAMPLE_UPSTREAM.marketReasons,
+      freshness: SAMPLE_UPSTREAM.freshness,
+      metadata: {
+        source: 'geckoterminal',
+        network: 'solana',
+        symbol: 'SOL/USDC',
+        timeframe: '1h',
+      },
+    };
+    vi.mocked(fetch).mockResolvedValue(new Response(JSON.stringify(upstream), { status: 200 }));
+    const adapter = new CurrentRegimeAdapter('https://regime.example.com', obs.port);
+    const result = await adapter.fetchCurrent(PARAMS);
+    expect(result.kind).toBe('block');
+    if (result.kind !== 'block') return;
+    expect(result.block.metadata.source).toBe('geckoterminal');
+    expect(result.block.metadata.network).toBe('solana');
+  });
+
+  it('rejects when required metadata cannot be resolved from either layer', async () => {
+    const upstream = {
+      regime: SAMPLE_UPSTREAM.regime,
+      telemetry: SAMPLE_UPSTREAM.telemetry,
+      clmmSuitability: SAMPLE_UPSTREAM.clmmSuitability,
+      marketReasons: SAMPLE_UPSTREAM.marketReasons,
+      freshness: SAMPLE_UPSTREAM.freshness,
+    };
+    vi.mocked(fetch).mockResolvedValue(new Response(JSON.stringify(upstream), { status: 200 }));
+    const adapter = new CurrentRegimeAdapter('https://regime.example.com', obs.port);
+    const result = await adapter.fetchCurrent(PARAMS);
+    expect(result.kind).toBe('upstream-error');
+  });
+
+  it('rejects when generatedAtIso is not parseable', async () => {
+    const upstream = {
+      ...SAMPLE_UPSTREAM,
+      freshness: { ...SAMPLE_UPSTREAM.freshness, generatedAtIso: 'not-a-date' },
+    };
+    vi.mocked(fetch).mockResolvedValue(new Response(JSON.stringify(upstream), { status: 200 }));
+    const adapter = new CurrentRegimeAdapter('https://regime.example.com', obs.port);
+    const result = await adapter.fetchCurrent(PARAMS);
+    expect(result.kind).toBe('upstream-error');
+  });
+
+  it('rejects when lastCandleIso is not parseable', async () => {
+    const upstream = {
+      ...SAMPLE_UPSTREAM,
+      freshness: { ...SAMPLE_UPSTREAM.freshness, lastCandleIso: 'not-a-date' },
+    };
+    vi.mocked(fetch).mockResolvedValue(new Response(JSON.stringify(upstream), { status: 200 }));
+    const adapter = new CurrentRegimeAdapter('https://regime.example.com', obs.port);
+    const result = await adapter.fetchCurrent(PARAMS);
+    expect(result.kind).toBe('upstream-error');
+  });
+
+  it('rejects when ageSeconds is negative', async () => {
+    const upstream = {
+      ...SAMPLE_UPSTREAM,
+      freshness: { ...SAMPLE_UPSTREAM.freshness, ageSeconds: -1 },
+    };
+    vi.mocked(fetch).mockResolvedValue(new Response(JSON.stringify(upstream), { status: 200 }));
+    const adapter = new CurrentRegimeAdapter('https://regime.example.com', obs.port);
+    const result = await adapter.fetchCurrent(PARAMS);
+    expect(result.kind).toBe('upstream-error');
+  });
+
+  it('rejects when softStaleSeconds is not positive', async () => {
+    const upstream = {
+      ...SAMPLE_UPSTREAM,
+      freshness: { ...SAMPLE_UPSTREAM.freshness, softStaleSeconds: 0 },
+    };
+    vi.mocked(fetch).mockResolvedValue(new Response(JSON.stringify(upstream), { status: 200 }));
+    const adapter = new CurrentRegimeAdapter('https://regime.example.com', obs.port);
+    const result = await adapter.fetchCurrent(PARAMS);
+    expect(result.kind).toBe('upstream-error');
+  });
+
+  it('rejects when hardStaleSeconds is not greater than softStaleSeconds', async () => {
+    const upstream = {
+      ...SAMPLE_UPSTREAM,
+      freshness: {
+        ...SAMPLE_UPSTREAM.freshness,
+        softStaleSeconds: 90 * 60,
+        hardStaleSeconds: 90 * 60,
+      },
+    };
+    vi.mocked(fetch).mockResolvedValue(new Response(JSON.stringify(upstream), { status: 200 }));
+    const adapter = new CurrentRegimeAdapter('https://regime.example.com', obs.port);
+    const result = await adapter.fetchCurrent(PARAMS);
+    expect(result.kind).toBe('upstream-error');
+  });
+
+  it('rejects when any telemetry value is non-finite', async () => {
+    const upstream = {
+      ...SAMPLE_UPSTREAM,
+      telemetry: { ...SAMPLE_UPSTREAM.telemetry, compression: Number.POSITIVE_INFINITY },
+    };
+    vi.mocked(fetch).mockResolvedValue(new Response(JSON.stringify(upstream), { status: 200 }));
+    const adapter = new CurrentRegimeAdapter('https://regime.example.com', obs.port);
+    const result = await adapter.fetchCurrent(PARAMS);
+    expect(result.kind).toBe('upstream-error');
+  });
+
+  it('preserves all five telemetry numbers exactly as parsed', async () => {
+    vi.mocked(fetch).mockResolvedValue(
+      new Response(JSON.stringify(SAMPLE_UPSTREAM), { status: 200 }),
+    );
+    const adapter = new CurrentRegimeAdapter('https://regime.example.com', obs.port);
+    const result = await adapter.fetchCurrent(PARAMS);
+    expect(result.kind).toBe('block');
+    if (result.kind !== 'block') return;
+    expect(result.block.telemetry).toEqual(SAMPLE_UPSTREAM.telemetry);
   });
 });
