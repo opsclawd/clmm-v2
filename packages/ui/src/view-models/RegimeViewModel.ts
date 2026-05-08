@@ -176,11 +176,12 @@ function buildSampleRows(block: RegimeBlock): RegimeDetailRow[] {
   return rows;
 }
 
-function buildFreshnessRows(block: RegimeBlock): RegimeDetailRow[] {
+function buildFreshnessRows(block: RegimeBlock, now: number): RegimeDetailRow[] {
+  const candleAgeMs = Math.max(0, now - block.freshness.lastCandleUnixMs);
   return [
     {
       label: 'Latest candle',
-      value: `${formatMinutesAgo(block.freshness.ageSeconds * 1000)} old`,
+      value: `${formatMinutesAgo(candleAgeMs)} old`,
       tone: block.freshness.hardStale
         ? 'danger'
         : block.freshness.softStale
@@ -204,9 +205,8 @@ export function buildRegimeViewModelBlock(block: RegimeBlock, now: number): Regi
   const dataQuality = classifyDataQuality(block.freshness.softStale, block.freshness.hardStale);
   const generatedElapsedMs = Math.max(0, now - block.freshness.generatedAtUnixMs);
   const generatedAgeLabel = `Generated ${formatMinutesAgo(generatedElapsedMs)} ago`;
-  const latestCandleAgeLabel = `Latest candle is ${formatMinutesAgo(
-    block.freshness.ageSeconds * 1000,
-  )} old`;
+  const candleAgeMs = Math.max(0, now - block.freshness.lastCandleUnixMs);
+  const latestCandleAgeLabel = `Latest candle is ${formatMinutesAgo(candleAgeMs)} old`;
   const sourceLabel = `${displaySource(block.metadata.source)} · ${block.metadata.symbol} · ${block.metadata.timeframe}`;
   const compactTelemetryLabel = `${trendQualitative(block.telemetry.trendStrength)} · Vol ratio ${formatRatio(
     block.telemetry.volRatio,
@@ -229,6 +229,6 @@ export function buildRegimeViewModelBlock(block: RegimeBlock, now: number): Regi
     displayReasons,
     expandedTelemetryRows: buildTelemetryRows(block),
     expandedSampleRows: buildSampleRows(block),
-    expandedFreshnessRows: buildFreshnessRows(block),
+    expandedFreshnessRows: buildFreshnessRows(block, now),
   };
 }

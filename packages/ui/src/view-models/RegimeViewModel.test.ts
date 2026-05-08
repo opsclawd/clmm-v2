@@ -162,9 +162,26 @@ describe('buildRegimeViewModelBlock — labels', () => {
     expect(vm.generatedAgeLabel).toBe('Generated 12m ago');
   });
 
-  it('formats latestCandleAge from ageSeconds', () => {
+  it('formats latestCandleAge from live clock (now - lastCandleUnixMs)', () => {
     const vm = buildRegimeViewModelBlock(makeBlock(), GENERATED);
     expect(vm.latestCandleAgeLabel).toBe('Latest candle is 87m old');
+  });
+
+  it('computes candle age from live clock, not cached ageSeconds', () => {
+    const block = makeBlock({
+      freshness: {
+        generatedAtUnixMs: GENERATED - 2 * 3_600_000,
+        lastCandleUnixMs: GENERATED - 2 * 3_600_000 - 30 * 60_000,
+        ageSeconds: 30 * 60,
+        softStale: true,
+        hardStale: false,
+        softStaleSeconds: 75 * 60,
+        hardStaleSeconds: 90 * 60,
+      },
+    });
+    const now = GENERATED;
+    const vm = buildRegimeViewModelBlock(block, now);
+    expect(vm.latestCandleAgeLabel).toBe('Latest candle is 150m old');
   });
 
   it('renders compact telemetry with qualitative trend label and vol ratio', () => {
@@ -322,5 +339,22 @@ describe('buildRegimeViewModelBlock — expanded rows', () => {
     expect(labels).toEqual(
       expect.arrayContaining(['Latest candle', 'Soft stale threshold', 'Hard stale threshold']),
     );
+  });
+
+  it('expandedFreshnessRows computes candle age from live clock, not cached ageSeconds', () => {
+    const block = makeBlock({
+      freshness: {
+        generatedAtUnixMs: GENERATED - 2 * 3_600_000,
+        lastCandleUnixMs: GENERATED - 2 * 3_600_000 - 30 * 60_000,
+        ageSeconds: 30 * 60,
+        softStale: true,
+        hardStale: false,
+        softStaleSeconds: 75 * 60,
+        hardStaleSeconds: 90 * 60,
+      },
+    });
+    const vm = buildRegimeViewModelBlock(block, GENERATED);
+    const candleRow = vm.expandedFreshnessRows.find((r) => r.label === 'Latest candle');
+    expect(candleRow?.value).toBe('150m old');
   });
 });

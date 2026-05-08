@@ -114,7 +114,7 @@ describe('RegimeSection', () => {
     expect(screen.getByText('◆ Choppy regime')).toBeTruthy();
     expect(screen.getByText(/CLMM caution/)).toBeTruthy();
     expect(screen.getByText(/data soft-?stale/i)).toBeTruthy();
-    expect(screen.getByText(/Latest candle is 87m old/)).toBeTruthy();
+    expect(screen.getByText(/Latest candle is 99m old/)).toBeTruthy();
     expect(screen.getByText(/Trend flat · Vol ratio 1\.06x/)).toBeTruthy();
     expect(screen.getByText(/Generated 12m ago/)).toBeTruthy();
     expect(screen.getByText(/GeckoTerminal · SOL\/USDC · 1h/)).toBeTruthy();
