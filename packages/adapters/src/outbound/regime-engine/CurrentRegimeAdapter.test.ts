@@ -536,6 +536,51 @@ describe('CurrentRegimeAdapter', () => {
     expect(result.kind).toBe('upstream-error');
   });
 
+  it('accepts age skew of 1 second within tolerance', async () => {
+    vi.mocked(fetch).mockResolvedValue(
+      new Response(
+        JSON.stringify({
+          ...SAMPLE_UPSTREAM,
+          freshness: { ...SAMPLE_UPSTREAM.freshness, ageSeconds: 1 },
+        }),
+        { status: 200 },
+      ),
+    );
+    const adapter = new CurrentRegimeAdapter('https://regime.example.com', obs.port);
+    const result = await adapter.fetchCurrent(PARAMS);
+    expect(result.kind).toBe('block');
+  });
+
+  it('rejects age skew of 3 seconds outside tolerance', async () => {
+    vi.mocked(fetch).mockResolvedValue(
+      new Response(
+        JSON.stringify({
+          ...SAMPLE_UPSTREAM,
+          freshness: { ...SAMPLE_UPSTREAM.freshness, ageSeconds: 3 },
+        }),
+        { status: 200 },
+      ),
+    );
+    const adapter = new CurrentRegimeAdapter('https://regime.example.com', obs.port);
+    const result = await adapter.fetchCurrent(PARAMS);
+    expect(result.kind).toBe('upstream-error');
+  });
+
+  it('rejects age skew of 60 seconds outside tolerance', async () => {
+    vi.mocked(fetch).mockResolvedValue(
+      new Response(
+        JSON.stringify({
+          ...SAMPLE_UPSTREAM,
+          freshness: { ...SAMPLE_UPSTREAM.freshness, ageSeconds: 60 },
+        }),
+        { status: 200 },
+      ),
+    );
+    const adapter = new CurrentRegimeAdapter('https://regime.example.com', obs.port);
+    const result = await adapter.fetchCurrent(PARAMS);
+    expect(result.kind).toBe('upstream-error');
+  });
+
   it('rejects when ageSeconds is negative', async () => {
     const upstream = {
       ...SAMPLE_UPSTREAM,
