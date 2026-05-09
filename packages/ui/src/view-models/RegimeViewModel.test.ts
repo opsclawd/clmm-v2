@@ -1,11 +1,31 @@
 import { describe, expect, it } from 'vitest';
 import type { RegimeBlock } from '@clmm/application/public';
-import { buildRegimeViewModelBlock } from './RegimeViewModel.js';
+import { buildRegimeViewModelBlock, formatCandleClockTime } from './RegimeViewModel.js';
 
 const GENERATED = 1_700_000_000_000;
-const LAST_CANDLE = GENERATED - 87 * 60_000;
+const LAST_CANDLE_CLOSE = GENERATED;
+const LAST_CANDLE_OPEN = GENERATED - 60 * 60_000;
+const AGE_SECONDS = 0;
 
-function makeBlock(overrides: Partial<RegimeBlock> = {}): RegimeBlock {
+function makeBlock(
+  overrides: Omit<Partial<RegimeBlock>, 'freshness'> & {
+    freshness?: Partial<RegimeBlock['freshness']>;
+  } = {},
+): RegimeBlock {
+  const { freshness: freshOverride, ...rest } = overrides;
+  const baseFreshness: RegimeBlock['freshness'] = {
+    generatedAtUnixMs: GENERATED,
+    generatedAtIso: new Date(GENERATED).toISOString(),
+    lastCandleOpenUnixMs: LAST_CANDLE_OPEN,
+    lastCandleOpenIso: new Date(LAST_CANDLE_OPEN).toISOString(),
+    lastCandleCloseUnixMs: LAST_CANDLE_CLOSE,
+    lastCandleCloseIso: new Date(LAST_CANDLE_CLOSE).toISOString(),
+    ageSeconds: AGE_SECONDS,
+    softStale: false,
+    hardStale: false,
+    softStaleSeconds: 75 * 60,
+    hardStaleSeconds: 90 * 60,
+  };
   return {
     regime: 'CHOP',
     telemetry: {
@@ -17,47 +37,35 @@ function makeBlock(overrides: Partial<RegimeBlock> = {}): RegimeBlock {
     },
     clmmSuitability: { status: 'CAUTION', reasons: [] },
     marketReasons: [],
-    freshness: {
-      generatedAtUnixMs: GENERATED,
-      lastCandleUnixMs: LAST_CANDLE,
-      ageSeconds: 87 * 60,
-      softStale: true,
-      hardStale: false,
-      softStaleSeconds: 75 * 60,
-      hardStaleSeconds: 90 * 60,
-    },
+    freshness: { ...baseFreshness, ...freshOverride },
     metadata: {
       source: 'geckoterminal',
       network: 'solana',
       symbol: 'SOL/USDC',
       timeframe: '1h',
     },
-    ...overrides,
+    ...rest,
   };
 }
 
 describe('buildRegimeViewModelBlock — data quality', () => {
   it('classifies Fresh when neither flag is set', () => {
-    const vm = buildRegimeViewModelBlock(
-      makeBlock({
-        freshness: {
-          generatedAtUnixMs: GENERATED,
-          lastCandleUnixMs: LAST_CANDLE,
-          ageSeconds: 60,
-          softStale: false,
-          hardStale: false,
-          softStaleSeconds: 75 * 60,
-          hardStaleSeconds: 90 * 60,
-        },
-      }),
-      GENERATED + 60_000,
-    );
+    const vm = buildRegimeViewModelBlock(makeBlock(), GENERATED + 60_000);
     expect(vm.dataQualityLabel).toMatch(/fresh/i);
     expect(vm.dataQualityTone).toBe('success');
   });
 
   it('classifies Soft-stale when softStale is true and hardStale is false', () => {
-    const vm = buildRegimeViewModelBlock(makeBlock(), GENERATED + 60_000);
+    const vm = buildRegimeViewModelBlock(
+      makeBlock({
+        freshness: {
+          ageSeconds: 80 * 60,
+          softStale: true,
+          hardStale: false,
+        },
+      }),
+      GENERATED + 60_000,
+    );
     expect(vm.dataQualityLabel).toMatch(/soft-?stale/i);
     expect(vm.dataQualityTone).toBe('warning');
   });
@@ -66,13 +74,9 @@ describe('buildRegimeViewModelBlock — data quality', () => {
     const vm = buildRegimeViewModelBlock(
       makeBlock({
         freshness: {
-          generatedAtUnixMs: GENERATED,
-          lastCandleUnixMs: LAST_CANDLE,
           ageSeconds: 95 * 60,
           softStale: true,
           hardStale: true,
-          softStaleSeconds: 75 * 60,
-          hardStaleSeconds: 90 * 60,
         },
       }),
       GENERATED + 60_000,
@@ -85,13 +89,9 @@ describe('buildRegimeViewModelBlock — data quality', () => {
     const vm = buildRegimeViewModelBlock(
       makeBlock({
         freshness: {
-          generatedAtUnixMs: GENERATED,
-          lastCandleUnixMs: LAST_CANDLE,
           ageSeconds: 95 * 60,
           softStale: false,
           hardStale: true,
-          softStaleSeconds: 75 * 60,
-          hardStaleSeconds: 90 * 60,
         },
       }),
       GENERATED + 60_000,
@@ -101,21 +101,39 @@ describe('buildRegimeViewModelBlock — data quality', () => {
   });
 
   it('does NOT mark stale based on local 48h rule when upstream flags are false', () => {
+    const old = GENERATED - 49 * 3_600_000;
     const vm = buildRegimeViewModelBlock(
       makeBlock({
         freshness: {
-          generatedAtUnixMs: GENERATED - 49 * 3_600_000,
-          lastCandleUnixMs: GENERATED - 49 * 3_600_000 - 60_000,
+          generatedAtUnixMs: old,
+          generatedAtIso: new Date(old).toISOString(),
+          lastCandleOpenUnixMs: old - 60 * 60_000,
+          lastCandleOpenIso: new Date(old - 60 * 60_000).toISOString(),
+          lastCandleCloseUnixMs: old,
+          lastCandleCloseIso: new Date(old).toISOString(),
           ageSeconds: 60,
           softStale: false,
           hardStale: false,
-          softStaleSeconds: 75 * 60,
-          hardStaleSeconds: 90 * 60,
         },
       }),
       GENERATED,
     );
     expect(vm.dataQualityTone).toBe('success');
+  });
+
+  it('keeps Fresh tone when displayAgeSeconds exceeds hardStaleSeconds but upstream flags are false', () => {
+    const block = makeBlock({
+      freshness: {
+        ageSeconds: 10_000,
+        softStale: false,
+        hardStale: false,
+      },
+    });
+    const vm = buildRegimeViewModelBlock(block, GENERATED, { locale: 'en-US', timeZone: 'UTC' });
+    expect(vm.dataQualityLabel).toMatch(/fresh/i);
+    expect(vm.dataQualityTone).toBe('success');
+    const ageRow = vm.expandedFreshnessRows.find((r) => r.label === 'Latest closed candle age');
+    expect(ageRow?.tone).toBe('default');
   });
 });
 
@@ -162,26 +180,37 @@ describe('buildRegimeViewModelBlock — labels', () => {
     expect(vm.generatedAgeLabel).toBe('Generated 12m ago');
   });
 
-  it('formats latestCandleAge from live clock (now - lastCandleUnixMs)', () => {
-    const vm = buildRegimeViewModelBlock(makeBlock(), GENERATED);
-    expect(vm.latestCandleAgeLabel).toBe('Latest candle is 87m old');
+  it('formats latestCandleAge from upstream ageSeconds plus elapsed since generatedAt', () => {
+    const vm = buildRegimeViewModelBlock(
+      makeBlock({
+        freshness: {
+          ageSeconds: 87 * 60,
+          softStale: false,
+          hardStale: false,
+        },
+      }),
+      GENERATED,
+    );
+    expect(vm.latestCandleAgeLabel).toBe('Latest closed candle is 87m old');
   });
 
-  it('computes candle age from live clock, not cached ageSeconds', () => {
+  it('advances candle age by elapsed-since-generatedAt', () => {
+    const generatedAt = GENERATED - 2 * 3_600_000;
     const block = makeBlock({
       freshness: {
-        generatedAtUnixMs: GENERATED - 2 * 3_600_000,
-        lastCandleUnixMs: GENERATED - 2 * 3_600_000 - 30 * 60_000,
+        generatedAtUnixMs: generatedAt,
+        generatedAtIso: new Date(generatedAt).toISOString(),
+        lastCandleOpenUnixMs: generatedAt - 60 * 60_000,
+        lastCandleOpenIso: new Date(generatedAt - 60 * 60_000).toISOString(),
+        lastCandleCloseUnixMs: generatedAt,
+        lastCandleCloseIso: new Date(generatedAt).toISOString(),
         ageSeconds: 30 * 60,
         softStale: true,
         hardStale: false,
-        softStaleSeconds: 75 * 60,
-        hardStaleSeconds: 90 * 60,
       },
     });
-    const now = GENERATED;
-    const vm = buildRegimeViewModelBlock(block, now);
-    expect(vm.latestCandleAgeLabel).toBe('Latest candle is 150m old');
+    const vm = buildRegimeViewModelBlock(block, GENERATED);
+    expect(vm.latestCandleAgeLabel).toBe('Latest closed candle is 150m old');
   });
 
   it('renders compact telemetry with qualitative trend label and vol ratio', () => {
@@ -337,24 +366,33 @@ describe('buildRegimeViewModelBlock — expanded rows', () => {
     const vm = buildRegimeViewModelBlock(makeBlock(), GENERATED);
     const labels = vm.expandedFreshnessRows.map((r) => r.label);
     expect(labels).toEqual(
-      expect.arrayContaining(['Latest candle', 'Soft stale threshold', 'Hard stale threshold']),
+      expect.arrayContaining([
+        'Latest candle open',
+        'Latest candle close',
+        'Latest closed candle age',
+        'Soft stale threshold',
+        'Hard stale threshold',
+      ]),
     );
   });
 
-  it('expandedFreshnessRows computes candle age from live clock, not cached ageSeconds', () => {
+  it('expandedFreshnessRows computes candle age from display-age formula, not local clock', () => {
+    const generatedAt = GENERATED - 2 * 3_600_000;
     const block = makeBlock({
       freshness: {
-        generatedAtUnixMs: GENERATED - 2 * 3_600_000,
-        lastCandleUnixMs: GENERATED - 2 * 3_600_000 - 30 * 60_000,
+        generatedAtUnixMs: generatedAt,
+        generatedAtIso: new Date(generatedAt).toISOString(),
+        lastCandleOpenUnixMs: generatedAt - 60 * 60_000,
+        lastCandleOpenIso: new Date(generatedAt - 60 * 60_000).toISOString(),
+        lastCandleCloseUnixMs: generatedAt,
+        lastCandleCloseIso: new Date(generatedAt).toISOString(),
         ageSeconds: 30 * 60,
         softStale: true,
         hardStale: false,
-        softStaleSeconds: 75 * 60,
-        hardStaleSeconds: 90 * 60,
       },
     });
     const vm = buildRegimeViewModelBlock(block, GENERATED);
-    const candleRow = vm.expandedFreshnessRows.find((r) => r.label === 'Latest candle');
+    const candleRow = vm.expandedFreshnessRows.find((r) => r.label === 'Latest closed candle age');
     expect(candleRow?.value).toBe('150m old');
   });
 
@@ -362,8 +400,6 @@ describe('buildRegimeViewModelBlock — expanded rows', () => {
     const vm = buildRegimeViewModelBlock(
       makeBlock({
         freshness: {
-          generatedAtUnixMs: GENERATED,
-          lastCandleUnixMs: LAST_CANDLE,
           ageSeconds: 60,
           softStale: false,
           hardStale: false,
@@ -381,8 +417,6 @@ describe('buildRegimeViewModelBlock — expanded rows', () => {
     const vm = buildRegimeViewModelBlock(
       makeBlock({
         freshness: {
-          generatedAtUnixMs: GENERATED,
-          lastCandleUnixMs: LAST_CANDLE,
           ageSeconds: 60,
           softStale: false,
           hardStale: false,
@@ -400,8 +434,6 @@ describe('buildRegimeViewModelBlock — expanded rows', () => {
     const vm = buildRegimeViewModelBlock(
       makeBlock({
         freshness: {
-          generatedAtUnixMs: GENERATED,
-          lastCandleUnixMs: LAST_CANDLE,
           ageSeconds: 60,
           softStale: false,
           hardStale: false,
@@ -419,8 +451,6 @@ describe('buildRegimeViewModelBlock — expanded rows', () => {
     const vm = buildRegimeViewModelBlock(
       makeBlock({
         freshness: {
-          generatedAtUnixMs: GENERATED,
-          lastCandleUnixMs: LAST_CANDLE,
           ageSeconds: 60,
           softStale: false,
           hardStale: false,
@@ -438,8 +468,6 @@ describe('buildRegimeViewModelBlock — expanded rows', () => {
     const vm = buildRegimeViewModelBlock(
       makeBlock({
         freshness: {
-          generatedAtUnixMs: GENERATED,
-          lastCandleUnixMs: LAST_CANDLE,
           ageSeconds: 60,
           softStale: false,
           hardStale: false,
@@ -453,5 +481,102 @@ describe('buildRegimeViewModelBlock — expanded rows', () => {
     const hard = vm.expandedFreshnessRows.find((r) => r.label === 'Hard stale threshold');
     expect(soft?.value).toBe('75m');
     expect(hard?.value).toBe('76m');
+  });
+
+  it('expanded freshness rows expose open, close, and close-age (no "Latest candle" row)', () => {
+    const open = Date.parse('2026-05-09T01:00:00Z');
+    const close = Date.parse('2026-05-09T02:00:00Z');
+    const generated = Date.parse('2026-05-09T02:48:00Z');
+    const block = makeBlock({
+      freshness: {
+        generatedAtUnixMs: generated,
+        generatedAtIso: '2026-05-09T02:48:00Z',
+        lastCandleOpenUnixMs: open,
+        lastCandleOpenIso: '2026-05-09T01:00:00Z',
+        lastCandleCloseUnixMs: close,
+        lastCandleCloseIso: '2026-05-09T02:00:00Z',
+        ageSeconds: 48 * 60,
+        softStale: false,
+        hardStale: false,
+      },
+    });
+    const vm = buildRegimeViewModelBlock(block, generated, {
+      locale: 'en-US',
+      timeZone: 'UTC',
+    });
+    expect(vm.expandedFreshnessRows.map((r) => r.label)).toEqual([
+      'Latest candle open',
+      'Latest candle close',
+      'Latest closed candle age',
+      'Soft stale threshold',
+      'Hard stale threshold',
+    ]);
+    expect(vm.expandedFreshnessRows[0]?.value).toBe('01:00');
+    expect(vm.expandedFreshnessRows[1]?.value).toBe('02:00');
+    expect(vm.expandedFreshnessRows[2]?.value).toBe('48m old');
+  });
+});
+
+describe('formatCandleClockTime', () => {
+  const NOON_UTC = Date.parse('2026-05-09T12:00:00Z');
+
+  it('formats same-day timestamps as HH:MM in 24-hour format', () => {
+    expect(
+      formatCandleClockTime(Date.parse('2026-05-09T02:00:00Z'), NOON_UTC, {
+        locale: 'en-US',
+        timeZone: 'UTC',
+      }),
+    ).toBe('02:00');
+  });
+
+  it('formats different-day timestamps with a date prefix', () => {
+    const open = Date.parse('2026-05-08T23:00:00Z');
+    const close = Date.parse('2026-05-09T00:00:00Z');
+    const now = Date.parse('2026-05-09T00:30:00Z');
+    expect(formatCandleClockTime(open, now, { locale: 'en-US', timeZone: 'UTC' })).toBe(
+      'May 8, 23:00',
+    );
+    expect(formatCandleClockTime(close, now, { locale: 'en-US', timeZone: 'UTC' })).toMatch(
+      /^(00:00|24:00)$/,
+    );
+  });
+
+  it('respects the injected timeZone for "today" comparison', () => {
+    const earlyAm = Date.parse('2026-05-09T09:30:00Z');
+    const later = Date.parse('2026-05-09T13:00:00Z');
+    expect(
+      formatCandleClockTime(earlyAm, later, { locale: 'en-US', timeZone: 'America/Los_Angeles' }),
+    ).toBe('02:30');
+  });
+});
+
+describe('formatMinutesAgo (via expandedFreshnessRows close-age)', () => {
+  function ageRowValue(ageSeconds: number): string {
+    const block = makeBlock({
+      freshness: {
+        ageSeconds,
+        softStale: false,
+        hardStale: false,
+      },
+    });
+    const vm = buildRegimeViewModelBlock(block, GENERATED, {
+      locale: 'en-US',
+      timeZone: 'UTC',
+    });
+    const row = vm.expandedFreshnessRows.find((r) => r.label === 'Latest closed candle age');
+    return row?.value ?? '';
+  }
+
+  it('rounds 29 seconds down to 0m', () => {
+    expect(ageRowValue(29)).toBe('0m old');
+  });
+  it('rounds 30 seconds up to 1m (Math.round half-up)', () => {
+    expect(ageRowValue(30)).toBe('1m old');
+  });
+  it('rounds 89 seconds to 1m', () => {
+    expect(ageRowValue(89)).toBe('1m old');
+  });
+  it('rounds 90 seconds to 2m', () => {
+    expect(ageRowValue(90)).toBe('2m old');
   });
 });

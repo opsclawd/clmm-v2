@@ -173,17 +173,69 @@ function buildSampleRows(block: RegimeBlock): RegimeDetailRow[] {
   return rows;
 }
 
-function buildFreshnessRows(block: RegimeBlock, now: number): RegimeDetailRow[] {
-  const candleAgeMs = Math.max(0, now - block.freshness.lastCandleUnixMs);
+export type ClockFormatOptions = { locale?: string; timeZone?: string };
+
+export function formatCandleClockTime(
+  unixMs: number,
+  now: number,
+  opts?: ClockFormatOptions,
+): string {
+  const locale = opts?.locale;
+  const timeZone = opts?.timeZone;
+  const dayKey = (ms: number): string =>
+    new Intl.DateTimeFormat(locale, {
+      ...(timeZone ? { timeZone } : {}),
+      year: 'numeric',
+      month: 'numeric',
+      day: 'numeric',
+    }).format(new Date(ms));
+  const time = new Intl.DateTimeFormat(locale, {
+    ...(timeZone ? { timeZone } : {}),
+    hour: '2-digit',
+    minute: '2-digit',
+    hour12: false,
+  }).format(new Date(unixMs));
+  if (dayKey(unixMs) === dayKey(now)) return time;
+  const datePrefix = new Intl.DateTimeFormat(locale, {
+    ...(timeZone ? { timeZone } : {}),
+    month: 'short',
+    day: 'numeric',
+  }).format(new Date(unixMs));
+  return `${datePrefix}, ${time}`;
+}
+
+function computeDisplayAgeSeconds(block: RegimeBlock, now: number): number {
+  const elapsedSinceGenerated = Math.max(
+    0,
+    Math.floor((now - block.freshness.generatedAtUnixMs) / 1000),
+  );
+  return block.freshness.ageSeconds + elapsedSinceGenerated;
+}
+
+function buildFreshnessRows(
+  block: RegimeBlock,
+  now: number,
+  opts?: ClockFormatOptions,
+): RegimeDetailRow[] {
+  const displayAgeSeconds = computeDisplayAgeSeconds(block, now);
+  const ageTone: RegimeDetailRow['tone'] = block.freshness.hardStale
+    ? 'danger'
+    : block.freshness.softStale
+      ? 'warning'
+      : 'default';
   return [
     {
-      label: 'Latest candle',
-      value: `${formatMinutesAgo(candleAgeMs)} old`,
-      tone: block.freshness.hardStale
-        ? 'danger'
-        : block.freshness.softStale
-          ? 'warning'
-          : 'default',
+      label: 'Latest candle open',
+      value: formatCandleClockTime(block.freshness.lastCandleOpenUnixMs, now, opts),
+    },
+    {
+      label: 'Latest candle close',
+      value: formatCandleClockTime(block.freshness.lastCandleCloseUnixMs, now, opts),
+    },
+    {
+      label: 'Latest closed candle age',
+      value: `${formatMinutesAgo(displayAgeSeconds * 1000)} old`,
+      tone: ageTone,
     },
     {
       label: 'Soft stale threshold',
@@ -198,12 +250,16 @@ function buildFreshnessRows(block: RegimeBlock, now: number): RegimeDetailRow[] 
   ];
 }
 
-export function buildRegimeViewModelBlock(block: RegimeBlock, now: number): RegimeViewModelBlock {
+export function buildRegimeViewModelBlock(
+  block: RegimeBlock,
+  now: number,
+  opts?: ClockFormatOptions,
+): RegimeViewModelBlock {
   const dataQuality = classifyDataQuality(block.freshness.softStale, block.freshness.hardStale);
   const generatedElapsedMs = Math.max(0, now - block.freshness.generatedAtUnixMs);
   const generatedAgeLabel = `Generated ${formatMinutesAgo(generatedElapsedMs)} ago`;
-  const candleAgeMs = Math.max(0, now - block.freshness.lastCandleUnixMs);
-  const latestCandleAgeLabel = `Latest candle is ${formatMinutesAgo(candleAgeMs)} old`;
+  const displayAgeSeconds = computeDisplayAgeSeconds(block, now);
+  const latestCandleAgeLabel = `Latest closed candle is ${formatMinutesAgo(displayAgeSeconds * 1000)} old`;
   const sourceLabel = `${displaySource(block.metadata.source)} · ${block.metadata.symbol} · ${block.metadata.timeframe}`;
   const compactTelemetryLabel = `${trendQualitative(block.telemetry.trendStrength)} · Vol ratio ${formatRatio(
     block.telemetry.volRatio,
@@ -226,6 +282,6 @@ export function buildRegimeViewModelBlock(block: RegimeBlock, now: number): Regi
     displayReasons,
     expandedTelemetryRows: buildTelemetryRows(block),
     expandedSampleRows: buildSampleRows(block),
-    expandedFreshnessRows: buildFreshnessRows(block, now),
+    expandedFreshnessRows: buildFreshnessRows(block, now, opts),
   };
 }

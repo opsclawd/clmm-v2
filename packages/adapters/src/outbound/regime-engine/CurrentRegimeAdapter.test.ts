@@ -50,9 +50,12 @@ const SAMPLE_UPSTREAM = {
   marketReasons: [{ severity: 'INFO', message: 'Constructive trend', code: 'TREND_OK' }],
   freshness: {
     generatedAtIso: '2026-05-06T12:00:00Z',
-    lastCandleIso: '2026-05-06T10:33:00Z',
-    ageSeconds: 87 * 60,
-    softStale: true,
+    lastCandleOpenUnixMs: Date.parse('2026-05-06T11:00:00Z'),
+    lastCandleOpenIso: '2026-05-06T11:00:00Z',
+    lastCandleCloseUnixMs: Date.parse('2026-05-06T12:00:00Z'),
+    lastCandleCloseIso: '2026-05-06T12:00:00Z',
+    ageSeconds: 0,
+    softStale: false,
     hardStale: false,
     softStaleSeconds: 75 * 60,
     hardStaleSeconds: 90 * 60,
@@ -99,9 +102,13 @@ describe('CurrentRegimeAdapter', () => {
     });
     expect(result.block.clmmSuitability.status).toBe('ALLOWED');
     expect(result.block.freshness.generatedAtUnixMs).toBe(Date.parse('2026-05-06T12:00:00Z'));
-    expect(result.block.freshness.lastCandleUnixMs).toBe(Date.parse('2026-05-06T10:33:00Z'));
-    expect(result.block.freshness.ageSeconds).toBe(87 * 60);
-    expect(result.block.freshness.softStale).toBe(true);
+    expect(result.block.freshness.generatedAtIso).toBe('2026-05-06T12:00:00Z');
+    expect(result.block.freshness.lastCandleOpenUnixMs).toBe(Date.parse('2026-05-06T11:00:00Z'));
+    expect(result.block.freshness.lastCandleOpenIso).toBe('2026-05-06T11:00:00Z');
+    expect(result.block.freshness.lastCandleCloseUnixMs).toBe(Date.parse('2026-05-06T12:00:00Z'));
+    expect(result.block.freshness.lastCandleCloseIso).toBe('2026-05-06T12:00:00Z');
+    expect(result.block.freshness.ageSeconds).toBe(0);
+    expect(result.block.freshness.softStale).toBe(false);
     expect(result.block.freshness.hardStale).toBe(false);
     expect(result.block.freshness.softStaleSeconds).toBe(75 * 60);
     expect(result.block.freshness.hardStaleSeconds).toBe(90 * 60);
@@ -308,16 +315,12 @@ describe('CurrentRegimeAdapter', () => {
   it('uses top-level optional metadata fields with nested fallback', async () => {
     const upstream = {
       ...SAMPLE_UPSTREAM,
-      sourceCandleCount: 500,
-      candleCount: 120,
-      derivedTimeframe: '4h',
+      derivedTimeframe: '1h',
       aggregationVersion: 'ohlcv-agg-v2',
       engineVersion: 'regime-engine-v2',
       configVersion: 'regime-config-v4',
       metadata: {
         ...SAMPLE_UPSTREAM.metadata,
-        sourceCandleCount: 999,
-        candleCount: 999,
         derivedTimeframe: 'NESTED-SHOULD-LOSE',
         aggregationVersion: 'NESTED-SHOULD-LOSE',
         engineVersion: 'NESTED-SHOULD-LOSE',
@@ -329,9 +332,7 @@ describe('CurrentRegimeAdapter', () => {
     const result = await adapter.fetchCurrent(PARAMS);
     expect(result.kind).toBe('block');
     if (result.kind !== 'block') return;
-    expect(result.block.metadata.sourceCandleCount).toBe(500);
-    expect(result.block.metadata.candleCount).toBe(120);
-    expect(result.block.metadata.derivedTimeframe).toBe('4h');
+    expect(result.block.metadata.derivedTimeframe).toBe('1h');
     expect(result.block.metadata.aggregationVersion).toBe('ohlcv-agg-v2');
     expect(result.block.metadata.engineVersion).toBe('regime-engine-v2');
     expect(result.block.metadata.configVersion).toBe('regime-config-v4');
@@ -409,16 +410,193 @@ describe('CurrentRegimeAdapter', () => {
     expect(result.kind).toBe('upstream-error');
   });
 
-  it('rejects when lastCandleIso is not parseable', async () => {
-    const upstream = {
-      ...SAMPLE_UPSTREAM,
-      freshness: { ...SAMPLE_UPSTREAM.freshness, lastCandleIso: 'not-a-date' },
-    };
-    vi.mocked(fetch).mockResolvedValue(new Response(JSON.stringify(upstream), { status: 200 }));
+  describe.each([
+    ['lastCandleIso', 'foo'],
+    ['lastCandleIso', null],
+    ['lastCandleIso', ''],
+    ['lastCandleUnixMs', 1_700_000_000_000],
+    ['lastCandleUnixMs', null],
+    ['lastCandleUnixMs', 0],
+  ])('rejects upstream freshness with legacy key %s = %p', (key, value) => {
+    it('returns kind:"upstream-error"', async () => {
+      vi.mocked(fetch).mockResolvedValue(
+        new Response(
+          JSON.stringify({
+            ...SAMPLE_UPSTREAM,
+            freshness: { ...SAMPLE_UPSTREAM.freshness, [key]: value },
+          }),
+          { status: 200 },
+        ),
+      );
+      const adapter = new CurrentRegimeAdapter('https://regime.example.com', obs.port);
+      const result = await adapter.fetchCurrent(PARAMS);
+      expect(result.kind).toBe('upstream-error');
+    });
+  });
+
+  it('rejects when lastCandleOpenIso does not match lastCandleOpenUnixMs', async () => {
+    vi.mocked(fetch).mockResolvedValue(
+      new Response(
+        JSON.stringify({
+          ...SAMPLE_UPSTREAM,
+          freshness: {
+            ...SAMPLE_UPSTREAM.freshness,
+            lastCandleOpenIso: '2026-05-06T11:00:01Z',
+          },
+        }),
+        { status: 200 },
+      ),
+    );
     const adapter = new CurrentRegimeAdapter('https://regime.example.com', obs.port);
     const result = await adapter.fetchCurrent(PARAMS);
     expect(result.kind).toBe('upstream-error');
   });
+
+  it('rejects when lastCandleCloseIso does not match lastCandleCloseUnixMs', async () => {
+    vi.mocked(fetch).mockResolvedValue(
+      new Response(
+        JSON.stringify({
+          ...SAMPLE_UPSTREAM,
+          freshness: {
+            ...SAMPLE_UPSTREAM.freshness,
+            lastCandleCloseIso: '2026-05-06T12:00:01Z',
+          },
+        }),
+        { status: 200 },
+      ),
+    );
+    const adapter = new CurrentRegimeAdapter('https://regime.example.com', obs.port);
+    const result = await adapter.fetchCurrent(PARAMS);
+    expect(result.kind).toBe('upstream-error');
+  });
+
+  it('rejects when lastCandleCloseUnixMs equals lastCandleOpenUnixMs', async () => {
+    vi.mocked(fetch).mockResolvedValue(
+      new Response(
+        JSON.stringify({
+          ...SAMPLE_UPSTREAM,
+          freshness: {
+            ...SAMPLE_UPSTREAM.freshness,
+            lastCandleOpenUnixMs: Date.parse('2026-05-06T12:00:00Z'),
+            lastCandleOpenIso: '2026-05-06T12:00:00Z',
+            lastCandleCloseUnixMs: Date.parse('2026-05-06T12:00:00Z'),
+            lastCandleCloseIso: '2026-05-06T12:00:00Z',
+          },
+        }),
+        { status: 200 },
+      ),
+    );
+    const adapter = new CurrentRegimeAdapter('https://regime.example.com', obs.port);
+    const result = await adapter.fetchCurrent(PARAMS);
+    expect(result.kind).toBe('upstream-error');
+  });
+
+  it('rejects when lastCandleCloseUnixMs is before lastCandleOpenUnixMs', async () => {
+    vi.mocked(fetch).mockResolvedValue(
+      new Response(
+        JSON.stringify({
+          ...SAMPLE_UPSTREAM,
+          freshness: {
+            ...SAMPLE_UPSTREAM.freshness,
+            lastCandleOpenUnixMs: Date.parse('2026-05-06T13:00:00Z'),
+            lastCandleOpenIso: '2026-05-06T13:00:00Z',
+            lastCandleCloseUnixMs: Date.parse('2026-05-06T12:00:00Z'),
+            lastCandleCloseIso: '2026-05-06T12:00:00Z',
+          },
+        }),
+        { status: 200 },
+      ),
+    );
+    const adapter = new CurrentRegimeAdapter('https://regime.example.com', obs.port);
+    const result = await adapter.fetchCurrent(PARAMS);
+    expect(result.kind).toBe('upstream-error');
+  });
+
+  it('rejects when generatedAtUnixMs is before lastCandleCloseUnixMs', async () => {
+    vi.mocked(fetch).mockResolvedValue(
+      new Response(
+        JSON.stringify({
+          ...SAMPLE_UPSTREAM,
+          freshness: {
+            ...SAMPLE_UPSTREAM.freshness,
+            generatedAtIso: '2026-05-06T11:30:00Z',
+          },
+        }),
+        { status: 200 },
+      ),
+    );
+    const adapter = new CurrentRegimeAdapter('https://regime.example.com', obs.port);
+    const result = await adapter.fetchCurrent(PARAMS);
+    expect(result.kind).toBe('upstream-error');
+  });
+
+  it('accepts age skew of 1 second within tolerance', async () => {
+    vi.mocked(fetch).mockResolvedValue(
+      new Response(
+        JSON.stringify({
+          ...SAMPLE_UPSTREAM,
+          freshness: { ...SAMPLE_UPSTREAM.freshness, ageSeconds: 1 },
+        }),
+        { status: 200 },
+      ),
+    );
+    const adapter = new CurrentRegimeAdapter('https://regime.example.com', obs.port);
+    const result = await adapter.fetchCurrent(PARAMS);
+    expect(result.kind).toBe('block');
+  });
+
+  it('rejects age skew of 3 seconds outside tolerance', async () => {
+    vi.mocked(fetch).mockResolvedValue(
+      new Response(
+        JSON.stringify({
+          ...SAMPLE_UPSTREAM,
+          freshness: { ...SAMPLE_UPSTREAM.freshness, ageSeconds: 3 },
+        }),
+        { status: 200 },
+      ),
+    );
+    const adapter = new CurrentRegimeAdapter('https://regime.example.com', obs.port);
+    const result = await adapter.fetchCurrent(PARAMS);
+    expect(result.kind).toBe('upstream-error');
+  });
+
+  it('rejects age skew of 60 seconds outside tolerance', async () => {
+    vi.mocked(fetch).mockResolvedValue(
+      new Response(
+        JSON.stringify({
+          ...SAMPLE_UPSTREAM,
+          freshness: { ...SAMPLE_UPSTREAM.freshness, ageSeconds: 60 },
+        }),
+        { status: 200 },
+      ),
+    );
+    const adapter = new CurrentRegimeAdapter('https://regime.example.com', obs.port);
+    const result = await adapter.fetchCurrent(PARAMS);
+    expect(result.kind).toBe('upstream-error');
+  });
+
+  describe.each(['generatedAtIso', 'lastCandleOpenIso', 'lastCandleCloseIso'])(
+    'rejects parseable-but-non-ISO %s',
+    (field) => {
+      it('returns kind:"upstream-error"', async () => {
+        vi.mocked(fetch).mockResolvedValue(
+          new Response(
+            JSON.stringify({
+              ...SAMPLE_UPSTREAM,
+              freshness: {
+                ...SAMPLE_UPSTREAM.freshness,
+                [field]: 'May 9 2026 02:00:00 GMT',
+              },
+            }),
+            { status: 200 },
+          ),
+        );
+        const adapter = new CurrentRegimeAdapter('https://regime.example.com', obs.port);
+        const result = await adapter.fetchCurrent(PARAMS);
+        expect(result.kind).toBe('upstream-error');
+      });
+    },
+  );
 
   it('rejects when ageSeconds is negative', async () => {
     const upstream = {
@@ -477,5 +655,54 @@ describe('CurrentRegimeAdapter', () => {
     expect(result.kind).toBe('block');
     if (result.kind !== 'block') return;
     expect(result.block.telemetry).toEqual(SAMPLE_UPSTREAM.telemetry);
+  });
+
+  it('rejects when derivedTimeframe is 1h but candle window is 30 minutes', async () => {
+    vi.mocked(fetch).mockResolvedValue(
+      new Response(
+        JSON.stringify({
+          ...SAMPLE_UPSTREAM,
+          freshness: {
+            ...SAMPLE_UPSTREAM.freshness,
+            lastCandleOpenUnixMs: Date.parse('2026-05-06T11:30:00Z'),
+            lastCandleOpenIso: '2026-05-06T11:30:00Z',
+            lastCandleCloseUnixMs: Date.parse('2026-05-06T12:00:00Z'),
+            lastCandleCloseIso: '2026-05-06T12:00:00Z',
+            ageSeconds: 0,
+          },
+        }),
+        { status: 200 },
+      ),
+    );
+    const adapter = new CurrentRegimeAdapter('https://regime.example.com', obs.port);
+    const result = await adapter.fetchCurrent(PARAMS);
+    expect(result.kind).toBe('upstream-error');
+  });
+
+  it('accepts unrecognized timeframes without duration validation', async () => {
+    vi.mocked(fetch).mockResolvedValue(
+      new Response(
+        JSON.stringify({
+          ...SAMPLE_UPSTREAM,
+          freshness: {
+            ...SAMPLE_UPSTREAM.freshness,
+            lastCandleOpenUnixMs: Date.parse('2026-05-06T11:53:00Z'),
+            lastCandleOpenIso: '2026-05-06T11:53:00Z',
+            lastCandleCloseUnixMs: Date.parse('2026-05-06T12:00:00Z'),
+            lastCandleCloseIso: '2026-05-06T12:00:00Z',
+            ageSeconds: 0,
+          },
+          metadata: {
+            ...SAMPLE_UPSTREAM.metadata,
+            derivedTimeframe: '7m',
+          },
+          timeframe: '7m',
+        }),
+        { status: 200 },
+      ),
+    );
+    const adapter = new CurrentRegimeAdapter('https://regime.example.com', obs.port);
+    const result = await adapter.fetchCurrent({ ...PARAMS, timeframe: '7m' });
+    expect(result.kind).toBe('block');
   });
 });

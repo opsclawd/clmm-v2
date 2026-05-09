@@ -68,15 +68,47 @@ function isRegimeClmmSuitabilityBlock(value: unknown): value is RegimeClmmSuitab
   return true;
 }
 
+const ISO_8601_UTC_OR_OFFSET =
+  /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(\.\d{1,3})?(Z|[+-]\d{2}:\d{2})$/;
+function isStrictIso(value: unknown): value is string {
+  return typeof value === 'string' && ISO_8601_UTC_OR_OFFSET.test(value);
+}
+
 function isRegimeFreshnessBlock(value: unknown): value is RegimeFreshness {
   if (!isRecord(value)) return false;
-  const generated = value['generatedAtUnixMs'];
-  const last = value['lastCandleUnixMs'];
+
+  if (
+    Object.prototype.hasOwnProperty.call(value, 'lastCandleIso') ||
+    Object.prototype.hasOwnProperty.call(value, 'lastCandleUnixMs')
+  ) {
+    return false;
+  }
+
+  const generatedAtMs = value['generatedAtUnixMs'];
+  const generatedAtIso = value['generatedAtIso'];
+  const openMs = value['lastCandleOpenUnixMs'];
+  const openIso = value['lastCandleOpenIso'];
+  const closeMs = value['lastCandleCloseUnixMs'];
+  const closeIso = value['lastCandleCloseIso'];
   const age = value['ageSeconds'];
   const softSec = value['softStaleSeconds'];
   const hardSec = value['hardStaleSeconds'];
-  if (typeof generated !== 'number' || !Number.isFinite(generated) || generated <= 0) return false;
-  if (typeof last !== 'number' || !Number.isFinite(last) || last <= 0) return false;
+
+  if (typeof generatedAtMs !== 'number' || !Number.isFinite(generatedAtMs) || generatedAtMs <= 0)
+    return false;
+  if (typeof openMs !== 'number' || !Number.isFinite(openMs) || openMs <= 0) return false;
+  if (typeof closeMs !== 'number' || !Number.isFinite(closeMs) || closeMs <= 0) return false;
+  if (!isStrictIso(generatedAtIso)) return false;
+  if (!isStrictIso(openIso)) return false;
+  if (!isStrictIso(closeIso)) return false;
+
+  if (Date.parse(generatedAtIso) !== generatedAtMs) return false;
+  if (Date.parse(openIso) !== openMs) return false;
+  if (Date.parse(closeIso) !== closeMs) return false;
+
+  if (closeMs <= openMs) return false;
+  if (generatedAtMs < closeMs) return false;
+
   if (typeof age !== 'number' || !Number.isFinite(age) || age < 0) return false;
   if (typeof value['softStale'] !== 'boolean') return false;
   if (typeof value['hardStale'] !== 'boolean') return false;
