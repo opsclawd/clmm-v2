@@ -50,9 +50,12 @@ const SAMPLE_UPSTREAM = {
   marketReasons: [{ severity: 'INFO', message: 'Constructive trend', code: 'TREND_OK' }],
   freshness: {
     generatedAtIso: '2026-05-06T12:00:00Z',
-    lastCandleIso: '2026-05-06T10:33:00Z',
-    ageSeconds: 87 * 60,
-    softStale: true,
+    lastCandleOpenUnixMs: Date.parse('2026-05-06T11:00:00Z'),
+    lastCandleOpenIso: '2026-05-06T11:00:00Z',
+    lastCandleCloseUnixMs: Date.parse('2026-05-06T12:00:00Z'),
+    lastCandleCloseIso: '2026-05-06T12:00:00Z',
+    ageSeconds: 0,
+    softStale: false,
     hardStale: false,
     softStaleSeconds: 75 * 60,
     hardStaleSeconds: 90 * 60,
@@ -99,9 +102,13 @@ describe('CurrentRegimeAdapter', () => {
     });
     expect(result.block.clmmSuitability.status).toBe('ALLOWED');
     expect(result.block.freshness.generatedAtUnixMs).toBe(Date.parse('2026-05-06T12:00:00Z'));
-    expect(result.block.freshness.lastCandleUnixMs).toBe(Date.parse('2026-05-06T10:33:00Z'));
-    expect(result.block.freshness.ageSeconds).toBe(87 * 60);
-    expect(result.block.freshness.softStale).toBe(true);
+    expect(result.block.freshness.generatedAtIso).toBe('2026-05-06T12:00:00Z');
+    expect(result.block.freshness.lastCandleOpenUnixMs).toBe(Date.parse('2026-05-06T11:00:00Z'));
+    expect(result.block.freshness.lastCandleOpenIso).toBe('2026-05-06T11:00:00Z');
+    expect(result.block.freshness.lastCandleCloseUnixMs).toBe(Date.parse('2026-05-06T12:00:00Z'));
+    expect(result.block.freshness.lastCandleCloseIso).toBe('2026-05-06T12:00:00Z');
+    expect(result.block.freshness.ageSeconds).toBe(0);
+    expect(result.block.freshness.softStale).toBe(false);
     expect(result.block.freshness.hardStale).toBe(false);
     expect(result.block.freshness.softStaleSeconds).toBe(75 * 60);
     expect(result.block.freshness.hardStaleSeconds).toBe(90 * 60);

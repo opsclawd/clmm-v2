@@ -19,6 +19,21 @@ const VALID_STATUSES: ReadonlySet<ClmmSuitabilityStatus> = new Set([
 ]);
 const VALID_SEVERITIES: ReadonlySet<RegimeReasonSeverity> = new Set(['ERROR', 'WARN', 'INFO']);
 
+const ISO_8601_UTC_OR_OFFSET =
+  /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(\.\d{1,3})?(Z|[+-]\d{2}:\d{2})$/;
+function isStrictIso(value: unknown): value is string {
+  return typeof value === 'string' && ISO_8601_UTC_OR_OFFSET.test(value);
+}
+
+const AGE_PARITY_TOLERANCE_SECONDS = 2;
+
+const _RECOGNIZED_TIMEFRAME_MS: Readonly<Record<string, number>> = {
+  '15m': 15 * 60_000,
+  '1h': 60 * 60_000,
+  '4h': 4 * 60 * 60_000,
+  '1d': 24 * 60 * 60_000,
+};
+
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null && !Array.isArray(value);
 }
@@ -110,15 +125,40 @@ function parseUpstream(data: unknown): RegimeBlock | null {
 
   const freshness = data['freshness'];
   if (!isRecord(freshness)) return null;
+
+  if (
+    Object.prototype.hasOwnProperty.call(freshness, 'lastCandleIso') ||
+    Object.prototype.hasOwnProperty.call(freshness, 'lastCandleUnixMs')
+  ) {
+    return null;
+  }
+
   const generatedAtIso = freshness['generatedAtIso'];
-  const lastCandleIso = freshness['lastCandleIso'];
+  const lastCandleOpenIso = freshness['lastCandleOpenIso'];
+  const lastCandleCloseIso = freshness['lastCandleCloseIso'];
+  const lastCandleOpenUnixMs = freshness['lastCandleOpenUnixMs'];
+  const lastCandleCloseUnixMs = freshness['lastCandleCloseUnixMs'];
   const ageSeconds = freshness['ageSeconds'];
   const softStale = freshness['softStale'];
   const hardStale = freshness['hardStale'];
   const softStaleSeconds = freshness['softStaleSeconds'];
   const hardStaleSeconds = freshness['hardStaleSeconds'];
-  if (typeof generatedAtIso !== 'string') return null;
-  if (typeof lastCandleIso !== 'string') return null;
+
+  if (!isStrictIso(generatedAtIso)) return null;
+  if (!isStrictIso(lastCandleOpenIso)) return null;
+  if (!isStrictIso(lastCandleCloseIso)) return null;
+  if (
+    typeof lastCandleOpenUnixMs !== 'number' ||
+    !Number.isFinite(lastCandleOpenUnixMs) ||
+    lastCandleOpenUnixMs <= 0
+  )
+    return null;
+  if (
+    typeof lastCandleCloseUnixMs !== 'number' ||
+    !Number.isFinite(lastCandleCloseUnixMs) ||
+    lastCandleCloseUnixMs <= 0
+  )
+    return null;
   if (typeof softStale !== 'boolean' || typeof hardStale !== 'boolean') return null;
   if (typeof ageSeconds !== 'number' || !Number.isFinite(ageSeconds) || ageSeconds < 0) return null;
   if (
@@ -133,10 +173,19 @@ function parseUpstream(data: unknown): RegimeBlock | null {
     hardStaleSeconds <= softStaleSeconds
   )
     return null;
+
   const generatedAtUnixMs = Date.parse(generatedAtIso);
   if (!Number.isFinite(generatedAtUnixMs) || generatedAtUnixMs <= 0) return null;
-  const lastCandleUnixMs = Date.parse(lastCandleIso);
-  if (!Number.isFinite(lastCandleUnixMs) || lastCandleUnixMs <= 0) return null;
+
+  if (Date.parse(lastCandleOpenIso) !== lastCandleOpenUnixMs) return null;
+  if (Date.parse(lastCandleCloseIso) !== lastCandleCloseUnixMs) return null;
+
+  if (lastCandleCloseUnixMs <= lastCandleOpenUnixMs) return null;
+
+  if (generatedAtUnixMs < lastCandleCloseUnixMs) return null;
+
+  const expectedAgeSeconds = Math.floor((generatedAtUnixMs - lastCandleCloseUnixMs) / 1000);
+  if (Math.abs(ageSeconds - expectedAgeSeconds) > AGE_PARITY_TOLERANCE_SECONDS) return null;
 
   const metadataRaw = data['metadata'];
   const metadata = isRecord(metadataRaw) ? metadataRaw : null;
@@ -162,7 +211,11 @@ function parseUpstream(data: unknown): RegimeBlock | null {
     marketReasons,
     freshness: {
       generatedAtUnixMs,
-      lastCandleUnixMs,
+      generatedAtIso,
+      lastCandleOpenUnixMs,
+      lastCandleOpenIso,
+      lastCandleCloseUnixMs,
+      lastCandleCloseIso,
       ageSeconds,
       softStale,
       hardStale,
