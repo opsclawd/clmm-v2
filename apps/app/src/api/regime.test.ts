@@ -273,7 +273,7 @@ describe('fetchCurrentRegime', () => {
     it('throws "malformed regime block"', async () => {
       env.EXPO_PUBLIC_BFF_BASE_URL = 'https://bff.example.test';
       const block = fixtureBlock();
-      const ms = (block.freshness as unknown as Record<string, number>)[msField];
+      const ms = (block.freshness as unknown as Record<string, number>)[msField]!;
       const broken = {
         ...block,
         freshness: {
