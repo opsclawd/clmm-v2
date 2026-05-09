@@ -78,11 +78,8 @@ function formatMinutesAgo(elapsedMs: number): string {
   return `${minutes}m`;
 }
 
-function formatSecondsThreshold(seconds: number): string {
-  const minutes = Math.round(seconds / 60);
-  if (minutes < 60) return `${minutes}m`;
-  const hours = Math.round(minutes / 60);
-  return `${hours}h`;
+function formatFreshnessThresholdSeconds(seconds: number): string {
+  return `${Math.round(seconds / 60)}m`;
 }
 
 function trendQualitative(strength: number): string {
@@ -190,12 +187,12 @@ function buildFreshnessRows(block: RegimeBlock, now: number): RegimeDetailRow[] 
     },
     {
       label: 'Soft stale threshold',
-      value: formatSecondsThreshold(block.freshness.softStaleSeconds),
+      value: formatFreshnessThresholdSeconds(block.freshness.softStaleSeconds),
       tone: 'muted',
     },
     {
       label: 'Hard stale threshold',
-      value: formatSecondsThreshold(block.freshness.hardStaleSeconds),
+      value: formatFreshnessThresholdSeconds(block.freshness.hardStaleSeconds),
       tone: 'muted',
     },
   ];

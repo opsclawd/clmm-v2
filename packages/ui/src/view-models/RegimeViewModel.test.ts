@@ -357,4 +357,101 @@ describe('buildRegimeViewModelBlock — expanded rows', () => {
     const candleRow = vm.expandedFreshnessRows.find((r) => r.label === 'Latest candle');
     expect(candleRow?.value).toBe('150m old');
   });
+
+  it('renders soft stale threshold as exact minutes (75m, not 1h)', () => {
+    const vm = buildRegimeViewModelBlock(
+      makeBlock({
+        freshness: {
+          generatedAtUnixMs: GENERATED,
+          lastCandleUnixMs: LAST_CANDLE,
+          ageSeconds: 60,
+          softStale: false,
+          hardStale: false,
+          softStaleSeconds: 4500,
+          hardStaleSeconds: 5400,
+        },
+      }),
+      GENERATED,
+    );
+    const soft = vm.expandedFreshnessRows.find((r) => r.label === 'Soft stale threshold');
+    expect(soft?.value).toBe('75m');
+  });
+
+  it('renders hard stale threshold as exact minutes (90m, not 2h)', () => {
+    const vm = buildRegimeViewModelBlock(
+      makeBlock({
+        freshness: {
+          generatedAtUnixMs: GENERATED,
+          lastCandleUnixMs: LAST_CANDLE,
+          ageSeconds: 60,
+          softStale: false,
+          hardStale: false,
+          softStaleSeconds: 4500,
+          hardStaleSeconds: 5400,
+        },
+      }),
+      GENERATED,
+    );
+    const hard = vm.expandedFreshnessRows.find((r) => r.label === 'Hard stale threshold');
+    expect(hard?.value).toBe('90m');
+  });
+
+  it('renders 7200s as 120m (not 2h) for the hard stale threshold', () => {
+    const vm = buildRegimeViewModelBlock(
+      makeBlock({
+        freshness: {
+          generatedAtUnixMs: GENERATED,
+          lastCandleUnixMs: LAST_CANDLE,
+          ageSeconds: 60,
+          softStale: false,
+          hardStale: false,
+          softStaleSeconds: 4500,
+          hardStaleSeconds: 7200,
+        },
+      }),
+      GENERATED,
+    );
+    const hard = vm.expandedFreshnessRows.find((r) => r.label === 'Hard stale threshold');
+    expect(hard?.value).toBe('120m');
+  });
+
+  it('renders 9000s as 150m (not 3h) for the hard stale threshold', () => {
+    const vm = buildRegimeViewModelBlock(
+      makeBlock({
+        freshness: {
+          generatedAtUnixMs: GENERATED,
+          lastCandleUnixMs: LAST_CANDLE,
+          ageSeconds: 60,
+          softStale: false,
+          hardStale: false,
+          softStaleSeconds: 4500,
+          hardStaleSeconds: 9000,
+        },
+      }),
+      GENERATED,
+    );
+    const hard = vm.expandedFreshnessRows.find((r) => r.label === 'Hard stale threshold');
+    expect(hard?.value).toBe('150m');
+  });
+
+  it('rounds threshold seconds with Math.round at the minute boundary', () => {
+    const vm = buildRegimeViewModelBlock(
+      makeBlock({
+        freshness: {
+          generatedAtUnixMs: GENERATED,
+          lastCandleUnixMs: LAST_CANDLE,
+          ageSeconds: 60,
+          softStale: false,
+          hardStale: false,
+          softStaleSeconds: 4529,
+          hardStaleSeconds: 4531,
+        },
+      }),
+      GENERATED,
+    );
+    const soft = vm.expandedFreshnessRows.find((r) => r.label === 'Soft stale threshold');
+    const hard = vm.expandedFreshnessRows.find((r) => r.label === 'Hard stale threshold');
+    expect(soft?.value).toBe('75m');
+    expect(hard?.value).toBe('76m');
+  });
 });
