@@ -120,6 +120,21 @@ describe('buildRegimeViewModelBlock — data quality', () => {
     );
     expect(vm.dataQualityTone).toBe('success');
   });
+
+  it('keeps Fresh tone when displayAgeSeconds exceeds hardStaleSeconds but upstream flags are false', () => {
+    const block = makeBlock({
+      freshness: {
+        ageSeconds: 10_000,
+        softStale: false,
+        hardStale: false,
+      },
+    });
+    const vm = buildRegimeViewModelBlock(block, GENERATED, { locale: 'en-US', timeZone: 'UTC' });
+    expect(vm.dataQualityLabel).toMatch(/fresh/i);
+    expect(vm.dataQualityTone).toBe('success');
+    const ageRow = vm.expandedFreshnessRows.find((r) => r.label === 'Latest closed candle age');
+    expect(ageRow?.tone).toBe('default');
+  });
 });
 
 describe('buildRegimeViewModelBlock — labels', () => {
@@ -530,5 +545,36 @@ describe('formatCandleClockTime', () => {
     expect(
       formatCandleClockTime(earlyAm, later, { locale: 'en-US', timeZone: 'America/Los_Angeles' }),
     ).toBe('02:30');
+  });
+});
+
+describe('formatMinutesAgo (via expandedFreshnessRows close-age)', () => {
+  function ageRowValue(ageSeconds: number): string {
+    const block = makeBlock({
+      freshness: {
+        ageSeconds,
+        softStale: false,
+        hardStale: false,
+      },
+    });
+    const vm = buildRegimeViewModelBlock(block, GENERATED, {
+      locale: 'en-US',
+      timeZone: 'UTC',
+    });
+    const row = vm.expandedFreshnessRows.find((r) => r.label === 'Latest closed candle age');
+    return row?.value ?? '';
+  }
+
+  it('rounds 29 seconds down to 0m', () => {
+    expect(ageRowValue(29)).toBe('0m old');
+  });
+  it('rounds 30 seconds up to 1m (Math.round half-up)', () => {
+    expect(ageRowValue(30)).toBe('1m old');
+  });
+  it('rounds 89 seconds to 1m', () => {
+    expect(ageRowValue(89)).toBe('1m old');
+  });
+  it('rounds 90 seconds to 2m', () => {
+    expect(ageRowValue(90)).toBe('2m old');
   });
 });
