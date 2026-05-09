@@ -212,17 +212,30 @@ function computeDisplayAgeSeconds(block: RegimeBlock, now: number): number {
   return block.freshness.ageSeconds + elapsedSinceGenerated;
 }
 
-function buildFreshnessRows(block: RegimeBlock, now: number): RegimeDetailRow[] {
+function buildFreshnessRows(
+  block: RegimeBlock,
+  now: number,
+  opts?: ClockFormatOptions,
+): RegimeDetailRow[] {
   const displayAgeSeconds = computeDisplayAgeSeconds(block, now);
+  const ageTone: RegimeDetailRow['tone'] = block.freshness.hardStale
+    ? 'danger'
+    : block.freshness.softStale
+      ? 'warning'
+      : 'default';
   return [
     {
-      label: 'Latest candle',
+      label: 'Latest candle open',
+      value: formatCandleClockTime(block.freshness.lastCandleOpenUnixMs, now, opts),
+    },
+    {
+      label: 'Latest candle close',
+      value: formatCandleClockTime(block.freshness.lastCandleCloseUnixMs, now, opts),
+    },
+    {
+      label: 'Latest closed candle age',
       value: `${formatMinutesAgo(displayAgeSeconds * 1000)} old`,
-      tone: block.freshness.hardStale
-        ? 'danger'
-        : block.freshness.softStale
-          ? 'warning'
-          : 'default',
+      tone: ageTone,
     },
     {
       label: 'Soft stale threshold',
@@ -237,7 +250,11 @@ function buildFreshnessRows(block: RegimeBlock, now: number): RegimeDetailRow[] 
   ];
 }
 
-export function buildRegimeViewModelBlock(block: RegimeBlock, now: number): RegimeViewModelBlock {
+export function buildRegimeViewModelBlock(
+  block: RegimeBlock,
+  now: number,
+  opts?: ClockFormatOptions,
+): RegimeViewModelBlock {
   const dataQuality = classifyDataQuality(block.freshness.softStale, block.freshness.hardStale);
   const generatedElapsedMs = Math.max(0, now - block.freshness.generatedAtUnixMs);
   const generatedAgeLabel = `Generated ${formatMinutesAgo(generatedElapsedMs)} ago`;
@@ -265,6 +282,6 @@ export function buildRegimeViewModelBlock(block: RegimeBlock, now: number): Regi
     displayReasons,
     expandedTelemetryRows: buildTelemetryRows(block),
     expandedSampleRows: buildSampleRows(block),
-    expandedFreshnessRows: buildFreshnessRows(block, now),
+    expandedFreshnessRows: buildFreshnessRows(block, now, opts),
   };
 }

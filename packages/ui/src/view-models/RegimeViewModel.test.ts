@@ -351,7 +351,13 @@ describe('buildRegimeViewModelBlock — expanded rows', () => {
     const vm = buildRegimeViewModelBlock(makeBlock(), GENERATED);
     const labels = vm.expandedFreshnessRows.map((r) => r.label);
     expect(labels).toEqual(
-      expect.arrayContaining(['Latest candle', 'Soft stale threshold', 'Hard stale threshold']),
+      expect.arrayContaining([
+        'Latest candle open',
+        'Latest candle close',
+        'Latest closed candle age',
+        'Soft stale threshold',
+        'Hard stale threshold',
+      ]),
     );
   });
 
@@ -371,7 +377,7 @@ describe('buildRegimeViewModelBlock — expanded rows', () => {
       },
     });
     const vm = buildRegimeViewModelBlock(block, GENERATED);
-    const candleRow = vm.expandedFreshnessRows.find((r) => r.label === 'Latest candle');
+    const candleRow = vm.expandedFreshnessRows.find((r) => r.label === 'Latest closed candle age');
     expect(candleRow?.value).toBe('150m old');
   });
 
@@ -460,6 +466,39 @@ describe('buildRegimeViewModelBlock — expanded rows', () => {
     const hard = vm.expandedFreshnessRows.find((r) => r.label === 'Hard stale threshold');
     expect(soft?.value).toBe('75m');
     expect(hard?.value).toBe('76m');
+  });
+
+  it('expanded freshness rows expose open, close, and close-age (no "Latest candle" row)', () => {
+    const open = Date.parse('2026-05-09T01:00:00Z');
+    const close = Date.parse('2026-05-09T02:00:00Z');
+    const generated = Date.parse('2026-05-09T02:48:00Z');
+    const block = makeBlock({
+      freshness: {
+        generatedAtUnixMs: generated,
+        generatedAtIso: '2026-05-09T02:48:00Z',
+        lastCandleOpenUnixMs: open,
+        lastCandleOpenIso: '2026-05-09T01:00:00Z',
+        lastCandleCloseUnixMs: close,
+        lastCandleCloseIso: '2026-05-09T02:00:00Z',
+        ageSeconds: 48 * 60,
+        softStale: false,
+        hardStale: false,
+      },
+    });
+    const vm = buildRegimeViewModelBlock(block, generated, {
+      locale: 'en-US',
+      timeZone: 'UTC',
+    });
+    expect(vm.expandedFreshnessRows.map((r) => r.label)).toEqual([
+      'Latest candle open',
+      'Latest candle close',
+      'Latest closed candle age',
+      'Soft stale threshold',
+      'Hard stale threshold',
+    ]);
+    expect(vm.expandedFreshnessRows[0]?.value).toBe('01:00');
+    expect(vm.expandedFreshnessRows[1]?.value).toBe('02:00');
+    expect(vm.expandedFreshnessRows[2]?.value).toBe('48m old');
   });
 });
 
