@@ -440,6 +440,42 @@ describe('CurrentRegimeAdapter', () => {
     });
   });
 
+  it('rejects when lastCandleOpenIso does not match lastCandleOpenUnixMs', async () => {
+    vi.mocked(fetch).mockResolvedValue(
+      new Response(
+        JSON.stringify({
+          ...SAMPLE_UPSTREAM,
+          freshness: {
+            ...SAMPLE_UPSTREAM.freshness,
+            lastCandleOpenIso: '2026-05-06T11:00:01Z',
+          },
+        }),
+        { status: 200 },
+      ),
+    );
+    const adapter = new CurrentRegimeAdapter('https://regime.example.com', obs.port);
+    const result = await adapter.fetchCurrent(PARAMS);
+    expect(result.kind).toBe('upstream-error');
+  });
+
+  it('rejects when lastCandleCloseIso does not match lastCandleCloseUnixMs', async () => {
+    vi.mocked(fetch).mockResolvedValue(
+      new Response(
+        JSON.stringify({
+          ...SAMPLE_UPSTREAM,
+          freshness: {
+            ...SAMPLE_UPSTREAM.freshness,
+            lastCandleCloseIso: '2026-05-06T12:00:01Z',
+          },
+        }),
+        { status: 200 },
+      ),
+    );
+    const adapter = new CurrentRegimeAdapter('https://regime.example.com', obs.port);
+    const result = await adapter.fetchCurrent(PARAMS);
+    expect(result.kind).toBe('upstream-error');
+  });
+
   it('rejects when ageSeconds is negative', async () => {
     const upstream = {
       ...SAMPLE_UPSTREAM,
