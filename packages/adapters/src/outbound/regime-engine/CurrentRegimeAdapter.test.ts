@@ -416,15 +416,28 @@ describe('CurrentRegimeAdapter', () => {
     expect(result.kind).toBe('upstream-error');
   });
 
-  it('rejects when lastCandleIso is not parseable', async () => {
-    const upstream = {
-      ...SAMPLE_UPSTREAM,
-      freshness: { ...SAMPLE_UPSTREAM.freshness, lastCandleIso: 'not-a-date' },
-    };
-    vi.mocked(fetch).mockResolvedValue(new Response(JSON.stringify(upstream), { status: 200 }));
-    const adapter = new CurrentRegimeAdapter('https://regime.example.com', obs.port);
-    const result = await adapter.fetchCurrent(PARAMS);
-    expect(result.kind).toBe('upstream-error');
+  describe.each([
+    ['lastCandleIso', 'foo'],
+    ['lastCandleIso', null],
+    ['lastCandleIso', ''],
+    ['lastCandleUnixMs', 1_700_000_000_000],
+    ['lastCandleUnixMs', null],
+    ['lastCandleUnixMs', 0],
+  ])('rejects upstream freshness with legacy key %s = %p', (key, value) => {
+    it('returns kind:"upstream-error"', async () => {
+      vi.mocked(fetch).mockResolvedValue(
+        new Response(
+          JSON.stringify({
+            ...SAMPLE_UPSTREAM,
+            freshness: { ...SAMPLE_UPSTREAM.freshness, [key]: value },
+          }),
+          { status: 200 },
+        ),
+      );
+      const adapter = new CurrentRegimeAdapter('https://regime.example.com', obs.port);
+      const result = await adapter.fetchCurrent(PARAMS);
+      expect(result.kind).toBe('upstream-error');
+    });
   });
 
   it('rejects when ageSeconds is negative', async () => {
