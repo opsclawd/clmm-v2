@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { RegimeBlock } from '@clmm/application/public';
-import { buildRegimeViewModelBlock } from './RegimeViewModel.js';
+import { buildRegimeViewModelBlock, formatCandleClockTime } from './RegimeViewModel.js';
 
 const GENERATED = 1_700_000_000_000;
 const LAST_CANDLE_CLOSE = GENERATED;
@@ -460,5 +460,36 @@ describe('buildRegimeViewModelBlock — expanded rows', () => {
     const hard = vm.expandedFreshnessRows.find((r) => r.label === 'Hard stale threshold');
     expect(soft?.value).toBe('75m');
     expect(hard?.value).toBe('76m');
+  });
+});
+
+describe('formatCandleClockTime', () => {
+  const NOON_UTC = Date.parse('2026-05-09T12:00:00Z');
+
+  it('formats same-day timestamps as HH:MM in 24-hour format', () => {
+    expect(
+      formatCandleClockTime(Date.parse('2026-05-09T02:00:00Z'), NOON_UTC, {
+        locale: 'en-US',
+        timeZone: 'UTC',
+      }),
+    ).toBe('02:00');
+  });
+
+  it('formats different-day timestamps with a date prefix', () => {
+    const open = Date.parse('2026-05-08T23:00:00Z');
+    const close = Date.parse('2026-05-09T00:00:00Z');
+    const now = Date.parse('2026-05-09T00:30:00Z');
+    expect(formatCandleClockTime(open, now, { locale: 'en-US', timeZone: 'UTC' })).toBe(
+      'May 8, 23:00',
+    );
+    expect(formatCandleClockTime(close, now, { locale: 'en-US', timeZone: 'UTC' })).toBe('00:00');
+  });
+
+  it('respects the injected timeZone for "today" comparison', () => {
+    const earlyAm = Date.parse('2026-05-09T09:30:00Z');
+    const later = Date.parse('2026-05-09T13:00:00Z');
+    expect(
+      formatCandleClockTime(earlyAm, later, { locale: 'en-US', timeZone: 'America/Los_Angeles' }),
+    ).toBe('02:30');
   });
 });

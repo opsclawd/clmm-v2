@@ -173,6 +173,37 @@ function buildSampleRows(block: RegimeBlock): RegimeDetailRow[] {
   return rows;
 }
 
+export type ClockFormatOptions = { locale?: string; timeZone?: string };
+
+export function formatCandleClockTime(
+  unixMs: number,
+  now: number,
+  opts?: ClockFormatOptions,
+): string {
+  const locale = opts?.locale;
+  const timeZone = opts?.timeZone;
+  const dayKey = (ms: number): string =>
+    new Intl.DateTimeFormat(locale, {
+      ...(timeZone ? { timeZone } : {}),
+      year: 'numeric',
+      month: 'numeric',
+      day: 'numeric',
+    }).format(new Date(ms));
+  const time = new Intl.DateTimeFormat(locale, {
+    ...(timeZone ? { timeZone } : {}),
+    hour: '2-digit',
+    minute: '2-digit',
+    hour12: false,
+  }).format(new Date(unixMs));
+  if (dayKey(unixMs) === dayKey(now)) return time;
+  const datePrefix = new Intl.DateTimeFormat(locale, {
+    ...(timeZone ? { timeZone } : {}),
+    month: 'short',
+    day: 'numeric',
+  }).format(new Date(unixMs));
+  return `${datePrefix}, ${time}`;
+}
+
 function computeDisplayAgeSeconds(block: RegimeBlock, now: number): number {
   const elapsedSinceGenerated = Math.max(
     0,
