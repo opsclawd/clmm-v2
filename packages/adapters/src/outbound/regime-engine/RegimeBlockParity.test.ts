@@ -14,9 +14,13 @@ const sampleBlock: RegimeBlock = {
   marketReasons: [],
   freshness: {
     generatedAtUnixMs: 1_700_000_000_000,
-    lastCandleUnixMs: 1_700_000_000_000 - 87 * 60_000,
-    ageSeconds: 87 * 60,
-    softStale: true,
+    generatedAtIso: '2023-11-14T22:13:20.000Z',
+    lastCandleOpenUnixMs: 1_700_000_000_000 - 60 * 60_000,
+    lastCandleOpenIso: '2023-11-14T21:13:20.000Z',
+    lastCandleCloseUnixMs: 1_700_000_000_000,
+    lastCandleCloseIso: '2023-11-14T22:13:20.000Z',
+    ageSeconds: 0,
+    softStale: false,
     hardStale: false,
     softStaleSeconds: 75 * 60,
     hardStaleSeconds: 90 * 60,
@@ -35,9 +39,11 @@ describe('RegimeBlock structural parity', () => {
     expect(sampleBlock.telemetry.trendStrength).toBe(0.00018);
     expect(sampleBlock.clmmSuitability.status).toBe('ALLOWED');
     expect(sampleBlock.freshness.generatedAtUnixMs).toBe(1_700_000_000_000);
-    expect(sampleBlock.freshness.softStaleSeconds).toBeLessThan(
-      sampleBlock.freshness.hardStaleSeconds,
+    expect(sampleBlock.freshness.lastCandleCloseUnixMs).toBeGreaterThan(
+      sampleBlock.freshness.lastCandleOpenUnixMs,
     );
+    expect(typeof sampleBlock.freshness.lastCandleOpenIso).toBe('string');
+    expect(typeof sampleBlock.freshness.lastCandleCloseIso).toBe('string');
     expect(sampleBlock.metadata.source).toBe('geckoterminal');
   });
 
