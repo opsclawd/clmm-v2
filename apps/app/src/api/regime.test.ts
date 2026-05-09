@@ -41,8 +41,12 @@ function fixtureBlock() {
     ],
     freshness: {
       generatedAtUnixMs: 1_745_712_000_000,
-      lastCandleUnixMs: 1_745_712_000_000 - 87 * 60_000,
-      ageSeconds: 87 * 60,
+      generatedAtIso: new Date(1_745_712_000_000).toISOString(),
+      lastCandleOpenUnixMs: 1_745_712_000_000 - 60 * 60_000,
+      lastCandleOpenIso: new Date(1_745_712_000_000 - 60 * 60_000).toISOString(),
+      lastCandleCloseUnixMs: 1_745_712_000_000,
+      lastCandleCloseIso: new Date(1_745_712_000_000).toISOString(),
+      ageSeconds: 0,
       softStale: false,
       hardStale: false,
       softStaleSeconds: 75 * 60,
@@ -172,6 +176,34 @@ describe('fetchCurrentRegime', () => {
     const error = await fetchCurrentRegime(POOL_ID).catch((reason: unknown) => reason);
     expect(error).toBeInstanceOf(Error);
     expect((error as Error).message).toContain('malformed regime block');
+  });
+
+  describe.each([
+    ['lastCandleIso', 'foo'],
+    ['lastCandleIso', null],
+    ['lastCandleIso', undefined],
+    ['lastCandleIso', ''],
+    ['lastCandleUnixMs', 1_745_712_000_000],
+    ['lastCandleUnixMs', null],
+    ['lastCandleUnixMs', undefined],
+    ['lastCandleUnixMs', 0],
+  ])('rejects regime block with legacy key %s = %p', (key, value) => {
+    it('throws "malformed regime block"', async () => {
+      env.EXPO_PUBLIC_BFF_BASE_URL = 'https://bff.example.test';
+      const block = fixtureBlock();
+      const broken = {
+        ...block,
+        freshness: { ...block.freshness, [key]: value },
+      };
+      globalThis.fetch = vi.fn().mockResolvedValue({
+        ok: true,
+        status: 200,
+        json: () => Promise.resolve({ regime: broken }),
+      }) as typeof fetch;
+      const error = await fetchCurrentRegime(POOL_ID).catch((reason: unknown) => reason);
+      expect(error).toBeInstanceOf(Error);
+      expect((error as Error).message).toContain('malformed regime block');
+    });
   });
 
   it('throws when metadata is missing required fields', async () => {
