@@ -476,6 +476,66 @@ describe('CurrentRegimeAdapter', () => {
     expect(result.kind).toBe('upstream-error');
   });
 
+  it('rejects when lastCandleCloseUnixMs equals lastCandleOpenUnixMs', async () => {
+    vi.mocked(fetch).mockResolvedValue(
+      new Response(
+        JSON.stringify({
+          ...SAMPLE_UPSTREAM,
+          freshness: {
+            ...SAMPLE_UPSTREAM.freshness,
+            lastCandleOpenUnixMs: Date.parse('2026-05-06T12:00:00Z'),
+            lastCandleOpenIso: '2026-05-06T12:00:00Z',
+            lastCandleCloseUnixMs: Date.parse('2026-05-06T12:00:00Z'),
+            lastCandleCloseIso: '2026-05-06T12:00:00Z',
+          },
+        }),
+        { status: 200 },
+      ),
+    );
+    const adapter = new CurrentRegimeAdapter('https://regime.example.com', obs.port);
+    const result = await adapter.fetchCurrent(PARAMS);
+    expect(result.kind).toBe('upstream-error');
+  });
+
+  it('rejects when lastCandleCloseUnixMs is before lastCandleOpenUnixMs', async () => {
+    vi.mocked(fetch).mockResolvedValue(
+      new Response(
+        JSON.stringify({
+          ...SAMPLE_UPSTREAM,
+          freshness: {
+            ...SAMPLE_UPSTREAM.freshness,
+            lastCandleOpenUnixMs: Date.parse('2026-05-06T13:00:00Z'),
+            lastCandleOpenIso: '2026-05-06T13:00:00Z',
+            lastCandleCloseUnixMs: Date.parse('2026-05-06T12:00:00Z'),
+            lastCandleCloseIso: '2026-05-06T12:00:00Z',
+          },
+        }),
+        { status: 200 },
+      ),
+    );
+    const adapter = new CurrentRegimeAdapter('https://regime.example.com', obs.port);
+    const result = await adapter.fetchCurrent(PARAMS);
+    expect(result.kind).toBe('upstream-error');
+  });
+
+  it('rejects when generatedAtUnixMs is before lastCandleCloseUnixMs', async () => {
+    vi.mocked(fetch).mockResolvedValue(
+      new Response(
+        JSON.stringify({
+          ...SAMPLE_UPSTREAM,
+          freshness: {
+            ...SAMPLE_UPSTREAM.freshness,
+            generatedAtIso: '2026-05-06T11:30:00Z',
+          },
+        }),
+        { status: 200 },
+      ),
+    );
+    const adapter = new CurrentRegimeAdapter('https://regime.example.com', obs.port);
+    const result = await adapter.fetchCurrent(PARAMS);
+    expect(result.kind).toBe('upstream-error');
+  });
+
   it('rejects when ageSeconds is negative', async () => {
     const upstream = {
       ...SAMPLE_UPSTREAM,
