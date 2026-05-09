@@ -27,7 +27,11 @@ const baseBlock: RegimeBlock = {
   marketReasons: [],
   freshness: {
     generatedAtUnixMs: GENERATED,
-    lastCandleUnixMs: LAST_CANDLE,
+    generatedAtIso: new Date(GENERATED).toISOString(),
+    lastCandleOpenUnixMs: LAST_CANDLE - 60 * 60_000,
+    lastCandleOpenIso: new Date(LAST_CANDLE - 60 * 60_000).toISOString(),
+    lastCandleCloseUnixMs: LAST_CANDLE,
+    lastCandleCloseIso: new Date(LAST_CANDLE).toISOString(),
     ageSeconds: 87 * 60,
     softStale: true,
     hardStale: false,
@@ -114,7 +118,7 @@ describe('RegimeSection', () => {
     expect(screen.getByText('◆ Choppy regime')).toBeTruthy();
     expect(screen.getByText(/CLMM caution/)).toBeTruthy();
     expect(screen.getByText(/data soft-?stale/i)).toBeTruthy();
-    expect(screen.getByText(/Latest candle is 99m old/)).toBeTruthy();
+    expect(screen.getByText(/Latest closed candle is 99m old/)).toBeTruthy();
     expect(screen.getByText(/Trend flat · Vol ratio 1\.06x/)).toBeTruthy();
     expect(screen.getByText(/Generated 12m ago/)).toBeTruthy();
     expect(screen.getByText(/GeckoTerminal · SOL\/USDC · 1h/)).toBeTruthy();
@@ -166,6 +170,9 @@ describe('RegimeSection', () => {
     expect(screen.getByText('Compression')).toBeTruthy();
     expect(screen.getByText('Samples')).toBeTruthy();
     expect(screen.getByText('Source candles')).toBeTruthy();
+    expect(screen.getByText('Latest candle open')).toBeTruthy();
+    expect(screen.getByText('Latest candle close')).toBeTruthy();
+    expect(screen.getByText('Latest closed candle age')).toBeTruthy();
     expect(screen.getByText('Soft stale threshold')).toBeTruthy();
     expect(screen.getByText('Hard stale threshold')).toBeTruthy();
   });
