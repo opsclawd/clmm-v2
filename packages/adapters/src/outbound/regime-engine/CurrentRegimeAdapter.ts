@@ -27,7 +27,7 @@ function isStrictIso(value: unknown): value is string {
 
 const AGE_PARITY_TOLERANCE_SECONDS = 2;
 
-const _RECOGNIZED_TIMEFRAME_MS: Readonly<Record<string, number>> = {
+const RECOGNIZED_TIMEFRAME_MS: Readonly<Record<string, number>> = {
   '15m': 15 * 60_000,
   '1h': 60 * 60_000,
   '4h': 4 * 60 * 60_000,
@@ -203,6 +203,12 @@ function parseUpstream(data: unknown): RegimeBlock | null {
   const aggregationVersion = pickStringTopThenNested(data, metadata, 'aggregationVersion');
   const engineVersion = pickStringTopThenNested(data, metadata, 'engineVersion');
   const configVersion = pickStringTopThenNested(data, metadata, 'configVersion');
+
+  const tfKey = derivedTimeframe ?? timeframe;
+  const expectedDurationMs = RECOGNIZED_TIMEFRAME_MS[tfKey];
+  if (expectedDurationMs !== undefined) {
+    if (lastCandleCloseUnixMs - lastCandleOpenUnixMs !== expectedDurationMs) return null;
+  }
 
   return {
     regime: regime as MarketRegime,

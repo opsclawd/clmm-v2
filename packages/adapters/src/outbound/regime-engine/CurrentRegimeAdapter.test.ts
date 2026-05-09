@@ -315,16 +315,12 @@ describe('CurrentRegimeAdapter', () => {
   it('uses top-level optional metadata fields with nested fallback', async () => {
     const upstream = {
       ...SAMPLE_UPSTREAM,
-      sourceCandleCount: 500,
-      candleCount: 120,
-      derivedTimeframe: '4h',
+      derivedTimeframe: '1h',
       aggregationVersion: 'ohlcv-agg-v2',
       engineVersion: 'regime-engine-v2',
       configVersion: 'regime-config-v4',
       metadata: {
         ...SAMPLE_UPSTREAM.metadata,
-        sourceCandleCount: 999,
-        candleCount: 999,
         derivedTimeframe: 'NESTED-SHOULD-LOSE',
         aggregationVersion: 'NESTED-SHOULD-LOSE',
         engineVersion: 'NESTED-SHOULD-LOSE',
@@ -336,9 +332,7 @@ describe('CurrentRegimeAdapter', () => {
     const result = await adapter.fetchCurrent(PARAMS);
     expect(result.kind).toBe('block');
     if (result.kind !== 'block') return;
-    expect(result.block.metadata.sourceCandleCount).toBe(500);
-    expect(result.block.metadata.candleCount).toBe(120);
-    expect(result.block.metadata.derivedTimeframe).toBe('4h');
+    expect(result.block.metadata.derivedTimeframe).toBe('1h');
     expect(result.block.metadata.aggregationVersion).toBe('ohlcv-agg-v2');
     expect(result.block.metadata.engineVersion).toBe('regime-engine-v2');
     expect(result.block.metadata.configVersion).toBe('regime-config-v4');
@@ -661,5 +655,54 @@ describe('CurrentRegimeAdapter', () => {
     expect(result.kind).toBe('block');
     if (result.kind !== 'block') return;
     expect(result.block.telemetry).toEqual(SAMPLE_UPSTREAM.telemetry);
+  });
+
+  it('rejects when derivedTimeframe is 1h but candle window is 30 minutes', async () => {
+    vi.mocked(fetch).mockResolvedValue(
+      new Response(
+        JSON.stringify({
+          ...SAMPLE_UPSTREAM,
+          freshness: {
+            ...SAMPLE_UPSTREAM.freshness,
+            lastCandleOpenUnixMs: Date.parse('2026-05-06T11:30:00Z'),
+            lastCandleOpenIso: '2026-05-06T11:30:00Z',
+            lastCandleCloseUnixMs: Date.parse('2026-05-06T12:00:00Z'),
+            lastCandleCloseIso: '2026-05-06T12:00:00Z',
+            ageSeconds: 0,
+          },
+        }),
+        { status: 200 },
+      ),
+    );
+    const adapter = new CurrentRegimeAdapter('https://regime.example.com', obs.port);
+    const result = await adapter.fetchCurrent(PARAMS);
+    expect(result.kind).toBe('upstream-error');
+  });
+
+  it('accepts unrecognized timeframes without duration validation', async () => {
+    vi.mocked(fetch).mockResolvedValue(
+      new Response(
+        JSON.stringify({
+          ...SAMPLE_UPSTREAM,
+          freshness: {
+            ...SAMPLE_UPSTREAM.freshness,
+            lastCandleOpenUnixMs: Date.parse('2026-05-06T11:53:00Z'),
+            lastCandleOpenIso: '2026-05-06T11:53:00Z',
+            lastCandleCloseUnixMs: Date.parse('2026-05-06T12:00:00Z'),
+            lastCandleCloseIso: '2026-05-06T12:00:00Z',
+            ageSeconds: 0,
+          },
+          metadata: {
+            ...SAMPLE_UPSTREAM.metadata,
+            derivedTimeframe: '7m',
+          },
+          timeframe: '7m',
+        }),
+        { status: 200 },
+      ),
+    );
+    const adapter = new CurrentRegimeAdapter('https://regime.example.com', obs.port);
+    const result = await adapter.fetchCurrent({ ...PARAMS, timeframe: '7m' });
+    expect(result.kind).toBe('block');
   });
 });
