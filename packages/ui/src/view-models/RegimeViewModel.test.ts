@@ -3,9 +3,29 @@ import type { RegimeBlock } from '@clmm/application/public';
 import { buildRegimeViewModelBlock } from './RegimeViewModel.js';
 
 const GENERATED = 1_700_000_000_000;
-const LAST_CANDLE = GENERATED - 87 * 60_000;
+const LAST_CANDLE_CLOSE = GENERATED;
+const LAST_CANDLE_OPEN = GENERATED - 60 * 60_000;
+const AGE_SECONDS = 0;
 
-function makeBlock(overrides: Partial<RegimeBlock> = {}): RegimeBlock {
+function makeBlock(
+  overrides: Omit<Partial<RegimeBlock>, 'freshness'> & {
+    freshness?: Partial<RegimeBlock['freshness']>;
+  } = {},
+): RegimeBlock {
+  const { freshness: freshOverride, ...rest } = overrides;
+  const baseFreshness: RegimeBlock['freshness'] = {
+    generatedAtUnixMs: GENERATED,
+    generatedAtIso: new Date(GENERATED).toISOString(),
+    lastCandleOpenUnixMs: LAST_CANDLE_OPEN,
+    lastCandleOpenIso: new Date(LAST_CANDLE_OPEN).toISOString(),
+    lastCandleCloseUnixMs: LAST_CANDLE_CLOSE,
+    lastCandleCloseIso: new Date(LAST_CANDLE_CLOSE).toISOString(),
+    ageSeconds: AGE_SECONDS,
+    softStale: false,
+    hardStale: false,
+    softStaleSeconds: 75 * 60,
+    hardStaleSeconds: 90 * 60,
+  };
   return {
     regime: 'CHOP',
     telemetry: {
@@ -17,47 +37,35 @@ function makeBlock(overrides: Partial<RegimeBlock> = {}): RegimeBlock {
     },
     clmmSuitability: { status: 'CAUTION', reasons: [] },
     marketReasons: [],
-    freshness: {
-      generatedAtUnixMs: GENERATED,
-      lastCandleUnixMs: LAST_CANDLE,
-      ageSeconds: 87 * 60,
-      softStale: true,
-      hardStale: false,
-      softStaleSeconds: 75 * 60,
-      hardStaleSeconds: 90 * 60,
-    },
+    freshness: { ...baseFreshness, ...freshOverride },
     metadata: {
       source: 'geckoterminal',
       network: 'solana',
       symbol: 'SOL/USDC',
       timeframe: '1h',
     },
-    ...overrides,
+    ...rest,
   };
 }
 
 describe('buildRegimeViewModelBlock — data quality', () => {
   it('classifies Fresh when neither flag is set', () => {
-    const vm = buildRegimeViewModelBlock(
-      makeBlock({
-        freshness: {
-          generatedAtUnixMs: GENERATED,
-          lastCandleUnixMs: LAST_CANDLE,
-          ageSeconds: 60,
-          softStale: false,
-          hardStale: false,
-          softStaleSeconds: 75 * 60,
-          hardStaleSeconds: 90 * 60,
-        },
-      }),
-      GENERATED + 60_000,
-    );
+    const vm = buildRegimeViewModelBlock(makeBlock(), GENERATED + 60_000);
     expect(vm.dataQualityLabel).toMatch(/fresh/i);
     expect(vm.dataQualityTone).toBe('success');
   });
 
   it('classifies Soft-stale when softStale is true and hardStale is false', () => {
-    const vm = buildRegimeViewModelBlock(makeBlock(), GENERATED + 60_000);
+    const vm = buildRegimeViewModelBlock(
+      makeBlock({
+        freshness: {
+          ageSeconds: 80 * 60,
+          softStale: true,
+          hardStale: false,
+        },
+      }),
+      GENERATED + 60_000,
+    );
     expect(vm.dataQualityLabel).toMatch(/soft-?stale/i);
     expect(vm.dataQualityTone).toBe('warning');
   });
@@ -66,13 +74,9 @@ describe('buildRegimeViewModelBlock — data quality', () => {
     const vm = buildRegimeViewModelBlock(
       makeBlock({
         freshness: {
-          generatedAtUnixMs: GENERATED,
-          lastCandleUnixMs: LAST_CANDLE,
           ageSeconds: 95 * 60,
           softStale: true,
           hardStale: true,
-          softStaleSeconds: 75 * 60,
-          hardStaleSeconds: 90 * 60,
         },
       }),
       GENERATED + 60_000,
@@ -85,13 +89,9 @@ describe('buildRegimeViewModelBlock — data quality', () => {
     const vm = buildRegimeViewModelBlock(
       makeBlock({
         freshness: {
-          generatedAtUnixMs: GENERATED,
-          lastCandleUnixMs: LAST_CANDLE,
           ageSeconds: 95 * 60,
           softStale: false,
           hardStale: true,
-          softStaleSeconds: 75 * 60,
-          hardStaleSeconds: 90 * 60,
         },
       }),
       GENERATED + 60_000,
@@ -101,16 +101,19 @@ describe('buildRegimeViewModelBlock — data quality', () => {
   });
 
   it('does NOT mark stale based on local 48h rule when upstream flags are false', () => {
+    const old = GENERATED - 49 * 3_600_000;
     const vm = buildRegimeViewModelBlock(
       makeBlock({
         freshness: {
-          generatedAtUnixMs: GENERATED - 49 * 3_600_000,
-          lastCandleUnixMs: GENERATED - 49 * 3_600_000 - 60_000,
+          generatedAtUnixMs: old,
+          generatedAtIso: new Date(old).toISOString(),
+          lastCandleOpenUnixMs: old - 60 * 60_000,
+          lastCandleOpenIso: new Date(old - 60 * 60_000).toISOString(),
+          lastCandleCloseUnixMs: old,
+          lastCandleCloseIso: new Date(old).toISOString(),
           ageSeconds: 60,
           softStale: false,
           hardStale: false,
-          softStaleSeconds: 75 * 60,
-          hardStaleSeconds: 90 * 60,
         },
       }),
       GENERATED,
@@ -162,26 +165,37 @@ describe('buildRegimeViewModelBlock — labels', () => {
     expect(vm.generatedAgeLabel).toBe('Generated 12m ago');
   });
 
-  it('formats latestCandleAge from live clock (now - lastCandleUnixMs)', () => {
-    const vm = buildRegimeViewModelBlock(makeBlock(), GENERATED);
-    expect(vm.latestCandleAgeLabel).toBe('Latest candle is 87m old');
+  it('formats latestCandleAge from upstream ageSeconds plus elapsed since generatedAt', () => {
+    const vm = buildRegimeViewModelBlock(
+      makeBlock({
+        freshness: {
+          ageSeconds: 87 * 60,
+          softStale: false,
+          hardStale: false,
+        },
+      }),
+      GENERATED,
+    );
+    expect(vm.latestCandleAgeLabel).toBe('Latest closed candle is 87m old');
   });
 
-  it('computes candle age from live clock, not cached ageSeconds', () => {
+  it('advances candle age by elapsed-since-generatedAt', () => {
+    const generatedAt = GENERATED - 2 * 3_600_000;
     const block = makeBlock({
       freshness: {
-        generatedAtUnixMs: GENERATED - 2 * 3_600_000,
-        lastCandleUnixMs: GENERATED - 2 * 3_600_000 - 30 * 60_000,
+        generatedAtUnixMs: generatedAt,
+        generatedAtIso: new Date(generatedAt).toISOString(),
+        lastCandleOpenUnixMs: generatedAt - 60 * 60_000,
+        lastCandleOpenIso: new Date(generatedAt - 60 * 60_000).toISOString(),
+        lastCandleCloseUnixMs: generatedAt,
+        lastCandleCloseIso: new Date(generatedAt).toISOString(),
         ageSeconds: 30 * 60,
         softStale: true,
         hardStale: false,
-        softStaleSeconds: 75 * 60,
-        hardStaleSeconds: 90 * 60,
       },
     });
-    const now = GENERATED;
-    const vm = buildRegimeViewModelBlock(block, now);
-    expect(vm.latestCandleAgeLabel).toBe('Latest candle is 150m old');
+    const vm = buildRegimeViewModelBlock(block, GENERATED);
+    expect(vm.latestCandleAgeLabel).toBe('Latest closed candle is 150m old');
   });
 
   it('renders compact telemetry with qualitative trend label and vol ratio', () => {
@@ -341,16 +355,19 @@ describe('buildRegimeViewModelBlock — expanded rows', () => {
     );
   });
 
-  it('expandedFreshnessRows computes candle age from live clock, not cached ageSeconds', () => {
+  it('expandedFreshnessRows computes candle age from display-age formula, not local clock', () => {
+    const generatedAt = GENERATED - 2 * 3_600_000;
     const block = makeBlock({
       freshness: {
-        generatedAtUnixMs: GENERATED - 2 * 3_600_000,
-        lastCandleUnixMs: GENERATED - 2 * 3_600_000 - 30 * 60_000,
+        generatedAtUnixMs: generatedAt,
+        generatedAtIso: new Date(generatedAt).toISOString(),
+        lastCandleOpenUnixMs: generatedAt - 60 * 60_000,
+        lastCandleOpenIso: new Date(generatedAt - 60 * 60_000).toISOString(),
+        lastCandleCloseUnixMs: generatedAt,
+        lastCandleCloseIso: new Date(generatedAt).toISOString(),
         ageSeconds: 30 * 60,
         softStale: true,
         hardStale: false,
-        softStaleSeconds: 75 * 60,
-        hardStaleSeconds: 90 * 60,
       },
     });
     const vm = buildRegimeViewModelBlock(block, GENERATED);
@@ -362,8 +379,6 @@ describe('buildRegimeViewModelBlock — expanded rows', () => {
     const vm = buildRegimeViewModelBlock(
       makeBlock({
         freshness: {
-          generatedAtUnixMs: GENERATED,
-          lastCandleUnixMs: LAST_CANDLE,
           ageSeconds: 60,
           softStale: false,
           hardStale: false,
@@ -381,8 +396,6 @@ describe('buildRegimeViewModelBlock — expanded rows', () => {
     const vm = buildRegimeViewModelBlock(
       makeBlock({
         freshness: {
-          generatedAtUnixMs: GENERATED,
-          lastCandleUnixMs: LAST_CANDLE,
           ageSeconds: 60,
           softStale: false,
           hardStale: false,
@@ -400,8 +413,6 @@ describe('buildRegimeViewModelBlock — expanded rows', () => {
     const vm = buildRegimeViewModelBlock(
       makeBlock({
         freshness: {
-          generatedAtUnixMs: GENERATED,
-          lastCandleUnixMs: LAST_CANDLE,
           ageSeconds: 60,
           softStale: false,
           hardStale: false,
@@ -419,8 +430,6 @@ describe('buildRegimeViewModelBlock — expanded rows', () => {
     const vm = buildRegimeViewModelBlock(
       makeBlock({
         freshness: {
-          generatedAtUnixMs: GENERATED,
-          lastCandleUnixMs: LAST_CANDLE,
           ageSeconds: 60,
           softStale: false,
           hardStale: false,
@@ -438,8 +447,6 @@ describe('buildRegimeViewModelBlock — expanded rows', () => {
     const vm = buildRegimeViewModelBlock(
       makeBlock({
         freshness: {
-          generatedAtUnixMs: GENERATED,
-          lastCandleUnixMs: LAST_CANDLE,
           ageSeconds: 60,
           softStale: false,
           hardStale: false,
