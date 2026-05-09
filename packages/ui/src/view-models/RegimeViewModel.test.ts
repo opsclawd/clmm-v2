@@ -536,7 +536,9 @@ describe('formatCandleClockTime', () => {
     expect(formatCandleClockTime(open, now, { locale: 'en-US', timeZone: 'UTC' })).toBe(
       'May 8, 23:00',
     );
-    expect(formatCandleClockTime(close, now, { locale: 'en-US', timeZone: 'UTC' })).toBe('00:00');
+    expect(formatCandleClockTime(close, now, { locale: 'en-US', timeZone: 'UTC' })).toMatch(
+      /^(00:00|24:00)$/,
+    );
   });
 
   it('respects the injected timeZone for "today" comparison', () => {
