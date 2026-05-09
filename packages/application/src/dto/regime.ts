@@ -10,7 +10,11 @@ export type RegimeReason = {
 
 export type RegimeFreshness = {
   generatedAtUnixMs: number;
-  lastCandleUnixMs: number;
+  generatedAtIso: string;
+  lastCandleOpenUnixMs: number;
+  lastCandleOpenIso: string;
+  lastCandleCloseUnixMs: number;
+  lastCandleCloseIso: string;
   ageSeconds: number;
   softStale: boolean;
   hardStale: boolean;

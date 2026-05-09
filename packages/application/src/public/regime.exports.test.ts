@@ -35,10 +35,22 @@ describe('@clmm/application/public exports for regime', () => {
     expectTypeOf<RegimeFreshness>().not.toHaveProperty('capturedAtUnixMs');
   });
 
-  it('RegimeFreshness exposes both clocks, age, stale flags, and thresholds', () => {
+  it('RegimeFreshness no longer exposes lastCandleUnixMs', () => {
+    expectTypeOf<RegimeFreshness>().not.toHaveProperty('lastCandleUnixMs');
+  });
+
+  it('RegimeFreshness no longer exposes lastCandleIso', () => {
+    expectTypeOf<RegimeFreshness>().not.toHaveProperty('lastCandleIso');
+  });
+
+  it('RegimeFreshness exposes generatedAt, candle open/close, age, stale flags, and thresholds', () => {
     expectTypeOf<RegimeFreshness>().toEqualTypeOf<{
       generatedAtUnixMs: number;
-      lastCandleUnixMs: number;
+      generatedAtIso: string;
+      lastCandleOpenUnixMs: number;
+      lastCandleOpenIso: string;
+      lastCandleCloseUnixMs: number;
+      lastCandleCloseIso: string;
       ageSeconds: number;
       softStale: boolean;
       hardStale: boolean;
@@ -77,7 +89,11 @@ describe('@clmm/application/public exports for regime', () => {
       marketReasons: [] as RegimeReason[],
       freshness: {
         generatedAtUnixMs: 1_700_000_000_000,
-        lastCandleUnixMs: 1_700_000_000_000 - 87 * 60_000,
+        generatedAtIso: '2026-05-06T12:00:00Z',
+        lastCandleOpenUnixMs: 1_700_000_000_000 - 88 * 60_000,
+        lastCandleOpenIso: '2026-05-06T10:32:00Z',
+        lastCandleCloseUnixMs: 1_700_000_000_000 - 87 * 60_000,
+        lastCandleCloseIso: '2026-05-06T10:33:00Z',
         ageSeconds: 87 * 60,
         softStale: true,
         hardStale: false,
