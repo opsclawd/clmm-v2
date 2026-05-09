@@ -581,6 +581,29 @@ describe('CurrentRegimeAdapter', () => {
     expect(result.kind).toBe('upstream-error');
   });
 
+  describe.each(['generatedAtIso', 'lastCandleOpenIso', 'lastCandleCloseIso'])(
+    'rejects parseable-but-non-ISO %s',
+    (field) => {
+      it('returns kind:"upstream-error"', async () => {
+        vi.mocked(fetch).mockResolvedValue(
+          new Response(
+            JSON.stringify({
+              ...SAMPLE_UPSTREAM,
+              freshness: {
+                ...SAMPLE_UPSTREAM.freshness,
+                [field]: 'May 9 2026 02:00:00 GMT',
+              },
+            }),
+            { status: 200 },
+          ),
+        );
+        const adapter = new CurrentRegimeAdapter('https://regime.example.com', obs.port);
+        const result = await adapter.fetchCurrent(PARAMS);
+        expect(result.kind).toBe('upstream-error');
+      });
+    },
+  );
+
   it('rejects when ageSeconds is negative', async () => {
     const upstream = {
       ...SAMPLE_UPSTREAM,
