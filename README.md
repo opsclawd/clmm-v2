@@ -2,7 +2,7 @@
 
 CLMM V2 is the product/runtime repo for a non-custodial SOL/USDC Orca Whirlpool exit assistant.
 
-The app watches supported concentrated-liquidity positions, detects out-of-range movement, qualifies actionable breach triggers, generates a directionally explicit execution preview, obtains user approval, submits the signed payload, reconciles execution state, and records off-chain operational history.
+The app watches supported concentrated-liquidity positions, detects out-of-range movement, qualifies actionable breach triggers, generates a directionally explicit execution preview, obtains user approval, submits signed payloads, reconciles execution state, and records off-chain operational history.
 
 This repo owns the user-facing product, the BFF/API, worker jobs, deterministic CLMM orchestration, and the Orca/Jupiter/Solana adapter boundary.
 
@@ -56,21 +56,65 @@ Wallet + App  <---- BFF/API + Worker ----> Orca / Jupiter / Solana RPC
 
 Today:
 
-- `clmm-v2` is the operational product. It owns wallet connection, monitored positions, alerts, preview approval, signing handoff, transaction submission, reconciliation, and history.
-- `regime-engine` is the deterministic analytics and ledger service. It stores candles, computes current regime, stores S/R and insight blocks, and records CLMM execution-result events.
+- `clmm-v2` is the operational product. It owns wallet connection, monitored positions, alerts, preview approval, signing handoff, signed payload submission, reconciliation, and history.
+- `regime-engine` is the deterministic analytics and ledger service. It stores candles, computes current regime, stores S/R and current insight blocks, and records CLMM execution-result events.
 - `sol-usdc-clmm-intelligence` is the advisory/evidence pipeline. It pulls CLMM bundles from this repo's BFF, runs OpenClaw-backed analysis against durable policies/memory, and produces advisory artifacts. It does not perform execution.
+
+## Open roadmap and future state
+
+Open issues currently frame the next architecture as an evidence-driven policy loop, not three independent services.
+
+### Evidence-driven PolicyInsights consumption
+
+Tracked by #90, #91, #92, and #93.
+
+Future CLMM V2 should:
+
+- remain the source of truth for live wallet, LP, position, alert, execution, and history state;
+- extend the read-only SOL/USDC intelligence bundle with missing raw LP facts needed by downstream evidence derivation, such as inventory skew, fee-capture inputs, unclaimed-fee valuation lineage, token composition, and explicit data-quality warnings;
+- consume one canonical Regime Engine PolicyInsight contract instead of hand-rolled or duplicated parser shapes;
+- render synthesized PolicyInsights in the app with freshness, confidence, risk, reasoning, levels, and degraded/unavailable states;
+- keep the UI concise and decision-focused rather than becoming a raw analytics dump.
+
+The important boundary: intelligence gets raw evidence inputs from CLMM; Regime Engine synthesizes the final PolicyInsight; CLMM displays/consumes the final policy while preserving live LP and signed-transaction responsibility.
+
+### Regime Engine plan/result loop
+
+Tracked by #62.
+
+A later operating mode adds a plan/result audit loop:
+
+```text
+CLMM -> POST /v1/plan             -> Regime Engine returns a plan
+CLMM -> user approval flow        -> signed transaction handling when applicable
+CLMM -> POST /v1/execution-result -> Regime Engine records the outcome
+```
+
+The audit rule is the important part: every received plan should eventually have a recorded result, including hold, skipped, failed, and completed cases. Regime Engine records decisions and outcomes; CLMM remains responsible for user approval, safety checks, transaction submission, and reconciliation.
+
+### Product/data hardening
+
+Tracked by #72, #73, and #76.
+
+Near-term polish and safety work includes:
+
+- making impossible or inconsistent `hasAlert + in-range` display states explicit instead of silently showing a normal chip;
+- avoiding plausible-looking RangeBar output when price inputs are non-finite or unavailable;
+- replacing placeholder portfolio metrics with real application-layer data or visibly marking them as unavailable;
+- reducing placeholder hash collisions and improving pair glyph fallbacks;
+- hardening market insight fetch timeouts so the timeout covers response body reads, not only response headers.
 
 ## Mature system vision
 
-The mature system is one feedback loop:
+The mature system is a closed feedback loop:
 
-1. `clmm-v2` observes supported SOL/USDC Orca Whirlpool positions.
-2. `regime-engine` maintains market context: candle history, trend/chop classification, CLMM suitability, support/resistance, S/R theses, and stored policy insights.
-3. `sol-usdc-clmm-intelligence` periodically produces higher-level advisory context from CLMM snapshots, market sources, research notes, and historical memory.
-4. `clmm-v2` combines deterministic position state with regime/intelligence context to decide what to show the user: hold, watch, prepare exit, refresh quote, or execute a user-approved exit.
-5. Execution results flow back to `regime-engine` so the system can measure outcomes, stale signals, false positives, fee capture, and avoided downside over time.
+1. `clmm-v2` observes supported SOL/USDC Orca Whirlpool positions and exposes safe read-only LP evidence through `/insights/sol-usdc/*`.
+2. `sol-usdc-clmm-intelligence` collects, normalizes, derives, and summarizes structured evidence from CLMM snapshots, market sources, on-chain flow, perps/liquidations, macro/protocol context, and durable memory.
+3. `regime-engine` ingests structured evidence, combines it with deterministic market regime state, and synthesizes one canonical PolicyInsight.
+4. `clmm-v2` reads and displays that canonical PolicyInsight while keeping deterministic stop-loss handling separate from advisory context.
+5. Execution outcomes flow back to `regime-engine` so the system can measure signal quality, stale evidence, false positives, fee capture, and outcome quality over time.
 
-The planned mature proof layer is a minimal Anchor receipt/claim program that records one execution receipt per epoch after a user-approved execution completes. That program is an audit/proof layer for duplicate-claim prevention and verifiable action history. It is not implemented in this repo's current codebase.
+A future proof layer may include a minimal Anchor receipt/claim program that records one execution receipt per epoch after a completed user-approved flow. That proof layer is not implemented in this repo today.
 
 ## Runtime surfaces
 
@@ -130,7 +174,7 @@ The worker hosts background jobs for breach scanning, trigger qualification, not
 
 ## Integration contracts
 
-### Regime engine
+### Regime Engine
 
 Backend-only env vars:
 
@@ -139,15 +183,21 @@ REGIME_ENGINE_BASE_URL=http://localhost:8787
 REGIME_ENGINE_INTERNAL_TOKEN=<must-match-regime-engine-CLMM_INTERNAL_TOKEN>
 ```
 
-`clmm-v2` reads:
+`clmm-v2` currently reads:
 
 - `GET /v1/regime/current` through `CurrentRegimeAdapter`;
 - `GET /v1/sr-levels/current` and `GET /v2/sr-levels/current` through S/R read adapters;
 - `GET /v1/insights/sol-usdc/current` through `CurrentPolicyInsightsAdapter`.
 
-`clmm-v2` writes:
+`clmm-v2` currently writes:
 
 - `POST /v1/clmm-execution-result` for terminal execution outcomes.
+
+Planned integration adds:
+
+- `POST /v1/plan` plan requests;
+- `POST /v1/execution-result` result records for every received plan;
+- canonical PolicyInsight contract fixtures/schema consumed from Regime Engine instead of duplicated parser logic.
 
 Never expose regime-engine through `EXPO_PUBLIC_*` variables.
 
@@ -166,7 +216,7 @@ CLMM_DATA_API_BASE=http://localhost:3001
 CLMM_INSIGHTS_API_KEY=<same-value-as-INSIGHTS_API_KEY>
 ```
 
-The intelligence endpoints are read-only. They do not submit transactions or request wallet credentials.
+The intelligence endpoints are read-only. They expose raw/product-owned facts for analysis. They do not submit transactions or request wallet credentials.
 
 ## Getting started
 
@@ -246,6 +296,7 @@ scripts                  Operational helper scripts
 - Directional exits are mandatory: lower breach exits to USDC, upper breach exits to SOL.
 - App secrets stay backend-only; the mobile/web bundle only receives public configuration.
 - Regime/intelligence outputs are context, not signing authority.
+- CLMM owns live LP/execution truth; intelligence owns evidence production; Regime Engine owns final policy synthesis.
 - This product is not a general wallet or generic analytics dashboard.
 
 ## Important docs
