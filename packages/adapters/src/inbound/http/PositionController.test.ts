@@ -11,6 +11,7 @@ import {
 } from '@clmm/testing';
 import type { BreachEpisodeId, ExitTriggerId, WalletId } from '@clmm/domain';
 import { makeClockTimestamp, makeWalletId } from '@clmm/domain';
+import type { PositionListFinancialMetricsDto } from '@clmm/application';
 
 const fakePricePort = new FakePricePort();
 const fixturePoolDataMap = { [FIXTURE_POOL_DATA.poolId]: FIXTURE_POOL_DATA };
@@ -320,5 +321,48 @@ describe('PositionController', () => {
     );
 
     expect((result.position as Record<string, unknown>)['srLevels']).toBeUndefined();
+  });
+
+  it('serializes financial metrics on successful position list responses', async () => {
+    const positionReadPort = new FakeSupportedPositionReadPort(
+      [FIXTURE_POSITION_IN_RANGE],
+      fixturePoolDataMap,
+      FIXTURE_POSITION_DETAIL,
+    );
+    const triggerRepo = new FakeTriggerRepository();
+    const controller = new PositionController(positionReadPort, triggerRepo, fakePricePort);
+
+    const result = await controller.listPositions(FIXTURE_POSITION_IN_RANGE.walletId);
+
+    expect(result).toHaveProperty('financialMetrics');
+    const financialMetrics = (result as { financialMetrics: PositionListFinancialMetricsDto })
+      .financialMetrics;
+    expect(financialMetrics.positionValue).toBeNull();
+    expect(financialMetrics.unclaimedFees).toBeNull();
+    expect(financialMetrics.poolsById[FIXTURE_POOL_DATA.poolId]).toEqual({
+      tvl: null,
+      fees24h: null,
+    });
+  });
+
+  it('keeps transient list failures as error envelopes without claimed financial metrics', async () => {
+    const positionReadPort = new FakeSupportedPositionReadPort(
+      [FIXTURE_POSITION_IN_RANGE],
+      fixturePoolDataMap,
+      FIXTURE_POSITION_DETAIL,
+    );
+    positionReadPort.listSupportedPositions = async () => {
+      throw new Error('Solana RPC timeout');
+    };
+    const triggerRepo = new FakeTriggerRepository();
+    const controller = new PositionController(positionReadPort, triggerRepo, fakePricePort);
+
+    const result = await controller.listPositions(FIXTURE_POSITION_IN_RANGE.walletId);
+
+    expect(result).toEqual({
+      positions: [],
+      error: 'Unable to fetch positions. Position data temporarily unavailable.',
+    });
+    expect(result).not.toHaveProperty('financialMetrics');
   });
 });
