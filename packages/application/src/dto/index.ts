@@ -351,3 +351,51 @@ export type {
   PolicyInsightStatus,
   PolicyInsightsUnavailableReason,
 } from './policyInsights.js';
+
+// --- Financial Metrics DTOs ---
+
+export type PositionValueMetricDto = {
+  valueUsd: number;
+  valuedAtUnixMs: number;
+  source: string;
+  basis: 'principal-token-amounts';
+  scope: 'returned-supported-positions';
+  excludes: readonly ['wallet-balances', 'fees', 'rewards', 'collected-history', 'pnl'];
+};
+
+export type UnclaimedFeesMetricDto = {
+  valueUsd: number;
+  valuedAtUnixMs: number;
+  source: string;
+  basis: 'currently-claimable-trading-fees';
+  scope: 'returned-supported-positions';
+  excludes: readonly ['rewards', 'collected-fees', 'lifetime-fees'];
+};
+
+export type PoolTvlMetricDto = {
+  poolId: PoolId;
+  valueUsd: number;
+  observedAtUnixMs: number;
+  source: string;
+  scope: 'whole-orca-pool';
+};
+
+export type PoolFees24hMetricDto = {
+  poolId: PoolId;
+  valueUsd: number;
+  source: string;
+  windowStartUnixMs: number;
+  windowEndUnixMs: number;
+  scope: 'whole-orca-pool';
+};
+
+export type PoolFinancialMetricsDto = {
+  tvl: PoolTvlMetricDto | null;
+  fees24h: PoolFees24hMetricDto | null;
+};
+
+export type PositionListFinancialMetricsDto = {
+  positionValue: PositionValueMetricDto | null;
+  unclaimedFees: UnclaimedFeesMetricDto | null;
+  poolsById: Readonly<Record<string, PoolFinancialMetricsDto>>;
+};

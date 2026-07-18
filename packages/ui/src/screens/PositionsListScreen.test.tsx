@@ -1,7 +1,11 @@
 import React from 'react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { cleanup, fireEvent, render, screen } from '@testing-library/react';
-import type { PositionSummaryDto, SrThesesBlock } from '@clmm/application/public';
+import type {
+  PositionSummaryDto,
+  SrThesesBlock,
+  PositionListFinancialMetricsDto,
+} from '@clmm/application/public';
 import { PositionsListScreen } from './PositionsListScreen.js';
 
 afterEach(() => {
@@ -17,8 +21,8 @@ function makePosition(overrides: Partial<PositionSummaryDto> = {}): PositionSumm
     positionId: brand<PositionSummaryDto['positionId']>('position-1'),
     poolId: brand<PositionSummaryDto['poolId']>('pool-1'),
     tokenPairLabel: 'SOL / USDC',
-    currentPrice: 142.35,
-    currentPriceLabel: 'USDC 142.35',
+    currentPrice: 200,
+    currentPriceLabel: 'USDC 200.00',
     feeRateLabel: '10 bps',
     lowerBoundPrice: 100,
     upperBoundPrice: 200,
@@ -28,6 +32,31 @@ function makePosition(overrides: Partial<PositionSummaryDto> = {}): PositionSumm
     rangeDistance: { belowLowerPercent: 0, aboveUpperPercent: 0 },
     hasActionableTrigger: false,
     monitoringStatus: 'active',
+    ...overrides,
+  };
+}
+
+function makeFinancialMetrics(
+  overrides: Partial<PositionListFinancialMetricsDto> = {},
+): PositionListFinancialMetricsDto {
+  return {
+    positionValue: {
+      valueUsd: 1000,
+      valuedAtUnixMs: Date.now(),
+      source: 'orca-whirlpool',
+      basis: 'principal-token-amounts',
+      scope: 'returned-supported-positions',
+      excludes: ['wallet-balances', 'fees', 'rewards', 'collected-history', 'pnl'] as const,
+    },
+    unclaimedFees: {
+      valueUsd: 50,
+      valuedAtUnixMs: Date.now(),
+      source: 'orca-whirlpool',
+      basis: 'currently-claimable-trading-fees',
+      scope: 'returned-supported-positions',
+      excludes: ['rewards', 'collected-fees', 'lifetime-fees'] as const,
+    },
+    poolsById: {},
     ...overrides,
   };
 }
@@ -374,32 +403,182 @@ describe('PositionsListScreen', () => {
   });
 
   it('renders the portfolio summary strip above the active positions for connected wallets with positions', () => {
-    render(<PositionsListScreen walletAddress="wallet-1" positions={[makePosition()]} />);
+    render(
+      <PositionsListScreen
+        walletAddress="wallet-1"
+        positions={[makePosition()]}
+        financialMetrics={makeFinancialMetrics()}
+      />,
+    );
 
-    expect(screen.getByText('Portfolio')).toBeTruthy();
-    expect(screen.getByText('$24,812')).toBeTruthy();
-    expect(screen.getByText('Fees earned')).toBeTruthy();
-    expect(screen.getByText('+$142.30')).toBeTruthy();
+    expect(screen.getByText('Position value')).toBeTruthy();
+    expect(screen.getByText('$1,000.00')).toBeTruthy();
+    expect(screen.getByText('Unclaimed fees')).toBeTruthy();
+    expect(screen.getByText('$50.00')).toBeTruthy();
   });
 
-  it('does not render the portfolio summary strip when disconnected, loading, or empty', () => {
-    const disconnected = render(<PositionsListScreen walletAddress={null} />);
-    expect(disconnected.container.textContent).not.toContain('$24,812');
-    cleanup();
+  it('renders unavailable financial metrics as em dashes with neutral styling', () => {
+    render(
+      <PositionsListScreen
+        walletAddress="wallet-1"
+        positions={[makePosition()]}
+        financialMetrics={makeFinancialMetrics({
+          positionValue: null,
+          unclaimedFees: null,
+        })}
+      />,
+    );
 
-    const loading = render(<PositionsListScreen walletAddress="wallet-1" positionsLoading />);
-    expect(loading.container.textContent).not.toContain('$24,812');
+    expect(screen.getByText('Position value')).toBeTruthy();
+    expect(screen.getAllByText('—')).toHaveLength(4);
+    expect(screen.getByText('Unclaimed fees')).toBeTruthy();
+  });
+
+  it('renders exact zero financial metrics as $0.00', () => {
+    render(
+      <PositionsListScreen
+        walletAddress="wallet-1"
+        positions={[makePosition()]}
+        financialMetrics={makeFinancialMetrics({
+          positionValue: {
+            valueUsd: 0,
+            valuedAtUnixMs: Date.now(),
+            source: 'orca-whirlpool',
+            basis: 'principal-token-amounts',
+            scope: 'returned-supported-positions',
+            excludes: ['wallet-balances', 'fees', 'rewards', 'collected-history', 'pnl'] as const,
+          },
+          unclaimedFees: {
+            valueUsd: 0,
+            valuedAtUnixMs: Date.now(),
+            source: 'orca-whirlpool',
+            basis: 'currently-claimable-trading-fees',
+            scope: 'returned-supported-positions',
+            excludes: ['rewards', 'collected-fees', 'lifetime-fees'] as const,
+          },
+        })}
+      />,
+    );
+
+    expect(screen.getAllByText('$0.00')).toHaveLength(2);
+  });
+
+  it('does not render metric components while positions are loading', () => {
+    render(<PositionsListScreen walletAddress="wallet-1" positionsLoading />);
+
+    expect(screen.queryByText('Position value')).toBeNull();
+    expect(screen.queryByText('Unclaimed fees')).toBeNull();
+    expect(screen.queryByText('$1,000.00')).toBeNull();
+  });
+
+  it('does not render the portfolio summary strip when disconnected or empty', () => {
+    const disconnected = render(<PositionsListScreen walletAddress={null} />);
+    expect(disconnected.container.textContent).not.toContain('Position value');
     cleanup();
 
     const empty = render(<PositionsListScreen walletAddress="wallet-1" positions={[]} />);
-    expect(empty.container.textContent).not.toContain('$24,812');
+    expect(empty.container.textContent).not.toContain('Position value');
   });
 
-  it('renders summary strip → cards → Support & Resistance → Market Thesis in that order', () => {
+  it('does not calculate unavailable summary values from populated pool cards', () => {
+    render(
+      <PositionsListScreen
+        walletAddress="wallet-1"
+        positions={[makePosition()]}
+        financialMetrics={{
+          ...makeFinancialMetrics(),
+          positionValue: null,
+          unclaimedFees: null,
+        }}
+      />,
+    );
+
+    expect(screen.getByText('Position value')).toBeTruthy();
+    expect(screen.getAllByText('—')).toHaveLength(4);
+  });
+
+  it('renders shared pool metrics on each matching card without double counting the summary', () => {
+    const sharedPoolId = brand<PositionSummaryDto['poolId']>('shared-pool');
+
+    render(
+      <PositionsListScreen
+        walletAddress="wallet-1"
+        positions={[
+          makePosition({
+            positionId: brand('position-1'),
+            poolId: sharedPoolId,
+            tokenPairLabel: 'SOL / USDC',
+          }),
+          makePosition({
+            positionId: brand('position-2'),
+            poolId: sharedPoolId,
+            tokenPairLabel: 'SOL / USDC',
+          }),
+        ]}
+        financialMetrics={{
+          ...makeFinancialMetrics(),
+          poolsById: {
+            [sharedPoolId]: {
+              tvl: {
+                poolId: sharedPoolId,
+                valueUsd: 1_000_000,
+                observedAtUnixMs: Date.now(),
+                source: 'orca-whirlpool',
+                scope: 'whole-orca-pool',
+              },
+              fees24h: {
+                poolId: sharedPoolId,
+                valueUsd: 5000,
+                source: 'orca-whirlpool',
+                windowStartUnixMs: Date.now() - 86400000,
+                windowEndUnixMs: Date.now(),
+                scope: 'whole-orca-pool',
+              },
+            },
+          },
+        }}
+      />,
+    );
+
+    expect(screen.getAllByText('$1,000,000.00')).toHaveLength(2);
+    expect(screen.getAllByText('$5,000.00')).toHaveLength(2);
+    expect(screen.getByText('Position value')).toBeTruthy();
+    expect(screen.getAllByText('$1,000.00')).toHaveLength(1);
+    expect(screen.getByText('Unclaimed fees')).toBeTruthy();
+    expect(screen.getAllByText('$50.00')).toHaveLength(1);
+  });
+
+  it('contains none of the removed fabricated financial labels', () => {
+    const fabricatedValues = [
+      '$24,812',
+      '+$142.30',
+      '$8,420.19',
+      '$6,220.00',
+      '$3,105.77',
+      '+$12.40',
+      '+$4.82',
+      '+$1.95',
+    ];
+
+    render(
+      <PositionsListScreen
+        walletAddress="wallet-1"
+        positions={[makePosition()]}
+        financialMetrics={makeFinancialMetrics()}
+      />,
+    );
+
+    fabricatedValues.forEach((value) => {
+      expect(screen.queryByText(value)).toBeNull();
+    });
+  });
+
+  it('preserves summary cards positions and market sections ordering', () => {
     const { container } = render(
       <PositionsListScreen
         walletAddress="wallet-1"
         positions={[makePosition()]}
+        financialMetrics={makeFinancialMetrics()}
         srLevels={{
           briefId: 'brief-1',
           sourceRecordedAtIso: null,
@@ -414,7 +593,42 @@ describe('PositionsListScreen', () => {
     );
 
     const text = container.textContent ?? '';
-    const portfolioIdx = text.indexOf('Portfolio');
+    const positionValueIdx = text.indexOf('Position value');
+    const cardIdx = text.indexOf('SOL / USDC');
+    const srIdx = text.indexOf('Support & Resistance');
+    const thesisIdx = text.indexOf('Market Thesis');
+
+    expect(positionValueIdx).toBeGreaterThan(-1);
+    expect(cardIdx).toBeGreaterThan(-1);
+    expect(srIdx).toBeGreaterThan(-1);
+    expect(thesisIdx).toBeGreaterThan(-1);
+
+    expect(positionValueIdx).toBeLessThan(cardIdx);
+    expect(cardIdx).toBeLessThan(srIdx);
+    expect(srIdx).toBeLessThan(thesisIdx);
+  });
+
+  it('renders summary strip → cards → Support & Resistance → Market Thesis in that order', () => {
+    const { container } = render(
+      <PositionsListScreen
+        walletAddress="wallet-1"
+        positions={[makePosition()]}
+        financialMetrics={makeFinancialMetrics()}
+        srLevels={{
+          briefId: 'brief-1',
+          sourceRecordedAtIso: null,
+          summary: 'Bullish continuation.',
+          capturedAtUnixMs: 1_745_712_000_000,
+          supports: [{ price: 132 }],
+          resistances: [{ price: 148 }],
+        }}
+        poolLabel="SOL / USDC"
+        now={1_745_712_000_000 + 5 * 60_000}
+      />,
+    );
+
+    const text = container.textContent ?? '';
+    const portfolioIdx = text.indexOf('Position value');
     const cardIdx = text.indexOf('SOL / USDC');
     const srIdx = text.indexOf('Support & Resistance');
     const thesisIdx = text.indexOf('Market Thesis');

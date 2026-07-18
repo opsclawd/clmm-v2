@@ -17,10 +17,113 @@ const baseItem: PositionListItemViewModel = {
   upperBoundPrice: 200,
   lowerBoundLabel: 'USDC 100.00',
   upperBoundLabel: 'USDC 200.00',
+  poolTvl: { kind: 'unavailable', label: '—' },
+  poolFees24h: { kind: 'unavailable', label: '—' },
 };
+
+const makeItem = (
+  overrides: Partial<PositionListItemViewModel> = {},
+): PositionListItemViewModel => ({
+  ...baseItem,
+  ...overrides,
+});
 
 afterEach(() => {
   cleanup();
+});
+
+describe('PositionCard financial metrics rendering', () => {
+  describe('renders unavailable financial metrics as em dashes with neutral styling', () => {
+    it('renders unavailable pool TVL as em dash with tertiary color', () => {
+      render(
+        <PositionCard
+          item={makeItem({ poolFees24h: { kind: 'available', valueUsd: 100, label: '$100.00' } })}
+        />,
+      );
+
+      expect(screen.getByText('Pool TVL')).toBeTruthy();
+      expect(screen.getByText('—')).toBeTruthy();
+    });
+
+    it('renders unavailable pool fees 24h as em dash with tertiary color', () => {
+      render(
+        <PositionCard
+          item={makeItem({ poolTvl: { kind: 'available', valueUsd: 1000, label: '$1,000.00' } })}
+        />,
+      );
+
+      expect(screen.getByText('Pool fees · 24h')).toBeTruthy();
+      expect(screen.getByText('—')).toBeTruthy();
+    });
+  });
+
+  describe('renders exact zero financial metrics as $0.00', () => {
+    it('renders available zero pool TVL as $0.00', () => {
+      render(
+        <PositionCard
+          item={makeItem({ poolTvl: { kind: 'available', valueUsd: 0, label: '$0.00' } })}
+        />,
+      );
+
+      expect(screen.getByText('$0.00')).toBeTruthy();
+    });
+
+    it('renders available zero pool fees 24h as $0.00', () => {
+      render(
+        <PositionCard
+          item={makeItem({ poolFees24h: { kind: 'available', valueUsd: 0, label: '$0.00' } })}
+        />,
+      );
+
+      expect(screen.getByText('$0.00')).toBeTruthy();
+    });
+  });
+
+  describe('renders populated authoritative financial metrics with corrected labels', () => {
+    it('renders available pool TVL with Pool TVL label', () => {
+      render(
+        <PositionCard
+          item={makeItem({ poolTvl: { kind: 'available', valueUsd: 1000, label: '$1,000.00' } })}
+        />,
+      );
+
+      expect(screen.getByText('Pool TVL')).toBeTruthy();
+      expect(screen.getByText('$1,000.00')).toBeTruthy();
+    });
+
+    it('renders available pool fees 24h with Pool fees · 24h label', () => {
+      render(
+        <PositionCard
+          item={makeItem({ poolFees24h: { kind: 'available', valueUsd: 500, label: '$500.00' } })}
+        />,
+      );
+
+      expect(screen.getByText('Pool fees · 24h')).toBeTruthy();
+      expect(screen.getByText('$500.00')).toBeTruthy();
+    });
+
+    it('does not prefix fees with +', () => {
+      render(
+        <PositionCard
+          item={makeItem({ poolFees24h: { kind: 'available', valueUsd: 500, label: '$500.00' } })}
+        />,
+      );
+
+      expect(screen.queryByText('+$500.00')).toBeNull();
+      expect(screen.getByText('$500.00')).toBeTruthy();
+    });
+  });
+
+  describe('contains none of the removed fabricated financial labels', () => {
+    const fabricatedValues = ['$8,420.19', '$6,220.00', '$3,105.77', '+$12.40', '+$4.82', '+$1.95'];
+
+    it('does not render any hardcoded placeholder TVL values', () => {
+      render(<PositionCard item={baseItem} />);
+      fabricatedValues.forEach((value) => {
+        expect(screen.queryByText(value)).toBeNull();
+      });
+    });
+  });
 });
 
 describe('PositionCard', () => {

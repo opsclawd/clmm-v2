@@ -12,6 +12,7 @@ import type {
   TriggerRepository,
   PositionSummaryDto,
   PositionDetailDto,
+  PositionListFinancialMetricsDto,
 } from '@clmm/application';
 import { listSupportedPositions, getPositionDetail } from '@clmm/application';
 import type { ExitTrigger } from '@clmm/domain';
@@ -27,6 +28,7 @@ type ListPositionsErrorResponse = {
 
 type ListPositionsSuccessResponse = {
   positions: PositionSummaryDto[];
+  financialMetrics: PositionListFinancialMetricsDto;
   warning?: string;
 };
 
@@ -128,6 +130,7 @@ export class PositionController {
     const wallet = makeWalletId(walletId);
 
     let summaryDtos: PositionSummaryDto[];
+    let financialMetrics: PositionListFinancialMetricsDto;
     let poolMetadataFailures = 0;
     try {
       const result = await listSupportedPositions({
@@ -135,6 +138,7 @@ export class PositionController {
         positionReadPort: this.positionReadPort,
       });
       summaryDtos = result.summaryDtos;
+      financialMetrics = result.financialMetrics;
       poolMetadataFailures = result.poolMetadataFailures;
     } catch (error: unknown) {
       if (!isTransientPositionReadFailure(error)) {
@@ -175,6 +179,7 @@ export class PositionController {
       positions: summaryDtos.map((dto) =>
         toPositionSummaryDto(dto, triggerPositionIds.has(dto.positionId)),
       ),
+      financialMetrics,
     };
     if (warnings.length > 0) response.warning = warnings.join(' ');
     return response;

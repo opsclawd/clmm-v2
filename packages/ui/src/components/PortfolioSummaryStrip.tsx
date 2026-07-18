@@ -1,20 +1,19 @@
 import { View, Text } from 'react-native';
+import type { FinancialMetricViewModel } from '../view-models/PositionListViewModel.js';
 import { colors, typography } from '../design-system/index.js';
-
-const PORTFOLIO_VALUE = '$24,812';
-const FEES_EARNED_VALUE = '+$142.30';
 
 function SummaryCard({
   label,
-  value,
-  valueColor,
+  metric,
   testID,
 }: {
   label: string;
-  value: string;
-  valueColor: string;
+  metric: FinancialMetricViewModel;
   testID: string;
 }): JSX.Element {
+  const isAvailable = metric.kind === 'available';
+  const valueColor = isAvailable ? colors.textPrimary : colors.textTertiary;
+
   return (
     <View
       testID={testID}
@@ -47,13 +46,19 @@ function SummaryCard({
           color: valueColor,
         }}
       >
-        {value}
+        {metric.label}
       </Text>
     </View>
   );
 }
 
-export function PortfolioSummaryStrip(): JSX.Element {
+export function PortfolioSummaryStrip({
+  positionValue,
+  unclaimedFees,
+}: {
+  positionValue: FinancialMetricViewModel;
+  unclaimedFees: FinancialMetricViewModel;
+}): JSX.Element {
   return (
     <View
       style={{
@@ -64,17 +69,11 @@ export function PortfolioSummaryStrip(): JSX.Element {
         paddingBottom: 4,
       }}
     >
+      <SummaryCard testID="position-summary-value" label="Position value" metric={positionValue} />
       <SummaryCard
-        testID="portfolio-summary-portfolio"
-        label="Portfolio"
-        value={PORTFOLIO_VALUE}
-        valueColor={colors.textPrimary}
-      />
-      <SummaryCard
-        testID="portfolio-summary-fees-earned"
-        label="Fees earned"
-        value={FEES_EARNED_VALUE}
-        valueColor={colors.safe}
+        testID="position-summary-unclaimed-fees"
+        label="Unclaimed fees"
+        metric={unclaimedFees}
       />
     </View>
   );

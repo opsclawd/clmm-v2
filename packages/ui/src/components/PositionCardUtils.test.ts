@@ -2,7 +2,6 @@ import { describe, expect, it } from 'vitest';
 import {
   formatPoolId,
   getBreachSide,
-  getCardPlaceholderMetrics,
   getMonitoringDisplay,
   getStatusChipProps,
   isNearEdge,
@@ -198,28 +197,6 @@ describe('getMonitoringDisplay', () => {
 
   it('throws for an invalid monitoring status at runtime', () => {
     expect(() => getMonitoringDisplay('unknown' as never)).toThrow('Unexpected monitoringStatus');
-  });
-});
-
-describe('getCardPlaceholderMetrics', () => {
-  it('returns the same metrics for the same poolId on repeated calls (deterministic)', () => {
-    const a = getCardPlaceholderMetrics('pool-1');
-    const b = getCardPlaceholderMetrics('pool-1');
-    expect(a).toEqual(b);
-  });
-
-  it('returns shapes that look like USD-formatted strings', () => {
-    const r = getCardPlaceholderMetrics('any-pool-id');
-    expect(r.tvlLabel).toMatch(/^\$/);
-    expect(r.fees24hLabel).toMatch(/^\+\$/);
-  });
-
-  it('returns deterministic fallback labels for unknown pool ids', () => {
-    const r = getCardPlaceholderMetrics('definitely-not-known-7e7e');
-    expect(typeof r.tvlLabel).toBe('string');
-    expect(typeof r.fees24hLabel).toBe('string');
-    expect(r.tvlLabel.length).toBeGreaterThan(0);
-    expect(r.fees24hLabel.length).toBeGreaterThan(0);
   });
 });
 

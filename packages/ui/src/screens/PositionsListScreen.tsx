@@ -1,6 +1,7 @@
 import { View, Text, FlatList, ActivityIndicator } from 'react-native';
 import type {
   PositionSummaryDto,
+  PositionListFinancialMetricsDto,
   SrLevelsBlock,
   SrThesesBlock,
   RegimeBlock,
@@ -55,6 +56,7 @@ type Props = {
     | 'upstream-error'
     | null
     | undefined;
+  financialMetrics?: PositionListFinancialMetricsDto | undefined;
 };
 
 export function PositionsListScreen({
@@ -88,6 +90,7 @@ export function PositionsListScreen({
   policyInsightsError,
   policyInsightsEnabled,
   policyInsightsUnavailableReason,
+  financialMetrics,
 }: Props): JSX.Element {
   const isConnected = walletAddress != null && walletAddress.length > 0;
   const hasPositions = (positions?.length ?? 0) > 0;
@@ -129,6 +132,7 @@ export function PositionsListScreen({
           policyInsightsError={policyInsightsError}
           policyInsightsEnabled={policyInsightsEnabled}
           policyInsightsUnavailableReason={policyInsightsUnavailableReason}
+          financialMetrics={financialMetrics}
         />
       ) : (
         <EmptyState />
@@ -272,6 +276,7 @@ function ConnectedPositionsList({
   policyInsightsError,
   policyInsightsEnabled,
   policyInsightsUnavailableReason,
+  financialMetrics,
 }: {
   positions: PositionSummaryDto[];
   onSelectPosition?: (positionId: string) => void;
@@ -303,8 +308,12 @@ function ConnectedPositionsList({
     | 'upstream-error'
     | null
     | undefined;
+  financialMetrics?: PositionListFinancialMetricsDto | undefined;
 }) {
-  const viewModel = buildPositionListViewModel(positions);
+  const viewModel = buildPositionListViewModel(
+    positions,
+    financialMetrics ?? { positionValue: null, unclaimedFees: null, poolsById: {} },
+  );
 
   return (
     <FlatList
@@ -314,7 +323,10 @@ function ConnectedPositionsList({
       removeClippedSubviews={false}
       ListHeaderComponent={
         <View>
-          <PortfolioSummaryStrip />
+          <PortfolioSummaryStrip
+            positionValue={viewModel.positionValue}
+            unclaimedFees={viewModel.unclaimedFees}
+          />
           <SectionHeader title="Active positions" meta={`${positions.length} monitored`} />
         </View>
       }

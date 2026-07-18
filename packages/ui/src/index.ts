@@ -66,7 +66,9 @@ export {
 } from './view-models/PositionListViewModel.js';
 export type {
   PositionListItemViewModel,
+  PositionListViewModel,
   MonitoringStatus,
+  FinancialMetricViewModel,
 } from './view-models/PositionListViewModel.js';
 export { buildPositionDetailViewModel } from './view-models/PositionDetailViewModel.js';
 export { buildHistoryViewModel } from './view-models/HistoryViewModel.js';

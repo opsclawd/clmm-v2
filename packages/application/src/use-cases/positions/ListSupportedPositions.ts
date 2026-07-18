@@ -1,6 +1,6 @@
 import type { SupportedPositionReadPort } from '../../ports/index.js';
 import type { WalletId, LiquidityPosition, PoolId } from '@clmm/domain';
-import type { PositionSummaryDto } from '../../dto/index.js';
+import type { PositionSummaryDto, PositionListFinancialMetricsDto } from '../../dto/index.js';
 import { priceFromSqrtPrice, rangeDistancePercent, formatFeeRateLabel } from '@clmm/domain';
 import { buildPositionDisplayBounds } from './buildPositionDisplayBounds.js';
 
@@ -8,6 +8,7 @@ export type ListSupportedPositionsResult = {
   positions: LiquidityPosition[];
   summaryDtos: PositionSummaryDto[];
   poolMetadataFailures: number;
+  financialMetrics: PositionListFinancialMetricsDto;
 };
 
 export async function listSupportedPositions(params: {
@@ -85,5 +86,18 @@ export async function listSupportedPositions(params: {
     });
   }
 
-  return { positions, summaryDtos, poolMetadataFailures };
+  const poolsById = Object.fromEntries(
+    [...new Set(summaryDtos.map((dto) => dto.poolId))].map((poolId) => [
+      poolId,
+      { tvl: null, fees24h: null },
+    ]),
+  );
+
+  const financialMetrics: PositionListFinancialMetricsDto = {
+    positionValue: null,
+    unclaimedFees: null,
+    poolsById,
+  };
+
+  return { positions, summaryDtos, poolMetadataFailures, financialMetrics };
 }

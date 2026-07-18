@@ -59,4 +59,10 @@ describe('app shell wallet dependency guard', () => {
     expect(routeSource).toContain('navigateRoute');
     expect(routeSource).toContain('path: `/position/');
   });
+
+  it('passes response financial metrics through the Expo route without derivation', () => {
+    const routeSource = readText('../app/(tabs)/positions.tsx');
+
+    expect(routeSource).toContain('financialMetrics={positionsResult?.financialMetrics}');
+  });
 });

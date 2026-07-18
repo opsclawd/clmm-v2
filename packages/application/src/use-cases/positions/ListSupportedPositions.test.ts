@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { listSupportedPositions } from './ListSupportedPositions.js';
-import { tickToPrice } from '@clmm/domain';
+import { tickToPrice, makePositionId } from '@clmm/domain';
 import {
   FakeSupportedPositionReadPort,
   FIXTURE_WALLET_ID,
@@ -8,6 +8,7 @@ import {
   FIXTURE_POSITION_BELOW_RANGE,
   FIXTURE_POOL_DATA,
 } from '@clmm/testing';
+import type { LiquidityPosition } from '@clmm/domain';
 
 describe('ListSupportedPositions', () => {
   it('returns enriched summaries with pool data', async () => {
@@ -138,5 +139,71 @@ describe('ListSupportedPositions', () => {
 
     expect(result.poolMetadataFailures).toBe(0);
     expect(result.summaryDtos).toHaveLength(1);
+  });
+
+  it('returns unavailable financial metrics for every returned unique pool', async () => {
+    const positionReadPort = new FakeSupportedPositionReadPort([FIXTURE_POSITION_IN_RANGE], {
+      [FIXTURE_POSITION_IN_RANGE.poolId]: FIXTURE_POOL_DATA,
+    });
+
+    const result = await listSupportedPositions({
+      walletId: FIXTURE_WALLET_ID,
+      positionReadPort,
+    });
+
+    expect(result.financialMetrics).toEqual({
+      positionValue: null,
+      unclaimedFees: null,
+      poolsById: {
+        [FIXTURE_POOL_DATA.poolId]: { tvl: null, fees24h: null },
+      },
+    });
+  });
+
+  it('does not derive financial metrics from raw pool liquidity', async () => {
+    const positionReadPort = new FakeSupportedPositionReadPort([FIXTURE_POSITION_IN_RANGE], {
+      [FIXTURE_POSITION_IN_RANGE.poolId]: FIXTURE_POOL_DATA,
+    });
+
+    const result = await listSupportedPositions({
+      walletId: FIXTURE_WALLET_ID,
+      positionReadPort,
+    });
+
+    const highLiquidityPoolData = { ...FIXTURE_POOL_DATA, liquidity: 9999999999n };
+    const highLiquidityReadPort = new FakeSupportedPositionReadPort([FIXTURE_POSITION_IN_RANGE], {
+      [FIXTURE_POSITION_IN_RANGE.poolId]: highLiquidityPoolData,
+    });
+
+    const highLiquidityResult = await listSupportedPositions({
+      walletId: FIXTURE_WALLET_ID,
+      positionReadPort: highLiquidityReadPort,
+    });
+
+    expect(result.financialMetrics).toEqual(highLiquidityResult.financialMetrics);
+  });
+
+  it('deduplicates unavailable pool metrics when positions share a pool', async () => {
+    const secondPosition: LiquidityPosition = {
+      ...FIXTURE_POSITION_IN_RANGE,
+      positionId: makePositionId('fixture-pos-2'),
+      bounds: { lowerBound: 200, upperBound: 300 },
+    };
+    const positionReadPort = new FakeSupportedPositionReadPort(
+      [FIXTURE_POSITION_IN_RANGE, secondPosition],
+      { [FIXTURE_POSITION_IN_RANGE.poolId]: FIXTURE_POOL_DATA },
+    );
+
+    const result = await listSupportedPositions({
+      walletId: FIXTURE_WALLET_ID,
+      positionReadPort,
+    });
+
+    expect(result.summaryDtos).toHaveLength(2);
+    expect(Object.keys(result.financialMetrics.poolsById)).toHaveLength(1);
+    expect(result.financialMetrics.poolsById[FIXTURE_POOL_DATA.poolId]).toEqual({
+      tvl: null,
+      fees24h: null,
+    });
   });
 });
