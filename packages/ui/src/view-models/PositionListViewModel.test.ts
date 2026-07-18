@@ -88,7 +88,7 @@ function makeFinancialMetrics(
 
 describe('buildPositionListViewModel', () => {
   it('maps price-space bound fields from DTO', () => {
-    const vm = buildPositionListViewModel([makeSummaryDto()]);
+    const vm = buildPositionListViewModel([makeSummaryDto()], makeFinancialMetrics());
     const item = vm.items[0]!;
 
     expect(item.lowerBoundPrice).toBe(100);
@@ -98,12 +98,15 @@ describe('buildPositionListViewModel', () => {
   });
 
   it('exposes poolId and numeric currentPrice for card-layer consumers', () => {
-    const vm = buildPositionListViewModel([
-      makeSummaryDto({
-        poolId: 'pool-xyz' as PositionSummaryDto['poolId'],
-        currentPrice: 142.35,
-      }),
-    ]);
+    const vm = buildPositionListViewModel(
+      [
+        makeSummaryDto({
+          poolId: 'pool-xyz' as PositionSummaryDto['poolId'],
+          currentPrice: 142.35,
+        }),
+      ],
+      makeFinancialMetrics(),
+    );
     const item = vm.items[0]!;
 
     expect(item.poolId).toBe('pool-xyz');
@@ -111,7 +114,7 @@ describe('buildPositionListViewModel', () => {
   });
 
   it('returns isEmpty true when list is empty', () => {
-    const vm = buildPositionListViewModel([]);
+    const vm = buildPositionListViewModel([], makeFinancialMetrics());
     expect(vm.isEmpty).toBe(true);
     expect(vm.items).toHaveLength(0);
   });
@@ -119,25 +122,35 @@ describe('buildPositionListViewModel', () => {
 
 describe('buildPositionListViewModel monitoringStatus mapping', () => {
   it('copies active monitoring status through as a typed value', () => {
-    const vm = buildPositionListViewModel([makeSummaryDto({ monitoringStatus: 'active' })]);
+    const vm = buildPositionListViewModel(
+      [makeSummaryDto({ monitoringStatus: 'active' })],
+      makeFinancialMetrics(),
+    );
     expect(vm.items[0]!.monitoringStatus).toBe('active');
   });
 
   it('copies degraded monitoring status through as a typed value', () => {
-    const vm = buildPositionListViewModel([makeSummaryDto({ monitoringStatus: 'degraded' })]);
+    const vm = buildPositionListViewModel(
+      [makeSummaryDto({ monitoringStatus: 'degraded' })],
+      makeFinancialMetrics(),
+    );
     expect(vm.items[0]!.monitoringStatus).toBe('degraded');
   });
 
   it('copies inactive monitoring status through as a typed value', () => {
-    const vm = buildPositionListViewModel([makeSummaryDto({ monitoringStatus: 'inactive' })]);
+    const vm = buildPositionListViewModel(
+      [makeSummaryDto({ monitoringStatus: 'inactive' })],
+      makeFinancialMetrics(),
+    );
     expect(vm.items[0]!.monitoringStatus).toBe('inactive');
   });
 
   it('throws on an invalid monitoringStatus from the DTO', () => {
     expect(() =>
-      buildPositionListViewModel([
-        makeSummaryDto({ monitoringStatus: 'unknown' as PositionSummaryDto['monitoringStatus'] }),
-      ]),
+      buildPositionListViewModel(
+        [makeSummaryDto({ monitoringStatus: 'unknown' as PositionSummaryDto['monitoringStatus'] })],
+        makeFinancialMetrics(),
+      ),
     ).toThrow('Invalid monitoringStatus');
   });
 });

@@ -310,7 +310,10 @@ function ConnectedPositionsList({
     | undefined;
   financialMetrics?: PositionListFinancialMetricsDto | undefined;
 }) {
-  const viewModel = buildPositionListViewModel(positions, financialMetrics);
+  const viewModel = buildPositionListViewModel(
+    positions,
+    financialMetrics ?? { positionValue: null, unclaimedFees: null, poolsById: {} },
+  );
 
   return (
     <FlatList

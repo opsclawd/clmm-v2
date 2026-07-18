@@ -65,7 +65,7 @@ export type PositionListViewModel = {
 
 export function buildPositionListViewModel(
   positions: PositionSummaryDto[],
-  financialMetrics?: PositionListFinancialMetricsDto,
+  financialMetrics: PositionListFinancialMetricsDto,
 ): PositionListViewModel {
   const poolsById = financialMetrics?.poolsById ?? {};
 
