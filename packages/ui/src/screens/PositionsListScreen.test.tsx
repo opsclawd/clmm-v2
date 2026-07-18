@@ -21,8 +21,8 @@ function makePosition(overrides: Partial<PositionSummaryDto> = {}): PositionSumm
     positionId: brand<PositionSummaryDto['positionId']>('position-1'),
     poolId: brand<PositionSummaryDto['poolId']>('pool-1'),
     tokenPairLabel: 'SOL / USDC',
-    currentPrice: 142.35,
-    currentPriceLabel: 'USDC 142.35',
+    currentPrice: 200,
+    currentPriceLabel: 'USDC 200.00',
     feeRateLabel: '10 bps',
     lowerBoundPrice: 100,
     upperBoundPrice: 200,
@@ -49,7 +49,7 @@ function makeFinancialMetrics(
       excludes: ['wallet-balances', 'fees', 'rewards', 'collected-history', 'pnl'] as const,
     },
     unclaimedFees: {
-      valueUsd: 500,
+      valueUsd: 50,
       valuedAtUnixMs: Date.now(),
       source: 'orca-whirlpool',
       basis: 'currently-claimable-trading-fees',
@@ -414,7 +414,7 @@ describe('PositionsListScreen', () => {
     expect(screen.getByText('Position value')).toBeTruthy();
     expect(screen.getByText('$1,000.00')).toBeTruthy();
     expect(screen.getByText('Unclaimed fees')).toBeTruthy();
-    expect(screen.getByText('$500.00')).toBeTruthy();
+    expect(screen.getByText('$50.00')).toBeTruthy();
   });
 
   it('renders unavailable financial metrics as em dashes with neutral styling', () => {
@@ -545,7 +545,7 @@ describe('PositionsListScreen', () => {
     expect(screen.getByText('Position value')).toBeTruthy();
     expect(screen.getAllByText('$1,000.00')).toHaveLength(1);
     expect(screen.getByText('Unclaimed fees')).toBeTruthy();
-    expect(screen.getAllByText('$500.00')).toHaveLength(1);
+    expect(screen.getAllByText('$50.00')).toHaveLength(1);
   });
 
   it('contains none of the removed fabricated financial labels', () => {
