@@ -497,6 +497,57 @@ describe('PositionsListScreen', () => {
     expect(screen.getAllByText('—')).toHaveLength(4);
   });
 
+  it('renders shared pool metrics on each matching card without double counting the summary', () => {
+    const sharedPoolId = brand<PositionSummaryDto['poolId']>('shared-pool');
+
+    render(
+      <PositionsListScreen
+        walletAddress="wallet-1"
+        positions={[
+          makePosition({
+            positionId: brand('position-1'),
+            poolId: sharedPoolId,
+            tokenPairLabel: 'SOL / USDC',
+          }),
+          makePosition({
+            positionId: brand('position-2'),
+            poolId: sharedPoolId,
+            tokenPairLabel: 'SOL / USDC',
+          }),
+        ]}
+        financialMetrics={{
+          ...makeFinancialMetrics(),
+          poolsById: {
+            [sharedPoolId]: {
+              tvl: {
+                poolId: sharedPoolId,
+                valueUsd: 1_000_000,
+                observedAtUnixMs: Date.now(),
+                source: 'orca-whirlpool',
+                scope: 'whole-orca-pool',
+              },
+              fees24h: {
+                poolId: sharedPoolId,
+                valueUsd: 5000,
+                source: 'orca-whirlpool',
+                windowStartUnixMs: Date.now() - 86400000,
+                windowEndUnixMs: Date.now(),
+                scope: 'whole-orca-pool',
+              },
+            },
+          },
+        }}
+      />,
+    );
+
+    expect(screen.getAllByText('$1,000,000.00')).toHaveLength(2);
+    expect(screen.getAllByText('$5,000.00')).toHaveLength(2);
+    expect(screen.getByText('Position value')).toBeTruthy();
+    expect(screen.getAllByText('$24,812.00')).toHaveLength(1);
+    expect(screen.getByText('Unclaimed fees')).toBeTruthy();
+    expect(screen.getAllByText('$142.30')).toHaveLength(1);
+  });
+
   it('contains none of the removed fabricated financial labels', () => {
     const fabricatedValues = [
       '$24,812',

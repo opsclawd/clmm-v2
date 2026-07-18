@@ -1,0 +1,5 @@
+{
+  "verdict": "done_with_fixes",
+  "summary": "Fixed two P1 signature-change blast-radius findings in task-manifest.json. Task 1 signature_changes now correctly lists `packages/application/src/public/index.ts` as the declaration file for all seven exported DTOs and the validator, matching the plan's Step 4 which states exports are from the public boundary. Task 4 signature_changes now correctly lists `packages/ui/src/index.ts` as the declaration file for `FinancialMetricViewModel`, matching the plan's exported signature from the UI public index.",
+  "rebuttal": null
+}
