@@ -320,7 +320,10 @@ function ConnectedPositionsList({
       removeClippedSubviews={false}
       ListHeaderComponent={
         <View>
-          <PortfolioSummaryStrip />
+          <PortfolioSummaryStrip
+            positionValue={viewModel.positionValue}
+            unclaimedFees={viewModel.unclaimedFees}
+          />
           <SectionHeader title="Active positions" meta={`${positions.length} monitored`} />
         </View>
       }

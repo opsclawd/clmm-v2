@@ -7,7 +7,6 @@ import { RangeBar } from './RangeBar.js';
 import {
   formatPoolId,
   getBreachSide,
-  getCardPlaceholderMetrics,
   getMonitoringDisplay,
   getStatusChipProps,
   isNearEdge,
@@ -38,6 +37,8 @@ export function PositionCard({ item, onPress }: Props): JSX.Element {
     rangeStatusKind,
     hasAlert,
     monitoringStatus,
+    poolTvl,
+    poolFees24h,
   } = item;
 
   const tokens = splitTokenPair(poolLabel);
@@ -45,9 +46,12 @@ export function PositionCard({ item, onPress }: Props): JSX.Element {
   const nearEdge = isNearEdge({ currentPrice, lowerBoundPrice, upperBoundPrice });
   const chip = getStatusChipProps({ rangeStatusKind, hasAlert, nearEdge });
   const monitoring = getMonitoringDisplay(monitoringStatus);
-  const placeholders = getCardPlaceholderMetrics(poolId);
 
   const breachSide = getBreachSide(hasAlert, rangeStatusKind);
+
+  const tvlValueColor = poolTvl.kind === 'available' ? colors.textPrimary : colors.textTertiary;
+  const feesValueColor =
+    poolFees24h.kind === 'available' ? colors.textPrimary : colors.textTertiary;
 
   return (
     <TouchableOpacity
@@ -130,17 +134,17 @@ export function PositionCard({ item, onPress }: Props): JSX.Element {
               fontWeight: typography.fontWeight.semibold,
             }}
           >
-            TVL
+            Pool TVL
           </Text>
           <Text
             style={{
               fontFamily: typography.fontFamily.mono,
               fontSize: 14,
               marginTop: 2,
-              color: colors.textPrimary,
+              color: tvlValueColor,
             }}
           >
-            {placeholders.tvlLabel}
+            {poolTvl.label}
           </Text>
         </View>
         <View style={{ flex: 1 }}>
@@ -153,17 +157,17 @@ export function PositionCard({ item, onPress }: Props): JSX.Element {
               fontWeight: typography.fontWeight.semibold,
             }}
           >
-            Fees 24h
+            Pool fees · 24h
           </Text>
           <Text
             style={{
               fontFamily: typography.fontFamily.mono,
               fontSize: 14,
               marginTop: 2,
-              color: colors.safe,
+              color: feesValueColor,
             }}
           >
-            {placeholders.fees24hLabel}
+            {poolFees24h.label}
           </Text>
         </View>
         <View style={{ flex: 1, alignItems: 'flex-end' }}>

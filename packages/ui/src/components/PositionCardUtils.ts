@@ -94,22 +94,6 @@ export function getMonitoringDisplay(status: MonitoringStatus): MonitoringDispla
   }
 }
 
-export type CardPlaceholderMetrics = { tvlLabel: string; fees24hLabel: string };
-
-const CARD_PLACEHOLDER_FALLBACKS = [
-  { tvlLabel: '$8,420.19', fees24hLabel: '+$12.40' },
-  { tvlLabel: '$6,220.00', fees24hLabel: '+$4.82' },
-  { tvlLabel: '$3,105.77', fees24hLabel: '+$1.95' },
-] as const satisfies ReadonlyArray<CardPlaceholderMetrics>;
-
-function hashStringToIndex(input: string, modulo: number): number {
-  let h = 0;
-  for (let i = 0; i < input.length; i++) {
-    h = (h * 31 + input.charCodeAt(i)) >>> 0;
-  }
-  return h % modulo;
-}
-
 export type BreachSide = 'below' | 'above' | undefined;
 
 export function getBreachSide(
@@ -120,9 +104,4 @@ export function getBreachSide(
   if (rangeStatusKind === 'below-range') return 'below';
   if (rangeStatusKind === 'above-range') return 'above';
   return undefined;
-}
-
-export function getCardPlaceholderMetrics(poolId: string): CardPlaceholderMetrics {
-  const idx = hashStringToIndex(poolId || '', CARD_PLACEHOLDER_FALLBACKS.length);
-  return CARD_PLACEHOLDER_FALLBACKS[idx] ?? CARD_PLACEHOLDER_FALLBACKS[0];
 }
