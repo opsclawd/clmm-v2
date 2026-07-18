@@ -162,6 +162,7 @@ export default function PositionsRoute() {
           method: 'push',
         })
       }
+      financialMetrics={positionsResult?.financialMetrics}
     />
   );
 }

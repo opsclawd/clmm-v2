@@ -17,6 +17,8 @@ const baseItem: PositionListItemViewModel = {
   upperBoundPrice: 200,
   lowerBoundLabel: 'USDC 100.00',
   upperBoundLabel: 'USDC 200.00',
+  poolTvl: { kind: 'unavailable', label: '—' },
+  poolFees24h: { kind: 'unavailable', label: '—' },
 };
 
 afterEach(() => {
