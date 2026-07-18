@@ -36,3 +36,14 @@ Stop and flag any request moving toward:
 - Multi-CLMM protocol support beyond Orca for MVP
 - On-chain receipts, attestations, proofs, or claim verification
 - Social features, copy trading, or strategy marketplaces
+
+## Displayed Financial Metric Semantics
+
+| Display label   | Scope                        | Required timing            | Included                                | Excluded                                               | Current production source |
+| --------------- | ---------------------------- | -------------------------- | --------------------------------------- | ------------------------------------------------------ | ------------------------- |
+| Position value  | Returned supported positions | `valuedAtUnixMs`           | Principal token amounts                 | Wallet balances, fees, rewards, collected history, P&L | None; unavailable         |
+| Unclaimed fees  | Returned supported positions | `valuedAtUnixMs`           | Currently claimable trading fees        | Rewards, collected/lifetime fees                       | None; unavailable         |
+| Pool TVL        | Whole identified Orca pool   | `observedAtUnixMs`         | Source-reported USD TVL                 | Raw concentrated-liquidity scalar                      | None; unavailable         |
+| Pool fees · 24h | Whole identified Orca pool   | Explicit 24-hour start/end | Source-reported pool fees in the window | Position fees and lifetime fees                        | None; unavailable         |
+
+`null` means unavailable. Zero is authoritative. Claimed values require a named source. Summary totals must be complete rather than sums of available subsets.
