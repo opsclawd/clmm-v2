@@ -41,7 +41,7 @@ function makeFinancialMetrics(
 ): PositionListFinancialMetricsDto {
   return {
     positionValue: {
-      valueUsd: 24812,
+      valueUsd: 1000,
       valuedAtUnixMs: Date.now(),
       source: 'orca-whirlpool',
       basis: 'principal-token-amounts',
@@ -49,7 +49,7 @@ function makeFinancialMetrics(
       excludes: ['wallet-balances', 'fees', 'rewards', 'collected-history', 'pnl'] as const,
     },
     unclaimedFees: {
-      valueUsd: 142.3,
+      valueUsd: 500,
       valuedAtUnixMs: Date.now(),
       source: 'orca-whirlpool',
       basis: 'currently-claimable-trading-fees',
@@ -412,9 +412,9 @@ describe('PositionsListScreen', () => {
     );
 
     expect(screen.getByText('Position value')).toBeTruthy();
-    expect(screen.getByText('$24,812.00')).toBeTruthy();
+    expect(screen.getByText('$1,000.00')).toBeTruthy();
     expect(screen.getByText('Unclaimed fees')).toBeTruthy();
-    expect(screen.getByText('$142.30')).toBeTruthy();
+    expect(screen.getByText('$500.00')).toBeTruthy();
   });
 
   it('renders unavailable financial metrics as em dashes with neutral styling', () => {
@@ -468,7 +468,7 @@ describe('PositionsListScreen', () => {
 
     expect(screen.queryByText('Position value')).toBeNull();
     expect(screen.queryByText('Unclaimed fees')).toBeNull();
-    expect(screen.queryByText('$24,812.00')).toBeNull();
+    expect(screen.queryByText('$1,000.00')).toBeNull();
   });
 
   it('does not render the portfolio summary strip when disconnected or empty', () => {
@@ -543,9 +543,9 @@ describe('PositionsListScreen', () => {
     expect(screen.getAllByText('$1,000,000.00')).toHaveLength(2);
     expect(screen.getAllByText('$5,000.00')).toHaveLength(2);
     expect(screen.getByText('Position value')).toBeTruthy();
-    expect(screen.getAllByText('$24,812.00')).toHaveLength(1);
+    expect(screen.getAllByText('$1,000.00')).toHaveLength(1);
     expect(screen.getByText('Unclaimed fees')).toBeTruthy();
-    expect(screen.getAllByText('$142.30')).toHaveLength(1);
+    expect(screen.getAllByText('$500.00')).toHaveLength(1);
   });
 
   it('contains none of the removed fabricated financial labels', () => {

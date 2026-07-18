@@ -42,6 +42,7 @@ describe('PositionCard financial metrics rendering', () => {
       );
 
       expect(screen.getByText('Pool TVL')).toBeTruthy();
+      expect(screen.getByText('—')).toBeTruthy();
     });
 
     it('renders unavailable pool fees 24h as em dash with tertiary color', () => {
@@ -52,6 +53,7 @@ describe('PositionCard financial metrics rendering', () => {
       );
 
       expect(screen.getByText('Pool fees · 24h')).toBeTruthy();
+      expect(screen.getByText('—')).toBeTruthy();
     });
   });
 
@@ -81,34 +83,34 @@ describe('PositionCard financial metrics rendering', () => {
     it('renders available pool TVL with Pool TVL label', () => {
       render(
         <PositionCard
-          item={makeItem({ poolTvl: { kind: 'available', valueUsd: 8420.19, label: '$8,420.19' } })}
+          item={makeItem({ poolTvl: { kind: 'available', valueUsd: 1000, label: '$1,000.00' } })}
         />,
       );
 
       expect(screen.getByText('Pool TVL')).toBeTruthy();
-      expect(screen.getByText('$8,420.19')).toBeTruthy();
+      expect(screen.getByText('$1,000.00')).toBeTruthy();
     });
 
     it('renders available pool fees 24h with Pool fees · 24h label', () => {
       render(
         <PositionCard
-          item={makeItem({ poolFees24h: { kind: 'available', valueUsd: 12.4, label: '$12.40' } })}
+          item={makeItem({ poolFees24h: { kind: 'available', valueUsd: 500, label: '$500.00' } })}
         />,
       );
 
       expect(screen.getByText('Pool fees · 24h')).toBeTruthy();
-      expect(screen.getByText('$12.40')).toBeTruthy();
+      expect(screen.getByText('$500.00')).toBeTruthy();
     });
 
     it('does not prefix fees with +', () => {
       render(
         <PositionCard
-          item={makeItem({ poolFees24h: { kind: 'available', valueUsd: 142.3, label: '$142.30' } })}
+          item={makeItem({ poolFees24h: { kind: 'available', valueUsd: 500, label: '$500.00' } })}
         />,
       );
 
-      expect(screen.queryByText('+$142.30')).toBeNull();
-      expect(screen.getByText('$142.30')).toBeTruthy();
+      expect(screen.queryByText('+$500.00')).toBeNull();
+      expect(screen.getByText('$500.00')).toBeTruthy();
     });
   });
 
