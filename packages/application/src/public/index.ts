@@ -36,6 +36,12 @@ export type {
   PolicyInsightDataQuality,
   PolicyInsightStatus,
   PolicyInsightsUnavailableReason,
+  PositionValueMetricDto,
+  UnclaimedFeesMetricDto,
+  PoolTvlMetricDto,
+  PoolFees24hMetricDto,
+  PoolFinancialMetricsDto,
+  PositionListFinancialMetricsDto,
 } from '../dto/index.js';
 
 // Port types needed by UI (capability + permission state)
@@ -110,6 +116,7 @@ export {
   isPositionDetailDto,
   isPositionSummaryDtoArray,
   isPositionSummaryRecord,
+  isPositionListFinancialMetricsDto,
 } from '../dto/validation.js';
 
 // Use cases (needed by testing scenarios)
