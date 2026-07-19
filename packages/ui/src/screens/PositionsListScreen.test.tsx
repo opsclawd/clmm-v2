@@ -10,6 +10,7 @@ import { PositionsListScreen } from './PositionsListScreen.js';
 
 afterEach(() => {
   cleanup();
+  recordingObservability.log.mockClear();
 });
 
 function brand<T>(value: string): T {
@@ -61,23 +62,31 @@ function makeFinancialMetrics(
   };
 }
 
+const recordingObservability = { log: vi.fn() };
+
+function TestPositionsListScreen(
+  props: Omit<React.ComponentProps<typeof PositionsListScreen>, 'observability'>,
+): JSX.Element {
+  return <PositionsListScreen {...props} observability={recordingObservability} />;
+}
+
 describe('PositionsListScreen', () => {
   it('renders connect-wallet entry when disconnected', () => {
-    render(<PositionsListScreen walletAddress={null} />);
+    render(<TestPositionsListScreen walletAddress={null} />);
 
     expect(screen.getByText('Connect your wallet to get started')).toBeTruthy();
     expect(screen.getByText('Connect Wallet')).toBeTruthy();
   });
 
   it('renders loading state for connected wallets while positions are fetching', () => {
-    render(<PositionsListScreen walletAddress="wallet-1" positionsLoading />);
+    render(<TestPositionsListScreen walletAddress="wallet-1" positionsLoading />);
 
     expect(screen.getByText('Loading supported Orca positions')).toBeTruthy();
   });
 
   it('renders error state when loading fails before any positions are available', () => {
     render(
-      <PositionsListScreen
+      <TestPositionsListScreen
         walletAddress="wallet-1"
         positionsError="Could not load supported positions for this wallet."
       />,
@@ -89,7 +98,7 @@ describe('PositionsListScreen', () => {
 
   it('keeps rendering the positions list when a background refetch fails after positions load', () => {
     render(
-      <PositionsListScreen
+      <TestPositionsListScreen
         walletAddress="wallet-1"
         positions={[makePosition()]}
         positionsError="Could not load supported positions for this wallet."
@@ -102,7 +111,7 @@ describe('PositionsListScreen', () => {
 
   it('renders warning banner when positionsWarning is provided alongside positions', () => {
     render(
-      <PositionsListScreen
+      <TestPositionsListScreen
         walletAddress="wallet-1"
         positions={[makePosition()]}
         positionsWarning="Some pool data unavailable. Position list may be incomplete."
@@ -117,7 +126,7 @@ describe('PositionsListScreen', () => {
 
   it('does not render warning banner when positionsWarning is null', () => {
     render(
-      <PositionsListScreen
+      <TestPositionsListScreen
         walletAddress="wallet-1"
         positions={[makePosition()]}
         positionsWarning={null}
@@ -129,7 +138,7 @@ describe('PositionsListScreen', () => {
   });
 
   it('renders the empty state when connected without positions and without an error', () => {
-    render(<PositionsListScreen walletAddress="wallet-1" positions={[]} />);
+    render(<TestPositionsListScreen walletAddress="wallet-1" positions={[]} />);
 
     expect(screen.getByText('No supported positions')).toBeTruthy();
     expect(
@@ -139,7 +148,7 @@ describe('PositionsListScreen', () => {
 
   it('renders all six status-chip labels per the spec mapping', () => {
     render(
-      <PositionsListScreen
+      <TestPositionsListScreen
         walletAddress="wallet-1"
         positions={[
           makePosition({
@@ -195,7 +204,7 @@ describe('PositionsListScreen', () => {
 
   it('renders section header with position count', () => {
     render(
-      <PositionsListScreen
+      <TestPositionsListScreen
         walletAddress="wallet-1"
         positions={[makePosition(), makePosition({ positionId: brand('position-2') })]}
       />,
@@ -209,7 +218,7 @@ describe('PositionsListScreen', () => {
     const onSelectPosition = vi.fn();
 
     render(
-      <PositionsListScreen
+      <TestPositionsListScreen
         walletAddress="wallet-1"
         positions={[
           makePosition({
@@ -228,7 +237,7 @@ describe('PositionsListScreen', () => {
   it('calls onConnectWallet when Connect Wallet is tapped', () => {
     const onConnectWallet = vi.fn();
 
-    render(<PositionsListScreen walletAddress={null} onConnectWallet={onConnectWallet} />);
+    render(<TestPositionsListScreen walletAddress={null} onConnectWallet={onConnectWallet} />);
 
     fireEvent.click(screen.getByText('Connect Wallet'));
     expect(onConnectWallet).toHaveBeenCalled();
@@ -236,7 +245,7 @@ describe('PositionsListScreen', () => {
 
   it('renders monitoring indicator with correct text for each status', () => {
     render(
-      <PositionsListScreen
+      <TestPositionsListScreen
         walletAddress="wallet-1"
         positions={[
           makePosition({ monitoringStatus: 'active' }),
@@ -253,7 +262,7 @@ describe('PositionsListScreen', () => {
 
   it('renders directional breach chip for positions with actionable trigger', () => {
     render(
-      <PositionsListScreen
+      <TestPositionsListScreen
         walletAddress="wallet-1"
         positions={[makePosition({ hasActionableTrigger: true, rangeState: 'below-range' })]}
       />,
@@ -264,7 +273,7 @@ describe('PositionsListScreen', () => {
 
   it('renders the market context panel with pool label when positions and S/R data are available', () => {
     render(
-      <PositionsListScreen
+      <TestPositionsListScreen
         walletAddress="wallet-1"
         positions={[makePosition()]}
         srLevels={{
@@ -286,21 +295,21 @@ describe('PositionsListScreen', () => {
   });
 
   it('hides the market context panel when wallet is disconnected', () => {
-    render(<PositionsListScreen walletAddress={null} />);
+    render(<TestPositionsListScreen walletAddress={null} />);
 
     expect(screen.queryByText('Market Thesis')).toBeNull();
     expect(screen.queryByText('S/R analysis unavailable')).toBeNull();
   });
 
   it('hides the market context panel while positions are loading', () => {
-    render(<PositionsListScreen walletAddress="wallet-1" positionsLoading />);
+    render(<TestPositionsListScreen walletAddress="wallet-1" positionsLoading />);
 
     expect(screen.queryByText('Market Thesis')).toBeNull();
     expect(screen.queryByText('S/R analysis unavailable')).toBeNull();
   });
 
   it('hides the market context panel when there are no positions', () => {
-    render(<PositionsListScreen walletAddress="wallet-1" positions={[]} />);
+    render(<TestPositionsListScreen walletAddress="wallet-1" positions={[]} />);
 
     expect(screen.queryByText('Market Thesis')).toBeNull();
     expect(screen.queryByText('S/R analysis unavailable')).toBeNull();
@@ -308,7 +317,7 @@ describe('PositionsListScreen', () => {
 
   it('renders the unavailable caption when S/R is unsupported but positions render', () => {
     render(
-      <PositionsListScreen
+      <TestPositionsListScreen
         walletAddress="wallet-1"
         positions={[makePosition()]}
         srLevelsUnsupported
@@ -321,7 +330,7 @@ describe('PositionsListScreen', () => {
 
   it('renders cached S/R data with degraded message when S/R errored but data exists', () => {
     render(
-      <PositionsListScreen
+      <TestPositionsListScreen
         walletAddress="wallet-1"
         positions={[makePosition()]}
         srLevels={{
@@ -342,7 +351,7 @@ describe('PositionsListScreen', () => {
 
   it('renders unavailable when S/R errored with no cached data', () => {
     render(
-      <PositionsListScreen
+      <TestPositionsListScreen
         walletAddress="wallet-1"
         positions={[makePosition()]}
         srLevels={null}
@@ -355,7 +364,11 @@ describe('PositionsListScreen', () => {
 
   it('renders the positions list when S/R is loading (non-blocking)', () => {
     render(
-      <PositionsListScreen walletAddress="wallet-1" positions={[makePosition()]} srLevelsLoading />,
+      <TestPositionsListScreen
+        walletAddress="wallet-1"
+        positions={[makePosition()]}
+        srLevelsLoading
+      />,
     );
 
     expect(screen.getByText('Active positions')).toBeTruthy();
@@ -363,7 +376,7 @@ describe('PositionsListScreen', () => {
 
   it('renders mixed-pools unavailable message when positions span multiple pools', () => {
     render(
-      <PositionsListScreen
+      <TestPositionsListScreen
         walletAddress="wallet-1"
         positions={[
           makePosition({ poolId: brand<PositionSummaryDto['poolId']>('pool-a') }),
@@ -384,7 +397,7 @@ describe('PositionsListScreen', () => {
 
   it('does not label out-of-range positions as Near edge even when current price is close to a bound', () => {
     render(
-      <PositionsListScreen
+      <TestPositionsListScreen
         walletAddress="wallet-1"
         positions={[
           makePosition({
@@ -404,7 +417,7 @@ describe('PositionsListScreen', () => {
 
   it('renders the portfolio summary strip above the active positions for connected wallets with positions', () => {
     render(
-      <PositionsListScreen
+      <TestPositionsListScreen
         walletAddress="wallet-1"
         positions={[makePosition()]}
         financialMetrics={makeFinancialMetrics()}
@@ -419,7 +432,7 @@ describe('PositionsListScreen', () => {
 
   it('renders unavailable financial metrics as em dashes with neutral styling', () => {
     render(
-      <PositionsListScreen
+      <TestPositionsListScreen
         walletAddress="wallet-1"
         positions={[makePosition()]}
         financialMetrics={makeFinancialMetrics({
@@ -436,7 +449,7 @@ describe('PositionsListScreen', () => {
 
   it('renders exact zero financial metrics as $0.00', () => {
     render(
-      <PositionsListScreen
+      <TestPositionsListScreen
         walletAddress="wallet-1"
         positions={[makePosition()]}
         financialMetrics={makeFinancialMetrics({
@@ -464,7 +477,7 @@ describe('PositionsListScreen', () => {
   });
 
   it('does not render metric components while positions are loading', () => {
-    render(<PositionsListScreen walletAddress="wallet-1" positionsLoading />);
+    render(<TestPositionsListScreen walletAddress="wallet-1" positionsLoading />);
 
     expect(screen.queryByText('Position value')).toBeNull();
     expect(screen.queryByText('Unclaimed fees')).toBeNull();
@@ -472,17 +485,17 @@ describe('PositionsListScreen', () => {
   });
 
   it('does not render the portfolio summary strip when disconnected or empty', () => {
-    const disconnected = render(<PositionsListScreen walletAddress={null} />);
+    const disconnected = render(<TestPositionsListScreen walletAddress={null} />);
     expect(disconnected.container.textContent).not.toContain('Position value');
     cleanup();
 
-    const empty = render(<PositionsListScreen walletAddress="wallet-1" positions={[]} />);
+    const empty = render(<TestPositionsListScreen walletAddress="wallet-1" positions={[]} />);
     expect(empty.container.textContent).not.toContain('Position value');
   });
 
   it('does not calculate unavailable summary values from populated pool cards', () => {
     render(
-      <PositionsListScreen
+      <TestPositionsListScreen
         walletAddress="wallet-1"
         positions={[makePosition()]}
         financialMetrics={{
@@ -501,7 +514,7 @@ describe('PositionsListScreen', () => {
     const sharedPoolId = brand<PositionSummaryDto['poolId']>('shared-pool');
 
     render(
-      <PositionsListScreen
+      <TestPositionsListScreen
         walletAddress="wallet-1"
         positions={[
           makePosition({
@@ -561,7 +574,7 @@ describe('PositionsListScreen', () => {
     ];
 
     render(
-      <PositionsListScreen
+      <TestPositionsListScreen
         walletAddress="wallet-1"
         positions={[makePosition()]}
         financialMetrics={makeFinancialMetrics()}
@@ -575,7 +588,7 @@ describe('PositionsListScreen', () => {
 
   it('preserves summary cards positions and market sections ordering', () => {
     const { container } = render(
-      <PositionsListScreen
+      <TestPositionsListScreen
         walletAddress="wallet-1"
         positions={[makePosition()]}
         financialMetrics={makeFinancialMetrics()}
@@ -610,7 +623,7 @@ describe('PositionsListScreen', () => {
 
   it('renders summary strip → cards → Support & Resistance → Market Thesis in that order', () => {
     const { container } = render(
-      <PositionsListScreen
+      <TestPositionsListScreen
         walletAddress="wallet-1"
         positions={[makePosition()]}
         financialMetrics={makeFinancialMetrics()}
@@ -645,7 +658,7 @@ describe('PositionsListScreen', () => {
 
   it('renders the RangeBar with lower, current, and upper bound labels from the view model', () => {
     render(
-      <PositionsListScreen
+      <TestPositionsListScreen
         walletAddress="wallet-1"
         positions={[
           makePosition({
@@ -701,7 +714,7 @@ describe('PositionsListScreen', () => {
 
   it('renders v2 thesis panel when srTheses is provided', () => {
     render(
-      <PositionsListScreen
+      <TestPositionsListScreen
         walletAddress="wallet-1"
         positions={[makePosition()]}
         srTheses={SAMPLE_THESES_BLOCK}
@@ -718,7 +731,7 @@ describe('PositionsListScreen', () => {
 
   it('falls back to v1 SrLevelsCard when srTheses is null with not-found reason', () => {
     render(
-      <PositionsListScreen
+      <TestPositionsListScreen
         walletAddress="wallet-1"
         positions={[makePosition()]}
         srLevels={{
@@ -743,7 +756,7 @@ describe('PositionsListScreen', () => {
 
   it('renders PolicyInsights unavailable copy when enabled with not-found reason', () => {
     render(
-      <PositionsListScreen
+      <TestPositionsListScreen
         walletAddress="wallet-1"
         positions={[makePosition()]}
         policyInsight={null}
@@ -758,7 +771,7 @@ describe('PositionsListScreen', () => {
 
   it('does not render PolicyInsightsSection when not enabled', () => {
     render(
-      <PositionsListScreen
+      <TestPositionsListScreen
         walletAddress="wallet-1"
         positions={[makePosition()]}
         policyInsight={null}
@@ -773,7 +786,7 @@ describe('PositionsListScreen', () => {
 
   it('renders PolicyInsights unavailable when in error with upstream-error', () => {
     render(
-      <PositionsListScreen
+      <TestPositionsListScreen
         walletAddress="wallet-1"
         positions={[makePosition()]}
         policyInsight={null}
@@ -784,5 +797,37 @@ describe('PositionsListScreen', () => {
       />,
     );
     expect(screen.getByText('Policy insights unavailable.')).toBeTruthy();
+  });
+
+  it('keeps loading distinct from a loaded card with unavailable prices', () => {
+    render(<TestPositionsListScreen walletAddress="wallet-1" positionsLoading />);
+    expect(screen.getByText('Loading supported Orca positions')).toBeTruthy();
+    expect(recordingObservability.log).not.toHaveBeenCalledWith(
+      'warn',
+      'Position card range visualization unavailable',
+      expect.any(Object),
+    );
+  });
+
+  it('renders Action needed and Price unavailable together and emits both independent warnings', () => {
+    render(
+      <TestPositionsListScreen
+        walletAddress="wallet-1"
+        positions={[
+          makePosition({
+            positionId: brand('position-alert'),
+            rangeState: 'in-range',
+            currentPrice: Number.NaN,
+            hasActionableTrigger: true,
+          }),
+        ]}
+      />,
+    );
+    expect(screen.getByText('Action needed')).toBeTruthy();
+    expect(screen.getByText('Price unavailable')).toBeTruthy();
+    const logCalls = (
+      recordingObservability.log.mock.calls as Array<[string, string, Record<string, unknown>]>
+    ).filter((call) => call[0] === 'warn');
+    expect(logCalls.length).toBeGreaterThanOrEqual(2);
   });
 });

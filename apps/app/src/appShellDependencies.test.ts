@@ -65,4 +65,18 @@ describe('app shell wallet dependency guard', () => {
 
     expect(routeSource).toContain('financialMetrics={positionsResult?.financialMetrics}');
   });
+
+  it('composes TelemetryAdapter in the approved composition entrypoint', () => {
+    const compositionSource = readText('./composition/index.ts');
+
+    expect(compositionSource).toContain('TelemetryAdapter');
+    expect(compositionSource).toContain('positionCardObservability');
+  });
+
+  it('wires positionCardObservability from composition to PositionsListScreen in the route', () => {
+    const routeSource = readText('../app/(tabs)/positions.tsx');
+
+    expect(routeSource).toContain('positionCardObservability');
+    expect(routeSource).toContain('observability={positionCardObservability}');
+  });
 });

@@ -4,6 +4,7 @@ import {
   getBreachSide,
   getMonitoringDisplay,
   getStatusChipProps,
+  getStatusDiagnosticCode,
   isNearEdge,
   splitTokenPair,
 } from './PositionCardUtils.js';
@@ -173,6 +174,36 @@ describe('getStatusChipProps', () => {
     expect(
       getStatusChipProps({ rangeStatusKind: 'below-range', hasAlert: true, nearEdge: true }),
     ).toEqual({ tone: 'breach', label: 'Breach · below' });
+  });
+
+  it.each([
+    ['below-range', true, false, 'Breach · below', 'breach'],
+    ['above-range', true, false, 'Breach · above', 'breach'],
+    ['in-range', true, false, 'Action needed', 'warn'],
+    ['in-range', true, true, 'Action needed', 'warn'],
+    ['below-range', false, true, 'Below range', 'warn'],
+    ['above-range', false, true, 'Above range', 'warn'],
+    ['in-range', false, true, 'Near edge', 'warn'],
+    ['in-range', false, false, 'In range', 'safe'],
+  ] as const)(
+    'maps %s alert=%s nearEdge=%s to %s',
+    (rangeStatusKind, hasAlert, nearEdge, label, tone) => {
+      expect(getStatusChipProps({ rangeStatusKind, hasAlert, nearEdge })).toEqual({ label, tone });
+    },
+  );
+});
+
+describe('getStatusDiagnosticCode', () => {
+  it('classifies only hasAlert + in-range as position_alert_in_range', () => {
+    expect(
+      getStatusDiagnosticCode({ rangeStatusKind: 'in-range', hasAlert: true, nearEdge: true }),
+    ).toBe('position_alert_in_range');
+    expect(
+      getStatusDiagnosticCode({ rangeStatusKind: 'below-range', hasAlert: true, nearEdge: false }),
+    ).toBeUndefined();
+    expect(
+      getStatusDiagnosticCode({ rangeStatusKind: 'in-range', hasAlert: false, nearEdge: true }),
+    ).toBeUndefined();
   });
 });
 

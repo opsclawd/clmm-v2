@@ -1,20 +1,27 @@
+import { useEffect, useMemo } from 'react';
 import { View, Text, TouchableOpacity } from 'react-native';
+import type { ObservabilityPort } from '@clmm/application/public';
 import type { PositionListItemViewModel } from '../view-models/PositionListViewModel.js';
 import { colors, typography } from '../design-system/index.js';
 import { Chip } from './Chip.js';
 import { PairGlyph } from './PairGlyph.js';
 import { RangeBar } from './RangeBar.js';
+import { buildRangeBarDisplayState } from './RangeBarUtils.js';
 import {
   formatPoolId,
   getBreachSide,
   getMonitoringDisplay,
   getStatusChipProps,
+  getStatusDiagnosticCode,
   isNearEdge,
   splitTokenPair,
 } from './PositionCardUtils.js';
 
+type PositionCardObservability = Pick<ObservabilityPort, 'log'>;
+
 type Props = {
   item: PositionListItemViewModel;
+  observability: PositionCardObservability;
   onPress?: () => void;
 };
 
@@ -24,7 +31,7 @@ function monitoringDotColor(tone: 'safe' | 'warn' | 'faint'): string {
   return colors.textFaint;
 }
 
-export function PositionCard({ item, onPress }: Props): JSX.Element {
+export function PositionCard({ item, observability, onPress }: Props): JSX.Element {
   const {
     poolId,
     poolLabel,
@@ -48,6 +55,36 @@ export function PositionCard({ item, onPress }: Props): JSX.Element {
   const monitoring = getMonitoringDisplay(monitoringStatus);
 
   const breachSide = getBreachSide(hasAlert, rangeStatusKind);
+
+  const rangeBarDisplayState = useMemo(
+    () => buildRangeBarDisplayState({ currentPrice, lowerBoundPrice, upperBoundPrice }),
+    [currentPrice, lowerBoundPrice, upperBoundPrice],
+  );
+
+  const statusDiagnosticCode = getStatusDiagnosticCode({ rangeStatusKind, hasAlert, nearEdge });
+
+  useEffect(() => {
+    if (statusDiagnosticCode == null) return;
+    observability.log('warn', 'Position card alert conflicts with range status', {
+      code: statusDiagnosticCode,
+      positionId: item.positionId,
+      poolId,
+      hasAlert,
+      rangeStatusKind,
+    });
+  }, [hasAlert, item.positionId, observability, poolId, rangeStatusKind, statusDiagnosticCode]);
+
+  useEffect(() => {
+    if (rangeBarDisplayState.kind !== 'unavailable') return;
+    observability.log('warn', 'Position card range visualization unavailable', {
+      code: 'range_bar_input_invalid',
+      reason: rangeBarDisplayState.reason,
+      positionId: item.positionId,
+      poolId,
+      rangeStatusKind,
+      hasAlert,
+    });
+  }, [hasAlert, item.positionId, observability, poolId, rangeBarDisplayState, rangeStatusKind]);
 
   const tvlValueColor = poolTvl.kind === 'available' ? colors.textPrimary : colors.textTertiary;
   const feesValueColor =
@@ -108,9 +145,7 @@ export function PositionCard({ item, onPress }: Props): JSX.Element {
 
       {/* Range bar */}
       <RangeBar
-        lowerBoundPrice={lowerBoundPrice}
-        upperBoundPrice={upperBoundPrice}
-        currentPrice={currentPrice}
+        displayState={rangeBarDisplayState}
         lowerBoundLabel={lowerBoundLabel}
         upperBoundLabel={upperBoundLabel}
         currentPriceLabel={currentPriceLabel}

@@ -56,6 +56,15 @@ export type StatusChipInput = {
   nearEdge: boolean;
 };
 
+export type StatusDiagnosticCode = 'position_alert_in_range';
+
+export function getStatusDiagnosticCode({
+  rangeStatusKind,
+  hasAlert,
+}: StatusChipInput): StatusDiagnosticCode | undefined {
+  return hasAlert && rangeStatusKind === 'in-range' ? 'position_alert_in_range' : undefined;
+}
+
 export function getStatusChipProps({
   rangeStatusKind,
   hasAlert,
@@ -67,6 +76,7 @@ export function getStatusChipProps({
   if (hasAlert && rangeStatusKind === 'above-range') {
     return { tone: 'breach', label: 'Breach · above' };
   }
+  if (hasAlert) return { tone: 'warn', label: 'Action needed' };
   if (rangeStatusKind === 'in-range') {
     return nearEdge ? { tone: 'warn', label: 'Near edge' } : { tone: 'safe', label: 'In range' };
   }

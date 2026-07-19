@@ -1,5 +1,6 @@
 import { View, Text, FlatList, ActivityIndicator } from 'react-native';
 import type {
+  ObservabilityPort,
   PositionSummaryDto,
   PositionListFinancialMetricsDto,
   SrLevelsBlock,
@@ -19,7 +20,10 @@ import { PolicyInsightsSection } from '../components/PolicyInsightsSection.js';
 import { PortfolioSummaryStrip } from '../components/PortfolioSummaryStrip.js';
 import type { PlatformCapabilities } from '../components/DegradedCapabilityBannerUtils.js';
 
+type PositionsListObservability = Pick<ObservabilityPort, 'log'>;
+
 type Props = {
+  observability: PositionsListObservability;
   walletAddress?: string | null;
   positions?: PositionSummaryDto[] | undefined;
   positionsLoading?: boolean;
@@ -60,6 +64,7 @@ type Props = {
 };
 
 export function PositionsListScreen({
+  observability,
   walletAddress,
   positions,
   positionsLoading,
@@ -108,6 +113,7 @@ export function PositionsListScreen({
         <ErrorState error={positionsError} />
       ) : hasPositions ? (
         <ConnectedPositionsList
+          observability={observability}
           positions={positions ?? []}
           {...(onSelectPosition != null ? { onSelectPosition } : {})}
           srLevels={srLevels}
@@ -252,6 +258,7 @@ function EmptyState() {
 }
 
 function ConnectedPositionsList({
+  observability,
   positions,
   onSelectPosition,
   srLevels,
@@ -278,6 +285,7 @@ function ConnectedPositionsList({
   policyInsightsUnavailableReason,
   financialMetrics,
 }: {
+  observability: PositionsListObservability;
   positions: PositionSummaryDto[];
   onSelectPosition?: (positionId: string) => void;
   srLevels?: SrLevelsBlock | null | undefined;
@@ -365,7 +373,11 @@ function ConnectedPositionsList({
         </>
       }
       renderItem={({ item }) => (
-        <PositionCard item={item} onPress={() => onSelectPosition?.(item.positionId)} />
+        <PositionCard
+          item={item}
+          observability={observability}
+          onPress={() => onSelectPosition?.(item.positionId)}
+        />
       )}
     />
   );

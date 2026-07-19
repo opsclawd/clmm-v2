@@ -32,12 +32,19 @@ afterEach(() => {
   cleanup();
 });
 
+const observability = { log: vi.fn() };
+
+afterEach(() => {
+  observability.log.mockClear();
+});
+
 describe('PositionCard financial metrics rendering', () => {
   describe('renders unavailable financial metrics as em dashes with neutral styling', () => {
     it('renders unavailable pool TVL as em dash with tertiary color', () => {
       render(
         <PositionCard
           item={makeItem({ poolFees24h: { kind: 'available', valueUsd: 100, label: '$100.00' } })}
+          observability={observability}
         />,
       );
 
@@ -49,6 +56,7 @@ describe('PositionCard financial metrics rendering', () => {
       render(
         <PositionCard
           item={makeItem({ poolTvl: { kind: 'available', valueUsd: 1000, label: '$1,000.00' } })}
+          observability={observability}
         />,
       );
 
@@ -62,6 +70,7 @@ describe('PositionCard financial metrics rendering', () => {
       render(
         <PositionCard
           item={makeItem({ poolTvl: { kind: 'available', valueUsd: 0, label: '$0.00' } })}
+          observability={observability}
         />,
       );
 
@@ -72,6 +81,7 @@ describe('PositionCard financial metrics rendering', () => {
       render(
         <PositionCard
           item={makeItem({ poolFees24h: { kind: 'available', valueUsd: 0, label: '$0.00' } })}
+          observability={observability}
         />,
       );
 
@@ -84,6 +94,7 @@ describe('PositionCard financial metrics rendering', () => {
       render(
         <PositionCard
           item={makeItem({ poolTvl: { kind: 'available', valueUsd: 1000, label: '$1,000.00' } })}
+          observability={observability}
         />,
       );
 
@@ -95,6 +106,7 @@ describe('PositionCard financial metrics rendering', () => {
       render(
         <PositionCard
           item={makeItem({ poolFees24h: { kind: 'available', valueUsd: 500, label: '$500.00' } })}
+          observability={observability}
         />,
       );
 
@@ -106,6 +118,7 @@ describe('PositionCard financial metrics rendering', () => {
       render(
         <PositionCard
           item={makeItem({ poolFees24h: { kind: 'available', valueUsd: 500, label: '$500.00' } })}
+          observability={observability}
         />,
       );
 
@@ -118,7 +131,7 @@ describe('PositionCard financial metrics rendering', () => {
     const fabricatedValues = ['$8,420.19', '$6,220.00', '$3,105.77', '+$12.40', '+$4.82', '+$1.95'];
 
     it('does not render any hardcoded placeholder TVL values', () => {
-      render(<PositionCard item={baseItem} />);
+      render(<PositionCard item={baseItem} observability={observability} />);
       fabricatedValues.forEach((value) => {
         expect(screen.queryByText(value)).toBeNull();
       });
@@ -128,43 +141,164 @@ describe('PositionCard financial metrics rendering', () => {
 
 describe('PositionCard', () => {
   it('renders pool label and truncated pool id', () => {
-    render(<PositionCard item={baseItem} />);
+    render(<PositionCard item={baseItem} observability={observability} />);
 
     expect(screen.getByText('SOL / USDC')).toBeTruthy();
     expect(screen.getByText('Czfq…44zE')).toBeTruthy();
   });
 
   it('renders monitoring display text for each status', () => {
-    const { rerender } = render(<PositionCard item={baseItem} />);
+    const { rerender } = render(<PositionCard item={baseItem} observability={observability} />);
     expect(screen.getByText('Live')).toBeTruthy();
 
-    rerender(<PositionCard item={{ ...baseItem, monitoringStatus: 'degraded' }} />);
+    rerender(
+      <PositionCard
+        item={{ ...baseItem, monitoringStatus: 'degraded' }}
+        observability={observability}
+      />,
+    );
     expect(screen.getByText('Degraded')).toBeTruthy();
 
-    rerender(<PositionCard item={{ ...baseItem, monitoringStatus: 'inactive' }} />);
+    rerender(
+      <PositionCard
+        item={{ ...baseItem, monitoringStatus: 'inactive' }}
+        observability={observability}
+      />,
+    );
     expect(screen.getByText('Inactive')).toBeTruthy();
   });
 
   it('renders chip label for in-range position without alert', () => {
-    render(<PositionCard item={baseItem} />);
+    render(<PositionCard item={baseItem} observability={observability} />);
     expect(screen.getByText('In range')).toBeTruthy();
   });
 
   it('renders chip label for breach · below', () => {
-    render(<PositionCard item={{ ...baseItem, rangeStatusKind: 'below-range', hasAlert: true }} />);
+    render(
+      <PositionCard
+        item={{ ...baseItem, rangeStatusKind: 'below-range', hasAlert: true }}
+        observability={observability}
+      />,
+    );
     expect(screen.getByText('Breach · below')).toBeTruthy();
   });
 
   it('calls onPress when tapped', () => {
     const onPress = vi.fn();
-    render(<PositionCard item={baseItem} onPress={onPress} />);
+    render(<PositionCard item={baseItem} onPress={onPress} observability={observability} />);
 
     fireEvent.click(screen.getByRole('button'));
     expect(onPress).toHaveBeenCalledOnce();
   });
 
   it('has accessible label with pool label and chip text', () => {
-    render(<PositionCard item={baseItem} />);
+    render(<PositionCard item={baseItem} observability={observability} />);
     expect(screen.getByLabelText('Position card for SOL / USDC, In range')).toBeTruthy();
+  });
+
+  it('does not log warnings for a normal available card', () => {
+    render(<PositionCard item={baseItem} observability={observability} />);
+    expect(observability.log).not.toHaveBeenCalled();
+  });
+
+  it('logs position_alert_in_range with position and pool identity but no wallet data', () => {
+    render(
+      <PositionCard
+        item={makeItem({ currentPrice: 150, hasAlert: true, rangeStatusKind: 'in-range' })}
+        observability={observability}
+      />,
+    );
+    expect(observability.log).toHaveBeenCalledWith(
+      'warn',
+      'Position card alert conflicts with range status',
+      {
+        code: 'position_alert_in_range',
+        positionId: 'pos-1',
+        poolId: baseItem.poolId,
+        hasAlert: true,
+        rangeStatusKind: 'in-range',
+      },
+    );
+    const logCalls = observability.log.mock.calls as Array<
+      [string, string, Record<string, unknown>]
+    >;
+    logCalls.forEach((call) => {
+      expect(call[2]).not.toHaveProperty('walletAddress');
+    });
+  });
+
+  it('logs range_bar_input_invalid with the deterministic reason and safe state fields', () => {
+    render(
+      <PositionCard
+        item={makeItem({ currentPrice: Number.NaN, hasAlert: false, rangeStatusKind: 'in-range' })}
+        observability={observability}
+      />,
+    );
+    expect(observability.log).toHaveBeenCalledWith(
+      'warn',
+      'Position card range visualization unavailable',
+      {
+        code: 'range_bar_input_invalid',
+        reason: 'current_price_non_finite',
+        positionId: 'pos-1',
+        poolId: baseItem.poolId,
+        rangeStatusKind: 'in-range',
+        hasAlert: false,
+      },
+    );
+  });
+
+  it('renders Action needed and Price unavailable together and emits both independent warnings', () => {
+    render(
+      <PositionCard
+        item={makeItem({ currentPrice: Number.NaN, hasAlert: true, rangeStatusKind: 'in-range' })}
+        observability={observability}
+      />,
+    );
+    expect(screen.getByText('Action needed')).toBeTruthy();
+    expect(screen.getByText('Price unavailable')).toBeTruthy();
+    expect(observability.log).toHaveBeenCalledTimes(2);
+  });
+
+  it('keeps alert + in-range directionless and free of breach decoration', () => {
+    render(
+      <PositionCard
+        item={makeItem({ hasAlert: true, rangeStatusKind: 'in-range' })}
+        observability={observability}
+      />,
+    );
+    expect(screen.getByText('Action needed')).toBeTruthy();
+    expect(screen.queryByText('Breach')).toBeNull();
+  });
+
+  it('does not log again on an unchanged rerender', () => {
+    const { rerender } = render(
+      <PositionCard
+        item={makeItem({ currentPrice: Number.NaN, hasAlert: true, rangeStatusKind: 'in-range' })}
+        observability={observability}
+      />,
+    );
+    expect(observability.log).toHaveBeenCalledTimes(2);
+    rerender(
+      <PositionCard
+        item={makeItem({ currentPrice: Number.NaN, hasAlert: true, rangeStatusKind: 'in-range' })}
+        observability={observability}
+      />,
+    );
+    expect(observability.log).toHaveBeenCalledTimes(2);
+  });
+
+  it('still calls only onPress when the card is tapped', () => {
+    const onPress = vi.fn();
+    render(
+      <PositionCard
+        item={makeItem({ currentPrice: Number.NaN, hasAlert: true, rangeStatusKind: 'in-range' })}
+        observability={observability}
+        onPress={onPress}
+      />,
+    );
+    fireEvent.click(screen.getByRole('button'));
+    expect(onPress).toHaveBeenCalledOnce();
+    expect(observability.log).toHaveBeenCalledTimes(2);
   });
 });
