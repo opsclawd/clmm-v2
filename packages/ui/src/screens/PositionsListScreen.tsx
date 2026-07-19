@@ -113,7 +113,7 @@ export function PositionsListScreen({
         <ErrorState error={positionsError} />
       ) : hasPositions ? (
         <ConnectedPositionsList
-          observability={observability}
+          {...(observability != null && { observability })}
           positions={positions ?? []}
           {...(onSelectPosition != null ? { onSelectPosition } : {})}
           srLevels={srLevels}
@@ -375,7 +375,7 @@ function ConnectedPositionsList({
       renderItem={({ item }) => (
         <PositionCard
           item={item}
-          observability={observability}
+          {...(observability != null && { observability })}
           onPress={() => onSelectPosition?.(item.positionId)}
         />
       )}
