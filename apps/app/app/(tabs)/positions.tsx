@@ -10,6 +10,7 @@ import { fetchCurrentPolicyInsight } from '../../src/api/policyInsights';
 import { walletSessionStore } from '../../src/state/walletSessionStore';
 import type { PositionListItemViewModel } from '@clmm/ui';
 import { navigateRoute } from '../../src/platform/webNavigation';
+import { positionCardObservability } from '../../src/composition';
 
 const SR_LEVELS_STALE_TIME_MS = 5 * 60 * 1000;
 const REGIME_STALE_TIME_MS = 5 * 60 * 1000;
@@ -115,6 +116,7 @@ export default function PositionsRoute() {
 
   return (
     <PositionsListScreen
+      observability={positionCardObservability}
       walletAddress={walletAddress}
       positions={positions}
       positionsLoading={positionsQuery.isLoading}

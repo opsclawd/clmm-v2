@@ -10,6 +10,7 @@ import { PositionsListScreen } from './PositionsListScreen.js';
 
 afterEach(() => {
   cleanup();
+  recordingObservability.log.mockClear();
 });
 
 function brand<T>(value: string): T {
@@ -59,6 +60,14 @@ function makeFinancialMetrics(
     poolsById: {},
     ...overrides,
   };
+}
+
+const recordingObservability = { log: vi.fn() };
+
+function TestPositionsListScreen(
+  props: Omit<React.ComponentProps<typeof PositionsListScreen>, 'observability'>,
+): JSX.Element {
+  return <PositionsListScreen {...props} observability={recordingObservability} />;
 }
 
 describe('PositionsListScreen', () => {
@@ -784,5 +793,37 @@ describe('PositionsListScreen', () => {
       />,
     );
     expect(screen.getByText('Policy insights unavailable.')).toBeTruthy();
+  });
+
+  it('keeps loading distinct from a loaded card with unavailable prices', () => {
+    render(<TestPositionsListScreen walletAddress="wallet-1" positionsLoading />);
+    expect(screen.getByText('Loading supported Orca positions')).toBeTruthy();
+    expect(recordingObservability.log).not.toHaveBeenCalledWith(
+      'warn',
+      'Position card range visualization unavailable',
+      expect.any(Object),
+    );
+  });
+
+  it('renders Action needed and Price unavailable together and emits both independent warnings', () => {
+    render(
+      <TestPositionsListScreen
+        walletAddress="wallet-1"
+        positions={[
+          makePosition({
+            positionId: brand('position-alert'),
+            rangeState: 'in-range',
+            currentPrice: Number.NaN,
+            hasActionableTrigger: true,
+          }),
+        ]}
+      />,
+    );
+    expect(screen.getByText('Action needed')).toBeTruthy();
+    expect(screen.getByText('Price unavailable')).toBeTruthy();
+    const logCalls = (
+      recordingObservability.log.mock.calls as Array<[string, string, Record<string, unknown>]>
+    ).filter((call) => call[0] === 'warn');
+    expect(logCalls.length).toBeGreaterThanOrEqual(2);
   });
 });

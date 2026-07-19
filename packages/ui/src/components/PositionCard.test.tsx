@@ -32,6 +32,12 @@ afterEach(() => {
   cleanup();
 });
 
+const observability = { log: vi.fn() };
+
+afterEach(() => {
+  observability.log.mockClear();
+});
+
 describe('PositionCard financial metrics rendering', () => {
   describe('renders unavailable financial metrics as em dashes with neutral styling', () => {
     it('renders unavailable pool TVL as em dash with tertiary color', () => {
@@ -166,5 +172,111 @@ describe('PositionCard', () => {
   it('has accessible label with pool label and chip text', () => {
     render(<PositionCard item={baseItem} />);
     expect(screen.getByLabelText('Position card for SOL / USDC, In range')).toBeTruthy();
+  });
+
+  it('does not log warnings for a normal available card', () => {
+    render(<PositionCard item={baseItem} observability={observability} />);
+    expect(observability.log).not.toHaveBeenCalled();
+  });
+
+  it('logs position_alert_in_range with position and pool identity but no wallet data', () => {
+    render(
+      <PositionCard
+        item={makeItem({ currentPrice: 150, hasAlert: true, rangeStatusKind: 'in-range' })}
+        observability={observability}
+      />,
+    );
+    expect(observability.log).toHaveBeenCalledWith(
+      'warn',
+      'Position card alert conflicts with range status',
+      {
+        code: 'position_alert_in_range',
+        positionId: 'pos-1',
+        poolId: baseItem.poolId,
+        hasAlert: true,
+        rangeStatusKind: 'in-range',
+      },
+    );
+    const logCalls = observability.log.mock.calls as Array<
+      [string, string, Record<string, unknown>]
+    >;
+    logCalls.forEach((call) => {
+      expect(call[2]).not.toHaveProperty('walletAddress');
+    });
+  });
+
+  it('logs range_bar_input_invalid with the deterministic reason and safe state fields', () => {
+    render(
+      <PositionCard
+        item={makeItem({ currentPrice: Number.NaN, hasAlert: false, rangeStatusKind: 'in-range' })}
+        observability={observability}
+      />,
+    );
+    expect(observability.log).toHaveBeenCalledWith(
+      'warn',
+      'Position card range visualization unavailable',
+      {
+        code: 'range_bar_input_invalid',
+        reason: 'current_price_non_finite',
+        positionId: 'pos-1',
+        poolId: baseItem.poolId,
+        rangeStatusKind: 'in-range',
+        hasAlert: false,
+      },
+    );
+  });
+
+  it('renders Action needed and Price unavailable together and emits both independent warnings', () => {
+    render(
+      <PositionCard
+        item={makeItem({ currentPrice: Number.NaN, hasAlert: true, rangeStatusKind: 'in-range' })}
+        observability={observability}
+      />,
+    );
+    expect(screen.getByText('Action needed')).toBeTruthy();
+    expect(screen.getByText('Price unavailable')).toBeTruthy();
+    expect(observability.log).toHaveBeenCalledTimes(2);
+  });
+
+  it('keeps alert + in-range directionless and free of breach decoration', () => {
+    render(
+      <PositionCard
+        item={makeItem({ hasAlert: true, rangeStatusKind: 'in-range' })}
+        observability={observability}
+      />,
+    );
+    expect(screen.getByText('Action needed')).toBeTruthy();
+    expect(screen.queryByText('Breach')).toBeNull();
+  });
+
+  it('does not log again on an unchanged rerender', () => {
+    const { rerender } = render(
+      <PositionCard
+        item={makeItem({ currentPrice: Number.NaN, hasAlert: true, rangeStatusKind: 'in-range' })}
+        observability={observability}
+      />,
+    );
+    expect(observability.log).toHaveBeenCalledTimes(2);
+    rerender(
+      <PositionCard
+        item={makeItem({ currentPrice: Number.NaN, hasAlert: true, rangeStatusKind: 'in-range' })}
+        observability={observability}
+      />,
+    );
+    expect(observability.log).toHaveBeenCalledTimes(2);
+  });
+
+  it('still calls only onPress when the card is tapped', () => {
+    const onPress = vi.fn();
+    render(
+      <PositionCard
+        item={makeItem({ currentPrice: Number.NaN, hasAlert: true, rangeStatusKind: 'in-range' })}
+        observability={observability}
+        onPress={onPress}
+      />,
+    );
+    fireEvent.click(screen.getByRole('button'));
+    expect(onPress).toHaveBeenCalledOnce();
+    expect(observability.log).toHaveBeenCalledTimes(2);
   });
 });

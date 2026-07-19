@@ -8,6 +8,7 @@ import { NativePlatformCapabilityAdapter } from '@clmm/adapters/src/outbound/cap
 import { WebPlatformCapabilityAdapter } from '@clmm/adapters/src/outbound/capabilities/WebPlatformCapabilityAdapter';
 import { ExpoDeepLinkAdapter } from '@clmm/adapters/src/outbound/capabilities/ExpoDeepLinkAdapter';
 import { NativeNotificationPermissionAdapter } from '@clmm/adapters/src/outbound/capabilities/NativeNotificationPermissionAdapter';
+import { TelemetryAdapter } from '@clmm/adapters/src/outbound/observability/TelemetryAdapter';
 import { detectPlatformKind, selectCapabilityAdapter } from '../platform/capabilities';
 import { parseIncomingUrl, registerDeepLinkListener } from '../platform/deepLinks';
 
@@ -34,3 +35,5 @@ export const walletPlatform = {
     return nativeWallet.connectNativeWallet(cluster);
   },
 };
+
+export const positionCardObservability = new TelemetryAdapter();
