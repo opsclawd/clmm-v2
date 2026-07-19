@@ -178,7 +178,8 @@ async function classifyNotFound(poolId: string, response: Response): Promise<Err
   let body: unknown;
   try {
     body = await response.json();
-  } catch {
+  } catch (error: unknown) {
+    if (isAbortError(error)) throw error;
     return new Error('Could not load market regime: unexpected 404');
   }
   if (
@@ -195,55 +196,65 @@ export async function fetchCurrentRegime(poolId: string): Promise<RegimeResponse
   const controller = new AbortController();
   const timeoutId = setTimeout(() => controller.abort(), FETCH_TIMEOUT_MS);
 
-  let response: Response;
   try {
-    response = await fetch(
-      `${getBffBaseUrl()}/regime/pools/${encodeURIComponent(poolId)}/current`,
-      { signal: controller.signal },
-    );
+    let response: Response;
+    try {
+      response = await fetch(
+        `${getBffBaseUrl()}/regime/pools/${encodeURIComponent(poolId)}/current`,
+        { signal: controller.signal },
+      );
+    } catch (error: unknown) {
+      if (isAbortError(error)) throw error;
+      throw new Error(
+        `Could not load market regime: ${error instanceof Error ? error.message : 'network error'}`,
+      );
+    }
+
+    if (response.status === 404) throw await classifyNotFound(poolId, response);
+
+    if (!response.ok) {
+      let detail: string;
+      try {
+        detail = await response.text();
+      } catch (error: unknown) {
+        if (isAbortError(error)) throw error;
+        detail = `HTTP ${response.status}`;
+      }
+      throw new Error(`Could not load market regime: ${detail || response.statusText}`);
+    }
+
+    let body: unknown;
+    try {
+      body = await response.json();
+    } catch (error: unknown) {
+      if (isAbortError(error)) throw error;
+      throw new Error('Could not load market regime: response body was not valid JSON');
+    }
+
+    if (!isRecord(body)) {
+      throw new Error('Could not load market regime: malformed response');
+    }
+
+    const regime = body['regime'];
+    const unavailableReason = isRegimeUnavailableReason(body['unavailableReason'])
+      ? body['unavailableReason']
+      : undefined;
+
+    if (regime === null) {
+      return { regime: null, unavailableReason };
+    }
+
+    if (!isRegimeBlock(regime)) {
+      throw new Error('Could not load market regime: malformed regime block');
+    }
+
+    return { regime, unavailableReason };
   } catch (error: unknown) {
     if (isAbortError(error)) {
       throw new Error('Could not load market regime: request timed out');
     }
-    throw new Error(
-      `Could not load market regime: ${error instanceof Error ? error.message : 'network error'}`,
-    );
+    throw error;
   } finally {
     clearTimeout(timeoutId);
   }
-
-  if (response.status === 404) {
-    throw await classifyNotFound(poolId, response);
-  }
-
-  if (!response.ok) {
-    const detail = await response.text().catch(() => `HTTP ${response.status}`);
-    throw new Error(`Could not load market regime: ${detail || response.statusText}`);
-  }
-
-  let body: unknown;
-  try {
-    body = await response.json();
-  } catch {
-    throw new Error('Could not load market regime: response body was not valid JSON');
-  }
-
-  if (!isRecord(body)) {
-    throw new Error('Could not load market regime: malformed response');
-  }
-
-  const regime = body['regime'];
-  const unavailableReason = isRegimeUnavailableReason(body['unavailableReason'])
-    ? body['unavailableReason']
-    : undefined;
-
-  if (regime === null) {
-    return { regime: null, unavailableReason };
-  }
-
-  if (!isRegimeBlock(regime)) {
-    throw new Error('Could not load market regime: malformed regime block');
-  }
-
-  return { regime, unavailableReason };
 }

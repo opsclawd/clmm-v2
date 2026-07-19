@@ -40,6 +40,7 @@ describe('CurrentSrLevelsAdapter', () => {
 
   afterEach(() => {
     vi.restoreAllMocks();
+    vi.useRealTimers();
   });
 
   it('returns sorted SrLevelsBlock on happy path', async () => {
@@ -195,6 +196,49 @@ describe('CurrentSrLevelsAdapter', () => {
     const result = await adapter.fetchCurrent('SOL/USDC', 'mco');
 
     expect(result).toBeNull();
+  });
+
+  it('returns null when a 200 body stalls until the 2s deadline', async () => {
+    vi.useFakeTimers();
+    let signal: AbortSignal | undefined;
+    vi.mocked(fetch).mockImplementation((_input, init) => {
+      signal = init?.signal as AbortSignal;
+      return Promise.resolve({
+        ok: true,
+        status: 200,
+        json: () =>
+          new Promise((_, reject) => {
+            signal!.addEventListener('abort', () => reject({ name: 'AbortError' }), { once: true });
+          }),
+      } as Response);
+    });
+    const adapter = new CurrentSrLevelsAdapter('https://regime.example.com', obs.port);
+
+    const pending = adapter.fetchCurrent('SOL/USDC', 'mco');
+    await vi.advanceTimersByTimeAsync(2_000);
+
+    await expect(pending).resolves.toBeNull();
+    expect(signal?.aborted).toBe(true);
+    expect(obs.logs.some((entry) => entry.message === 'SR levels fetch error')).toBe(true);
+  });
+
+  it('cleans up the deadline timer when the response finishes early', async () => {
+    vi.useFakeTimers();
+    let signal: AbortSignal | undefined;
+    vi.mocked(fetch).mockImplementation((_input, init) => {
+      signal = init?.signal as AbortSignal;
+      return Promise.resolve(new Response(JSON.stringify(SAMPLE_RESPONSE), { status: 200 }));
+    });
+
+    const adapter = new CurrentSrLevelsAdapter('https://regime.example.com', obs.port);
+    const result = await adapter.fetchCurrent('SOL/USDC', 'mco');
+
+    expect(result).not.toBeNull();
+
+    // Advance timers past the 2s deadline
+    await vi.advanceTimersByTimeAsync(3000);
+
+    expect(signal?.aborted).toBe(false);
   });
 
   it('returns null when baseUrl is null, logs warn on first call only', async () => {

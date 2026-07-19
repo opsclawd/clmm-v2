@@ -21,6 +21,28 @@ function restoreBffBaseUrl(): void {
   env.EXPO_PUBLIC_BFF_BASE_URL = ORIGINAL_BFF_BASE_URL;
 }
 
+function stubStalledBody(status: number, method: 'json' | 'text') {
+  let signal: AbortSignal | undefined;
+  const readBody = () =>
+    new Promise<never>((_resolve, reject) => {
+      signal!.addEventListener('abort', () => reject({ name: 'AbortError' }), { once: true });
+    });
+
+  globalThis.fetch = vi
+    .fn()
+    .mockImplementation((_input: string | URL | Request, init?: RequestInit) => {
+      signal = init?.signal as AbortSignal;
+      return Promise.resolve({
+        ok: status >= 200 && status < 300,
+        status,
+        statusText: '',
+        ...(method === 'json' ? { json: readBody } : { text: readBody }),
+      } as unknown as Response);
+    }) as typeof fetch;
+
+  return { getSignal: () => signal };
+}
+
 function fixtureBlock() {
   return {
     briefId: 'brief-1',
@@ -34,6 +56,7 @@ function fixtureBlock() {
 
 describe('fetchCurrentSrLevels', () => {
   afterEach(() => {
+    vi.useRealTimers();
     globalThis.fetch = ORIGINAL_FETCH;
     restoreBffBaseUrl();
     vi.unstubAllGlobals();
@@ -225,5 +248,82 @@ describe('fetchCurrentSrLevels', () => {
 
     expect(error).toBeInstanceOf(Error);
     expect((error as Error).message).toContain('malformed');
+  });
+
+  it('throws the timeout error when a 200 JSON body stalls after headers', async () => {
+    env.EXPO_PUBLIC_BFF_BASE_URL = 'https://bff.example.test';
+    vi.useFakeTimers();
+    const stalled = stubStalledBody(200, 'json');
+
+    const pending = fetchCurrentSrLevels('Pool111111111111111111111111111111111111111');
+    pending.catch(() => {});
+    await vi.advanceTimersByTimeAsync(10_000);
+
+    await expect(pending).rejects.toThrow('Could not load market context: request timed out');
+    expect(stalled.getSignal()?.aborted).toBe(true);
+  });
+
+  it('throws the timeout error when a 404 JSON body stalls after headers', async () => {
+    env.EXPO_PUBLIC_BFF_BASE_URL = 'https://bff.example.test';
+    vi.useFakeTimers();
+    const stalled = stubStalledBody(404, 'json');
+
+    const pending = fetchCurrentSrLevels('Pool111111111111111111111111111111111111111');
+    pending.catch(() => {});
+    await vi.advanceTimersByTimeAsync(10_000);
+
+    await expect(pending).rejects.toThrow('Could not load market context: request timed out');
+    expect(stalled.getSignal()?.aborted).toBe(true);
+  });
+
+  it('throws the timeout error when a 503 text body stalls after headers', async () => {
+    env.EXPO_PUBLIC_BFF_BASE_URL = 'https://bff.example.test';
+    vi.useFakeTimers();
+    const stalled = stubStalledBody(503, 'text');
+
+    const pending = fetchCurrentSrLevels('Pool111111111111111111111111111111111111111');
+    pending.catch(() => {});
+    await vi.advanceTimersByTimeAsync(10_000);
+
+    await expect(pending).rejects.toThrow('Could not load market context: request timed out');
+    expect(stalled.getSignal()?.aborted).toBe(true);
+  });
+
+  it('uses HTTP status fallback when a non-success text body rejects without AbortError', async () => {
+    env.EXPO_PUBLIC_BFF_BASE_URL = 'https://bff.example.test';
+    globalThis.fetch = vi.fn().mockResolvedValue({
+      ok: false,
+      status: 503,
+      statusText: 'Service Unavailable',
+      text: () => Promise.reject(new Error('stream failed')),
+    }) as typeof fetch;
+
+    await expect(
+      fetchCurrentSrLevels('Pool111111111111111111111111111111111111111'),
+    ).rejects.toThrow('Could not load market context: HTTP 503');
+  });
+
+  it('clears the S/R deadline after the response body settles', async () => {
+    env.EXPO_PUBLIC_BFF_BASE_URL = 'https://bff.example.test';
+    vi.useFakeTimers();
+    let signal: AbortSignal | undefined;
+    const block = fixtureBlock();
+    globalThis.fetch = vi
+      .fn()
+      .mockImplementation((_input: string | URL | Request, init?: RequestInit) => {
+        signal = init?.signal as AbortSignal;
+        return Promise.resolve({
+          ok: true,
+          status: 200,
+          json: () => Promise.resolve({ srLevels: block }),
+        } as Response);
+      }) as typeof fetch;
+
+    await expect(
+      fetchCurrentSrLevels('Pool111111111111111111111111111111111111111'),
+    ).resolves.toEqual({ srLevels: block });
+    await vi.advanceTimersByTimeAsync(10_001);
+
+    expect(signal?.aborted).toBe(false);
   });
 });

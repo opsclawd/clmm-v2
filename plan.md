@@ -1,615 +1,805 @@
 <!-- plan-review-required -->
 
-# Alert Visibility and Fail-Closed RangeBar Implementation Plan
+# Market Insight Response-Body Timeout Implementation Plan
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-**Goal:** Preserve every actionable position alert in the status chip, fail closed when RangeBar prices cannot support an authoritative visualization, and emit structured non-wallet diagnostics through the existing observability seam.
+**Goal:** Keep each existing market-regime and support/resistance request deadline active until every required response body has been consumed, while preserving all current adapter results, client error messages, timeout durations, and graceful-degradation behavior.
 
-**Architecture:** Keep all classification in pure UI helpers: status-chip precedence remains in `PositionCardUtils.ts`, while a new `RangeBarUtils.ts` returns a discriminated available/unavailable display model. `PositionCard` owns the warning effects because it has the classification results and safe position/pool identifiers; the Expo route injects the existing `TelemetryAdapter` through the approved composition entrypoint. Domain range classification, trigger qualification, and directional exit policy are unchanged.
+**Architecture:** Keep the existing local `AbortController` pattern at each HTTP boundary instead of introducing a shared abstraction. Each request owns one timer from immediately before `fetch()` through status classification and `json()`/`text()` consumption, clears that timer once in `finally`, and translates a body-read abort through the same public contract already used for a fetch abort. `CurrentSrLevelsAdapter` already has the correct lifetime, so its implementation remains unchanged and receives regression coverage alongside the corrected regime adapter.
 
-**Tech Stack:** TypeScript, React 19, React Native, Expo Router, Vitest, Testing Library, `@clmm/application/public`, and the existing `TelemetryAdapter`.
+**Tech Stack:** TypeScript, Fetch API `AbortController`, Vitest fake timers, pnpm workspaces, ESLint, Prettier.
 
 ---
 
-# Non-goals
+## Goal
 
-- Do not change trigger qualification, debounce, breach episodes, alert lifecycle, preview, approval, signing, submission, or execution behavior.
-- Do not change application DTOs, runtime DTO validation, the canonical range model, or `DirectionalExitPolicyService`.
-- Do not infer breach direction for `hasAlert=true` plus `in-range`, including from token order, price proximity, or a default side.
-- Do not repair, retry, cache, or substitute invalid prices, and do not create backend telemetry ingestion.
-- Do not redesign the position card, change financial metrics, or add new design tokens.
+Ensure the existing 2-second outbound-adapter deadlines and 10-second app-client deadlines cover both receipt of response headers and completion of the selected response-body reader. The result must be an end-to-end deadline for one request attempt, not a timer that resets after headers.
 
-# Affected files
+## Non-goals
 
-- `packages/ui/src/components/PositionCardUtils.ts` — status precedence and stable alert/range diagnostic classification.
-- `packages/ui/src/components/PositionCardUtils.test.ts` — exhaustive alert/range matrix and directionless inconsistent-state tests.
-- `packages/ui/src/components/RangeBarUtils.ts` — pure price validation and discriminated display-state calculation.
-- `packages/ui/src/components/RangeBarUtils.test.ts` — invalid-reason ordering, overflow protection, clamping, and midpoint tests.
-- `packages/ui/src/components/RangeBar.tsx` — available and unavailable render branches.
-- `packages/ui/src/components/RangeBar.test.tsx` — marker, decoration, labels, unavailable copy, and accessibility tests.
-- `packages/ui/src/components/PositionCard.tsx` — display-state construction and structured warning effects.
-- `packages/ui/src/components/PositionCard.test.tsx` — chip/accessibility behavior, warning payloads, coexistence, deduplication-by-dependencies, and press isolation.
-- `packages/ui/src/screens/PositionsListScreen.tsx` — required narrow observability dependency threaded to every card.
-- `packages/ui/src/screens/PositionsListScreen.test.tsx` — test wrapper for the required dependency plus focused loading/unavailable and pass-through assertions.
-- `apps/app/src/composition/index.ts` — approved construction/export of `TelemetryAdapter`.
-- `apps/app/app/(tabs)/positions.tsx` — production injection into `PositionsListScreen`.
-- `apps/app/src/appShellDependencies.test.ts` — composition/route wiring guard.
+- Do not change domain or application contracts, DTOs, BFF endpoints, UI state, TanStack Query behavior, cache policy, or supported-pool configuration.
+- Do not add retries, recovery/backoff loops, circuit breakers, streaming support, timeout configuration, or a new HTTP dependency.
+- Do not harden neighboring policy-insight, S/R-thesis, execution-event, or unrelated fetch paths.
+- Do not replace the four local lifecycles with a universal fetch helper or `AbortSignal.timeout()`.
+- Do not change the 2,000 ms adapter timeout or the 10,000 ms app timeout.
+- Do not touch directional exit policy or re-derive the repository's lower/upper-bound directional invariant.
+- Do not change exported API signatures. The existing `CurrentRegimeAdapter`, `CurrentSrLevelsAdapter`, `fetchCurrentRegime`, and `fetchCurrentSrLevels` surfaces remain intact.
 
-# Behavioral invariants
+## Affected files
 
-- Alert precedence: `hasAlert=true` with `below-range`, `above-range`, or `in-range` renders `Breach · below`, `Breach · above`, or `Action needed`, respectively; `nearEdge` never hides an alert.
-- Directional safety: `hasAlert=true` plus `in-range` remains directionless and never receives below/above breach decoration.
-- RangeBar validity: an available state exists only when all prices are finite and strictly positive, bounds ascend, and every intermediate and final percentage is finite over an ascending visual domain.
-- Deterministic invalidity: when several validations fail, the first reason in the specified validation order is returned.
-- Fail-closed rendering: unavailable state has no marker, current label, active band, or breach decoration, and exposes `Price unavailable` plus `Price range unavailable` accessibility text.
-- Midpoint distinction: valid midpoint data remains available and renders a marker at exactly `50%`; it is never confused with unavailable data.
-- Independent surfaces: alert inconsistency and invalid RangeBar data may coexist, producing `Action needed`, `Price unavailable`, and both warning records.
-- Diagnostic authority: warning effects only call `observability.log`; they never invoke card navigation or any execution callback.
-- Diagnostic privacy: contexts contain stable codes, position/pool IDs, range status, alert state, and invalid reason where relevant, but never wallet address, wallet label, or raw invalid numeric values.
-- Effect behavior: warnings emit when their classified state mounts or changes; remount/Strict Mode duplicates are permitted, and unchanged rerenders do not create a custom exact-once business guarantee.
+- `packages/adapters/src/outbound/regime-engine/CurrentRegimeAdapter.ts` — extend the existing regime request scope through all JSON reads and propagate body aborts to the fail-soft request catch.
+- `packages/adapters/src/outbound/regime-engine/CurrentRegimeAdapter.test.ts` — add focused post-header success/error-envelope body-timeout tests. Although this file exceeds 500 lines, the implementation task below changes only the transport-lifecycle cases in the top-level `CurrentRegimeAdapter` suite; it does not create a broad test-update task.
+- `packages/adapters/src/outbound/regime-engine/CurrentSrLevelsAdapter.test.ts` — lock in the already-correct post-header body-timeout behavior without rewriting `CurrentSrLevelsAdapter.ts`.
+- `apps/app/src/api/regime.ts` — extend the BFF regime timer through 200 JSON, 404 JSON, and non-success text reads without changing classified errors.
+- `apps/app/src/api/regime.test.ts` — add deterministic body-abort and cleanup cases within `fetchCurrentRegime`.
+- `apps/app/src/api/srLevels.ts` — extend the BFF S/R timer through 200 JSON, 404 JSON, and non-success text reads without changing classified errors.
+- `apps/app/src/api/srLevels.test.ts` — add deterministic body-abort and cleanup cases within `fetchCurrentSrLevels`.
 
-## Task 1: Make alert-first status presentation exhaustive
+`packages/adapters/src/outbound/regime-engine/CurrentSrLevelsAdapter.ts` is an audited reference, not an expected edit: its inner `try/finally` already encloses both `fetch()` and successful `res.json()` consumption.
+
+## Behavioral invariants
+
+The following invariants are state-transition contracts and must become tests before implementation changes:
+
+1. **One continuous deadline:** when request state is `awaiting-headers`, receipt of headers transitions to `awaiting-body` without clearing or replacing the original timer.
+2. **Adapter success-body timeout:** when an adapter is `awaiting-body` for a successful response and its 2-second timer fires, the signal transitions to `aborted`; regime settles as `{ kind: 'upstream-error' }`, S/R settles as `null`, and warning telemetry remains observable.
+3. **Adapter error-envelope timeout:** when the regime adapter is `awaiting-body` for a `400` or `404` JSON error envelope and its timer fires, the abort is not converted into a malformed envelope; the request settles through the existing `{ kind: 'upstream-error' }` failure path.
+4. **App body timeout classification:** when either app client is `awaiting-body` for success JSON, 404 JSON, or non-success text and its 10-second timer fires, the body reader's `AbortError` transitions to the feature's existing `request timed out` error, never invalid JSON, unexpected 404, endpoint-not-found, or HTTP fallback text.
+5. **Non-abort classification stability:** when a body reader rejects for a non-abort reason, the existing branch-specific classification remains unchanged: invalid success JSON, unexpected non-JSON 404, or `HTTP <status>` fallback.
+6. **Exactly-once cleanup:** when any request reaches a terminal result through success, early return, classified error, parse failure, network failure, or abort, its timer transitions to cleared exactly once; advancing fake timers afterward must not abort the captured signal.
+7. **No public-contract transition:** valid responses, typed unsupported-pool 404s, generic 404s, `unavailableReason`, malformed DTO handling, and fail-soft adapter results remain byte-for-byte/message-for-message compatible.
+
+## Task 1: Enforce adapter response-body deadlines
 
 **Files:**
 
-- Modify: `packages/ui/src/components/PositionCardUtils.test.ts` (`getStatusChipProps` and `getBreachSide` describe blocks only)
-- Modify: `packages/ui/src/components/PositionCardUtils.ts` (`StatusChipInput`, status derivation, and alert inconsistency helper only)
+- Modify: `packages/adapters/src/outbound/regime-engine/CurrentRegimeAdapter.ts` (`isRecord` helper area, `CurrentRegimeAdapter.fetchCurrent`, and `readErrorEnvelope` only)
+- Modify: `packages/adapters/src/outbound/regime-engine/CurrentRegimeAdapter.test.ts` (top-level transport/status cases only)
+- Modify: `packages/adapters/src/outbound/regime-engine/CurrentSrLevelsAdapter.test.ts` (timeout case and timer teardown only)
 
-**Invariants to test first:**
+**Invariants covered:** `adapter success body aborts to the existing fail-soft result`, `regime error-envelope body abort is not swallowed`, `adapter timers clear after body settlement`.
 
-- `returns Action needed for hasAlert + in-range even when nearEdge is true`
-- `classifies only hasAlert + in-range as position_alert_in_range`
-- `keeps alert + in-range directionless`
-- `preserves the complete alert and non-alert status matrix`
+- [ ] **Step 1: Add the failing regime adapter success-body timeout test**
 
-- [ ] **Step 1: Add failing matrix and diagnostic tests.** Extend only the existing status and breach-side sections with table-driven cases. Introduce an expectation for a pure helper named `getStatusDiagnosticCode`:
+In `CurrentRegimeAdapter.test.ts`, make timer restoration unconditional by adding `vi.useRealTimers()` to the existing `afterEach`. Add this named case near the existing network/JSON transport tests:
 
 ```ts
-it.each([
-  ['below-range', true, false, 'Breach · below', 'breach'],
-  ['above-range', true, false, 'Breach · above', 'breach'],
-  ['in-range', true, false, 'Action needed', 'warn'],
-  ['in-range', true, true, 'Action needed', 'warn'],
-  ['below-range', false, true, 'Below range', 'warn'],
-  ['above-range', false, true, 'Above range', 'warn'],
-  ['in-range', false, true, 'Near edge', 'warn'],
-  ['in-range', false, false, 'In range', 'safe'],
-] as const)(
-  'maps %s alert=%s nearEdge=%s to %s',
-  (rangeStatusKind, hasAlert, nearEdge, label, tone) => {
-    expect(getStatusChipProps({ rangeStatusKind, hasAlert, nearEdge })).toEqual({ label, tone });
-  },
-);
+it('returns kind:"upstream-error" when a 200 body stalls until the 2s deadline', async () => {
+  vi.useFakeTimers();
+  let signal: AbortSignal | undefined;
+  vi.mocked(fetch).mockImplementation((_input, init) => {
+    signal = init?.signal as AbortSignal;
+    return Promise.resolve({
+      status: 200,
+      json: () =>
+        new Promise((_, reject) => {
+          signal!.addEventListener('abort', () => reject({ name: 'AbortError' }), { once: true });
+        }),
+    } as Response);
+  });
+  const adapter = new CurrentRegimeAdapter('https://regime.example.com', obs.port);
 
-it('classifies only hasAlert + in-range as position_alert_in_range', () => {
-  expect(
-    getStatusDiagnosticCode({ rangeStatusKind: 'in-range', hasAlert: true, nearEdge: true }),
-  ).toBe('position_alert_in_range');
-  expect(
-    getStatusDiagnosticCode({ rangeStatusKind: 'below-range', hasAlert: true, nearEdge: false }),
-  ).toBeUndefined();
-  expect(
-    getStatusDiagnosticCode({ rangeStatusKind: 'in-range', hasAlert: false, nearEdge: true }),
-  ).toBeUndefined();
+  const pending = adapter.fetchCurrent(PARAMS);
+  await vi.advanceTimersByTimeAsync(2_000);
+
+  await expect(pending).resolves.toEqual({ kind: 'upstream-error' });
+  expect(signal?.aborted).toBe(true);
+  expect(obs.logs.some((entry) => entry.level === 'warn')).toBe(true);
 });
 ```
 
-- [ ] **Step 2: Run the focused test and confirm it fails because the in-range alert still falls through and the diagnostic helper is absent.**
+- [ ] **Step 2: Add the failing regime error-envelope timeout test**
 
-Run: `pnpm --filter @clmm/ui exec vitest run src/components/PositionCardUtils.test.ts`
-
-Expected: FAIL in the new `Action needed` cases and for missing `getStatusDiagnosticCode`.
-
-- [ ] **Step 3: Add the minimal alert-first branch and pure diagnostic helper.** Evaluate all alert branches before ordinary range/near-edge branches and do not alter `getBreachSide`:
+Add a separate named case beside the existing `404` envelope tests. It must use a `404` response double whose `json()` rejects with `{ name: 'AbortError' }` only after the supplied signal aborts:
 
 ```ts
-export type StatusDiagnosticCode = 'position_alert_in_range';
+it('returns kind:"upstream-error" when a 404 error body stalls until the 2s deadline', async () => {
+  vi.useFakeTimers();
+  let signal: AbortSignal | undefined;
+  vi.mocked(fetch).mockImplementation((_input, init) => {
+    signal = init?.signal as AbortSignal;
+    return Promise.resolve({
+      status: 404,
+      json: () =>
+        new Promise((_, reject) => {
+          signal!.addEventListener('abort', () => reject({ name: 'AbortError' }), { once: true });
+        }),
+    } as Response);
+  });
+  const adapter = new CurrentRegimeAdapter('https://regime.example.com', obs.port);
 
-export function getStatusDiagnosticCode({
-  rangeStatusKind,
-  hasAlert,
-}: StatusChipInput): StatusDiagnosticCode | undefined {
-  return hasAlert && rangeStatusKind === 'in-range' ? 'position_alert_in_range' : undefined;
-}
+  const pending = adapter.fetchCurrent(PARAMS);
+  await vi.advanceTimersByTimeAsync(2_000);
 
-export function getStatusChipProps(input: StatusChipInput): StatusChipProps {
-  const { rangeStatusKind, hasAlert, nearEdge } = input;
-  if (hasAlert && rangeStatusKind === 'below-range') {
-    return { tone: 'breach', label: 'Breach · below' };
-  }
-  if (hasAlert && rangeStatusKind === 'above-range') {
-    return { tone: 'breach', label: 'Breach · above' };
-  }
-  if (hasAlert) return { tone: 'warn', label: 'Action needed' };
-  if (rangeStatusKind === 'in-range') {
-    return nearEdge ? { tone: 'warn', label: 'Near edge' } : { tone: 'safe', label: 'In range' };
-  }
-  return rangeStatusKind === 'below-range'
-    ? { tone: 'warn', label: 'Below range' }
-    : { tone: 'warn', label: 'Above range' };
-}
+  await expect(pending).resolves.toEqual({ kind: 'upstream-error' });
+  expect(signal?.aborted).toBe(true);
+});
 ```
 
-- [ ] **Step 4: Verify the scoped helper behavior and lint only the changed files.**
+- [ ] **Step 3: Run the two new regime adapter tests and verify the pre-fix failure**
 
-Run: `pnpm --filter @clmm/ui exec vitest run src/components/PositionCardUtils.test.ts`
-
-Expected: PASS with every matrix row and the directionless alert test green.
-
-Run: `pnpm --filter @clmm/ui exec eslint src/components/PositionCardUtils.ts src/components/PositionCardUtils.test.ts`
-
-Expected: PASS with no lint errors.
-
-- [ ] **Step 5: Commit the independently usable status derivation.**
+Run:
 
 ```bash
-git add packages/ui/src/components/PositionCardUtils.ts packages/ui/src/components/PositionCardUtils.test.ts
-git commit -m "fix(ui): preserve in-range alert visibility"
+pnpm --filter @clmm/adapters test -- src/outbound/regime-engine/CurrentRegimeAdapter.test.ts -t 'body stalls until the 2s deadline'
 ```
 
-## Task 2: Build a fail-closed RangeBar display model
+Expected: both tests fail or remain pending before implementation because `fetchCurrent` clears its timeout immediately after headers; the captured signal never transitions to `aborted` during body consumption.
 
-**Files:**
+- [ ] **Step 4: Keep `CurrentRegimeAdapter`'s timer alive through status handling and JSON reads**
 
-- Create: `packages/ui/src/components/RangeBarUtils.ts`
-- Create: `packages/ui/src/components/RangeBarUtils.test.ts`
-
-**Invariants to test first:**
-
-- `returns field-specific non-finite reasons in validation order`
-- `rejects zero and negative required prices`
-- `rejects equal and inverted bounds`
-- `fails closed when finite inputs overflow the visual domain`
-- `keeps valid lower midpoint upper and out-of-domain prices available`
-- `clamps only finite derived marker percentages`
-- `returns an available marker at exactly 50 percent for a genuine midpoint`
-
-- [ ] **Step 1: Create focused failing tests for every reason and valid coordinate class.** Use table cases for `NaN`, positive infinity, and negative infinity in each field; zero/negative values in each field; equal/inverted bounds; `Number.MAX_VALUE` overflow; lower/midpoint/upper; and far-below/far-above current prices. Assert the exact union shape and exact reason strings rather than merely checking truthiness:
+Add this structural helper beside `isRecord` so React Native/test-double aborts are recognized without relying on `DOMException` identity:
 
 ```ts
-expect(
-  buildRangeBarDisplayState({ currentPrice: 150, lowerBoundPrice: 100, upperBoundPrice: 200 }),
-).toMatchObject({ kind: 'available', markerPercent: 50 });
-
-expect(
-  buildRangeBarDisplayState({ currentPrice: Number.NaN, lowerBoundPrice: 0, upperBoundPrice: 0 }),
-).toEqual({ kind: 'unavailable', reason: 'current_price_non_finite' });
-
-expect(
-  buildRangeBarDisplayState({
-    currentPrice: Number.MAX_VALUE,
-    lowerBoundPrice: 1,
-    upperBoundPrice: Number.MAX_VALUE,
-  }),
-).toEqual({ kind: 'unavailable', reason: 'derived_percentage_non_finite' });
+function isAbortError(error: unknown): boolean {
+  return isRecord(error) && error['name'] === 'AbortError';
+}
 ```
 
-- [ ] **Step 2: Run the new test and confirm it fails because the module does not exist.**
-
-Run: `pnpm --filter @clmm/ui exec vitest run src/components/RangeBarUtils.test.ts`
-
-Expected: FAIL with module-not-found or missing-export errors.
-
-- [ ] **Step 3: Implement the discriminated model with the fixed validation order.** Keep constants and numeric helpers private; never return a midpoint fallback:
+Refactor only the transport/status portion of `fetchCurrent` so one outer `try/finally` owns the timer. Keep URL construction before controller creation. Inside the protected `try`, await `fetch`, classify `200`/`404`/`400`/other statuses, and await every `response.json()` before leaving the scope. Keep the current logs and return unions. The success-body parse catch must rethrow aborts and preserve ordinary invalid-JSON behavior:
 
 ```ts
-export type RangeBarUnavailableReason =
-  | 'current_price_non_finite'
-  | 'lower_price_non_finite'
-  | 'upper_price_non_finite'
-  | 'current_price_non_positive'
-  | 'lower_price_non_positive'
-  | 'upper_price_non_positive'
-  | 'bounds_not_ascending'
-  | 'derived_percentage_non_finite';
+try {
+  const response = await fetch(url.toString(), { signal: controller.signal });
 
-export type RangeBarDisplayState =
-  | {
-      kind: 'available';
-      bandLeftPercent: number;
-      bandRightPercent: number;
-      markerPercent: number;
+  if (response.status === 200) {
+    let body: unknown;
+    try {
+      body = await response.json();
+    } catch (error: unknown) {
+      if (isAbortError(error)) throw error;
+      this.observability.log('warn', 'Regime response was not valid JSON');
+      return { kind: 'upstream-error' };
     }
-  | { kind: 'unavailable'; reason: RangeBarUnavailableReason };
-
-export type RangeBarPriceInput = {
-  currentPrice: number;
-  lowerBoundPrice: number;
-  upperBoundPrice: number;
-};
-
-const VISUAL_PAD_FRACTION = 0.35;
-
-function finitePercent(price: number, lo: number, hi: number): number | undefined {
-  const value = ((price - lo) / (hi - lo)) * 100;
-  if (!Number.isFinite(value)) return undefined;
-  return Math.min(100, Math.max(0, value));
-}
-
-export function buildRangeBarDisplayState(input: RangeBarPriceInput): RangeBarDisplayState {
-  const { currentPrice, lowerBoundPrice, upperBoundPrice } = input;
-  if (!Number.isFinite(currentPrice))
-    return { kind: 'unavailable', reason: 'current_price_non_finite' };
-  if (!Number.isFinite(lowerBoundPrice))
-    return { kind: 'unavailable', reason: 'lower_price_non_finite' };
-  if (!Number.isFinite(upperBoundPrice))
-    return { kind: 'unavailable', reason: 'upper_price_non_finite' };
-  if (currentPrice <= 0) return { kind: 'unavailable', reason: 'current_price_non_positive' };
-  if (lowerBoundPrice <= 0) return { kind: 'unavailable', reason: 'lower_price_non_positive' };
-  if (upperBoundPrice <= 0) return { kind: 'unavailable', reason: 'upper_price_non_positive' };
-  if (upperBoundPrice <= lowerBoundPrice)
-    return { kind: 'unavailable', reason: 'bounds_not_ascending' };
-
-  const width = upperBoundPrice - lowerBoundPrice;
-  const pad = width * VISUAL_PAD_FRACTION;
-  const lo = lowerBoundPrice - pad;
-  const hi = upperBoundPrice + pad;
-  if (![width, pad, lo, hi].every(Number.isFinite) || hi <= lo) {
-    return { kind: 'unavailable', reason: 'derived_percentage_non_finite' };
+    const block = parseUpstream(body);
+    if (!block) {
+      this.observability.log('warn', 'Regime response failed shape validation');
+      return { kind: 'upstream-error' };
+    }
+    return { kind: 'block', block };
   }
-  const bandLeftPercent = finitePercent(lowerBoundPrice, lo, hi);
-  const bandRightPercent = finitePercent(upperBoundPrice, lo, hi);
-  const markerPercent = finitePercent(currentPrice, lo, hi);
-  if (bandLeftPercent == null || bandRightPercent == null || markerPercent == null) {
-    return { kind: 'unavailable', reason: 'derived_percentage_non_finite' };
+
+  if (response.status === 404) {
+    const envelope = await this.readErrorEnvelope(response);
+    if (envelope?.code === 'CANDLES_NOT_FOUND') {
+      return { kind: 'not-found' };
+    }
+    this.observability.log('warn', 'Regime upstream 404 with unexpected code', { envelope });
+    return { kind: 'upstream-error' };
   }
-  return { kind: 'available', bandLeftPercent, bandRightPercent, markerPercent };
+
+  if (response.status === 400) {
+    const envelope = await this.readErrorEnvelope(response);
+    if (envelope?.code === 'VALIDATION_ERROR') {
+      this.observability.log('warn', 'Regime upstream rejected request as VALIDATION_ERROR', {
+        envelope,
+      });
+      return { kind: 'config-error' };
+    }
+    this.observability.log('warn', 'Regime upstream 400 with unexpected code', { envelope });
+    return { kind: 'upstream-error' };
+  }
+
+  this.observability.log('warn', 'Regime upstream non-2xx', { status: response.status });
+  return { kind: 'upstream-error' };
+} catch (error: unknown) {
+  const message = error instanceof Error ? error.message : String(error);
+  this.observability.log('warn', 'Regime fetch network error', { message });
+  return { kind: 'upstream-error' };
+} finally {
+  clearTimeout(timeout);
 }
 ```
 
-- [ ] **Step 4: Verify every numeric branch and lint only the new helper files.**
-
-Run: `pnpm --filter @clmm/ui exec vitest run src/components/RangeBarUtils.test.ts`
-
-Expected: PASS for every invalid reason, deterministic precedence, overflow, clamping, and the exact midpoint.
-
-Run: `pnpm --filter @clmm/ui exec eslint src/components/RangeBarUtils.ts src/components/RangeBarUtils.test.ts`
-
-Expected: PASS with no lint errors.
-
-- [ ] **Step 5: Commit the pure display model.**
-
-```bash
-git add packages/ui/src/components/RangeBarUtils.ts packages/ui/src/components/RangeBarUtils.test.ts
-git commit -m "feat(ui): classify unavailable range bars"
-```
-
-## Task 3: Render RangeBar from the discriminated state
-
-**Files:**
-
-- Modify: `packages/ui/src/components/RangeBar.test.tsx`
-- Modify: `packages/ui/src/components/RangeBar.tsx`
-- Modify: `packages/ui/src/components/PositionCard.tsx` (RangeBar caller migration only)
-
-**Invariants to test first:**
-
-- `renders Price unavailable with accessible unavailable text and no authoritative elements`
-- `renders a genuine midpoint with a tick and without unavailable copy`
-- `renders directional breach decoration only for available states`
-- `renders provided numeric labels only for available states`
-
-- [ ] **Step 1: Rewrite the existing RangeBar tests around `displayState`.** Preserve available below/above and clamping assertions, replace the former collapsed/NaN/Infinity midpoint-fallback expectations with one unavailable branch assertion, and name all authoritative elements with stable test IDs:
-
-```tsx
-render(
-  <RangeBar
-    displayState={{ kind: 'unavailable', reason: 'current_price_non_finite' }}
-    lowerBoundLabel="USDC 100.00"
-    upperBoundLabel="USDC 200.00"
-    currentPriceLabel="∞"
-    breachSide="above"
-  />,
-);
-expect(screen.getByText('Price unavailable')).toBeTruthy();
-expect(screen.getByLabelText('Price range unavailable')).toBeTruthy();
-expect(screen.queryByTestId('range-bar-tick')).toBeNull();
-expect(screen.queryByTestId('range-bar-active-band')).toBeNull();
-expect(screen.queryByTestId('range-bar-breach-above')).toBeNull();
-expect(screen.queryByText('∞')).toBeNull();
-```
-
-- [ ] **Step 2: Run the focused renderer test and confirm the old numeric-prop component fails the new contract.**
-
-Run: `pnpm --filter @clmm/ui exec vitest run src/components/RangeBar.test.tsx`
-
-Expected: FAIL because `displayState` is not accepted and unavailable output does not exist.
-
-- [ ] **Step 3: Change `RangeBarProps` to accept `displayState: RangeBarDisplayState`, delete `pricePercent`, `clampPercent`, and price calculations, and return a fixed-height unavailable branch before rendering available coordinates.** Reuse existing colors and typography:
-
-```tsx
-export type RangeBarProps = {
-  displayState: RangeBarDisplayState;
-  lowerBoundLabel: string;
-  upperBoundLabel: string;
-  currentPriceLabel: string;
-  breachSide?: 'below' | 'above';
-};
-
-if (displayState.kind === 'unavailable') {
-  return (
-    <View
-      testID="range-bar-unavailable"
-      accessibilityLabel="Price range unavailable"
-      style={{ paddingTop: 8, paddingBottom: 32, paddingHorizontal: 4 }}
-    >
-      <View style={{ height: TRACK_HEIGHT, backgroundColor: colors.border, borderRadius: 999 }} />
-      <Text style={{ marginTop: 12, height: 14, color: colors.textTertiary }}>
-        Price unavailable
-      </Text>
-    </View>
-  );
-}
-
-const { bandLeftPercent, bandRightPercent, markerPercent } = displayState;
-```
-
-Add `testID="range-bar-active-band"` to the available band and use only the union's percentages for positioning. The unavailable branch must not access or render the supplied labels or `breachSide`.
-
-- [ ] **Step 4: Migrate the only production caller in the same signature-changing task.** In `PositionCard.tsx`, import the helper, derive the model from the three raw prices, and replace the three numeric RangeBar props with `displayState`. Do not add effects or observability yet:
-
-```tsx
-const rangeBarDisplayState = buildRangeBarDisplayState({
-  currentPrice,
-  lowerBoundPrice,
-  upperBoundPrice,
-});
-
-<RangeBar
-  displayState={rangeBarDisplayState}
-  lowerBoundLabel={lowerBoundLabel}
-  upperBoundLabel={upperBoundLabel}
-  currentPriceLabel={currentPriceLabel}
-  {...(breachSide ? { breachSide } : {})}
-/>;
-```
-
-- [ ] **Step 5: Verify the renderer branches, caller regression, and lint only the changed component files.**
-
-Run: `pnpm --filter @clmm/ui exec vitest run src/components/RangeBar.test.tsx src/components/PositionCard.test.tsx`
-
-Expected: PASS; unavailable has no authoritative elements, and valid midpoint/directional render cases remain distinct.
-
-Run: `pnpm --filter @clmm/ui exec eslint src/components/RangeBar.tsx src/components/RangeBar.test.tsx src/components/PositionCard.tsx`
-
-Expected: PASS with no lint errors.
-
-- [ ] **Step 6: Commit the fail-closed renderer and its caller migration.**
-
-```bash
-git add packages/ui/src/components/RangeBar.tsx packages/ui/src/components/RangeBar.test.tsx packages/ui/src/components/PositionCard.tsx
-git commit -m "fix(ui): hide invalid range visualization"
-```
-
-## Task 4: Wire structured diagnostics through composition and the position list
-
-**Files:**
-
-- Modify: `packages/ui/src/components/PositionCard.test.tsx`
-- Modify: `packages/ui/src/components/PositionCard.tsx`
-- Modify: `packages/ui/src/screens/PositionsListScreen.test.tsx`
-- Modify: `packages/ui/src/screens/PositionsListScreen.tsx`
-- Modify: `apps/app/src/composition/index.ts`
-- Modify: `apps/app/app/(tabs)/positions.tsx`
-- Modify: `apps/app/src/appShellDependencies.test.ts`
-
-**Invariants to test first:**
-
-- `logs position_alert_in_range with position and pool identity but no wallet data`
-- `logs range_bar_input_invalid with the deterministic reason and safe state fields`
-- `renders Action needed and Price unavailable together and emits both independent warnings`
-- `does not log warnings for a normal available card`
-- `keeps alert + in-range directionless and free of breach decoration`
-- `does not log again on an unchanged rerender`
-- `still calls only onPress when the card is tapped`
-- `keeps loading distinct from a loaded card with unavailable prices`
-- `passes the composed observability dependency from route to screen to every card`
-
-- [ ] **Step 1: Add focused failing card tests with a narrow recording logger.** Update existing card renders to pass the required logger, then add assertions against exact warning calls. Clear the mock in `afterEach`:
+Update `readErrorEnvelope` to preserve `null` for ordinary malformed JSON but rethrow an abort to the request-level catch:
 
 ```ts
-const observability = { log: vi.fn() };
+} catch (error: unknown) {
+  if (isAbortError(error)) throw error;
+  return null;
+}
+```
 
-it('renders both warnings and logs safe structured contexts', () => {
-  render(
-    <PositionCard
-      observability={observability}
-      item={makeItem({ currentPrice: Number.NaN, hasAlert: true, rangeStatusKind: 'in-range' })}
-    />,
-  );
-  expect(screen.getByText('Action needed')).toBeTruthy();
-  expect(screen.getByText('Price unavailable')).toBeTruthy();
-  expect(screen.queryByTestId('range-bar-tick')).toBeNull();
-  expect(observability.log).toHaveBeenCalledWith(
-    'warn',
-    'Position card alert conflicts with range status',
-    {
-      code: 'position_alert_in_range',
-      positionId: 'pos-1',
-      poolId: baseItem.poolId,
-      hasAlert: true,
-      rangeStatusKind: 'in-range',
-    },
-  );
-  expect(observability.log).toHaveBeenCalledWith(
-    'warn',
-    'Position card range visualization unavailable',
-    {
-      code: 'range_bar_input_invalid',
-      reason: 'current_price_non_finite',
-      positionId: 'pos-1',
-      poolId: baseItem.poolId,
-      rangeStatusKind: 'in-range',
-      hasAlert: true,
-    },
-  );
+Remove the old `let response`, fetch-only `try/catch/finally`, and all status/body work that sat after its `finally`. Do not add additional `clearTimeout` calls.
+
+- [ ] **Step 5: Run the focused regime adapter file and verify all existing classifications still pass**
+
+Run:
+
+```bash
+pnpm --filter @clmm/adapters test -- src/outbound/regime-engine/CurrentRegimeAdapter.test.ts
+```
+
+Expected: PASS, including the named 200 and 404 body-stall tests and all pre-existing block/config/not-found/upstream-error cases.
+
+- [ ] **Step 6: Add the S/R adapter regression test without changing its implementation**
+
+In `CurrentSrLevelsAdapter.test.ts`, add `vi.useRealTimers()` to `afterEach` and add this named case beside `returns null on 2s timeout (AbortError)`:
+
+```ts
+it('returns null when a 200 body stalls until the 2s deadline', async () => {
+  vi.useFakeTimers();
+  let signal: AbortSignal | undefined;
+  vi.mocked(fetch).mockImplementation((_input, init) => {
+    signal = init?.signal as AbortSignal;
+    return Promise.resolve({
+      ok: true,
+      status: 200,
+      json: () =>
+        new Promise((_, reject) => {
+          signal!.addEventListener('abort', () => reject({ name: 'AbortError' }), { once: true });
+        }),
+    } as Response);
+  });
+  const adapter = new CurrentSrLevelsAdapter('https://regime.example.com', obs.port);
+
+  const pending = adapter.fetchCurrent('SOL/USDC', 'mco');
+  await vi.advanceTimersByTimeAsync(2_000);
+
+  await expect(pending).resolves.toBeNull();
+  expect(signal?.aborted).toBe(true);
+  expect(obs.logs.some((entry) => entry.message === 'SR levels fetch error')).toBe(true);
 });
 ```
 
-Also inspect the serialized mock calls to assert that neither `walletAddress` nor any raw price field is present, verify no warnings for the base card, verify unchanged `rerender` call count, and retain the existing press-only assertion.
+This should pass against the current `CurrentSrLevelsAdapter.ts`, proving its existing inner `try/finally` already covers body consumption. Do not create a cosmetic source diff.
 
-- [ ] **Step 2: Run the card test and confirm it fails on the missing dependency, unavailable state, and warning effects.**
+- [ ] **Step 7: Add an adapter timer-cleanup regression and run scoped checks**
 
-Run: `pnpm --filter @clmm/ui exec vitest run src/components/PositionCard.test.tsx`
+Add this focused case; it proves early success cannot leave a live timer:
 
-Expected: FAIL because `observability` is not accepted and warnings/display-state construction are absent.
-
-- [ ] **Step 3: Make `PositionCard` log its already-built RangeBar model and status presentation from independent effects.** Import `useEffect` and `useMemo`, `ObservabilityPort` from `@clmm/application/public`, and `getStatusDiagnosticCode`. Require only the logger method, and memoize the display model introduced in Task 3 so an unchanged rerender does not create a new effect dependency:
-
-```tsx
-type PositionCardObservability = Pick<ObservabilityPort, 'log'>;
-
-type Props = {
-  item: PositionListItemViewModel;
-  observability: PositionCardObservability;
-  onPress?: () => void;
-};
-
-const rangeBarDisplayState = useMemo(
-  () => buildRangeBarDisplayState({ currentPrice, lowerBoundPrice, upperBoundPrice }),
-  [currentPrice, lowerBoundPrice, upperBoundPrice],
-);
-const statusDiagnosticCode = getStatusDiagnosticCode({ rangeStatusKind, hasAlert, nearEdge });
-
-useEffect(() => {
-  if (statusDiagnosticCode == null) return;
-  observability.log('warn', 'Position card alert conflicts with range status', {
-    code: statusDiagnosticCode,
-    positionId: item.positionId,
-    poolId,
-    hasAlert,
-    rangeStatusKind,
+```ts
+it('clears the adapter deadline after the response body settles', async () => {
+  vi.useFakeTimers();
+  let signal: AbortSignal | undefined;
+  vi.mocked(fetch).mockImplementation((_input, init) => {
+    signal = init?.signal as AbortSignal;
+    return Promise.resolve(new Response(JSON.stringify(SAMPLE_UPSTREAM), { status: 200 }));
   });
-}, [hasAlert, item.positionId, observability, poolId, rangeStatusKind, statusDiagnosticCode]);
+  const adapter = new CurrentRegimeAdapter('https://regime.example.com', obs.port);
 
-useEffect(() => {
-  if (rangeBarDisplayState.kind !== 'unavailable') return;
-  observability.log('warn', 'Position card range visualization unavailable', {
-    code: 'range_bar_input_invalid',
-    reason: rangeBarDisplayState.reason,
-    positionId: item.positionId,
-    poolId,
-    rangeStatusKind,
-    hasAlert,
-  });
-}, [hasAlert, item.positionId, observability, poolId, rangeBarDisplayState, rangeStatusKind]);
+  await expect(adapter.fetchCurrent(PARAMS)).resolves.toMatchObject({ kind: 'block' });
+  await vi.advanceTimersByTimeAsync(2_001);
+
+  expect(signal?.aborted).toBe(false);
+});
 ```
 
-Pass `displayState={rangeBarDisplayState}` to `RangeBar` and preserve the existing conditional `breachSide`; `getBreachSide(true, 'in-range')` must remain `undefined`.
+Run:
 
-- [ ] **Step 4: Prepare the large screen test file without splitting its established describe block.** Because the file exceeds 500 lines, avoid touching each test case independently: add one `recordingObservability` fixture and a local `TestPositionsListScreen` wrapper that injects it, then mechanically replace existing JSX uses with the wrapper. Add only two focused cases near the existing status/RangeBar cases: one proving a loaded invalid card receives/logs unavailable while loading shows no card warning, and one proving `Action needed` plus unavailable coexist. This is a supporting caller update in the same signature-changing task, not a standalone test-update task.
+```bash
+pnpm --filter @clmm/adapters test -- src/outbound/regime-engine/CurrentRegimeAdapter.test.ts src/outbound/regime-engine/CurrentSrLevelsAdapter.test.ts
+pnpm exec eslint packages/adapters/src/outbound/regime-engine/CurrentRegimeAdapter.ts packages/adapters/src/outbound/regime-engine/CurrentRegimeAdapter.test.ts packages/adapters/src/outbound/regime-engine/CurrentSrLevelsAdapter.test.ts
+pnpm exec prettier --check packages/adapters/src/outbound/regime-engine/CurrentRegimeAdapter.ts packages/adapters/src/outbound/regime-engine/CurrentRegimeAdapter.test.ts packages/adapters/src/outbound/regime-engine/CurrentSrLevelsAdapter.test.ts
+```
 
-```tsx
-const recordingObservability = { log: vi.fn() };
+Expected: all focused tests pass, ESLint reports no errors, and Prettier reports all three files formatted. The implement loop's automatic `pnpm -r typecheck` gate must also pass before committing.
 
-function TestPositionsListScreen(
-  props: Omit<React.ComponentProps<typeof PositionsListScreen>, 'observability'>,
-): JSX.Element {
-  return <PositionsListScreen {...props} observability={recordingObservability} />;
+- [ ] **Step 8: Commit the adapter behavior and regression coverage**
+
+```bash
+git add packages/adapters/src/outbound/regime-engine/CurrentRegimeAdapter.ts packages/adapters/src/outbound/regime-engine/CurrentRegimeAdapter.test.ts packages/adapters/src/outbound/regime-engine/CurrentSrLevelsAdapter.test.ts
+git commit -m "fix: keep insight adapter deadlines through body reads"
+```
+
+## Task 2: Preserve regime client classifications through body deadlines
+
+**Files:**
+
+- Modify: `apps/app/src/api/regime.ts` (`classifyNotFound` and `fetchCurrentRegime` transport/status/body scope only)
+- Modify: `apps/app/src/api/regime.test.ts` (`fetchCurrentRegime` transport cases and timer teardown only)
+
+**Invariants covered:** `regime success JSON abort reports timeout`, `regime 404 JSON abort reports timeout`, `regime non-success text abort reports timeout`, `regime non-abort parse classifications remain stable`, `regime timer clears after terminal settlement`.
+
+- [ ] **Step 1: Add failing post-header regime-client timeout tests first**
+
+Add `vi.useRealTimers()` to the existing `afterEach`. Add this test-local response factory after `restoreBffBaseUrl`; it captures the request signal and returns a body promise rejected only by its `abort` event:
+
+```ts
+function stubStalledBody(status: number, method: 'json' | 'text') {
+  let signal: AbortSignal | undefined;
+  const readBody = () =>
+    new Promise<never>((_resolve, reject) => {
+      signal!.addEventListener('abort', () => reject({ name: 'AbortError' }), { once: true });
+    });
+
+  globalThis.fetch = vi
+    .fn()
+    .mockImplementation((_input: string | URL | Request, init?: RequestInit) => {
+      signal = init?.signal as AbortSignal;
+      return Promise.resolve({
+        ok: status >= 200 && status < 300,
+        status,
+        statusText: '',
+        ...(method === 'json' ? { json: readBody } : { text: readBody }),
+      } as Response);
+    }) as typeof fetch;
+
+  return { getSignal: () => signal };
 }
 ```
 
-Reset `recordingObservability.log` after each test. Do not refactor unrelated S/R, regime, policy, or financial-metric cases.
-
-- [ ] **Step 5: Require and thread the same narrow logger through `PositionsListScreen` and `ConnectedPositionsList`.** Import only the public application type and pass the dependency unchanged:
-
-```tsx
-type PositionsListObservability = Pick<ObservabilityPort, 'log'>;
-
-type Props = {
-  observability: PositionsListObservability;
-  // existing props unchanged
-};
-
-<PositionCard
-  item={item}
-  observability={observability}
-  onPress={() => onSelectPosition?.(item.positionId)}
-/>;
-```
-
-The disconnected, loading, error, empty, partial-data, and loaded-list branches remain otherwise unchanged.
-
-- [ ] **Step 6: Add production composition and route wiring plus a static guard test.** Construct the existing adapter only in the approved composition entrypoint, export it under the narrow operational name, import that export in the positions route, and pass it to the screen:
+Use it in these exact named cases within `describe('fetchCurrentRegime')`:
 
 ```ts
-import { TelemetryAdapter } from '@clmm/adapters/src/outbound/observability/TelemetryAdapter';
+it('throws the timeout error when a 200 JSON body stalls after headers', async () => {
+  env.EXPO_PUBLIC_BFF_BASE_URL = 'https://bff.example.test';
+  vi.useFakeTimers();
+  const stalled = stubStalledBody(200, 'json');
 
-export const positionCardObservability = new TelemetryAdapter();
+  const pending = fetchCurrentRegime(POOL_ID);
+  await vi.advanceTimersByTimeAsync(10_000);
+
+  await expect(pending).rejects.toThrow('Could not load market regime: request timed out');
+  expect(stalled.getSignal()?.aborted).toBe(true);
+});
+
+it('throws the timeout error when a 404 JSON body stalls after headers', async () => {
+  env.EXPO_PUBLIC_BFF_BASE_URL = 'https://bff.example.test';
+  vi.useFakeTimers();
+  const stalled = stubStalledBody(404, 'json');
+
+  const pending = fetchCurrentRegime(POOL_ID);
+  await vi.advanceTimersByTimeAsync(10_000);
+
+  await expect(pending).rejects.toThrow('Could not load market regime: request timed out');
+  expect(stalled.getSignal()?.aborted).toBe(true);
+});
+
+it('throws the timeout error when a 503 text body stalls after headers', async () => {
+  env.EXPO_PUBLIC_BFF_BASE_URL = 'https://bff.example.test';
+  vi.useFakeTimers();
+  const stalled = stubStalledBody(503, 'text');
+
+  const pending = fetchCurrentRegime(POOL_ID);
+  await vi.advanceTimersByTimeAsync(10_000);
+
+  await expect(pending).rejects.toThrow('Could not load market regime: request timed out');
+  expect(stalled.getSignal()?.aborted).toBe(true);
+});
 ```
 
-```tsx
-import { positionCardObservability } from '../../src/composition';
+For every case, set `EXPO_PUBLIC_BFF_BASE_URL`, call `vi.useFakeTimers()`, capture `init.signal`, start the request before advancing time, and assert the exact existing message:
 
-<PositionsListScreen observability={positionCardObservability} /* existing props */ />;
+```ts
+await expect(pending).rejects.toThrow('Could not load market regime: request timed out');
+expect(signal?.aborted).toBe(true);
 ```
 
-Extend only the `appShellDependencies.test.ts` positions wiring section to assert that composition contains `TelemetryAdapter` and `positionCardObservability`, while the route imports/passes `observability={positionCardObservability}`. Preserve the existing root-barrel prohibition.
+- [ ] **Step 2: Run only the new regime body-timeout cases and verify the pre-fix failure**
 
-- [ ] **Step 7: Run the scoped cross-boundary tests.**
-
-Run: `pnpm --filter @clmm/ui exec vitest run src/components/PositionCard.test.tsx src/screens/PositionsListScreen.test.tsx`
-
-Expected: PASS, including warning payload/privacy, coexistence, unchanged rerender, loading distinction, and existing list behavior.
-
-Run: `pnpm --filter @clmm/app exec vitest run --config vitest.config.ts src/appShellDependencies.test.ts`
-
-Expected: PASS, including approved deep-import composition and route injection guards.
-
-- [ ] **Step 8: Lint only the files changed in this vertical slice.**
-
-Run: `pnpm --filter @clmm/ui exec eslint src/components/PositionCard.tsx src/components/PositionCard.test.tsx src/screens/PositionsListScreen.tsx src/screens/PositionsListScreen.test.tsx`
-
-Expected: PASS with no lint errors.
-
-Run: `pnpm --filter @clmm/app exec eslint src/composition/index.ts 'app/(tabs)/positions.tsx' src/appShellDependencies.test.ts`
-
-Expected: PASS with no lint errors.
-
-- [ ] **Step 9: Commit the complete type-safe observability slice.**
+Run:
 
 ```bash
-git add packages/ui/src/components/PositionCard.tsx packages/ui/src/components/PositionCard.test.tsx packages/ui/src/screens/PositionsListScreen.tsx packages/ui/src/screens/PositionsListScreen.test.tsx apps/app/src/composition/index.ts 'apps/app/app/(tabs)/positions.tsx' apps/app/src/appShellDependencies.test.ts
-git commit -m "feat(ui): report unsafe position card states"
+pnpm --filter @clmm/app test -- src/api/regime.test.ts -t 'stalls after headers'
 ```
 
-# Validation commands
+Expected: the cases fail or remain pending because the timer is currently cleared once `fetch()` returns; the body promises never receive an abort.
 
-The implementation loop runs `pnpm -r typecheck` after every task; each task above is bounded so that gate remains green. After all implementation tasks, the dedicated validate phase must run the repository-required broad checks because the final change crosses UI, application-public typing, app composition, and adapter boundaries:
+- [ ] **Step 3: Make 404 JSON classification abort-aware**
+
+Change only `classifyNotFound`'s catch so an abort escapes to the request-level timeout classifier while a syntax/read error preserves the existing unexpected-404 message:
+
+```ts
+} catch (error: unknown) {
+  if (isAbortError(error)) throw error;
+  return new Error('Could not load market regime: unexpected 404');
+}
+```
+
+- [ ] **Step 4: Extend `fetchCurrentRegime`'s single timer through every response-body branch**
+
+Keep controller/timer creation as-is. Replace the fetch-only outer scope with one outer `try/catch/finally` covering status classification, `classifyNotFound`, `response.text()`, success `response.json()`, shape validation, and result mapping. A narrow inner catch around `fetch()` preserves its current network-error wrapping. The request-level catch maps propagated aborts and rethrows every already-classified error unchanged:
+
+```ts
+try {
+  let response: Response;
+  try {
+    response = await fetch(
+      `${getBffBaseUrl()}/regime/pools/${encodeURIComponent(poolId)}/current`,
+      { signal: controller.signal },
+    );
+  } catch (error: unknown) {
+    if (isAbortError(error)) throw error;
+    throw new Error(
+      `Could not load market regime: ${error instanceof Error ? error.message : 'network error'}`,
+    );
+  }
+
+  if (response.status === 404) throw await classifyNotFound(poolId, response);
+
+  if (!response.ok) {
+    let detail: string;
+    try {
+      detail = await response.text();
+    } catch (error: unknown) {
+      if (isAbortError(error)) throw error;
+      detail = `HTTP ${response.status}`;
+    }
+    throw new Error(`Could not load market regime: ${detail || response.statusText}`);
+  }
+
+  let body: unknown;
+  try {
+    body = await response.json();
+  } catch (error: unknown) {
+    if (isAbortError(error)) throw error;
+    throw new Error('Could not load market regime: response body was not valid JSON');
+  }
+
+  if (!isRecord(body)) {
+    throw new Error('Could not load market regime: malformed response');
+  }
+
+  const regime = body['regime'];
+  const unavailableReason = isRegimeUnavailableReason(body['unavailableReason'])
+    ? body['unavailableReason']
+    : undefined;
+
+  if (regime === null) {
+    return { regime: null, unavailableReason };
+  }
+
+  if (!isRegimeBlock(regime)) {
+    throw new Error('Could not load market regime: malformed regime block');
+  }
+
+  return { regime, unavailableReason };
+} catch (error: unknown) {
+  if (isAbortError(error)) {
+    throw new Error('Could not load market regime: request timed out');
+  }
+  throw error;
+} finally {
+  clearTimeout(timeoutId);
+}
+```
+
+There must be no body read after this `finally`, no `.catch(() => fallback)` that can swallow an abort, and no second timer or scattered cleanup call.
+
+- [ ] **Step 5: Lock in non-abort fallback and exactly-once cleanup behavior**
+
+Retain the existing unsupported-pool and malformed-response tests. Add these exact cases to distinguish ordinary stream failure from timeout and prove terminal cleanup:
+
+```ts
+it('uses HTTP status fallback when a non-success text body rejects without AbortError', async () => {
+  env.EXPO_PUBLIC_BFF_BASE_URL = 'https://bff.example.test';
+  globalThis.fetch = vi.fn().mockResolvedValue({
+    ok: false,
+    status: 503,
+    statusText: 'Service Unavailable',
+    text: () => Promise.reject(new Error('stream failed')),
+  }) as typeof fetch;
+
+  await expect(fetchCurrentRegime(POOL_ID)).rejects.toThrow(
+    'Could not load market regime: HTTP 503',
+  );
+});
+
+it('clears the regime deadline after the response body settles', async () => {
+  env.EXPO_PUBLIC_BFF_BASE_URL = 'https://bff.example.test';
+  vi.useFakeTimers();
+  let signal: AbortSignal | undefined;
+  const block = fixtureBlock();
+  globalThis.fetch = vi
+    .fn()
+    .mockImplementation((_input: string | URL | Request, init?: RequestInit) => {
+      signal = init?.signal as AbortSignal;
+      return Promise.resolve({
+        ok: true,
+        status: 200,
+        json: () => Promise.resolve({ regime: block }),
+      } as Response);
+    }) as typeof fetch;
+
+  await expect(fetchCurrentRegime(POOL_ID)).resolves.toEqual({ regime: block });
+  await vi.advanceTimersByTimeAsync(10_001);
+
+  expect(signal?.aborted).toBe(false);
+});
+```
+
+- [ ] **Step 6: Run scoped regime-client verification**
+
+Run:
 
 ```bash
-pnpm build
+pnpm --filter @clmm/app test -- src/api/regime.test.ts
+pnpm exec eslint apps/app/src/api/regime.ts apps/app/src/api/regime.test.ts
+pnpm exec prettier --check apps/app/src/api/regime.ts apps/app/src/api/regime.test.ts
+```
+
+Expected: all regime client cases pass, ESLint reports no errors, and Prettier reports both files formatted. The implement loop's automatic `pnpm -r typecheck` gate must also pass before committing.
+
+- [ ] **Step 7: Commit the regime client deadline behavior**
+
+```bash
+git add apps/app/src/api/regime.ts apps/app/src/api/regime.test.ts
+git commit -m "fix: include regime response bodies in request deadline"
+```
+
+## Task 3: Preserve S/R client classifications through body deadlines
+
+**Files:**
+
+- Modify: `apps/app/src/api/srLevels.ts` (`classifyNotFound` and `fetchCurrentSrLevels` transport/status/body scope only)
+- Modify: `apps/app/src/api/srLevels.test.ts` (`fetchCurrentSrLevels` transport cases and timer teardown only)
+
+**Invariants covered:** `S/R success JSON abort reports timeout`, `S/R 404 JSON abort reports timeout`, `S/R non-success text abort reports timeout`, `S/R non-abort parse classifications remain stable`, `S/R timer clears after terminal settlement`.
+
+- [ ] **Step 1: Add failing post-header S/R-client timeout tests first**
+
+Add `vi.useRealTimers()` to `afterEach`. Add this test-local helper after `restoreBffBaseUrl` (the duplication is intentional because app API tests do not share a transport-test utility):
+
+```ts
+function stubStalledBody(status: number, method: 'json' | 'text') {
+  let signal: AbortSignal | undefined;
+  const readBody = () =>
+    new Promise<never>((_resolve, reject) => {
+      signal!.addEventListener('abort', () => reject({ name: 'AbortError' }), { once: true });
+    });
+
+  globalThis.fetch = vi
+    .fn()
+    .mockImplementation((_input: string | URL | Request, init?: RequestInit) => {
+      signal = init?.signal as AbortSignal;
+      return Promise.resolve({
+        ok: status >= 200 && status < 300,
+        status,
+        statusText: '',
+        ...(method === 'json' ? { json: readBody } : { text: readBody }),
+      } as Response);
+    }) as typeof fetch;
+
+  return { getSignal: () => signal };
+}
+```
+
+Add these exact named cases:
+
+```ts
+it('throws the timeout error when a 200 JSON body stalls after headers', async () => {
+  env.EXPO_PUBLIC_BFF_BASE_URL = 'https://bff.example.test';
+  vi.useFakeTimers();
+  const stalled = stubStalledBody(200, 'json');
+
+  const pending = fetchCurrentSrLevels('Pool111111111111111111111111111111111111111');
+  await vi.advanceTimersByTimeAsync(10_000);
+
+  await expect(pending).rejects.toThrow('Could not load market context: request timed out');
+  expect(stalled.getSignal()?.aborted).toBe(true);
+});
+
+it('throws the timeout error when a 404 JSON body stalls after headers', async () => {
+  env.EXPO_PUBLIC_BFF_BASE_URL = 'https://bff.example.test';
+  vi.useFakeTimers();
+  const stalled = stubStalledBody(404, 'json');
+
+  const pending = fetchCurrentSrLevels('Pool111111111111111111111111111111111111111');
+  await vi.advanceTimersByTimeAsync(10_000);
+
+  await expect(pending).rejects.toThrow('Could not load market context: request timed out');
+  expect(stalled.getSignal()?.aborted).toBe(true);
+});
+
+it('throws the timeout error when a 503 text body stalls after headers', async () => {
+  env.EXPO_PUBLIC_BFF_BASE_URL = 'https://bff.example.test';
+  vi.useFakeTimers();
+  const stalled = stubStalledBody(503, 'text');
+
+  const pending = fetchCurrentSrLevels('Pool111111111111111111111111111111111111111');
+  await vi.advanceTimersByTimeAsync(10_000);
+
+  await expect(pending).rejects.toThrow('Could not load market context: request timed out');
+  expect(stalled.getSignal()?.aborted).toBe(true);
+});
+```
+
+Each case must enable fake timers, set the BFF base URL, start `fetchCurrentSrLevels`, advance 10,000 ms, assert `signal.aborted === true`, and assert exactly:
+
+```ts
+await expect(pending).rejects.toThrow('Could not load market context: request timed out');
+```
+
+- [ ] **Step 2: Run only the new S/R body-timeout cases and verify the pre-fix failure**
+
+Run:
+
+```bash
+pnpm --filter @clmm/app test -- src/api/srLevels.test.ts -t 'stalls after headers'
+```
+
+Expected: the cases fail or remain pending because the current fetch-only `finally` clears the 10-second timer before `json()` or `text()` begins.
+
+- [ ] **Step 3: Make S/R 404 JSON classification abort-aware**
+
+Change only `classifyNotFound`'s catch to preserve aborts while retaining the existing non-JSON 404 result:
+
+```ts
+} catch (error: unknown) {
+  if (isAbortError(error)) throw error;
+  return new Error('Could not load market context: unexpected 404');
+}
+```
+
+- [ ] **Step 4: Extend `fetchCurrentSrLevels`'s single timer through every response-body branch**
+
+Apply the same scoped lifecycle as Task 2, with S/R-specific strings and the existing S/R result mapping. Use an inner fetch catch for current network wording, abort-aware catches around `response.text()` and `response.json()`, one request-level abort mapper, and one outer cleanup:
+
+```ts
+try {
+  let response: Response;
+  try {
+    response = await fetch(
+      `${getBffBaseUrl()}/sr-levels/pools/${encodeURIComponent(poolId)}/current`,
+      { signal: controller.signal },
+    );
+  } catch (error: unknown) {
+    if (isAbortError(error)) throw error;
+    throw new Error(
+      `Could not load market context: ${error instanceof Error ? error.message : 'network error'}`,
+    );
+  }
+
+  if (response.status === 404) throw await classifyNotFound(poolId, response);
+
+  if (!response.ok) {
+    let detail: string;
+    try {
+      detail = await response.text();
+    } catch (error: unknown) {
+      if (isAbortError(error)) throw error;
+      detail = `HTTP ${response.status}`;
+    }
+    throw new Error(`Could not load market context: ${detail || response.statusText}`);
+  }
+
+  let body: unknown;
+  try {
+    body = await response.json();
+  } catch (error: unknown) {
+    if (isAbortError(error)) throw error;
+    throw new Error('Could not load market context: response body was not valid JSON');
+  }
+
+  if (!isRecord(body)) {
+    throw new Error('Could not load market context: malformed response');
+  }
+
+  const srLevels = body['srLevels'];
+  if (srLevels === null) {
+    return { srLevels: null };
+  }
+
+  if (!isSrLevelsBlock(srLevels)) {
+    throw new Error('Could not load market context: malformed srLevels block');
+  }
+
+  return { srLevels };
+} catch (error: unknown) {
+  if (isAbortError(error)) {
+    throw new Error('Could not load market context: request timed out');
+  }
+  throw error;
+} finally {
+  clearTimeout(timeoutId);
+}
+```
+
+Do not change `SrLevelsUnsupportedPoolError`, exported types/functions, field validation, or error text.
+
+- [ ] **Step 5: Lock in non-abort fallback and exactly-once cleanup behavior**
+
+Preserve the existing non-JSON 404 test and add these exact cases:
+
+```ts
+it('uses HTTP status fallback when a non-success text body rejects without AbortError', async () => {
+  env.EXPO_PUBLIC_BFF_BASE_URL = 'https://bff.example.test';
+  globalThis.fetch = vi.fn().mockResolvedValue({
+    ok: false,
+    status: 503,
+    statusText: 'Service Unavailable',
+    text: () => Promise.reject(new Error('stream failed')),
+  }) as typeof fetch;
+
+  await expect(fetchCurrentSrLevels('Pool111111111111111111111111111111111111111')).rejects.toThrow(
+    'Could not load market context: HTTP 503',
+  );
+});
+
+it('clears the S/R deadline after the response body settles', async () => {
+  env.EXPO_PUBLIC_BFF_BASE_URL = 'https://bff.example.test';
+  vi.useFakeTimers();
+  let signal: AbortSignal | undefined;
+  const block = fixtureBlock();
+  globalThis.fetch = vi
+    .fn()
+    .mockImplementation((_input: string | URL | Request, init?: RequestInit) => {
+      signal = init?.signal as AbortSignal;
+      return Promise.resolve({
+        ok: true,
+        status: 200,
+        json: () => Promise.resolve({ srLevels: block }),
+      } as Response);
+    }) as typeof fetch;
+
+  await expect(
+    fetchCurrentSrLevels('Pool111111111111111111111111111111111111111'),
+  ).resolves.toEqual({ srLevels: block });
+  await vi.advanceTimersByTimeAsync(10_001);
+
+  expect(signal?.aborted).toBe(false);
+});
+```
+
+- [ ] **Step 6: Run scoped S/R-client verification**
+
+Run:
+
+```bash
+pnpm --filter @clmm/app test -- src/api/srLevels.test.ts
+pnpm exec eslint apps/app/src/api/srLevels.ts apps/app/src/api/srLevels.test.ts
+pnpm exec prettier --check apps/app/src/api/srLevels.ts apps/app/src/api/srLevels.test.ts
+```
+
+Expected: all S/R client cases pass, ESLint reports no errors, and Prettier reports both files formatted. The implement loop's automatic `pnpm -r typecheck` gate must also pass before committing.
+
+- [ ] **Step 7: Commit the S/R client deadline behavior**
+
+```bash
+git add apps/app/src/api/srLevels.ts apps/app/src/api/srLevels.test.ts
+git commit -m "fix: include S/R response bodies in request deadline"
+```
+
+## Tests to add or update
+
+- Adapter success-body timeout after headers: regime returns `{ kind: 'upstream-error' }`; S/R returns `null`.
+- Regime adapter error-envelope timeout after headers: abort propagates to the existing upstream-error path.
+- Regime client 200 JSON, 404 JSON, and 503 text body timeouts: all use the exact market-regime timeout message.
+- S/R client 200 JSON, 404 JSON, and 503 text body timeouts: all use the exact market-context timeout message.
+- Non-abort 503 text-read rejection in each client: preserve the `HTTP 503` fallback.
+- Successful adapter/client body settlement: later fake-timer advancement does not abort the captured signal.
+- Existing happy paths, typed unsupported-pool errors, ordinary/non-JSON 404s, malformed payloads, unavailable regime reasons, network failures, and immediate aborts remain green.
+
+## Validation commands
+
+The commands embedded in each task are the acceptance criteria for that commit and target only files changed by that task. After all three implementation tasks complete, the repository's dedicated validate phase must run the issue-required workspace gates; this is not a standalone implementation task and must not produce unrelated fixes:
+
+```bash
+pnpm -r typecheck
 pnpm typecheck
-pnpm lint
-pnpm boundaries
 pnpm test
 ```
 
-Expected: every command exits zero. The focused task commands are the acceptance checks for task-local behavior; this final automatic phase is not an implementation task and must not be converted into one.
+Expected: every command exits 0. If the validate phase requires the repository-wide release checklist because the actual diff expands beyond the seven affected files, also run `pnpm build`, `pnpm lint`, and `pnpm boundaries`; expansion itself must first satisfy the stop conditions below.
 
-# Risk areas
+## Risk areas
 
-- Floating-point subtraction and padding can overflow even for finite inputs; the helper must validate intermediates and the visual domain before calculating any percentage.
-- React development Strict Mode and remounts may duplicate warnings. These records are diagnostic, at-least-once signals, not counters or execution events.
-- Including the entire `rangeBarDisplayState` object in an effect dependency can re-run on ordinary rerenders if it is rebuilt each render. Use `useMemo` keyed by the three numeric inputs or depend on stable scalar `kind`/`reason` fields so the named unchanged-rerender test passes without claiming exact-once delivery across remounts.
-- The screen test is already large. Limit edits to a dependency-injecting wrapper and the status/RangeBar cases; do not mix in unrelated test cleanup.
-- Invalid numeric labels must not leak into unavailable UI or logs, since displaying them would undermine fail-closed presentation and JSON can coerce non-finite values misleadingly.
-- The logger must enter the Expo shell only through `apps/app/src/composition/index.ts`; importing adapters directly from the route or UI violates repository boundaries.
-- `Action needed` must stay neutral and directionless. No task may derive lower/upper direction outside `DirectionalExitPolicyService` or alter the release-blocker mapping.
+- **Abort misclassification:** a body-reader catch can accidentally turn `AbortError` into invalid JSON, unexpected 404, endpoint-not-found, or `HTTP <status>`. Assert public messages/results, not merely that `abort()` ran.
+- **Swallowed text abort:** replacing `.catch(() => fallback)` incorrectly can preserve the timeout but still emit `HTTP 503`; use an abort-aware catch.
+- **Timer leaks or duplicate cleanup:** early returns and typed errors must still cross exactly one `finally`. Do not retain the old fetch-only cleanup or add branch-local cleanup.
+- **Fake-timer deadlock:** a test promise that ignores the request signal will never settle. Every hanging body double must attach a one-shot `abort` listener, and every modified suite must restore real timers in teardown.
+- **Contract drift during restructuring:** moving branches into a `try` can inadvertently wrap already-classified errors or change logs/messages. Keep nested fetch classification narrow and rethrow non-abort classified errors unchanged.
+- **Runtime cancellation variance:** the plan relies on standard Fetch signal propagation to response-body reads. If a supported runtime demonstrably ignores abort during body consumption, stop rather than silently adding a second deadline mechanism.
+- **Oversized regime adapter test file:** restrict edits to the named transport/status cases. Do not reorganize unrelated metadata/freshness tests as part of this issue.
 
-# Stop conditions
+## Stop conditions
 
-- Stop if implementation appears to require changing application/domain range classification, trigger qualification, or directional exit policy; that is outside this issue and could violate the release-blocker invariant.
-- Stop if `TelemetryAdapter` cannot be imported through the approved app composition entrypoint without adding an adapters dependency to UI or route code.
-- Stop if a required logger signature cannot be made workspace-typecheck-clean in the same vertical task; do not land a port/caller mismatch or weaken the dependency to `any`.
-- Stop if any unavailable branch still needs a fabricated numeric coordinate, cached price, zero, or midpoint to preserve layout; use a fixed non-authoritative placeholder instead.
-- Stop if tests reveal the approved stable copy (`Action needed`, `Price unavailable`) or reason-code order conflicts with a newer repository contract; reconcile the contract before proceeding rather than inventing alternatives.
-- Stop if unrelated pre-existing failures prevent distinguishing changed behavior after the focused tests pass; report the exact failing command and preserve the scoped evidence.
+Abort implementation and report the evidence instead of continuing if any of the following occurs:
 
-# Plan self-review
+- A body read in a supported production runtime does not reject when the request `AbortSignal` aborts; that requires a separate compatibility design such as an explicitly raced deadline.
+- Preserving body deadlines appears to require changing an exported port/interface, DTO, error class surface, BFF endpoint, UI contract, or package boundary.
+- The fix would alter the 2-second/10-second budgets, introduce retry/recovery behavior, or extend into neighboring market-insight clients.
+- Existing typed unsupported-pool, graceful-degradation, `unavailableReason`, or exact user-facing error contracts cannot be preserved with the scoped lifecycle.
+- Any proposed change touches directional exit mapping or attempts to infer it outside `packages/domain/src/exit-policy/DirectionalExitPolicyService`.
+- Focused tests expose unrelated pre-existing failures that cannot be isolated without editing files outside this plan. Record them; do not fold unrelated fixes into these commits.
+- The automatic workspace `pnpm -r typecheck` gate fails after a task and the failure cannot be resolved within that task's declared files.
 
-- Spec coverage: all acceptance criteria map to Tasks 1–4; no trigger/execution semantics or directional mapping changes are planned.
-- Placeholder scan: the plan contains no deferred implementation placeholders; code steps define all new types, symbols, messages, codes, and dependency paths used later.
-- Type consistency: `getStatusDiagnosticCode`, `RangeBarDisplayState`, `buildRangeBarDisplayState`, `observability`, and `positionCardObservability` use the same names and shapes throughout.
-- Risk classification: the first-line review marker is required because Task 4 introduces observable warning side effects and effect re-emission behavior.
+## Assumptions
+
+- `issue-comments.md` is intentionally empty, so it contributes no additional constraints.
+- The timeout is a total per-attempt budget beginning immediately before `fetch()` and ending after the required body value has materialized; it does not reset after headers.
+- Native Fetch implementations used by Node, Expo/React Native, and supported browsers connect the supplied signal to body consumption.
+- Structural `{ name: 'AbortError' }` detection is the compatibility requirement; `instanceof DOMException` is not reliable across all targets and test doubles.
+- No exported API signature changes are needed, so `task-manifest.json` intentionally omits `signature_changes` for every task.
