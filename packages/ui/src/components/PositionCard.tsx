@@ -21,7 +21,7 @@ type PositionCardObservability = Pick<ObservabilityPort, 'log'>;
 
 type Props = {
   item: PositionListItemViewModel;
-  observability?: PositionCardObservability;
+  observability: PositionCardObservability;
   onPress?: () => void;
 };
 
@@ -64,7 +64,7 @@ export function PositionCard({ item, observability, onPress }: Props): JSX.Eleme
   const statusDiagnosticCode = getStatusDiagnosticCode({ rangeStatusKind, hasAlert, nearEdge });
 
   useEffect(() => {
-    if (!observability || statusDiagnosticCode == null) return;
+    if (statusDiagnosticCode == null) return;
     observability.log('warn', 'Position card alert conflicts with range status', {
       code: statusDiagnosticCode,
       positionId: item.positionId,
@@ -75,7 +75,7 @@ export function PositionCard({ item, observability, onPress }: Props): JSX.Eleme
   }, [hasAlert, item.positionId, observability, poolId, rangeStatusKind, statusDiagnosticCode]);
 
   useEffect(() => {
-    if (!observability || rangeBarDisplayState.kind !== 'unavailable') return;
+    if (rangeBarDisplayState.kind !== 'unavailable') return;
     observability.log('warn', 'Position card range visualization unavailable', {
       code: 'range_bar_input_invalid',
       reason: rangeBarDisplayState.reason,

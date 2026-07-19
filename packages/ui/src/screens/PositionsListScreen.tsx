@@ -23,7 +23,7 @@ import type { PlatformCapabilities } from '../components/DegradedCapabilityBanne
 type PositionsListObservability = Pick<ObservabilityPort, 'log'>;
 
 type Props = {
-  observability?: PositionsListObservability;
+  observability: PositionsListObservability;
   walletAddress?: string | null;
   positions?: PositionSummaryDto[] | undefined;
   positionsLoading?: boolean;
@@ -113,7 +113,7 @@ export function PositionsListScreen({
         <ErrorState error={positionsError} />
       ) : hasPositions ? (
         <ConnectedPositionsList
-          {...(observability != null && { observability })}
+          observability={observability}
           positions={positions ?? []}
           {...(onSelectPosition != null ? { onSelectPosition } : {})}
           srLevels={srLevels}
@@ -285,7 +285,7 @@ function ConnectedPositionsList({
   policyInsightsUnavailableReason,
   financialMetrics,
 }: {
-  observability?: PositionsListObservability;
+  observability: PositionsListObservability;
   positions: PositionSummaryDto[];
   onSelectPosition?: (positionId: string) => void;
   srLevels?: SrLevelsBlock | null | undefined;
@@ -375,7 +375,7 @@ function ConnectedPositionsList({
       renderItem={({ item }) => (
         <PositionCard
           item={item}
-          {...(observability != null && { observability })}
+          observability={observability}
           onPress={() => onSelectPosition?.(item.positionId)}
         />
       )}

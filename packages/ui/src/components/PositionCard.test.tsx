@@ -44,6 +44,7 @@ describe('PositionCard financial metrics rendering', () => {
       render(
         <PositionCard
           item={makeItem({ poolFees24h: { kind: 'available', valueUsd: 100, label: '$100.00' } })}
+          observability={observability}
         />,
       );
 
@@ -55,6 +56,7 @@ describe('PositionCard financial metrics rendering', () => {
       render(
         <PositionCard
           item={makeItem({ poolTvl: { kind: 'available', valueUsd: 1000, label: '$1,000.00' } })}
+          observability={observability}
         />,
       );
 
@@ -68,6 +70,7 @@ describe('PositionCard financial metrics rendering', () => {
       render(
         <PositionCard
           item={makeItem({ poolTvl: { kind: 'available', valueUsd: 0, label: '$0.00' } })}
+          observability={observability}
         />,
       );
 
@@ -78,6 +81,7 @@ describe('PositionCard financial metrics rendering', () => {
       render(
         <PositionCard
           item={makeItem({ poolFees24h: { kind: 'available', valueUsd: 0, label: '$0.00' } })}
+          observability={observability}
         />,
       );
 
@@ -90,6 +94,7 @@ describe('PositionCard financial metrics rendering', () => {
       render(
         <PositionCard
           item={makeItem({ poolTvl: { kind: 'available', valueUsd: 1000, label: '$1,000.00' } })}
+          observability={observability}
         />,
       );
 
@@ -101,6 +106,7 @@ describe('PositionCard financial metrics rendering', () => {
       render(
         <PositionCard
           item={makeItem({ poolFees24h: { kind: 'available', valueUsd: 500, label: '$500.00' } })}
+          observability={observability}
         />,
       );
 
@@ -112,6 +118,7 @@ describe('PositionCard financial metrics rendering', () => {
       render(
         <PositionCard
           item={makeItem({ poolFees24h: { kind: 'available', valueUsd: 500, label: '$500.00' } })}
+          observability={observability}
         />,
       );
 
@@ -124,7 +131,7 @@ describe('PositionCard financial metrics rendering', () => {
     const fabricatedValues = ['$8,420.19', '$6,220.00', '$3,105.77', '+$12.40', '+$4.82', '+$1.95'];
 
     it('does not render any hardcoded placeholder TVL values', () => {
-      render(<PositionCard item={baseItem} />);
+      render(<PositionCard item={baseItem} observability={observability} />);
       fabricatedValues.forEach((value) => {
         expect(screen.queryByText(value)).toBeNull();
       });
@@ -134,43 +141,58 @@ describe('PositionCard financial metrics rendering', () => {
 
 describe('PositionCard', () => {
   it('renders pool label and truncated pool id', () => {
-    render(<PositionCard item={baseItem} />);
+    render(<PositionCard item={baseItem} observability={observability} />);
 
     expect(screen.getByText('SOL / USDC')).toBeTruthy();
     expect(screen.getByText('Czfq…44zE')).toBeTruthy();
   });
 
   it('renders monitoring display text for each status', () => {
-    const { rerender } = render(<PositionCard item={baseItem} />);
+    const { rerender } = render(<PositionCard item={baseItem} observability={observability} />);
     expect(screen.getByText('Live')).toBeTruthy();
 
-    rerender(<PositionCard item={{ ...baseItem, monitoringStatus: 'degraded' }} />);
+    rerender(
+      <PositionCard
+        item={{ ...baseItem, monitoringStatus: 'degraded' }}
+        observability={observability}
+      />,
+    );
     expect(screen.getByText('Degraded')).toBeTruthy();
 
-    rerender(<PositionCard item={{ ...baseItem, monitoringStatus: 'inactive' }} />);
+    rerender(
+      <PositionCard
+        item={{ ...baseItem, monitoringStatus: 'inactive' }}
+        observability={observability}
+      />,
+    );
     expect(screen.getByText('Inactive')).toBeTruthy();
   });
 
   it('renders chip label for in-range position without alert', () => {
-    render(<PositionCard item={baseItem} />);
+    render(<PositionCard item={baseItem} observability={observability} />);
     expect(screen.getByText('In range')).toBeTruthy();
   });
 
   it('renders chip label for breach · below', () => {
-    render(<PositionCard item={{ ...baseItem, rangeStatusKind: 'below-range', hasAlert: true }} />);
+    render(
+      <PositionCard
+        item={{ ...baseItem, rangeStatusKind: 'below-range', hasAlert: true }}
+        observability={observability}
+      />,
+    );
     expect(screen.getByText('Breach · below')).toBeTruthy();
   });
 
   it('calls onPress when tapped', () => {
     const onPress = vi.fn();
-    render(<PositionCard item={baseItem} onPress={onPress} />);
+    render(<PositionCard item={baseItem} onPress={onPress} observability={observability} />);
 
     fireEvent.click(screen.getByRole('button'));
     expect(onPress).toHaveBeenCalledOnce();
   });
 
   it('has accessible label with pool label and chip text', () => {
-    render(<PositionCard item={baseItem} />);
+    render(<PositionCard item={baseItem} observability={observability} />);
     expect(screen.getByLabelText('Position card for SOL / USDC, In range')).toBeTruthy();
   });
 
