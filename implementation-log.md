@@ -15,3 +15,24 @@
 - Verified that all tests pass after implementation.
 - Ran ESLint and Prettier, both passing with no warnings or errors.
 - Ran `pnpm typecheck` successfully.
+
+# Task 2 Implementation Log
+
+## Changes
+
+- Refactored `classifyNotFound` to throw/propagate `AbortError` if response.json() read is aborted.
+- Extended `fetchCurrentRegime`'s single timer through all response body branches (`text()` and `json()` reads).
+- Refactored `fetchCurrentRegime` with a single outer try/catch/finally to properly clear the timeout after response body settles.
+- Added tests in `regime.test.ts` for all behavioral invariants:
+  - `throws the timeout error when a 200 JSON body stalls after headers`
+  - `throws the timeout error when a 404 JSON body stalls after headers`
+  - `throws the timeout error when a 503 text body stalls after headers`
+  - `uses HTTP status fallback when a non-success text body rejects without AbortError`
+  - `clears the regime deadline after the response body settles`
+
+## Verification
+
+- Ran the stalls-after-headers Vitest tests before implementation, confirming they failed.
+- Ran the full test suite in `regime.test.ts` after implementation, and all tests passed.
+- Checked formatting using Prettier and ESLint, both passing.
+- Ran `pnpm typecheck` successfully.

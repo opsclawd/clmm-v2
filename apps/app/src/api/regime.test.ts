@@ -21,6 +21,28 @@ function restoreBffBaseUrl(): void {
   env.EXPO_PUBLIC_BFF_BASE_URL = ORIGINAL_BFF_BASE_URL;
 }
 
+function stubStalledBody(status: number, method: 'json' | 'text') {
+  let signal: AbortSignal | undefined;
+  const readBody = () =>
+    new Promise<never>((_resolve, reject) => {
+      signal!.addEventListener('abort', () => reject({ name: 'AbortError' }), { once: true });
+    });
+
+  globalThis.fetch = vi
+    .fn()
+    .mockImplementation((_input: string | URL | Request, init?: RequestInit) => {
+      signal = init?.signal as AbortSignal;
+      return Promise.resolve({
+        ok: status >= 200 && status < 300,
+        status,
+        statusText: '',
+        ...(method === 'json' ? { json: readBody } : { text: readBody }),
+      } as unknown as Response);
+    }) as typeof fetch;
+
+  return { getSignal: () => signal };
+}
+
 function fixtureBlock() {
   return {
     regime: 'UP',
@@ -64,6 +86,7 @@ describe('fetchCurrentRegime', () => {
     restoreBffBaseUrl();
     vi.unstubAllGlobals();
     vi.restoreAllMocks();
+    vi.useRealTimers();
   });
 
   it('returns { regime } on 200 with a valid regime block', async () => {
@@ -331,5 +354,83 @@ describe('fetchCurrentRegime', () => {
     }) as typeof fetch;
     const error = await fetchCurrentRegime(POOL_ID).catch((reason: unknown) => reason);
     expect((error as Error).message).toContain('malformed regime block');
+  });
+
+  it('throws the timeout error when a 200 JSON body stalls after headers', async () => {
+    env.EXPO_PUBLIC_BFF_BASE_URL = 'https://bff.example.test';
+    vi.useFakeTimers();
+    const stalled = stubStalledBody(200, 'json');
+
+    const pending = fetchCurrentRegime(POOL_ID);
+    const expectation = expect(pending).rejects.toThrow(
+      'Could not load market regime: request timed out',
+    );
+    await vi.advanceTimersByTimeAsync(10_000);
+    await expectation;
+    expect(stalled.getSignal()?.aborted).toBe(true);
+  });
+
+  it('throws the timeout error when a 404 JSON body stalls after headers', async () => {
+    env.EXPO_PUBLIC_BFF_BASE_URL = 'https://bff.example.test';
+    vi.useFakeTimers();
+    const stalled = stubStalledBody(404, 'json');
+
+    const pending = fetchCurrentRegime(POOL_ID);
+    const expectation = expect(pending).rejects.toThrow(
+      'Could not load market regime: request timed out',
+    );
+    await vi.advanceTimersByTimeAsync(10_000);
+    await expectation;
+    expect(stalled.getSignal()?.aborted).toBe(true);
+  });
+
+  it('throws the timeout error when a 503 text body stalls after headers', async () => {
+    env.EXPO_PUBLIC_BFF_BASE_URL = 'https://bff.example.test';
+    vi.useFakeTimers();
+    const stalled = stubStalledBody(503, 'text');
+
+    const pending = fetchCurrentRegime(POOL_ID);
+    const expectation = expect(pending).rejects.toThrow(
+      'Could not load market regime: request timed out',
+    );
+    await vi.advanceTimersByTimeAsync(10_000);
+    await expectation;
+    expect(stalled.getSignal()?.aborted).toBe(true);
+  });
+
+  it('uses HTTP status fallback when a non-success text body rejects without AbortError', async () => {
+    env.EXPO_PUBLIC_BFF_BASE_URL = 'https://bff.example.test';
+    globalThis.fetch = vi.fn().mockResolvedValue({
+      ok: false,
+      status: 503,
+      statusText: 'Service Unavailable',
+      text: () => Promise.reject(new Error('stream failed')),
+    }) as typeof fetch;
+
+    await expect(fetchCurrentRegime(POOL_ID)).rejects.toThrow(
+      'Could not load market regime: HTTP 503',
+    );
+  });
+
+  it('clears the regime deadline after the response body settles', async () => {
+    env.EXPO_PUBLIC_BFF_BASE_URL = 'https://bff.example.test';
+    vi.useFakeTimers();
+    let signal: AbortSignal | undefined;
+    const block = fixtureBlock();
+    globalThis.fetch = vi
+      .fn()
+      .mockImplementation((_input: string | URL | Request, init?: RequestInit) => {
+        signal = init?.signal as AbortSignal;
+        return Promise.resolve({
+          ok: true,
+          status: 200,
+          json: () => Promise.resolve({ regime: block }),
+        } as Response);
+      }) as typeof fetch;
+
+    await expect(fetchCurrentRegime(POOL_ID)).resolves.toEqual({ regime: block });
+    await vi.advanceTimersByTimeAsync(10_001);
+
+    expect(signal?.aborted).toBe(false);
   });
 });
