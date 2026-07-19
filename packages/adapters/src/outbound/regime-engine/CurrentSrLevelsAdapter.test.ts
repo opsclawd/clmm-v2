@@ -222,6 +222,25 @@ describe('CurrentSrLevelsAdapter', () => {
     expect(obs.logs.some((entry) => entry.message === 'SR levels fetch error')).toBe(true);
   });
 
+  it('cleans up the deadline timer when the response finishes early', async () => {
+    vi.useFakeTimers();
+    let signal: AbortSignal | undefined;
+    vi.mocked(fetch).mockImplementation((_input, init) => {
+      signal = init?.signal as AbortSignal;
+      return Promise.resolve(new Response(JSON.stringify(SAMPLE_RESPONSE), { status: 200 }));
+    });
+
+    const adapter = new CurrentSrLevelsAdapter('https://regime.example.com', obs.port);
+    const result = await adapter.fetchCurrent('SOL/USDC', 'mco');
+
+    expect(result).not.toBeNull();
+
+    // Advance timers past the 2s deadline
+    await vi.advanceTimersByTimeAsync(3000);
+
+    expect(signal?.aborted).toBe(false);
+  });
+
   it('returns null when baseUrl is null, logs warn on first call only', async () => {
     const adapter = new CurrentSrLevelsAdapter(null, obs.port);
 

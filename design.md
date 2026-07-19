@@ -1,260 +1,214 @@
-# Alert Visibility and Fail-Closed RangeBar Design
+# Market Insight Response-Body Timeout Design
 
 ## Summary
 
-This change fixes two safety-relevant presentation defects on the positions list:
+The regime and support/resistance (S/R) read paths intend to place a hard upper bound on each HTTP request, but three of the four identified paths clear their `AbortController` timer as soon as `fetch()` resolves. A successful header response can therefore be followed by an indefinitely slow `response.json()` or `response.text()` read. That leaves app queries loading beyond their documented 10-second limit and can keep BFF work open beyond the adapters' 2-second limit.
 
-1. `hasAlert=true` combined with `rangeStatusKind="in-range"` currently falls through to the ordinary `In range` or `Near edge` chip, hiding an actionable alert.
-2. `RangeBar` currently converts invalid inputs and invalid derived coordinates to `50%`, producing a credible-looking midpoint marker from data that cannot support one.
+This design extends each existing timeout lifecycle through every response-body read while preserving each path's current result contract, error messages, logging, timeout values, and graceful-degradation behavior. It uses the repository's already-correct `CurrentSrLevelsAdapter` structure as the local pattern: create the controller and timer immediately before the request, perform the fetch and any required body read inside the protected scope, and clear the timer exactly once in an outer `finally`.
 
-The proposed design keeps the change in the presentation path. It makes status precedence explicit, converts RangeBar calculation into a fail-closed discriminated result, renders an unavailable branch with no marker, and reports both inconsistency classes through the existing `ObservabilityPort`. It does not change range classification, trigger qualification, directional exit policy, preview creation, approval, signing, or execution.
+No market-context DTO, BFF endpoint, query policy, UI state, or directional exit behavior changes.
 
-## Why This Matters
+## Problem and Why It Matters
 
-The positions list is operational UI, not merely an analytics display. Hiding an actionable alert can delay a user's response to a qualified trigger. Fabricating a centered marker can make corrupt or unavailable financial data appear healthy and precise. Both defects violate the product's safety posture: the UI must preserve higher-priority operational state and must expose uncertainty rather than inventing a plausible value.
+The Fetch API resolves `fetch()` after the response status and headers are available; consuming the body is a separate asynchronous operation. In the current regime adapter and the two app clients, the timeout is cleared in a `finally` around only the initial `fetch()` call. The following operations are therefore unbounded:
 
-The issue is especially important because the current types alone do not make the rendering path safe. `PositionSummaryDto` uses plain `number` fields, and `isPositionSummaryRecord` validates finite lower and upper bounds but does not validate `currentPrice`, positivity, or bound ordering. Even if upstream producers normally emit good data, the component remains a necessary defensive boundary for direct use, malformed runtime values, and future contract drift.
+- a successful `200` response followed by `response.json()`;
+- a `404` response whose JSON body is read to distinguish an unsupported pool from a missing endpoint or upstream absence;
+- a non-success response whose `response.text()` body is included in the controlled client error.
+
+The practical likelihood is low because these payloads are small, but the failure mode defeats the purpose of the timeout. A peer can return headers and then stall the stream, leaving a mobile query in a loading state and consuming BFF resources until some unrelated infrastructure limit intervenes. Correct timeout semantics are also operationally important: a configured 2-second or 10-second request budget should cover receipt of the response needed by the caller, not merely receipt of headers.
 
 ## Current Code Analysis
 
-- `packages/ui/src/components/PositionCardUtils.ts` owns pure display derivations. `getStatusChipProps` handles alert-plus-below and alert-plus-above first, but has no alert-plus-in-range branch. The latter therefore reaches normal in-range presentation.
-- `isNearEdge` already follows the repository's guard-first pattern: non-finite, out-of-range, zero-width, and inverted ranges return `false`.
-- `packages/ui/src/components/RangeBar.tsx` contains private `pricePercent` and `clampPercent` helpers. Both use `50` as their non-finite fallback. The component also substitutes a width of `1` for invalid bounds, so malformed input still reaches an authoritative-looking visualization.
-- `packages/ui/src/components/PositionCard.tsx` is the only production caller of `RangeBar`. It has the position and pool identities needed for diagnostics and already computes presentation-only card state.
-- `packages/ui/src/screens/PositionsListScreen.tsx` builds list-item view models and renders cards. The screen receives no observability dependency today.
-- `ObservabilityPort` is an application-owned public contract with structured `log(level, message, context)` semantics. `TelemetryAdapter` is the existing implementation and emits structured JSON. The only approved app-to-adapter dependency seam is `apps/app/src/composition/index.ts`.
-- The repository's issue #67 learning explicitly says derived UI state belongs in pure utilities, range predicates must fail safely, and alert/range branches require complete tests.
+### Adapter boundary
 
-## Design Decisions and Alternatives
+- `packages/adapters/src/outbound/regime-engine/CurrentRegimeAdapter.ts` starts a 2-second timer, awaits `fetch()`, and clears the timer before reading either the `200` JSON payload or the `400`/`404` JSON error envelope. A body stall is therefore unbounded.
+- `packages/adapters/src/outbound/regime-engine/CurrentSrLevelsAdapter.ts` already has the desired lifecycle. Its inner `try/finally` contains both `fetch()` and the successful `res.json()` read, so the timer remains active until the body has been consumed or an exit path is selected. Git history shows this was deliberate: commit `c337a21` moved cleanup after `res.json()`, and `24903d7` consolidated cleanup into `finally` to cover all exits without leaking timers.
+- Both adapters are intentionally fail-soft. Regime failures become `{ kind: 'upstream-error' }`; S/R failures are logged and become `null`. Neither contract should expose transport exceptions.
 
-### Decision 1: preserve the existing range classification and fix presentation precedence locally
+### App-shell boundary
 
-`hasAlert=true` is already the application's actionable-trigger signal. The UI will treat it as higher priority than a normal in-range label. For `hasAlert + in-range`, the chip becomes a neutral warning with the stable label `Action needed`. It must not infer `below` or `above`; `getBreachSide` remains `undefined` for this combination.
+- `apps/app/src/api/regime.ts` and `apps/app/src/api/srLevels.ts` each use a 10-second timer but clear it immediately after `fetch()` settles. Their success JSON, 404 JSON, and non-success text reads are outside the timeout.
+- The clients intentionally distinguish unsupported-pool `404`s from generic endpoint `404`s and other transient failures. Regime also preserves `unavailableReason` values returned in valid `200` responses.
+- Each client currently maps an `AbortError` from the initial fetch to stable user-facing timeout text. Extending the protected scope must also map an `AbortError` raised during body consumption to that same timeout text. Body parsing helpers must not swallow an abort and accidentally reclassify it as malformed JSON, an unexpected 404, or a generic HTTP error.
 
-Directional alert behavior remains unchanged:
+### Related repository patterns
 
-| Alert | Range status               | Chip                          |
-| ----- | -------------------------- | ----------------------------- |
-| yes   | below-range                | `Breach · below`, breach tone |
-| yes   | above-range                | `Breach · above`, breach tone |
-| yes   | in-range                   | `Action needed`, warning tone |
-| no    | below-range                | `Below range`, warning tone   |
-| no    | above-range                | `Above range`, warning tone   |
-| no    | in-range and near edge     | `Near edge`, warning tone     |
-| no    | in-range and not near edge | `In range`, safe tone         |
+- `apps/app/src/api/srTheses.ts`, `apps/app/src/api/policyInsights.ts`, `packages/adapters/src/outbound/regime-engine/CurrentSrThesesAdapter.ts`, and `CurrentPolicyInsightsAdapter.ts` contain variants of body-aware cleanup, but they are not fully uniform in abort classification or cleanup placement.
+- The durable S/R adapter learning explicitly says to defer timeout cleanup until after `res.json()` for UI-facing fail-soft reads.
+- Architecture places external HTTP mechanics in adapters and app-shell API clients. There is no reason to introduce domain or application-layer types for this transport concern.
 
-The warning tone is preferred over the breach tone for `Action needed` because no breach direction is known. Existing `Chip` tokens already provide a neutral warning treatment, so no new visual token or chip variant is needed.
+## Design Decisions and Trade-offs
 
-Alternative considered: repair or reject the inconsistent state in the application/domain layer. This was rejected for this issue because an actionable trigger and a current range observation can legitimately diverge in time, and the issue explicitly excludes changing the canonical model and trigger semantics. Presentation must remain honest even when the two inputs disagree.
+### Decision 1: use a scoped lifecycle pattern, not a new shared package abstraction
 
-Alternative considered: map alert-plus-in-range to a directional breach using token order, price proximity, or a default side. This is prohibited. It would invent direction and risks violating the release-blocker directional invariant.
+Each affected operation will keep the existing `AbortController` and `setTimeout` mechanism, but the protected `try` will include status classification and every body read. A single outer `finally` will clear the timer on success, early return, parsing failure, network rejection, or abort.
 
-### Decision 2: represent RangeBar validity as a discriminated display model
-
-Extract the numeric validation and coordinate calculation from `RangeBar.tsx` into a focused pure helper, preferably `RangeBarUtils.ts`. The helper returns exactly one of:
+Conceptually, each path becomes:
 
 ```ts
-type RangeBarDisplayState =
-  | {
-      kind: 'available';
-      bandLeftPercent: number;
-      bandRightPercent: number;
-      markerPercent: number;
-    }
-  | {
-      kind: 'unavailable';
-      reason: RangeBarUnavailableReason;
-    };
+const controller = new AbortController();
+const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
+
+try {
+  const response = await fetch(url, { signal: controller.signal });
+  // Classify status and consume json()/text() while the timer is active.
+  return mapResponse(await readRequiredBody(response));
+} catch (error: unknown) {
+  // Preserve this caller's existing timeout/failure contract.
+} finally {
+  clearTimeout(timeoutId);
+}
 ```
 
-`RangeBarUnavailableReason` uses stable machine-readable codes:
+This is the recommended approach because the four paths do not share one response contract: the adapters return different fail-soft values, while the app clients throw feature-specific errors and inspect multiple body formats. A generic fetch-and-parse helper would either encode feature-specific status policy or require callbacks complicated enough to obscure the lifecycle it is meant to make safe. The established S/R adapter pattern is small, explicit, and already documented in this repository.
 
-- `current_price_non_finite`
-- `lower_price_non_finite`
-- `upper_price_non_finite`
-- `current_price_non_positive`
-- `lower_price_non_positive`
-- `upper_price_non_positive`
-- `bounds_not_ascending`
-- `derived_percentage_non_finite`
+Alternative considered: add one helper in `packages/adapters` and another in `apps/app` that owns the controller, timer, fetch, and parser callback. This reduces repeated setup, but it creates two nominally shared abstractions for only two callers each and still requires callers to own all response classification. It also increases the chance that a future callback catches and reclassifies aborts internally. This issue does not justify that abstraction.
 
-Validation order is the order above. When more than one input is invalid, the first matching reason is reported. This makes telemetry and tests deterministic without implying that later inputs are valid.
+Alternative considered: replace the manual timer with `AbortSignal.timeout()`. This is concise in runtimes that support it, but the app is an Expo/React Native and web application where runtime support needs separate compatibility validation. It also does not by itself solve body-error classification. Keeping the existing mechanism is lower risk and preserves compatibility.
 
-The available branch is created only after all three prices are finite and strictly positive and `upperBoundPrice > lowerBoundPrice`. The helper then computes the padded visual domain and all three percentages. If width, padding, visual-domain endpoints, or any derived percentage becomes non-finite or non-ascending because of overflow or floating-point collapse, the result is `derived_percentage_non_finite`. Clamping is allowed only for a finite percentage and continues to support genuine far-below and far-above prices at the track edges. No calculation function returns a midpoint fallback.
+### Decision 2: timeout covers network/body I/O, not synchronous validation
 
-`PositionCard` builds this model once and passes it to `RangeBar` with the existing display labels. `RangeBar` becomes a renderer of an already-classified state; it cannot accidentally place a marker for an unavailable state.
+The timer remains active through `fetch()`, `response.json()`, and `response.text()`. Once the required body value has been fully materialized, the timer may be cleared before synchronous shape validation and DTO mapping.
 
-Alternative considered: keep returning a number and use `null`, `undefined`, or `NaN` for invalid results. This is smaller but makes it easy for rendering code to coerce or default the value again, and it loses the reason needed for structured diagnostics.
+The simplest implementation can leave the outer `finally` around the entire async function body, which also covers the brief synchronous validation work. That difference is negligible for tiny payloads and guarantees exactly-once cleanup. The semantic requirement is that no asynchronous body read occurs after cleanup.
 
-Alternative considered: normalize invalid data to zero, a previous value, or a midpoint. This is rejected because all such values fabricate location. Missing or invalid is not zero.
+### Decision 3: preserve feature-level failure classification
 
-### Decision 3: render a dedicated unavailable branch, not a degraded active chart
+Adapter behavior remains unchanged at its public boundary:
 
-When `RangeBarDisplayState.kind === 'unavailable'`, `RangeBar` will:
+| Path and failure                       | Existing and proposed result                        |
+| -------------------------------------- | --------------------------------------------------- |
+| Regime fetch or body timeout/rejection | `{ kind: 'upstream-error' }` with warning telemetry |
+| S/R fetch or body timeout/rejection    | `null` with warning telemetry                       |
+| Regime recognized upstream `404`       | `{ kind: 'not-found' }`                             |
+| Regime recognized upstream `400`       | `{ kind: 'config-error' }`                          |
+| S/R upstream `404`                     | `null`                                              |
 
-- render no `range-bar-tick` marker;
-- render no current-price label positioned on the track;
-- render no active in-range band or directional breach decoration;
-- render a muted, disabled track or equivalent fixed-height placeholder using existing surface, border, and tertiary-text tokens;
-- show stable copy `Price unavailable`;
-- expose stable accessibility text such as `Price range unavailable`;
-- retain approximately the current component height so card layout does not jump.
+App client behavior also remains stable:
 
-The unavailable branch does not reuse raw labels. If a numeric input is invalid, continuing to display a formatted current or bound label beside a disabled chart could imply that the value is authoritative. A genuine midpoint remains in the available branch and renders a marker at `50%`, which makes it behaviorally distinct from unavailable.
+| BFF response/failure                  | Existing and proposed behavior                                                |
+| ------------------------------------- | ----------------------------------------------------------------------------- |
+| Abort during fetch or any body read   | Throw the feature's existing `request timed out` error                        |
+| `404` body says pool is not supported | Throw the existing typed unsupported-pool error                               |
+| Other parseable `404`                 | Throw the existing endpoint-not-found error                                   |
+| Unparseable non-abort `404` body      | Throw the existing unexpected-404 error                                       |
+| Non-success response                  | Preserve the existing feature-prefixed generic error and body/status fallback |
+| Invalid `200` JSON                    | Preserve the existing invalid-JSON error                                      |
+| Valid JSON with invalid DTO shape     | Preserve the existing malformed-response error                                |
 
-Loading remains a screen-level state. A loading positions screen does not render cards or `Price unavailable`; an unavailable RangeBar appears only after a position has loaded. No new loading prop is added to `RangeBar`.
+To achieve this, local body-read catches must distinguish abort from ordinary parse/read failure. An `AbortError` is rethrown to the request-level catch and translated into the existing timeout message. Only non-abort JSON failures become invalid-JSON or unexpected-404 errors; only non-abort text failures use the existing HTTP-status fallback.
 
-### Decision 4: report diagnostics through the existing observability seam
+The existing structural `isAbortError` check remains preferable to `instanceof DOMException` because React Native and test doubles may provide DOMException-like objects without the same global constructor identity.
 
-The UI will consume a narrow logger typed from the public application contract, such as `Pick<ObservabilityPort, 'log'>`. Production composition will instantiate or export the existing `TelemetryAdapter` from the approved `apps/app/src/composition/index.ts` entrypoint, and the positions route will pass it to `PositionsListScreen`, which passes it to each `PositionCard`.
+### Decision 4: treat the existing S/R adapter as audited behavior and add regression coverage
 
-`PositionCard` is the reporting boundary because it has both the pure classification results and non-wallet identities. Effects, rather than render-time calls, emit warnings when a classified warning state is mounted or changes. The two warnings are independent, so a card with alert-plus-in-range and invalid prices emits both and renders both `Action needed` and `Price unavailable`.
+`CurrentSrLevelsAdapter` already satisfies the core lifecycle requirement, so it does not need a behavioral rewrite merely to create a diff. Its focused test suite should gain a post-headers body-read regression case, and the implementation may receive only a naming/comment cleanup if useful. The test is the consistency change: it makes the previously implicit protection an enforced contract alongside the newly corrected paths.
 
-Suggested structured events:
+This avoids destabilizing the oldest and already-correct implementation while still applying the issue's requirement to both regime and S/R paths.
+
+## Proposed Approach
+
+### `CurrentRegimeAdapter`
+
+Move status handling and all calls to `response.json()` into the same timeout-owned `try/finally` as `fetch()`. Preserve URL validation before controller creation so configuration failures do not allocate a timer. Preserve the existing result union and observability messages.
+
+The private error-envelope reader may continue returning `null` for ordinary malformed JSON, but it must not prevent the request scope from observing an abort. Either rethrow `AbortError` from that helper or avoid catching body-read errors there and perform the existing envelope fallback at the caller. The preferred narrow change is to make the helper rethrow aborts and preserve `null` for all other parse failures.
+
+### `CurrentSrLevelsAdapter`
+
+Retain its current inner `try/finally`, which already covers the successful body read and clears the timer exactly once. Add a regression test that returns headers immediately and makes `json()` reject with an abort only after the supplied signal is aborted. The result remains `null` and a warning remains observable.
+
+### App regime and S/R clients
+
+For each exported fetch function:
+
+1. Create the controller and timer as today.
+2. Run the fetch, status branches, and required JSON/text reads inside one outer protected scope.
+3. At the request-level catch, translate any propagated `AbortError` to the existing feature-specific timeout error and rethrow all already-classified feature errors unchanged.
+4. In `classifyNotFound`, propagate abort errors while retaining current mappings for non-abort JSON failure and message inspection.
+5. For non-success `response.text()`, propagate an abort but retain the current `HTTP <status>` fallback for other read failures.
+6. In the success JSON branch, propagate an abort but retain the current invalid-JSON error for syntax or other non-abort read failures.
+7. Clear the timer once in the outer `finally`.
+
+This keeps the public functions and their return types unchanged. No callers, TanStack Query options, or UI components need modification.
+
+## Data and Control Flow
 
 ```text
-level: warn
-message: Position card alert conflicts with range status
-context: {
-  code: "position_alert_in_range",
-  positionId,
-  poolId,
-  hasAlert: true,
-  rangeStatusKind: "in-range"
-}
-
-level: warn
-message: Position card range visualization unavailable
-context: {
-  code: "range_bar_input_invalid",
-  reason,
-  positionId,
-  poolId,
-  rangeStatusKind,
-  hasAlert
-}
+caller
+  -> create AbortController + deadline timer
+  -> fetch(url, signal)
+  -> receive status/headers
+  -> choose body reader from status
+       200      -> json()
+       404      -> json() for unsupported classification
+       other !ok -> text() for controlled error detail
+  -> body settles
+       success  -> existing validation/result mapping
+       abort    -> existing timeout classification
+       other error -> existing parse/read classification
+  -> finally clears timer exactly once
+  -> caller receives the same feature-level result/error shape as before
 ```
 
-Wallet addresses, wallet labels, and other wallet metadata are not logged. Raw non-finite values are also omitted because JSON serialization can collapse them to `null`; the field-specific reason code carries the useful diagnostic class. Repeated mounts may produce repeated warning records, so these events are diagnostic signals rather than exact-once business events.
-
-Alternative considered: call `console.warn` directly inside UI helpers. This was rejected because pure helpers should remain side-effect free and the repository already has a structured application port and adapter.
-
-Alternative considered: send a new telemetry request to the backend. This would add a new network contract and infrastructure outside the issue's scope. The existing telemetry adapter is sufficient for the requested structured warning/logging behavior.
-
-## Proposed Component and Data Flow
-
-1. The existing BFF and client API return `PositionSummaryDto` values unchanged.
-2. `buildPositionListViewModel` continues mapping stable DTO fields without changing domain or application contracts.
-3. `PositionCard` derives the status-chip presentation through the pure status helper. Alert branches are evaluated before near-edge and normal branches.
-4. `PositionCard` derives `RangeBarDisplayState` through the pure range helper.
-5. `PositionCard` reports any status inconsistency and range-unavailable reason through the injected observability logger in effects.
-6. `RangeBar` renders either the authoritative available visualization or the explicit unavailable branch. The union prevents shared rendering code from accessing a marker percentage in the unavailable case.
-7. Card press behavior remains navigation-only. Neither classification nor logging invokes any execution use case.
-
-The precedence is therefore applied without coupling the two surfaces:
-
-- Alert state controls the chip first and always remains visible.
-- Price validity controls whether RangeBar is authoritative.
-- Directional breach, near-edge, and ordinary in-range presentation are used only in their existing valid contexts.
-- Alert and RangeBar unavailability may coexist; neither suppresses the other.
-
-RangeBar invalidity does not rewrite the application-provided range classification. For example, a non-alerting `below-range` position with invalid prices retains its `Below range` chip while the RangeBar says `Price unavailable`; the warning supersedes the chart, not the independently supplied status. This is the narrow interpretation of the issue's statement that chip status and RangeBar availability are separate concerns.
-
-## Expected File-Level Changes
-
-- `packages/ui/src/components/PositionCardUtils.ts` and its tests: add the alert-plus-in-range status branch and diagnostic code/result.
-- `packages/ui/src/components/RangeBarUtils.ts` and focused tests: add validation, reason classification, finite coordinate calculation, and the available/unavailable union.
-- `packages/ui/src/components/RangeBar.tsx` and its tests: render from the discriminated state and add unavailable/accessibility behavior.
-- `packages/ui/src/components/PositionCard.tsx` and its tests: build both presentations, emit structured warnings through the injected logger, and prove alert/unavailable coexistence.
-- `packages/ui/src/screens/PositionsListScreen.tsx` and its tests: accept and pass the observability dependency without changing list state behavior.
-- `apps/app/src/composition/index.ts`: expose the existing telemetry adapter through the approved composition seam.
-- `apps/app/app/(tabs)/positions.tsx` and relevant shell/composition tests: inject observability into the screen.
-
-No changes are proposed to `packages/domain`, application DTOs/use cases, position controllers, trigger repositories, execution code, or directional exit policy.
+The timeout budget is end-to-end for a single attempt. It does not reset after headers arrive, and it does not grant a fresh timeout for each body-read branch.
 
 ## Testing Strategy
 
-Pure status tests cover the complete alert/range matrix:
+Tests should use Vitest fake timers so the 2-second adapter and 10-second client budgets can be advanced deterministically without wall-clock delays. A response double should resolve from `fetch()` immediately, retain the request's `AbortSignal`, and expose a `json()` or `text()` promise that rejects with `{ name: 'AbortError' }` when that signal aborts. This proves the important sequence: headers arrived, body consumption began, the original timer remained live, and the public operation settled according to its contract.
 
-- alert plus below, above, and in-range;
-- no alert plus below and above;
-- no alert plus in-range near-edge and ordinary in-range;
-- alert precedence over `nearEdge=true`;
-- alert-plus-in-range yields `Action needed` and the inconsistency diagnostic without a breach side.
+Focused coverage:
 
-Pure RangeBar tests cover:
+- `CurrentRegimeAdapter.test.ts`: a `200` response whose `json()` hangs until abort returns `{ kind: 'upstream-error' }`; optionally cover a `404` error-envelope body to prove helper propagation.
+- `CurrentSrLevelsAdapter.test.ts`: a `200` response whose `json()` hangs until abort returns `null`, locking in the already-correct implementation.
+- `apps/app/src/api/regime.test.ts`: a post-headers `200` JSON abort throws the existing market-regime timeout error.
+- `apps/app/src/api/srLevels.test.ts`: a post-headers body abort throws the existing market-context timeout error. A representative `404` JSON or non-success text abort should also be covered because those branches have separate catches that could swallow aborts.
+- Existing happy path, unsupported `404`, generic `404`, non-success, invalid JSON, malformed DTO, network error, and immediate-fetch abort tests remain unchanged and must continue to pass.
+- Add a timer-cleanup assertion where practical: after a successful or rejected body read, no pending timeout should later abort the captured signal. This guards against moving cleanup later without guaranteeing cleanup.
 
-- `NaN`, positive infinity, and negative infinity for each required price field;
-- zero and negative current, lower, and upper prices;
-- equal and inverted bounds;
-- overflow or another non-finite derived-percentage case;
-- valid lower, midpoint, upper, far-below, and far-above values;
-- finite clamping at track edges;
-- exact midpoint remains available with a `50%` marker.
-
-Component tests cover:
-
-- unavailable renders `Price unavailable` and accessibility text;
-- unavailable has no tick, current label, active band, or breach decoration;
-- available midpoint has a tick and does not show unavailable copy;
-- directional below/above alert styling remains unchanged for valid data;
-- `Action needed` and `Price unavailable` render together when both conditions exist;
-- the card's accessibility label includes `Action needed` for the inconsistent alert state;
-- each warning carries its stable code, position ID, pool ID, and relevant state, with no wallet address;
-- a normal card emits no warning;
-- clicking the card still only calls `onPress`.
-
-Screen/route tests cover:
-
-- the production route supplies the composed observability dependency;
-- loading remains distinct from unavailable;
-- existing disconnected, error, empty, partial-data, and loaded-list behavior is unchanged.
-
-Implementation verification should use the narrow UI and app tests during development, followed by `pnpm build`, `pnpm typecheck`, `pnpm lint`, `pnpm boundaries`, and `pnpm test` because the observability injection crosses UI, app shell, and adapter composition boundaries.
+At implementation completion, run the narrow adapter and app API test files during development, then the issue's required `pnpm typecheck` and `pnpm test`. Because the change spans the app shell and adapters but does not alter package contracts, full `pnpm build`, `pnpm lint`, and `pnpm boundaries` are prudent final verification if the implementation touches a shared utility or exports; they are optional for a strictly local control-flow change unless repository policy for that implementation session requires the full suite.
 
 ## Assumptions
 
-- `hasAlert` continues to mean that an actionable trigger already exists; this issue does not re-qualify it.
-- `rangeStatusKind` remains the application's current derived range classification and may be temporally newer than the actionable trigger.
-- All RangeBar price inputs are required to be strictly positive for this component, including the current price.
-- `Action needed` is the approved stable copy for alert-plus-in-range, and the existing warning chip tone is the approved neutral-warning treatment.
-- `Price unavailable` is the approved stable copy for every invalid input reason; reason-specific details belong in telemetry, not user copy.
-- Position and pool IDs are acceptable diagnostic identifiers; wallet addresses are unnecessary and must not be included.
-- The existing `TelemetryAdapter` is safe for the Expo client because it depends only on `console` and `Date`, and its use is wired only through the approved composition entrypoint.
-- Diagnostic warnings are at-least-once per mounted warning state, not exact-once events.
-- Invalid input rendering is a defensive UI concern even if upstream validation is strengthened later.
+- The issue's timeout is a total per-request budget beginning immediately before `fetch()` and ending only after the required response body has been consumed; it is not a separate connection timeout plus body timeout.
+- Existing timeout durations remain 2 seconds for outbound regime-engine adapter reads and 10 seconds for app-to-BFF reads.
+- The native fetch implementations used by Node, Expo/React Native, and supported browsers connect the request `AbortSignal` to response-body consumption, as required by Fetch semantics.
+- Test doubles may model body cancellation by rejecting their body promise when the captured signal emits `abort`; production code does not need a separate `Promise.race` deadline solely to compensate for mocks that ignore the signal.
+- A body-read `AbortError` in an app client is semantically the same timeout class as an initial-fetch `AbortError` and should use the same existing message.
+- Non-abort body rejections retain their existing invalid-JSON, unexpected-404, or HTTP fallback classifications rather than being relabeled as timeouts.
+- `CurrentSrLevelsAdapter`'s present inner `try/finally` is correct and should be preserved rather than rewritten for cosmetic consistency.
+- `issue-comments.md` is empty, so there are no additional maintainer constraints beyond `issue.md` and repository guidance.
 
 ## In Scope
 
-- Status-chip precedence and `Action needed` presentation.
-- RangeBar input validation and derived-coordinate validation.
-- A discriminated available/unavailable RangeBar rendering model.
-- Disabled/unavailable UI, stable copy, test IDs, and accessibility text.
-- Structured warnings through existing observability composition.
-- Focused helper, component, screen, composition, and route tests.
+- Extending the 2-second regime adapter timeout through successful and error-envelope JSON reads.
+- Verifying and locking in the existing body-aware 2-second S/R adapter timeout.
+- Extending both 10-second app client timeouts through success JSON, 404 JSON, and non-success text reads.
+- Preserving current graceful-degradation values, typed unsupported-pool errors, unavailable reasons, controlled error messages, and observability behavior.
+- Deterministic regression tests for body reads that hang until abort or reject after headers arrive.
+- Exactly-once timer cleanup on all exits.
 
 ## Explicitly Out of Scope
 
-- Trigger qualification, debounce, breach episode, or alert lifecycle changes.
-- Inferring a breach direction for alert-plus-in-range.
-- Changes to the canonical position/range domain model or directional exit mapping.
-- Repairing, caching, retrying, or substituting upstream price data.
-- Creating previews, approvals, signatures, submissions, or execution attempts.
-- Backend telemetry ingestion APIs or a new client analytics system.
-- Broad position-card redesign or unrelated view-model cleanup.
-- Changing financial metric behavior or market insight sections.
+- Changes to market-context DTOs, application ports, BFF routes/controllers, or UI rendering.
+- Changes to supported-pool allowlists, regime/S/R query parameters, cache policy, TanStack Query retry behavior, or stale times.
+- New retries, backoff, circuit breakers, caching, streaming support, or configurable timeout environment variables.
+- Hardening policy-insight, S/R-theses, execution-event, or unrelated fetch paths; their similar patterns may be audited in a separate follow-up.
+- Replacing all repository fetch calls with a universal HTTP client.
+- Adding an external timeout or HTTP dependency.
+- Changes to domain logic, trigger qualification, execution planning, wallet signing, or the release-blocker directional exit invariant.
 
 ## Risks and Concerns
 
-- **React effect duplication:** development Strict Mode or remounts can duplicate warnings. Consumers must not treat these logs as counters or execution events.
-- **Validation drift:** `isNearEdge` and RangeBar validity both reason about prices. Keeping all authoritative RangeBar validity and coordinate logic in one helper reduces drift; tests must prove invalid values cannot reach an available model.
-- **DTO validation gap:** list DTO runtime validation currently allows some values that the RangeBar contract rejects and does not validate `currentPrice`. The UI guard is intentional, but upstream validation may deserve a separate follow-up. Tightening it here could turn a recoverable per-card state into a whole-list fetch failure and is therefore out of scope.
-- **Floating-point extremes:** finite inputs can still overflow during subtraction or padding. The derived-result guard must include intermediate values, not only final percentages.
-- **Misleading residual labels:** retaining numeric labels in unavailable mode could undermine the fail-closed behavior. The unavailable branch should avoid presenting them as authoritative.
-- **Observability wiring omission:** making the logger required at the production screen boundary and covering route composition in tests prevents a silent no-op in production.
-- **Execution coupling:** diagnostic callbacks must expose only logging. They must not reuse alert acknowledgement, preview, approval, or execution handlers.
-- **Directional invariant:** alert-plus-in-range must remain directionless. No UI helper may derive lower/upper breach direction from token order, proximity, or a fallback.
+- **Abort misclassification:** `response.json()` and `response.text()` catches currently treat every rejection as a parse/read failure in several branches. If abort is not explicitly propagated, the timer can fire correctly while users still see invalid-JSON or endpoint errors. Tests must assert the public timeout classification, not only that `controller.abort()` was called.
+- **Swallowed text-read aborts:** the existing `.catch(() => fallback)` on non-success `response.text()` will swallow `AbortError`. It needs an abort-aware catch rather than a blanket fallback.
+- **Timer leaks:** moving cleanup outward can leave timers pending if an early return or thrown typed error bypasses cleanup. A single outer `finally` is mandatory; scattered `clearTimeout` calls should not remain in the same function.
+- **Fake-timer hangs:** a test body promise that never observes the request signal will remain pending even after fake timers advance. Response doubles must reject on the captured signal's `abort` event, and fake timers must always be restored in teardown.
+- **Runtime cancellation variance:** this design relies on standard fetch signal propagation to the body stream. If a supported runtime is later found not to honor it, a `Promise.race` with an explicit timeout rejection can be added as a separately tested compatibility hardening measure.
+- **Scope creep from neighboring clients:** similar timeout patterns exist in policy-insight and S/R-theses code. Changing them in this issue would broaden regression risk and acceptance criteria; note them for follow-up rather than silently expanding scope.
+- **Over-abstraction:** a shared helper that owns feature-specific status parsing could blur the adapter/app boundaries and make error semantics less visible. Keep transport lifetime explicit in the four scoped paths.
 
 ## Completion Criteria
 
-The design is satisfied when every actionable alert has visible chip presentation, every invalid RangeBar input produces only the explicit unavailable state, both warnings can coexist, structured diagnostics identify the affected position/pool and reason without wallet data, and all trigger and execution semantics remain unchanged.
+The design is satisfied when the regime and S/R adapter/client requests retain one timeout from request start through the last required asynchronous body read, body-timeout aborts settle using each path's existing failure contract, all timers are cleared exactly once, and existing market-context API, DTO, and UI behavior remains unchanged.
