@@ -14,7 +14,6 @@ import {
   getStatusChipProps,
   getStatusDiagnosticCode,
   isNearEdge,
-  splitTokenPair,
 } from './PositionCardUtils.js';
 
 type PositionCardObservability = Pick<ObservabilityPort, 'log'>;
@@ -48,13 +47,14 @@ export function PositionCard({ item, observability, onPress }: Props): JSX.Eleme
     poolFees24h,
   } = item;
 
-  const tokens = splitTokenPair(poolLabel);
   const truncatedPoolId = formatPoolId(poolId);
   const nearEdge = isNearEdge({ currentPrice, lowerBoundPrice, upperBoundPrice });
   const chip = getStatusChipProps({ rangeStatusKind, hasAlert, nearEdge });
   const monitoring = getMonitoringDisplay(monitoringStatus);
 
   const breachSide = getBreachSide(hasAlert, rangeStatusKind);
+
+  const accessiblePoolLabel = poolLabel.trim() ? poolLabel : 'Unknown pool';
 
   const rangeBarDisplayState = useMemo(
     () => buildRangeBarDisplayState({ currentPrice, lowerBoundPrice, upperBoundPrice }),
@@ -94,7 +94,7 @@ export function PositionCard({ item, observability, onPress }: Props): JSX.Eleme
     <TouchableOpacity
       testID={`position-card-${poolId}`}
       accessibilityRole="button"
-      accessibilityLabel={`Position card for ${poolLabel}, ${chip.label}`}
+      accessibilityLabel={`Position card for ${accessiblePoolLabel}, ${chip.label}`}
       onPress={onPress}
       activeOpacity={0.8}
       style={{
@@ -117,7 +117,7 @@ export function PositionCard({ item, observability, onPress }: Props): JSX.Eleme
         }}
       >
         <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
-          <PairGlyph a={tokens.a} b={tokens.b} size={30} />
+          <PairGlyph label={poolLabel} size={30} />
           <View>
             <Text
               style={{

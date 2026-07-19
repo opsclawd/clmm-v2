@@ -302,3 +302,24 @@ describe('PositionCard', () => {
     expect(observability.log).toHaveBeenCalledTimes(2);
   });
 });
+
+describe('PositionCard pool-label fallback', () => {
+  it('preserves a malformed non-empty pool label in visible and accessible card identity', () => {
+    render(
+      <PositionCard item={makeItem({ poolLabel: 'SOL-USDC' })} observability={observability} />,
+    );
+
+    expect(screen.getByText('SOL-USDC')).toBeTruthy();
+    expect(screen.getByLabelText('Position card for SOL-USDC, In range')).toBeTruthy();
+  });
+
+  it.each(['', '   '])(
+    'uses Unknown pool in the accessible name for empty and whitespace-only labels: %j',
+    (poolLabel) => {
+      render(<PositionCard item={makeItem({ poolLabel })} observability={observability} />);
+
+      expect(screen.getByLabelText('Position card for Unknown pool, In range')).toBeTruthy();
+      cleanup();
+    },
+  );
+});

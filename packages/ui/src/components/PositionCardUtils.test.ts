@@ -7,26 +7,7 @@ import {
   getStatusDiagnosticCode,
   isNearEdge,
   parsePairGlyphLabel,
-  splitTokenPair,
 } from './PositionCardUtils.js';
-
-describe('splitTokenPair', () => {
-  it('returns both symbols for a well-formed "A / B" label', () => {
-    expect(splitTokenPair('SOL / USDC')).toEqual({ a: 'SOL', b: 'USDC' });
-  });
-
-  it('trims whitespace around symbols', () => {
-    expect(splitTokenPair('  SOL  /  USDC ')).toEqual({ a: 'SOL', b: 'USDC' });
-  });
-
-  it('returns the whole label as `a` and empty `b` when no separator present', () => {
-    expect(splitTokenPair('SOL-USDC')).toEqual({ a: 'SOL-USDC', b: '' });
-  });
-
-  it('returns empty pair for empty string', () => {
-    expect(splitTokenPair('')).toEqual({ a: '', b: '' });
-  });
-});
 
 describe('parsePairGlyphLabel', () => {
   it('returns a pair for exactly one slash and two non-empty compact symbols', () => {

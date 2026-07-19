@@ -1,5 +1,6 @@
 import { View, Text } from 'react-native';
 import { colors, typography } from '../design-system/index.js';
+import { parsePairGlyphLabel } from './PositionCardUtils.js';
 
 type TokenGlyphProps = {
   symbol: string;
@@ -10,6 +11,7 @@ type TokenGlyphProps = {
 function TokenGlyph({ symbol, size, tint }: TokenGlyphProps): JSX.Element {
   return (
     <View
+      testID="token-glyph"
       style={{
         width: size,
         height: size,
@@ -36,14 +38,34 @@ function TokenGlyph({ symbol, size, tint }: TokenGlyphProps): JSX.Element {
 }
 
 export type PairGlyphProps = {
-  a: string;
-  b: string;
+  label: string;
   size?: number;
 };
 
-export function PairGlyph({ a, b, size = 28 }: PairGlyphProps): JSX.Element {
+export function PairGlyph({ label, size = 28 }: PairGlyphProps): JSX.Element {
+  const parsed = parsePairGlyphLabel(label);
+
+  if (parsed.kind === 'single') {
+    return (
+      <View
+        testID="pair-glyph-single"
+        accessible={false}
+        style={{
+          width: size,
+          height: size,
+          alignItems: 'center',
+          justifyContent: 'center',
+        }}
+      >
+        <TokenGlyph symbol={parsed.symbol} size={size} />
+      </View>
+    );
+  }
+
   return (
     <View
+      testID="pair-glyph-pair"
+      accessible={false}
       style={{
         position: 'relative',
         width: size * 1.55,
@@ -51,10 +73,10 @@ export function PairGlyph({ a, b, size = 28 }: PairGlyphProps): JSX.Element {
       }}
     >
       <View style={{ position: 'absolute', left: 0, top: 0 }}>
-        <TokenGlyph symbol={a} size={size} tint={colors.safe} />
+        <TokenGlyph symbol={parsed.a} size={size} tint={colors.safe} />
       </View>
       <View style={{ position: 'absolute', left: size * 0.55, top: 0 }}>
-        <TokenGlyph symbol={b} size={size} tint={colors.accent} />
+        <TokenGlyph symbol={parsed.b} size={size} tint={colors.accent} />
       </View>
     </View>
   );
