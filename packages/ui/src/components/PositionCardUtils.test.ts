@@ -6,6 +6,7 @@ import {
   getStatusChipProps,
   getStatusDiagnosticCode,
   isNearEdge,
+  parsePairGlyphLabel,
   splitTokenPair,
 } from './PositionCardUtils.js';
 
@@ -25,6 +26,56 @@ describe('splitTokenPair', () => {
   it('returns empty pair for empty string', () => {
     expect(splitTokenPair('')).toEqual({ a: '', b: '' });
   });
+});
+
+describe('parsePairGlyphLabel', () => {
+  it('returns a pair for exactly one slash and two non-empty compact symbols', () => {
+    expect(parsePairGlyphLabel('SOL/USDC')).toEqual({ kind: 'pair', a: 'SOL', b: 'USDC' });
+  });
+
+  it('trims the full label and both symbols before returning a pair', () => {
+    expect(parsePairGlyphLabel('  SOL  /  USDC  ')).toEqual({
+      kind: 'pair',
+      a: 'SOL',
+      b: 'USDC',
+    });
+  });
+
+  it('returns the trimmed original as a single glyph when no slash exists', () => {
+    expect(parsePairGlyphLabel('  BONK  ')).toEqual({ kind: 'single', symbol: 'BONK' });
+  });
+
+  it('does not guess that a hyphen is a pair separator', () => {
+    expect(parsePairGlyphLabel('SOL-USDC')).toEqual({ kind: 'single', symbol: 'SOL-USDC' });
+  });
+
+  it.each(['', '   '])(
+    'returns the unknown single glyph for empty and whitespace-only labels: %j',
+    (label) => {
+      expect(parsePairGlyphLabel(label)).toEqual({ kind: 'single', symbol: '?' });
+    },
+  );
+
+  it.each(['SOL/', '/USDC', '  /  '])(
+    'returns the unknown single glyph when either slash-delimited segment is empty: %s',
+    (label) => {
+      expect(parsePairGlyphLabel(label)).toEqual({ kind: 'single', symbol: '?' });
+    },
+  );
+
+  it.each(['SOL//USDC', 'SOL/USDC/ETH'])(
+    'returns the unknown single glyph for repeated or extra slash separators: %s',
+    (label) => {
+      expect(parsePairGlyphLabel(label)).toEqual({ kind: 'single', symbol: '?' });
+    },
+  );
+
+  it.each(['SOL/', '/USDC', 'SOL//USDC', 'SOL/USDC/ETH'])(
+    'never returns a pair containing an empty symbol: %s',
+    (label) => {
+      expect(parsePairGlyphLabel(label).kind).toBe('single');
+    },
+  );
 });
 
 describe('formatPoolId', () => {
