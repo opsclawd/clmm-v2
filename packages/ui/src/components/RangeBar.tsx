@@ -1,53 +1,42 @@
 import { View, Text } from 'react-native';
 import { colors, typography } from '../design-system/index.js';
+import type { RangeBarDisplayState } from './RangeBarUtils.js';
 
 export type RangeBarProps = {
-  lowerBoundPrice: number;
-  upperBoundPrice: number;
-  currentPrice: number;
+  displayState: RangeBarDisplayState;
   lowerBoundLabel: string;
   upperBoundLabel: string;
   currentPriceLabel: string;
   breachSide?: 'below' | 'above';
 };
 
-const VISUAL_PAD_FRACTION = 0.35;
 const TRACK_HEIGHT = 10;
 const TICK_WIDTH = 2;
 const TICK_HEIGHT = 22;
 
-function clampPercent(value: number): number {
-  if (!Number.isFinite(value)) return 50;
-  if (value < 0) return 0;
-  if (value > 100) return 100;
-  return value;
-}
-
-function pricePercent(price: number, lo: number, hi: number): number {
-  if (!Number.isFinite(price) || !Number.isFinite(lo) || !Number.isFinite(hi) || hi <= lo) {
-    return 50;
-  }
-  return clampPercent(((price - lo) / (hi - lo)) * 100);
-}
-
 export function RangeBar({
-  lowerBoundPrice,
-  upperBoundPrice,
-  currentPrice,
+  displayState,
   lowerBoundLabel,
   upperBoundLabel,
   currentPriceLabel,
   breachSide,
 }: RangeBarProps): JSX.Element {
-  const width = upperBoundPrice - lowerBoundPrice;
-  const safeWidth = width > 0 ? width : 1;
-  const pad = safeWidth * VISUAL_PAD_FRACTION;
-  const lo = lowerBoundPrice - pad;
-  const hi = upperBoundPrice + pad;
+  if (displayState.kind === 'unavailable') {
+    return (
+      <View
+        testID="range-bar-unavailable"
+        accessibilityLabel="Price range unavailable"
+        style={{ paddingTop: 8, paddingBottom: 32, paddingHorizontal: 4 }}
+      >
+        <View style={{ height: TRACK_HEIGHT, backgroundColor: colors.border, borderRadius: 999 }} />
+        <Text style={{ marginTop: 12, height: 14, color: colors.textTertiary }}>
+          Price unavailable
+        </Text>
+      </View>
+    );
+  }
 
-  const bandLeft = pricePercent(lowerBoundPrice, lo, hi);
-  const bandRight = pricePercent(upperBoundPrice, lo, hi);
-  const tickLeft = pricePercent(currentPrice, lo, hi);
+  const { bandLeftPercent, bandRightPercent, markerPercent } = displayState;
 
   const tickColor = breachSide ? colors.breachAccent : colors.textPrimary;
 
@@ -70,7 +59,7 @@ export function RangeBar({
           style={{
             position: 'absolute',
             left: 0,
-            width: `${bandLeft}%`,
+            width: `${bandLeftPercent}%`,
             top: 0,
             bottom: 0,
             backgroundColor:
@@ -84,7 +73,7 @@ export function RangeBar({
           style={{
             position: 'absolute',
             right: 0,
-            width: `${100 - bandRight}%`,
+            width: `${100 - bandRightPercent}%`,
             top: 0,
             bottom: 0,
             backgroundColor:
@@ -94,10 +83,11 @@ export function RangeBar({
           }}
         />
         <View
+          testID="range-bar-active-band"
           style={{
             position: 'absolute',
-            left: `${bandLeft}%`,
-            width: `${Math.max(0, bandRight - bandLeft)}%`,
+            left: `${bandLeftPercent}%`,
+            width: `${Math.max(0, bandRightPercent - bandLeftPercent)}%`,
             top: 0,
             bottom: 0,
             backgroundColor: 'rgba(158,236,209,0.18)',
@@ -110,7 +100,7 @@ export function RangeBar({
           testID="range-bar-tick"
           style={{
             position: 'absolute',
-            left: `${tickLeft}%`,
+            left: `${markerPercent}%`,
             top: -6,
             width: TICK_WIDTH,
             height: TICK_HEIGHT,
@@ -131,7 +121,7 @@ export function RangeBar({
         <Text
           style={{
             position: 'absolute',
-            left: `${bandLeft}%`,
+            left: `${bandLeftPercent}%`,
             transform: [{ translateX: -20 }],
             fontFamily: typography.fontFamily.mono,
             fontSize: typography.fontSize.micro,
@@ -143,7 +133,7 @@ export function RangeBar({
         <Text
           style={{
             position: 'absolute',
-            left: `${tickLeft}%`,
+            left: `${markerPercent}%`,
             transform: [{ translateX: -20 }],
             fontFamily: typography.fontFamily.mono,
             fontSize: typography.fontSize.micro,
@@ -156,7 +146,7 @@ export function RangeBar({
         <Text
           style={{
             position: 'absolute',
-            left: `${bandRight}%`,
+            left: `${bandRightPercent}%`,
             transform: [{ translateX: -20 }],
             fontFamily: typography.fontFamily.mono,
             fontSize: typography.fontSize.micro,

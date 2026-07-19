@@ -4,6 +4,7 @@ import { colors, typography } from '../design-system/index.js';
 import { Chip } from './Chip.js';
 import { PairGlyph } from './PairGlyph.js';
 import { RangeBar } from './RangeBar.js';
+import { buildRangeBarDisplayState } from './RangeBarUtils.js';
 import {
   formatPoolId,
   getBreachSide,
@@ -48,6 +49,12 @@ export function PositionCard({ item, onPress }: Props): JSX.Element {
   const monitoring = getMonitoringDisplay(monitoringStatus);
 
   const breachSide = getBreachSide(hasAlert, rangeStatusKind);
+
+  const rangeBarDisplayState = buildRangeBarDisplayState({
+    currentPrice,
+    lowerBoundPrice,
+    upperBoundPrice,
+  });
 
   const tvlValueColor = poolTvl.kind === 'available' ? colors.textPrimary : colors.textTertiary;
   const feesValueColor =
@@ -108,9 +115,7 @@ export function PositionCard({ item, onPress }: Props): JSX.Element {
 
       {/* Range bar */}
       <RangeBar
-        lowerBoundPrice={lowerBoundPrice}
-        upperBoundPrice={upperBoundPrice}
-        currentPrice={currentPrice}
+        displayState={rangeBarDisplayState}
         lowerBoundLabel={lowerBoundLabel}
         upperBoundLabel={upperBoundLabel}
         currentPriceLabel={currentPriceLabel}
