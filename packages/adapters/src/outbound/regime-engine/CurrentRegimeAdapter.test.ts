@@ -80,6 +80,30 @@ describe('CurrentRegimeAdapter', () => {
 
   afterEach(() => {
     vi.restoreAllMocks();
+    vi.useRealTimers();
+  });
+
+  it('returns kind:"upstream-error" when a 200 body stalls until the 2s deadline', async () => {
+    vi.useFakeTimers();
+    let signal: AbortSignal | undefined;
+    vi.mocked(fetch).mockImplementation((_input, init) => {
+      signal = init?.signal as AbortSignal;
+      return Promise.resolve({
+        status: 200,
+        json: () =>
+          new Promise((_, reject) => {
+            signal!.addEventListener('abort', () => reject({ name: 'AbortError' }), { once: true });
+          }),
+      } as Response);
+    });
+    const adapter = new CurrentRegimeAdapter('https://regime.example.com', obs.port);
+
+    const pending = adapter.fetchCurrent(PARAMS);
+    await vi.advanceTimersByTimeAsync(2_000);
+
+    await expect(pending).resolves.toEqual({ kind: 'upstream-error' });
+    expect(signal?.aborted).toBe(true);
+    expect(obs.logs.some((entry) => entry.level === 'warn')).toBe(true);
   });
 
   it('returns kind:"block" with parsed RegimeBlock on 200', async () => {
@@ -192,6 +216,28 @@ describe('CurrentRegimeAdapter', () => {
     const adapter = new CurrentRegimeAdapter('https://regime.example.com', obs.port);
     const result = await adapter.fetchCurrent(PARAMS);
     expect(result.kind).toBe('upstream-error');
+  });
+
+  it('returns kind:"upstream-error" when a 404 error body stalls until the 2s deadline', async () => {
+    vi.useFakeTimers();
+    let signal: AbortSignal | undefined;
+    vi.mocked(fetch).mockImplementation((_input, init) => {
+      signal = init?.signal as AbortSignal;
+      return Promise.resolve({
+        status: 404,
+        json: () =>
+          new Promise((_, reject) => {
+            signal!.addEventListener('abort', () => reject({ name: 'AbortError' }), { once: true });
+          }),
+      } as Response);
+    });
+    const adapter = new CurrentRegimeAdapter('https://regime.example.com', obs.port);
+
+    const pending = adapter.fetchCurrent(PARAMS);
+    await vi.advanceTimersByTimeAsync(2_000);
+
+    await expect(pending).resolves.toEqual({ kind: 'upstream-error' });
+    expect(signal?.aborted).toBe(true);
   });
 
   it('returns kind:"upstream-error" on 5xx', async () => {
@@ -704,5 +750,20 @@ describe('CurrentRegimeAdapter', () => {
     const adapter = new CurrentRegimeAdapter('https://regime.example.com', obs.port);
     const result = await adapter.fetchCurrent({ ...PARAMS, timeframe: '7m' });
     expect(result.kind).toBe('block');
+  });
+
+  it('clears the adapter deadline after the response body settles', async () => {
+    vi.useFakeTimers();
+    let signal: AbortSignal | undefined;
+    vi.mocked(fetch).mockImplementation((_input, init) => {
+      signal = init?.signal as AbortSignal;
+      return Promise.resolve(new Response(JSON.stringify(SAMPLE_UPSTREAM), { status: 200 }));
+    });
+    const adapter = new CurrentRegimeAdapter('https://regime.example.com', obs.port);
+
+    await expect(adapter.fetchCurrent(PARAMS)).resolves.toMatchObject({ kind: 'block' });
+    await vi.advanceTimersByTimeAsync(2_001);
+
+    expect(signal?.aborted).toBe(false);
   });
 });

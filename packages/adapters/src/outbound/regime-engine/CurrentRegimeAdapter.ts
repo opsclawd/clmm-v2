@@ -38,6 +38,10 @@ function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null && !Array.isArray(value);
 }
 
+function isAbortError(error: unknown): boolean {
+  return isRecord(error) && error['name'] === 'AbortError';
+}
+
 function parseReasons(raw: unknown): RegimeReason[] | null {
   if (!Array.isArray(raw)) return null;
   const out: RegimeReason[] = [];
@@ -280,9 +284,49 @@ export class CurrentRegimeAdapter implements RegimeReadPort {
     const controller = new AbortController();
     const timeout = setTimeout(() => controller.abort(), FETCH_TIMEOUT_MS);
 
-    let response: Response;
     try {
-      response = await fetch(url.toString(), { signal: controller.signal });
+      const response = await fetch(url.toString(), { signal: controller.signal });
+
+      if (response.status === 200) {
+        let body: unknown;
+        try {
+          body = await response.json();
+        } catch (error: unknown) {
+          if (isAbortError(error)) throw error;
+          this.observability.log('warn', 'Regime response was not valid JSON');
+          return { kind: 'upstream-error' };
+        }
+        const block = parseUpstream(body);
+        if (!block) {
+          this.observability.log('warn', 'Regime response failed shape validation');
+          return { kind: 'upstream-error' };
+        }
+        return { kind: 'block', block };
+      }
+
+      if (response.status === 404) {
+        const envelope = await this.readErrorEnvelope(response);
+        if (envelope?.code === 'CANDLES_NOT_FOUND') {
+          return { kind: 'not-found' };
+        }
+        this.observability.log('warn', 'Regime upstream 404 with unexpected code', { envelope });
+        return { kind: 'upstream-error' };
+      }
+
+      if (response.status === 400) {
+        const envelope = await this.readErrorEnvelope(response);
+        if (envelope?.code === 'VALIDATION_ERROR') {
+          this.observability.log('warn', 'Regime upstream rejected request as VALIDATION_ERROR', {
+            envelope,
+          });
+          return { kind: 'config-error' };
+        }
+        this.observability.log('warn', 'Regime upstream 400 with unexpected code', { envelope });
+        return { kind: 'upstream-error' };
+      }
+
+      this.observability.log('warn', 'Regime upstream non-2xx', { status: response.status });
+      return { kind: 'upstream-error' };
     } catch (error: unknown) {
       const message = error instanceof Error ? error.message : String(error);
       this.observability.log('warn', 'Regime fetch network error', { message });
@@ -290,46 +334,6 @@ export class CurrentRegimeAdapter implements RegimeReadPort {
     } finally {
       clearTimeout(timeout);
     }
-
-    if (response.status === 200) {
-      let body: unknown;
-      try {
-        body = await response.json();
-      } catch {
-        this.observability.log('warn', 'Regime response was not valid JSON');
-        return { kind: 'upstream-error' };
-      }
-      const block = parseUpstream(body);
-      if (!block) {
-        this.observability.log('warn', 'Regime response failed shape validation');
-        return { kind: 'upstream-error' };
-      }
-      return { kind: 'block', block };
-    }
-
-    if (response.status === 404) {
-      const envelope = await this.readErrorEnvelope(response);
-      if (envelope?.code === 'CANDLES_NOT_FOUND') {
-        return { kind: 'not-found' };
-      }
-      this.observability.log('warn', 'Regime upstream 404 with unexpected code', { envelope });
-      return { kind: 'upstream-error' };
-    }
-
-    if (response.status === 400) {
-      const envelope = await this.readErrorEnvelope(response);
-      if (envelope?.code === 'VALIDATION_ERROR') {
-        this.observability.log('warn', 'Regime upstream rejected request as VALIDATION_ERROR', {
-          envelope,
-        });
-        return { kind: 'config-error' };
-      }
-      this.observability.log('warn', 'Regime upstream 400 with unexpected code', { envelope });
-      return { kind: 'upstream-error' };
-    }
-
-    this.observability.log('warn', 'Regime upstream non-2xx', { status: response.status });
-    return { kind: 'upstream-error' };
   }
 
   private async readErrorEnvelope(
@@ -345,7 +349,8 @@ export class CurrentRegimeAdapter implements RegimeReadPort {
         if (typeof err['message'] === 'string') out.message = err['message'];
       }
       return out;
-    } catch {
+    } catch (error: unknown) {
+      if (isAbortError(error)) throw error;
       return null;
     }
   }
