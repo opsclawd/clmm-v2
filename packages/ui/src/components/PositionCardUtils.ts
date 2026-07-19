@@ -1,12 +1,33 @@
 import type { MonitoringStatus } from '../view-models/PositionListViewModel.js';
 
-export type TokenPair = { a: string; b: string };
+export type ParsedPairGlyph =
+  | { kind: 'pair'; a: string; b: string }
+  | { kind: 'single'; symbol: string };
 
-export function splitTokenPair(label: string): TokenPair {
-  if (!label) return { a: '', b: '' };
-  const parts = label.split('/');
-  if (parts.length < 2) return { a: label.trim(), b: '' };
-  return { a: (parts[0] ?? '').trim(), b: (parts[1] ?? '').trim() };
+const UNKNOWN_GLYPH_SYMBOL = '?';
+
+export function parsePairGlyphLabel(label: string): ParsedPairGlyph {
+  const trimmedLabel = label.trim();
+  const parts = trimmedLabel.split('/');
+
+  if (parts.length === 1) {
+    return {
+      kind: 'single',
+      symbol: trimmedLabel || UNKNOWN_GLYPH_SYMBOL,
+    };
+  }
+
+  if (parts.length !== 2) {
+    return { kind: 'single', symbol: UNKNOWN_GLYPH_SYMBOL };
+  }
+
+  const a = (parts[0] ?? '').trim();
+  const b = (parts[1] ?? '').trim();
+  if (!a || !b) {
+    return { kind: 'single', symbol: UNKNOWN_GLYPH_SYMBOL };
+  }
+
+  return { kind: 'pair', a, b };
 }
 
 const POOL_ID_HEAD = 4;
