@@ -1,15 +1,193 @@
 import { describe, it, expect } from 'vitest';
-import { buildSolUsdcPositionInsight } from './buildSolUsdcPositionInsight.js';
+import { buildSolUsdcPositionInsight, type PriceMapEntry } from './buildSolUsdcPositionInsight.js';
 import { FIXTURE_POSITION_DETAIL, FIXTURE_POSITION_IN_RANGE } from '@clmm/testing';
+import { makeClockTimestamp } from '@clmm/domain';
+
+const SOL_MINT = 'So11111111111111111111111111111111111111112';
+const USDC_MINT = 'EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v';
+
+function makePriceMapEntry(
+  mint: string,
+  usdValue: number,
+  symbol: string,
+  quotedAt?: number,
+  source?: string,
+): PriceMapEntry {
+  return {
+    usdValue,
+    symbol,
+    quotedAt: quotedAt ?? makeClockTimestamp(1_700_000_000_000),
+    source: source ?? 'orca_full_liquidity_quote',
+  };
+}
 
 describe('buildSolUsdcPositionInsight', () => {
+  describe('behavioral invariants', () => {
+    it('serializes exact principal amounts including zero', () => {
+      const detailWithPrincipal = {
+        ...FIXTURE_POSITION_DETAIL,
+        principalTokenAmounts: {
+          amountA: 0n,
+          amountB: 0n,
+          observedAt: makeClockTimestamp(1_700_000_100_000),
+        },
+      };
+      const priceMap = new Map<string, PriceMapEntry>([
+        [SOL_MINT, makePriceMapEntry(SOL_MINT, 150, 'SOL')],
+        [USDC_MINT, makePriceMapEntry(USDC_MINT, 1, 'USDC')],
+      ]);
+      const result = buildSolUsdcPositionInsight({
+        detail: detailWithPrincipal,
+        observedAtUnixMs: 1_700_000_000_000,
+        priceMap,
+      });
+
+      expect(result.insight.principalTokenAmounts).toEqual({
+        tokenA: { raw: '0', decimals: 9, symbol: 'SOL', mint: SOL_MINT },
+        tokenB: { raw: '0', decimals: 6, symbol: 'USDC', mint: USDC_MINT },
+        observedAtUnixMs: 1_700_000_100_000,
+        source: 'orca_full_liquidity_quote',
+        basis: 'principal-only',
+      });
+    });
+
+    it('warns and returns null when principal amounts are unavailable', () => {
+      const detailNoPrincipal = {
+        ...FIXTURE_POSITION_DETAIL,
+        principalTokenAmounts: null,
+      };
+      const priceMap = new Map<string, PriceMapEntry>([
+        [SOL_MINT, makePriceMapEntry(SOL_MINT, 150, 'SOL')],
+        [USDC_MINT, makePriceMapEntry(USDC_MINT, 1, 'USDC')],
+      ]);
+      const result = buildSolUsdcPositionInsight({
+        detail: detailNoPrincipal,
+        observedAtUnixMs: 1_700_000_000_000,
+        priceMap,
+      });
+
+      expect(result.insight.principalTokenAmounts).toBeNull();
+      const principalWarning = result.warnings.find(
+        (w) => w.code === 'principal_token_amounts_unavailable',
+      );
+      expect(principalWarning).toBeDefined();
+      expect(principalWarning?.scope?.positionId).toBe(FIXTURE_POSITION_IN_RANGE.positionId);
+      expect(principalWarning?.scope?.poolId).toBeDefined();
+    });
+
+    it('serializes returned price quotes in mint order with exact lineage', () => {
+      const quotedAt1 = makeClockTimestamp(1_700_000_001_000);
+      const quotedAt2 = makeClockTimestamp(1_700_000_002_000);
+      const priceMap = new Map<string, PriceMapEntry>([
+        [USDC_MINT, makePriceMapEntry(USDC_MINT, 1, 'USDC', quotedAt2, 'test_source_b')],
+        [SOL_MINT, makePriceMapEntry(SOL_MINT, 150, 'SOL', quotedAt1, 'test_source_a')],
+      ]);
+      const result = buildSolUsdcPositionInsight({
+        detail: FIXTURE_POSITION_DETAIL,
+        observedAtUnixMs: 1_700_000_000_000,
+        priceMap,
+      });
+
+      expect(result.insight.usdPriceQuotes).toHaveLength(2);
+      expect(result.insight.usdPriceQuotes[0]).toMatchObject({
+        mint: USDC_MINT,
+        symbol: 'USDC',
+        usdPerToken: 1,
+        quotedAtUnixMs: 1_700_000_002_000,
+        source: 'test_source_b',
+      });
+      expect(result.insight.usdPriceQuotes[1]).toMatchObject({
+        mint: SOL_MINT,
+        symbol: 'SOL',
+        usdPerToken: 150,
+        quotedAtUnixMs: 1_700_000_001_000,
+        source: 'test_source_a',
+      });
+    });
+
+    it('warns once per requested missing mint and omits its quote', () => {
+      const priceMap = new Map<string, PriceMapEntry>([
+        [SOL_MINT, makePriceMapEntry(SOL_MINT, 150, 'SOL')],
+      ]);
+      const result = buildSolUsdcPositionInsight({
+        detail: FIXTURE_POSITION_DETAIL,
+        observedAtUnixMs: 1_700_000_000_000,
+        priceMap,
+      });
+
+      expect(result.insight.usdPriceQuotes).toHaveLength(1);
+      expect(result.insight.usdPriceQuotes[0]?.mint).toBe(SOL_MINT);
+
+      const missingQuoteWarning = result.warnings.filter(
+        (w) => w.code === 'usd_price_quote_unavailable' && w.scope?.tokenMint === USDC_MINT,
+      );
+      expect(missingQuoteWarning).toHaveLength(1);
+      expect(missingQuoteWarning[0]?.scope?.positionId).toBe(FIXTURE_POSITION_IN_RANGE.positionId);
+    });
+
+    it('computes known zero compatibility totals from serialized quotes', () => {
+      const detailZeroFees = {
+        ...FIXTURE_POSITION_DETAIL,
+        fees: {
+          ...FIXTURE_POSITION_DETAIL.fees,
+          feeOwedA: 0n,
+          feeOwedB: 0n,
+        },
+      };
+      const priceMap = new Map<string, PriceMapEntry>([
+        [SOL_MINT, makePriceMapEntry(SOL_MINT, 150, 'SOL')],
+        [USDC_MINT, makePriceMapEntry(USDC_MINT, 1, 'USDC')],
+      ]);
+      const result = buildSolUsdcPositionInsight({
+        detail: detailZeroFees,
+        observedAtUnixMs: 1_700_000_000_000,
+        priceMap,
+      });
+
+      expect(result.insight.unclaimedFeesUsd).toBe(0);
+      expect(result.insight.unclaimedRewardsUsd).toBe(0);
+      expect(result.warnings).toHaveLength(0);
+    });
+
+    it('sets affected totals null while retaining compatibility warnings', () => {
+      const priceMap = new Map<string, PriceMapEntry>([]);
+      const result = buildSolUsdcPositionInsight({
+        detail: FIXTURE_POSITION_DETAIL,
+        observedAtUnixMs: 1_700_000_000_000,
+        priceMap,
+      });
+
+      expect(result.insight.unclaimedFeesUsd).toBeNull();
+      expect(result.insight.unclaimedRewardsUsd).toBe(0);
+      const feeRewardWarning = result.warnings.find((w) => w.code === 'fee_reward_usd_unavailable');
+      expect(feeRewardWarning).toBeDefined();
+      expect(feeRewardWarning?.scope?.positionId).toBe(FIXTURE_POSITION_IN_RANGE.positionId);
+    });
+
+    it('sets partial exactly when raw-fact warnings exist', () => {
+      const priceMap = new Map<string, PriceMapEntry>([]);
+      const result = buildSolUsdcPositionInsight({
+        detail: FIXTURE_POSITION_DETAIL,
+        observedAtUnixMs: 1_700_000_000_000,
+        priceMap,
+      });
+
+      expect(result.warnings.length > 0).toBe(true);
+    });
+  });
   it('returns a SOL/USDC position insight DTO with raw fee fields and tick distances', () => {
     const result = buildSolUsdcPositionInsight({
       detail: FIXTURE_POSITION_DETAIL,
       observedAtUnixMs: 1_700_000_000_000,
       priceMap: new Map([
-        ['So11111111111111111111111111111111111111112', { usdValue: 150, symbol: 'SOL' }],
-        ['EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v', { usdValue: 1, symbol: 'USDC' }],
+        [
+          'So11111111111111111111111111111111111111112',
+          { usdValue: 150, symbol: 'SOL', quotedAt: 1_700_000_000_000, source: 'jupiter' },
+        ],
+        [
+          'EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v',
+          { usdValue: 1, symbol: 'USDC', quotedAt: 1_700_000_000_000, source: 'jupiter' },
+        ],
       ]),
     });
 
@@ -61,8 +239,14 @@ describe('buildSolUsdcPositionInsight', () => {
       detail: detailWithReward,
       observedAtUnixMs: 1_700_000_000_000,
       priceMap: new Map([
-        ['So11111111111111111111111111111111111111112', { usdValue: 150, symbol: 'SOL' }],
-        ['EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v', { usdValue: 1, symbol: 'USDC' }],
+        [
+          'So11111111111111111111111111111111111111112',
+          { usdValue: 150, symbol: 'SOL', quotedAt: 1_700_000_000_000, source: 'jupiter' },
+        ],
+        [
+          'EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v',
+          { usdValue: 1, symbol: 'USDC', quotedAt: 1_700_000_000_000, source: 'jupiter' },
+        ],
       ]),
     });
 
@@ -111,8 +295,14 @@ describe('buildSolUsdcPositionInsight', () => {
       detail: detailZeroWidth,
       observedAtUnixMs: 1_700_000_000_000,
       priceMap: new Map([
-        ['So11111111111111111111111111111111111111112', { usdValue: 150, symbol: 'SOL' }],
-        ['EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v', { usdValue: 1, symbol: 'USDC' }],
+        [
+          'So11111111111111111111111111111111111111112',
+          { usdValue: 150, symbol: 'SOL', quotedAt: 1_700_000_000_000, source: 'jupiter' },
+        ],
+        [
+          'EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v',
+          { usdValue: 1, symbol: 'USDC', quotedAt: 1_700_000_000_000, source: 'jupiter' },
+        ],
       ]),
     });
 
@@ -153,7 +343,10 @@ describe('buildSolUsdcPositionInsight', () => {
       detail: FIXTURE_POSITION_DETAIL,
       observedAtUnixMs: 1_700_000_000_000,
       priceMap: new Map([
-        ['So11111111111111111111111111111111111111112', { usdValue: 150, symbol: 'SOL' }],
+        [
+          'So11111111111111111111111111111111111111112',
+          { usdValue: 150, symbol: 'SOL', quotedAt: 1_700_000_000_000, source: 'jupiter' },
+        ],
       ]),
     });
 
