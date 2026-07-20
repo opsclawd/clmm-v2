@@ -14,6 +14,7 @@ import { TelemetryAdapter } from '../outbound/observability/TelemetryAdapter.js'
 import { RegimeEngineExecutionEventAdapter } from '../outbound/regime-engine/RegimeEngineExecutionEventAdapter.js';
 import { CurrentSrLevelsAdapter } from '../outbound/regime-engine/CurrentSrLevelsAdapter.js';
 import { JupiterPriceAdapter } from '../outbound/price/JupiterPriceAdapter.js';
+import { OrcaPositionPrincipalQuoteHelper } from '../outbound/solana-position-reads/OrcaPositionPrincipalQuoteHelper.js';
 import type { RegimeEngineEventPort } from '../outbound/regime-engine/types.js';
 import { createDb } from '../outbound/storage/db.js';
 import type { ClockPort, IdGeneratorPort } from '@clmm/application';
@@ -59,7 +60,13 @@ const systemIds: IdGeneratorPort = {
 };
 
 const telemetryEarly = new TelemetryAdapter();
-const snapshotReader = new SolanaPositionSnapshotReader(rpcUrl, telemetryEarly);
+const principalQuoteHelper = new OrcaPositionPrincipalQuoteHelper();
+const snapshotReader = new SolanaPositionSnapshotReader(
+  rpcUrl,
+  telemetryEarly,
+  undefined,
+  principalQuoteHelper,
+);
 const orcaPositionRead = new OrcaPositionReadAdapter(rpcUrl, snapshotReader, db);
 const rangeObservation = new SolanaRangeObservationAdapter(rpcUrl);
 const operationalStorage = new OperationalStorageAdapter(db, systemIds);

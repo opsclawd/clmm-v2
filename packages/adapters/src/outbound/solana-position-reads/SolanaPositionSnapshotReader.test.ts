@@ -522,5 +522,183 @@ describe('SolanaPositionSnapshotReader', () => {
       expect(stringified).not.toContain('8888');
       expect(stringified).not.toContain('7777');
     });
+
+    it('returns principal amounts and their completion time with a successful detail', async () => {
+      await setupHappyMocks();
+
+      const feeRewardHelper = {
+        quote: vi.fn().mockResolvedValue({
+          kind: 'ok',
+          fees: {
+            feeOwedA: 12345n,
+            feeOwedB: 67890n,
+            rewardInfos: [{ mint: SOL_MINT, amountOwed: 11111n, decimals: 9 }],
+          },
+        }),
+      };
+      const principalHelper = {
+        quote: vi.fn().mockResolvedValue({
+          kind: 'ok',
+          amountA: 250_000_000n,
+          amountB: 12_500_000n,
+        }),
+      };
+      // Use 4-arg constructor to pass principal helper
+      const reader = new SolanaPositionSnapshotReader(
+        mockRpcUrl,
+        undefined,
+        feeRewardHelper as never,
+        principalHelper as never,
+      );
+      const result = await reader.fetchPositionDetail(
+        mockRpcWithOwnership as never,
+        MOCK_POSITION_MINT,
+        MOCK_WALLET,
+      );
+
+      expect(result).not.toBeNull();
+      expect(result!.principalTokenAmounts).not.toBeNull();
+      expect(result!.principalTokenAmounts!.amountA).toBe(250_000_000n);
+      expect(result!.principalTokenAmounts!.amountB).toBe(12_500_000n);
+      expect(principalHelper.quote).toHaveBeenCalledTimes(1);
+      expect(principalHelper.quote).toHaveBeenCalledWith({
+        liquidity: 1000n,
+        sqrtPrice: 184467440737095516n,
+        tickLowerIndex: -18304,
+        tickUpperIndex: -17956,
+      });
+    });
+
+    it('preserves zero amounts from a successful principal quote', async () => {
+      await setupHappyMocks();
+      vi.setSystemTime(1_700_000_000_123);
+
+      const feeRewardHelper = {
+        quote: vi.fn().mockResolvedValue({
+          kind: 'ok',
+          fees: {
+            feeOwedA: 0n,
+            feeOwedB: 0n,
+            rewardInfos: [],
+          },
+        }),
+      };
+      const principalHelper = {
+        quote: vi.fn().mockResolvedValue({
+          kind: 'ok',
+          amountA: 0n,
+          amountB: 0n,
+        }),
+      };
+      const reader = new SolanaPositionSnapshotReader(
+        mockRpcUrl,
+        undefined,
+        feeRewardHelper as never,
+        principalHelper as never,
+      );
+      const result = await reader.fetchPositionDetail(
+        mockRpcWithOwnership as never,
+        MOCK_POSITION_MINT,
+        MOCK_WALLET,
+      );
+
+      expect(result).not.toBeNull();
+      expect(result!.principalTokenAmounts).not.toBeNull();
+      expect(result!.principalTokenAmounts!.amountA).toBe(0n);
+      expect(result!.principalTokenAmounts!.amountB).toBe(0n);
+    });
+
+    it('returns detail with null principal amounts and one warning when principal quoting is unavailable', async () => {
+      await setupHappyMocks();
+
+      const feeRewardHelper = {
+        quote: vi.fn().mockResolvedValue({
+          kind: 'ok',
+          fees: {
+            feeOwedA: 12345n,
+            feeOwedB: 67890n,
+            rewardInfos: [],
+          },
+        }),
+      };
+      const principalHelper = {
+        quote: vi.fn().mockResolvedValue({
+          kind: 'unavailable',
+          reason: 'principal-quote-failed',
+        }),
+      };
+      const observability = {
+        log: vi.fn(),
+        recordTiming: vi.fn(),
+        recordDetectionTiming: vi.fn(),
+        recordDeliveryTiming: vi.fn(),
+      };
+      const reader = new SolanaPositionSnapshotReader(
+        mockRpcUrl,
+        observability as never,
+        feeRewardHelper as never,
+        principalHelper as never,
+      );
+      const result = await reader.fetchPositionDetail(
+        mockRpcWithOwnership as never,
+        MOCK_POSITION_MINT,
+        MOCK_WALLET,
+      );
+
+      expect(result).not.toBeNull();
+      expect(result!.principalTokenAmounts).toBeNull();
+      expect(observability.log).toHaveBeenCalledTimes(1);
+      expect(observability.log).toHaveBeenCalledWith(
+        'warn',
+        'orca_position_principal_quote_unavailable',
+        expect.objectContaining({
+          positionId: MOCK_POSITION_MINT,
+          walletId: MOCK_WALLET,
+          poolId: MOCK_WHIRLPOOL,
+          lowerTick: -18304,
+          upperTick: -17956,
+          currentTick: -18130,
+          reason: 'principal-quote-failed',
+        }),
+      );
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-return
+      const replacer = (_k: string, v: unknown): unknown =>
+        typeof v === 'bigint' ? v.toString() : v;
+      const stringified = JSON.stringify(observability.log.mock.calls, replacer);
+      expect(stringified).not.toContain('1000n');
+      expect(stringified).not.toContain('184467440737095516n');
+    });
+
+    it('keeps live fee reward failure as a null detail', async () => {
+      await setupHappyMocks();
+
+      const feeRewardHelper = {
+        quote: vi.fn().mockResolvedValue({
+          kind: 'unavailable',
+          reason: 'fee-quote-failed',
+        }),
+      };
+      const principalHelper = {
+        quote: vi.fn().mockResolvedValue({
+          kind: 'ok',
+          amountA: 250_000_000n,
+          amountB: 12_500_000n,
+        }),
+      };
+      const reader = new SolanaPositionSnapshotReader(
+        mockRpcUrl,
+        undefined,
+        feeRewardHelper as never,
+        principalHelper as never,
+      );
+      const result = await reader.fetchPositionDetail(
+        mockRpcWithOwnership as never,
+        MOCK_POSITION_MINT,
+        MOCK_WALLET,
+      );
+
+      expect(result).toBeNull();
+      expect(principalHelper.quote).not.toHaveBeenCalled();
+    });
   });
 });

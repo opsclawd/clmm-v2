@@ -21,6 +21,7 @@ import type { LiquidityPosition, WalletId, PositionId, PoolData, PositionFees } 
 import { makePoolId, makeClockTimestamp, evaluateRangeState } from '@clmm/domain';
 import { KNOWN_TOKENS } from '../price/known-tokens.js';
 import { OrcaPositionFeeRewardQuoteHelper } from './OrcaPositionFeeRewardQuoteHelper.js';
+import { OrcaPositionPrincipalQuoteHelper } from './OrcaPositionPrincipalQuoteHelper.js';
 
 export type WhirlpoolData = {
   tickCurrentIndex: number;
@@ -37,6 +38,7 @@ export class SolanaPositionSnapshotReader {
     private readonly rpcUrl: string,
     private readonly observability?: ObservabilityPort,
     private readonly quoteHelper: OrcaPositionFeeRewardQuoteHelper = new OrcaPositionFeeRewardQuoteHelper(),
+    private readonly principalQuoteHelper: OrcaPositionPrincipalQuoteHelper = new OrcaPositionPrincipalQuoteHelper(),
   ) {}
 
   getRpc() {
@@ -155,6 +157,11 @@ export class SolanaPositionSnapshotReader {
     poolData: PoolData;
     fees: PositionFees;
     positionLiquidity: bigint;
+    principalTokenAmounts: {
+      amountA: bigint;
+      amountB: bigint;
+      observedAt: import('@clmm/domain').ClockTimestamp;
+    } | null;
   } | null> {
     let positionMint;
     let positionAddress;
@@ -228,6 +235,42 @@ export class SolanaPositionSnapshotReader {
       return null;
     }
 
+    // eslint-disable-next-line @typescript-eslint/await-thenable
+    const principalQuote = await this.principalQuoteHelper.quote({
+      liquidity: pos.liquidity,
+      sqrtPrice: w.sqrtPrice,
+      tickLowerIndex: pos.tickLowerIndex,
+      tickUpperIndex: pos.tickUpperIndex,
+    });
+
+    let principalTokenAmounts: {
+      amountA: bigint;
+      amountB: bigint;
+      observedAt: import('@clmm/domain').ClockTimestamp;
+    } | null = null;
+
+    if (principalQuote.kind === 'ok') {
+      principalTokenAmounts = {
+        amountA: principalQuote.amountA,
+        amountB: principalQuote.amountB,
+        observedAt: makeClockTimestamp(Date.now()),
+      };
+    } else {
+      this.observability?.log('warn', 'orca_position_principal_quote_unavailable', {
+        positionId,
+        walletId,
+        poolId: poolIdStr,
+        lowerTick: pos.tickLowerIndex,
+        upperTick: pos.tickUpperIndex,
+        currentTick: w.tickCurrentIndex,
+        reason: principalQuote.reason,
+        ...(principalQuote.errorName !== undefined ? { errorName: principalQuote.errorName } : {}),
+        ...(principalQuote.errorMessage !== undefined
+          ? { errorMessage: principalQuote.errorMessage }
+          : {}),
+      });
+    }
+
     const bounds = {
       lowerBound: pos.tickLowerIndex,
       upperBound: pos.tickUpperIndex,
@@ -250,6 +293,7 @@ export class SolanaPositionSnapshotReader {
       poolData,
       fees: quote.fees,
       positionLiquidity: pos.liquidity,
+      principalTokenAmounts,
     };
   }
 }

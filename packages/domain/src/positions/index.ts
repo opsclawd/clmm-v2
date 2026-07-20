@@ -71,6 +71,11 @@ export type PositionDetail = {
   readonly poolData: PoolData;
   readonly fees: PositionFees;
   readonly positionLiquidity: bigint;
+  readonly principalTokenAmounts: {
+    readonly amountA: bigint;
+    readonly amountB: bigint;
+    readonly observedAt: ClockTimestamp;
+  } | null;
 };
 
 export type PriceQuote = {
