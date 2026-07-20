@@ -525,6 +525,7 @@ describe('SolanaPositionSnapshotReader', () => {
 
     it('returns principal amounts and their completion time with a successful detail', async () => {
       await setupHappyMocks();
+      vi.setSystemTime(1_700_000_000_123);
 
       const feeRewardHelper = {
         quote: vi.fn().mockResolvedValue({
@@ -560,6 +561,7 @@ describe('SolanaPositionSnapshotReader', () => {
       expect(result!.principalTokenAmounts).not.toBeNull();
       expect(result!.principalTokenAmounts!.amountA).toBe(250_000_000n);
       expect(result!.principalTokenAmounts!.amountB).toBe(12_500_000n);
+      expect(result!.principalTokenAmounts!.observedAt).toBe(1_700_000_000_123);
       expect(principalHelper.quote).toHaveBeenCalledTimes(1);
       expect(principalHelper.quote).toHaveBeenCalledWith({
         liquidity: 1000n,
@@ -665,8 +667,8 @@ describe('SolanaPositionSnapshotReader', () => {
       const replacer = (_k: string, v: unknown): unknown =>
         typeof v === 'bigint' ? v.toString() : v;
       const stringified = JSON.stringify(observability.log.mock.calls, replacer);
-      expect(stringified).not.toContain('1000n');
-      expect(stringified).not.toContain('184467440737095516n');
+      expect(stringified).not.toContain('"1000"');
+      expect(stringified).not.toContain('"184467440737095516"');
     });
 
     it('keeps live fee reward failure as a null detail', async () => {
