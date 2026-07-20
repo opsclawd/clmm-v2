@@ -110,6 +110,8 @@ describe('getSolUsdcInsightBundle', () => {
       });
       expect(result.bundle.dataQuality.partial).toBe(false);
       expect(result.bundle.dataQuality.warnings).toEqual([]);
+      expect(result.bundle.positions[0]!.principalTokenAmounts).not.toBeNull();
+      expect(result.bundle.positions[0]!.usdPriceQuotes).toHaveLength(2);
     }
   });
 

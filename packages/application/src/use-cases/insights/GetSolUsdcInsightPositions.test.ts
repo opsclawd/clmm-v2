@@ -290,9 +290,49 @@ describe('getSolUsdcInsightPositions', () => {
     if (result.kind === 'ok') {
       expect(result.snapshot.positions).toHaveLength(1);
       expect(result.snapshot.positions[0]!.unclaimedFeesUsd).toBeNull();
+      expect(result.snapshot.positions[0]!.usdPriceQuotes).toEqual([]);
+      expect(result.snapshot.positions[0]!.principalTokenAmounts).not.toBeNull();
       expect(
         result.snapshot.dataQuality.warnings.find((w) => w.code === 'fee_reward_usd_unavailable'),
       ).toBeDefined();
+    }
+  });
+
+  it('returns ok with empty quote list and missing-mint warnings when price port returns partial response', async () => {
+    const positions = [positionInPool('pos-1', SOL_USDC_POOL_ID)];
+    const positionReadPort = {
+      listSupportedPositions: async () => positions,
+      getPosition: async () => null,
+      getPositionDetail: async () => detailFor('pos-1', SOL_USDC_POOL_ID),
+      getPoolData: async () => poolDataFor(SOL_USDC_POOL_ID),
+    } as unknown as SupportedPositionReadPort;
+    const partialPricePort = {
+      getPrices: async () => [FIXTURE_SOL_PRICE_QUOTE],
+    } as unknown as PricePort;
+
+    const result = await getSolUsdcInsightPositions({
+      walletId: FIXTURE_POSITION_IN_RANGE.walletId,
+      poolId: SOL_USDC_POOL_ID,
+      positionReadPort,
+      triggerRepo: new FakeTriggerRepository(),
+      pricePort: partialPricePort,
+      now,
+    });
+
+    expect(result.kind).toBe('ok');
+    if (result.kind === 'ok') {
+      expect(result.snapshot.positions).toHaveLength(1);
+      expect(result.snapshot.positions[0]!.usdPriceQuotes).toHaveLength(1);
+      expect(result.snapshot.positions[0]!.usdPriceQuotes[0]!.mint).toBe(
+        FIXTURE_SOL_PRICE_QUOTE.tokenMint,
+      );
+      expect(result.snapshot.dataQuality.partial).toBe(true);
+      const missingUsdcWarning = result.snapshot.dataQuality.warnings.find(
+        (w) =>
+          w.code === 'usd_price_quote_unavailable' &&
+          w.scope?.tokenMint === 'EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v',
+      );
+      expect(missingUsdcWarning).toBeDefined();
     }
   });
 });
