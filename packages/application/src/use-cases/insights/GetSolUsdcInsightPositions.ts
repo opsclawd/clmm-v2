@@ -123,7 +123,12 @@ async function fetchPriceMap(
   try {
     const quotes = await pricePort.getPrices([...mints]);
     for (const q of quotes) {
-      map.set(q.tokenMint, { usdValue: q.usdValue, symbol: q.symbol });
+      map.set(q.tokenMint, {
+        usdValue: q.usdValue,
+        symbol: q.symbol,
+        quotedAt: q.quotedAt,
+        source: q.source,
+      });
     }
   } catch {
     // priceMap stays empty — buildSolUsdcPositionInsight will record warnings

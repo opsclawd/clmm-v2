@@ -1,6 +1,6 @@
 # Task Context: Task 2
 
-Title: Build a fail-closed RangeBar display model
+Title: Add the Orca full-liquidity principal quote helper
 
 ## Workspace & Scope Constraints
 
@@ -10,160 +10,124 @@ Your working directory is a dedicated git worktree with the repository's complet
 
 .ai-orchestrator.local.json, if one exists, lives only in the main checkout and is intentionally not copied into your worktree — it is operator-machine-specific and not part of your task. Do not search for it or read it outside this directory. Reason about configuration using only .ai-orchestrator.json in your own working directory; treat it as the effective config for your task.
 
-Working Directory: /home/gary/.openclaw/workspace/clmm-superpowers-v2/.ai-worktrees/issue-72
+Working Directory: /home/gary/.openclaw/workspace/clmm-superpowers-v2/.ai-worktrees/issue-91
 Repository: opsclawd/clmm-v2
-Branch: ai/issue-72
-Start Commit: 572b4b6664dc6ca14583b483060acbf48ef7c47e
+Branch: ai/issue-91
+Start Commit: 57d292c93728379cfe3b77d288586aac649a5d46
 
 ## Task Requirements
 
 **Files:**
 
-- Create: `packages/ui/src/components/RangeBarUtils.ts`
-- Create: `packages/ui/src/components/RangeBarUtils.test.ts`
+- Create: `packages/adapters/src/outbound/solana-position-reads/OrcaPositionPrincipalQuoteHelper.ts`
+- Create: `packages/adapters/src/outbound/solana-position-reads/OrcaPositionPrincipalQuoteHelper.test.ts`
 
-**Invariants to test first:**
+**Invariants to test first:** `returns estimated principal amounts for full liquidity`, `preserves successful zero principal amounts`, `rejects invalid principal quote inputs before calling Orca`, `sanitizes a thrown principal quote failure`.
 
-- `returns field-specific non-finite reasons in validation order`
-- `rejects zero and negative required prices`
-- `rejects equal and inverted bounds`
-- `fails closed when finite inputs overflow the visual domain`
-- `keeps valid lower midpoint upper and out-of-domain prices available`
-- `clamps only finite derived marker percentages`
-- `returns an available marker at exactly 50 percent for a genuine midpoint`
+- [ ] **Step 1: Consult the installed-version official Orca API before coding.** Use Context7/current official Orca documentation for `@orca-so/whirlpools-core` v3.1.0 and confirm the installed `decreaseLiquidityQuote(liquidity, slippageToleranceBps, sqrtPrice, tickLowerIndex, tickUpperIndex)` signature and that `tokenEstA`/`tokenEstB` are estimated principal amounts. Do not use `closePositionInstructions`, `tokenMinA`, `tokenMinB`, fee quotes, or reward quotes. If the official v3.1.0 API does not expose an instruction-free estimated-amount function with these semantics, stop under the documented stop condition instead of improvising protocol math.
 
-- [ ] **Step 1: Create focused failing tests for every reason and valid coordinate class.** Use table cases for `NaN`, positive infinity, and negative infinity in each field; zero/negative values in each field; equal/inverted bounds; `Number.MAX_VALUE` overflow; lower/midpoint/upper; and far-below/far-above current prices. Assert the exact union shape and exact reason strings rather than merely checking truthiness:
+- [ ] **Step 2: Write the new helper tests first.** Mock `decreaseLiquidityQuote` and test exact forwarding of liquidity, current sqrt price, lower tick, and upper tick; assert returned estimates are unchanged. Add separate zero, invalid-liquidity/invalid-bounds, and thrown-error cases. Use these exact test names:
 
-```ts
-expect(
-  buildRangeBarDisplayState({ currentPrice: 150, lowerBoundPrice: 100, upperBoundPrice: 200 }),
-).toMatchObject({ kind: 'available', markerPercent: 50 });
+  ```ts
+  it('returns estimated principal amounts for full liquidity', async () => {});
+  it('preserves successful zero principal amounts', async () => {});
+  it('rejects invalid principal quote inputs before calling Orca', async () => {});
+  it('sanitizes a thrown principal quote failure', async () => {});
+  ```
 
-expect(
-  buildRangeBarDisplayState({ currentPrice: Number.NaN, lowerBoundPrice: 0, upperBoundPrice: 0 }),
-).toEqual({ kind: 'unavailable', reason: 'current_price_non_finite' });
+- [ ] **Step 3: Run the new test and verify it fails because the helper is absent.**
 
-expect(
-  buildRangeBarDisplayState({
-    currentPrice: Number.MAX_VALUE,
-    lowerBoundPrice: 1,
-    upperBoundPrice: Number.MAX_VALUE,
-  }),
-).toEqual({ kind: 'unavailable', reason: 'derived_percentage_non_finite' });
-```
+  ```bash
+  pnpm --filter @clmm/adapters test -- src/outbound/solana-position-reads/OrcaPositionPrincipalQuoteHelper.test.ts
+  ```
 
-- [ ] **Step 2: Run the new test and confirm it fails because the module does not exist.**
+  Expected: FAIL with the helper module missing.
 
-Run: `pnpm --filter @clmm/ui exec vitest run src/components/RangeBarUtils.test.ts`
+- [ ] **Step 4: Implement the focused discriminated-union helper.** Keep it synchronous internally because the core quote is pure, but expose `quote` as a normal method. Use the documented estimated fields and a zero-bps argument only because the SDK signature requires it; the returned contract must never expose minimum amounts:
 
-Expected: FAIL with module-not-found or missing-export errors.
+  ```ts
+  import { decreaseLiquidityQuote } from '@orca-so/whirlpools-core';
 
-- [ ] **Step 3: Implement the discriminated model with the fixed validation order.** Keep constants and numeric helpers private; never return a midpoint fallback:
+  export type PrincipalTokenAmountsQuoteResult =
+    | { kind: 'ok'; amountA: bigint; amountB: bigint }
+    | {
+        kind: 'unavailable';
+        reason: 'quote-input-invalid' | 'principal-quote-failed';
+        errorName?: string;
+        errorMessage?: string;
+      };
 
-```ts
-export type RangeBarUnavailableReason =
-  | 'current_price_non_finite'
-  | 'lower_price_non_finite'
-  | 'upper_price_non_finite'
-  | 'current_price_non_positive'
-  | 'lower_price_non_positive'
-  | 'upper_price_non_positive'
-  | 'bounds_not_ascending'
-  | 'derived_percentage_non_finite';
+  export type PrincipalQuoteArgs = {
+    liquidity: bigint;
+    sqrtPrice: bigint;
+    tickLowerIndex: number;
+    tickUpperIndex: number;
+  };
 
-export type RangeBarDisplayState =
-  | {
-      kind: 'available';
-      bandLeftPercent: number;
-      bandRightPercent: number;
-      markerPercent: number;
+  export class OrcaPositionPrincipalQuoteHelper {
+    quote(args: PrincipalQuoteArgs): PrincipalTokenAmountsQuoteResult {
+      if (args.liquidity < 0n || args.tickLowerIndex >= args.tickUpperIndex) {
+        return { kind: 'unavailable', reason: 'quote-input-invalid' };
+      }
+      try {
+        const quote = decreaseLiquidityQuote(
+          args.liquidity,
+          0,
+          args.sqrtPrice,
+          args.tickLowerIndex,
+          args.tickUpperIndex,
+        );
+        return { kind: 'ok', amountA: quote.tokenEstA, amountB: quote.tokenEstB };
+      } catch (error) {
+        const described =
+          error instanceof Error
+            ? { errorName: error.name, errorMessage: error.message.slice(0, 200) }
+            : { errorMessage: String(error).slice(0, 200) };
+        return { kind: 'unavailable', reason: 'principal-quote-failed', ...described };
+      }
     }
-  | { kind: 'unavailable'; reason: RangeBarUnavailableReason };
-
-export type RangeBarPriceInput = {
-  currentPrice: number;
-  lowerBoundPrice: number;
-  upperBoundPrice: number;
-};
-
-const VISUAL_PAD_FRACTION = 0.35;
-
-function finitePercent(price: number, lo: number, hi: number): number | undefined {
-  const value = ((price - lo) / (hi - lo)) * 100;
-  if (!Number.isFinite(value)) return undefined;
-  return Math.min(100, Math.max(0, value));
-}
-
-export function buildRangeBarDisplayState(input: RangeBarPriceInput): RangeBarDisplayState {
-  const { currentPrice, lowerBoundPrice, upperBoundPrice } = input;
-  if (!Number.isFinite(currentPrice))
-    return { kind: 'unavailable', reason: 'current_price_non_finite' };
-  if (!Number.isFinite(lowerBoundPrice))
-    return { kind: 'unavailable', reason: 'lower_price_non_finite' };
-  if (!Number.isFinite(upperBoundPrice))
-    return { kind: 'unavailable', reason: 'upper_price_non_finite' };
-  if (currentPrice <= 0) return { kind: 'unavailable', reason: 'current_price_non_positive' };
-  if (lowerBoundPrice <= 0) return { kind: 'unavailable', reason: 'lower_price_non_positive' };
-  if (upperBoundPrice <= 0) return { kind: 'unavailable', reason: 'upper_price_non_positive' };
-  if (upperBoundPrice <= lowerBoundPrice)
-    return { kind: 'unavailable', reason: 'bounds_not_ascending' };
-
-  const width = upperBoundPrice - lowerBoundPrice;
-  const pad = width * VISUAL_PAD_FRACTION;
-  const lo = lowerBoundPrice - pad;
-  const hi = upperBoundPrice + pad;
-  if (![width, pad, lo, hi].every(Number.isFinite) || hi <= lo) {
-    return { kind: 'unavailable', reason: 'derived_percentage_non_finite' };
   }
-  const bandLeftPercent = finitePercent(lowerBoundPrice, lo, hi);
-  const bandRightPercent = finitePercent(upperBoundPrice, lo, hi);
-  const markerPercent = finitePercent(currentPrice, lo, hi);
-  if (bandLeftPercent == null || bandRightPercent == null || markerPercent == null) {
-    return { kind: 'unavailable', reason: 'derived_percentage_non_finite' };
-  }
-  return { kind: 'available', bandLeftPercent, bandRightPercent, markerPercent };
-}
-```
+  ```
 
-- [ ] **Step 4: Verify every numeric branch and lint only the new helper files.**
+  If official typing uses a named bps wrapper or a different parameter order, mirror that exact official signature while preserving the tested inputs and `tokenEstA`/`tokenEstB` output contract.
 
-Run: `pnpm --filter @clmm/ui exec vitest run src/components/RangeBarUtils.test.ts`
+- [ ] **Step 5: Verify the helper only.**
 
-Expected: PASS for every invalid reason, deterministic precedence, overflow, clamping, and the exact midpoint.
+  ```bash
+  pnpm --filter @clmm/adapters test -- src/outbound/solana-position-reads/OrcaPositionPrincipalQuoteHelper.test.ts
+  pnpm exec eslint packages/adapters/src/outbound/solana-position-reads/OrcaPositionPrincipalQuoteHelper.ts packages/adapters/src/outbound/solana-position-reads/OrcaPositionPrincipalQuoteHelper.test.ts
+  pnpm exec prettier --check packages/adapters/src/outbound/solana-position-reads/OrcaPositionPrincipalQuoteHelper.ts packages/adapters/src/outbound/solana-position-reads/OrcaPositionPrincipalQuoteHelper.test.ts
+  ```
 
-Run: `pnpm --filter @clmm/ui exec eslint src/components/RangeBarUtils.ts src/components/RangeBarUtils.test.ts`
+  Expected: all four named cases pass; lint and formatting pass. The automatic workspace typecheck gate must pass before commit.
 
-Expected: PASS with no lint errors.
+- [ ] **Step 6: Commit the adapter-local quote primitive.**
 
-- [ ] **Step 5: Commit the pure display model.**
-
-```bash
-git add packages/ui/src/components/RangeBarUtils.ts packages/ui/src/components/RangeBarUtils.test.ts
-git commit -m "feat(ui): classify unavailable range bars"
-```
+  ```bash
+  git add packages/adapters/src/outbound/solana-position-reads/OrcaPositionPrincipalQuoteHelper.ts packages/adapters/src/outbound/solana-position-reads/OrcaPositionPrincipalQuoteHelper.test.ts
+  git commit -m "feat: quote Orca position principal amounts"
+  ```
 
 ## Repository Targets
 
 ### Expected Files
 
-- packages/ui/src/components/RangeBarUtils.ts
-- packages/ui/src/components/RangeBarUtils.test.ts
+- packages/adapters/src/outbound/solana-position-reads/OrcaPositionPrincipalQuoteHelper.ts
+- packages/adapters/src/outbound/solana-position-reads/OrcaPositionPrincipalQuoteHelper.test.ts
 
 ## Validation Commands
 
 ```bash
-pnpm --filter @clmm/ui exec vitest run src/components/RangeBarUtils.test.ts
-pnpm --filter @clmm/ui exec eslint src/components/RangeBarUtils.ts src/components/RangeBarUtils.test.ts
+pnpm --filter @clmm/adapters test -- src/outbound/solana-position-reads/OrcaPositionPrincipalQuoteHelper.test.ts
+pnpm exec eslint packages/adapters/src/outbound/solana-position-reads/OrcaPositionPrincipalQuoteHelper.ts packages/adapters/src/outbound/solana-position-reads/OrcaPositionPrincipalQuoteHelper.test.ts
+pnpm exec prettier --check packages/adapters/src/outbound/solana-position-reads/OrcaPositionPrincipalQuoteHelper.ts packages/adapters/src/outbound/solana-position-reads/OrcaPositionPrincipalQuoteHelper.test.ts
 ```
 
 ## Behavioral Invariants
 
 You MUST implement the following behavioral invariants as named tests first (TDD):
 
-- **non-finite validation order**: Non-finite current, lower, and upper inputs fail closed with the first field-specific reason in the fixed validation order. (Test: `returns field-specific non-finite reasons in validation order`)
-- **positive-price contract**: Zero or negative current, lower, or upper prices cannot create an available display model. (Test: `rejects zero and negative required prices`)
-- **ascending bounds**: Equal or inverted bounds return bounds_not_ascending and never produce coordinates. (Test: `rejects equal and inverted bounds`)
-- **derived overflow guard**: Finite inputs whose subtraction, padding, visual domain, or percentages become non-finite return derived_percentage_non_finite. (Test: `fails closed when finite inputs overflow the visual domain`)
-- **valid coordinate classes**: Valid lower, midpoint, upper, far-below, and far-above prices all remain available. (Test: `keeps valid lower midpoint upper and out-of-domain prices available`)
-- **finite-only clamping**: Only finite derived marker percentages may be clamped to track edges. (Test: `clamps only finite derived marker percentages`)
-- **genuine midpoint**: A valid price at the visual-domain midpoint produces an available marker at exactly 50 percent. (Test: `returns an available marker at exactly 50 percent for a genuine midpoint`)
+- **principal quote is principal-only**: Valid full-liquidity inputs return Orca tokenEstA and tokenEstB unchanged without fees, rewards, or minimum outputs. (Test: `returns estimated principal amounts for full liquidity`)
+- **principal zero is data**: A successful quote with zero on either side remains an ok result containing 0n. (Test: `preserves successful zero principal amounts`)
+- **principal invalid input is classified**: Negative liquidity or non-ascending bounds returns quote-input-invalid before Orca math is called, while zero liquidity remains quotable. (Test: `rejects invalid principal quote inputs before calling Orca`)
+- **principal quote failure is bounded**: Thrown Orca errors become principal-quote-failed with error name and at most 200 message characters. (Test: `sanitizes a thrown principal quote failure`)

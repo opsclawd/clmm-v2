@@ -135,6 +135,9 @@ describe('InsightsDataController', () => {
     const result = await controller.getPositions(VALID_WALLET_ID_RAW);
     expect(result.snapshot.walletId).toBe(VALID_WALLET_ID_RAW);
     expect(result.snapshot.positions).toHaveLength(1);
+    expect(result.snapshot.positions[0]!.principalTokenAmounts).not.toBeNull();
+    expect(result.snapshot.positions[0]!.usdPriceQuotes).toHaveLength(2);
+    expect((result.snapshot.positions[0] as Record<string, unknown>)['srLevels']).toBeUndefined();
   });
 
   it('GET positions/:walletId: returns 503 with position_list_unavailable when listing fails', async () => {
@@ -222,6 +225,9 @@ describe('InsightsDataController', () => {
     expect(result.bundle.pool.poolId).toBe(SOL_USDC_POOL_ID);
     expect(result.bundle.srLevels).toEqual(block);
     expect(result.bundle.positions).toHaveLength(1);
+    expect(result.bundle.positions[0]!.principalTokenAmounts).not.toBeNull();
+    expect(result.bundle.positions[0]!.usdPriceQuotes).toHaveLength(2);
+    expect((result.bundle.positions[0] as Record<string, unknown>)['srLevels']).toBeUndefined();
   });
 
   it('GET bundle/:walletId: returns 503 with position_detail_unavailable on detail failure', async () => {

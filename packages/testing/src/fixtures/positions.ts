@@ -54,6 +54,11 @@ export const FIXTURE_POSITION_DETAIL: PositionDetail = {
     rewardInfos: [],
   },
   positionLiquidity: 5000000000n,
+  principalTokenAmounts: {
+    amountA: 250_000_000n,
+    amountB: 12_500_000n,
+    observedAt: makeClockTimestamp(1_000_100),
+  },
 };
 
 export const FIXTURE_SOL_PRICE_QUOTE: PriceQuote = {
@@ -61,6 +66,7 @@ export const FIXTURE_SOL_PRICE_QUOTE: PriceQuote = {
   usdValue: 150,
   symbol: 'SOL',
   quotedAt: makeClockTimestamp(Date.now()),
+  source: 'test_price_fixture',
 };
 
 export const FIXTURE_USDC_PRICE_QUOTE: PriceQuote = {
@@ -68,4 +74,5 @@ export const FIXTURE_USDC_PRICE_QUOTE: PriceQuote = {
   usdValue: 1,
   symbol: 'USDC',
   quotedAt: makeClockTimestamp(Date.now()),
+  source: 'test_price_fixture',
 };

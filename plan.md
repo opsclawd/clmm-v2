@@ -1,805 +1,447 @@
 <!-- plan-review-required -->
 
-# Market Insight Response-Body Timeout Implementation Plan
+# SOL/USDC Intelligence Bundle Raw LP Facts Implementation Plan
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-**Goal:** Keep each existing market-regime and support/resistance request deadline active until every required response body has been consumed, while preserving all current adapter results, client error messages, timeout durations, and graceful-degradation behavior.
+**Goal:** Extend both successful SOL/USDC position-insight responses with truthful full-liquidity principal token amounts and reusable USD quote lineage, while preserving zero values and degrading optional fact failures to scoped warnings.
 
-**Architecture:** Keep the existing local `AbortController` pattern at each HTTP boundary instead of introducing a shared abstraction. Each request owns one timer from immediately before `fetch()` through status classification and `json()`/`text()` consumption, clears that timer once in `finally`, and translates a body-read abort through the same public contract already used for a fetch abort. `CurrentSrLevelsAdapter` already has the correct lifetime, so its implementation remains unchanged and receives regression coverage alongside the corrected regime adapter.
+**Architecture:** Keep Orca-specific principal math in a focused adapter helper and attach its nullable result to the existing domain `PositionDetail`; do not add another wallet scan, endpoint, or execution quote. Extend `PriceQuote` with provider provenance and preserve the cache entry's actual fetch time, then let the existing application position builder serialize principal and price facts, compute compatibility totals from those same facts, and own consumer-facing warnings. The controller remains a pass-through over the shared `/positions` and `/bundle` use-case path.
 
-**Tech Stack:** TypeScript, Fetch API `AbortController`, Vitest fake timers, pnpm workspaces, ESLint, Prettier.
+**Tech Stack:** TypeScript, Vitest, pnpm workspaces, `@solana/kit` v6, `@orca-so/whirlpools-core` v3.1.0, `@orca-so/whirlpools-client` v6.2.1, Jupiter Price API v3, NestJS.
 
 ---
 
 ## Goal
 
-Ensure the existing 2-second outbound-adapter deadlines and 10-second app-client deadlines cover both receipt of response headers and completion of the selected response-body reader. The result must be an end-to-end deadline for one request attempt, not a timer that resets after headers.
+Expose the raw facts CLMM V2 owns for downstream inventory-composition and valuation-lineage derivation: principal-only token A/B amounts for 100% of position liquidity, and every successfully returned pool/reward mint USD quote with provider and actual quote time. A successful raw `0n` must serialize as `'0'`; unavailable enrichment must remain absent or `null` and produce an explicit scoped warning.
 
 ## Non-goals
 
-- Do not change domain or application contracts, DTOs, BFF endpoints, UI state, TanStack Query behavior, cache policy, or supported-pool configuration.
-- Do not add retries, recovery/backoff loops, circuit breakers, streaming support, timeout configuration, or a new HTTP dependency.
-- Do not harden neighboring policy-insight, S/R-thesis, execution-event, or unrelated fetch paths.
-- Do not replace the four local lifecycles with a universal fetch helper or `AbortSignal.timeout()`.
-- Do not change the 2,000 ms adapter timeout or the 10,000 ms app timeout.
-- Do not touch directional exit policy or re-derive the repository's lower/upper-bound directional invariant.
-- Do not change exported API signatures. The existing `CurrentRegimeAdapter`, `CurrentSrLevelsAdapter`, `fetchCurrentRegime`, and `fetchCurrentSrLevels` surfaces remain intact.
+- Do not add inventory-skew labels, dominant-asset/one-sided judgments, position USD value, fee APR/APY, fee-to-volatility ratios, recommendations, target posture, or swap direction.
+- Do not change routes, authentication, top-level S/R placement, trigger behavior, primary pool/list/detail failure unions, or existing 503 responses.
+- Do not add a composition endpoint, bundle-only DTO fork, second owner scan, duplicate position-account fetch, execution instruction construction, or `closePositionInstructions` reuse.
+- Do not change the existing live fee/reward fail-closed behavior or fall back to checkpointed Orca accumulators.
+- Do not add retries, historical fee/deposit/withdrawal data, wallet balances, pool TVL/24-hour fees, on-chain receipts, attestations, or UI work.
+- Do not derive the release-blocker lower/upper-bound exit mapping anywhere in this read path.
 
 ## Affected files
 
-- `packages/adapters/src/outbound/regime-engine/CurrentRegimeAdapter.ts` — extend the existing regime request scope through all JSON reads and propagate body aborts to the fail-soft request catch.
-- `packages/adapters/src/outbound/regime-engine/CurrentRegimeAdapter.test.ts` — add focused post-header success/error-envelope body-timeout tests. Although this file exceeds 500 lines, the implementation task below changes only the transport-lifecycle cases in the top-level `CurrentRegimeAdapter` suite; it does not create a broad test-update task.
-- `packages/adapters/src/outbound/regime-engine/CurrentSrLevelsAdapter.test.ts` — lock in the already-correct post-header body-timeout behavior without rewriting `CurrentSrLevelsAdapter.ts`.
-- `apps/app/src/api/regime.ts` — extend the BFF regime timer through 200 JSON, 404 JSON, and non-success text reads without changing classified errors.
-- `apps/app/src/api/regime.test.ts` — add deterministic body-abort and cleanup cases within `fetchCurrentRegime`.
-- `apps/app/src/api/srLevels.ts` — extend the BFF S/R timer through 200 JSON, 404 JSON, and non-success text reads without changing classified errors.
-- `apps/app/src/api/srLevels.test.ts` — add deterministic body-abort and cleanup cases within `fetchCurrentSrLevels`.
-
-`packages/adapters/src/outbound/regime-engine/CurrentSrLevelsAdapter.ts` is an audited reference, not an expected edit: its inner `try/finally` already encloses both `fetch()` and successful `res.json()` consumption.
+- `packages/domain/src/positions/index.ts` — add `PriceQuote.source` and nullable principal amounts on `PositionDetail`.
+- `packages/testing/src/fixtures/positions.ts` — provide explicit quote provenance and representative principal amounts for shared typed fixtures.
+- `packages/adapters/src/outbound/price/JupiterPriceAdapter.ts` — emit `jupiter_price_v3` and return each cache entry's real fetch timestamp.
+- `packages/adapters/src/outbound/price/JupiterPriceAdapter.test.ts` — cover provider provenance and cache-hit timestamp truthfulness.
+- `packages/adapters/src/outbound/solana-position-reads/OrcaPositionPrincipalQuoteHelper.ts` — new adapter-local full-liquidity principal quote helper.
+- `packages/adapters/src/outbound/solana-position-reads/OrcaPositionPrincipalQuoteHelper.test.ts` — cover success, zeros, invalid input, and sanitized failures.
+- `packages/adapters/src/outbound/solana-position-reads/SolanaPositionSnapshotReader.ts` — invoke the principal helper with already-fetched position/pool state and fail soft with structured logging.
+- `packages/adapters/src/outbound/solana-position-reads/SolanaPositionSnapshotReader.test.ts` — cover principal success and optional-failure behavior in the existing `fetchPositionDetail` block.
+- `packages/adapters/src/composition/AdaptersModule.ts` — update `SolanaPositionSnapshotReader` constructor call to pass the principal helper (位置 after fee/reward helper).
+- `packages/adapters/src/inbound/http/AppModule.ts` — update `SolanaPositionSnapshotReader` provider registration to match new constructor signature.
+- `packages/adapters/src/outbound/solana-position-reads/OrcaPositionReadAdapter.test.ts` — update test fixtures and assertions that reference `PositionDetail` or `SolanaPositionSnapshotReader`.
+- `packages/adapters/src/outbound/solana-position-reads/SolanaReadPathEfficiency.integration.test.ts` — update integration test assertions that reference `PositionDetail` fields.
+- `packages/adapters/src/outbound/swap-execution/SolanaExecutionPreparationAdapter.test.ts` — update test fixtures referencing position detail types.
+- `packages/application/src/dto/index.ts` — add raw principal/price DTOs, position fields, warning codes, and `scope.tokenMint`.
+- `packages/application/src/use-cases/insights/buildSolUsdcPositionInsight.ts` — serialize facts, preserve zero/null semantics, sort quote facts, and emit position/token-scoped warnings.
+- `packages/application/src/use-cases/insights/buildSolUsdcPositionInsight.test.ts` — cover the new builder contract and compatibility valuations.
+- `packages/application/src/use-cases/insights/GetSolUsdcInsightPositions.ts` — retain quote time/source in the shared price map without changing read ordering.
+- `packages/application/src/use-cases/insights/GetSolUsdcInsightPositions.test.ts` — cover missing/throwing quote enrichment and shared snapshot semantics.
+- `packages/application/src/use-cases/insights/GetSolUsdcInsightBundle.test.ts` — verify bundle propagation, top-level S/R placement, and aggregate data quality.
+- `packages/adapters/src/inbound/http/InsightsDataController.test.ts` — verify both successful HTTP surfaces expose the identical additive position shape.
+- `docs/superpowers/specs/2026-05-01-sol-usdc-insights-data-api-design.md` — document the additive raw-fact schema, warning semantics, and compatibility guidance.
 
 ## Behavioral invariants
 
-The following invariants are state-transition contracts and must become tests before implementation changes:
+The named invariants below are mandatory tests written before implementation in the task that owns them:
 
-1. **One continuous deadline:** when request state is `awaiting-headers`, receipt of headers transitions to `awaiting-body` without clearing or replacing the original timer.
-2. **Adapter success-body timeout:** when an adapter is `awaiting-body` for a successful response and its 2-second timer fires, the signal transitions to `aborted`; regime settles as `{ kind: 'upstream-error' }`, S/R settles as `null`, and warning telemetry remains observable.
-3. **Adapter error-envelope timeout:** when the regime adapter is `awaiting-body` for a `400` or `404` JSON error envelope and its timer fires, the abort is not converted into a malformed envelope; the request settles through the existing `{ kind: 'upstream-error' }` failure path.
-4. **App body timeout classification:** when either app client is `awaiting-body` for success JSON, 404 JSON, or non-success text and its 10-second timer fires, the body reader's `AbortError` transitions to the feature's existing `request timed out` error, never invalid JSON, unexpected 404, endpoint-not-found, or HTTP fallback text.
-5. **Non-abort classification stability:** when a body reader rejects for a non-abort reason, the existing branch-specific classification remains unchanged: invalid success JSON, unexpected non-JSON 404, or `HTTP <status>` fallback.
-6. **Exactly-once cleanup:** when any request reaches a terminal result through success, early return, classified error, parse failure, network failure, or abort, its timer transitions to cleared exactly once; advancing fake timers afterward must not abort the captured signal.
-7. **No public-contract transition:** valid responses, typed unsupported-pool 404s, generic 404s, `unavailableReason`, malformed DTO handling, and fail-soft adapter results remain byte-for-byte/message-for-message compatible.
+1. **Cached quote time is truthful:** a cache hit returns the original entry `fetchedAt` as `quotedAt`, never the later lookup time, and always reports `source: 'jupiter_price_v3'`.
+2. **Principal quote is principal-only:** valid full-liquidity inputs return Orca `tokenEstA`/`tokenEstB` unchanged and never add fee/reward amounts or expose minimum/slippage amounts.
+3. **Principal zero is data:** a successful quote containing zero on either side remains an `ok` result with `0n`; it is never converted to unavailable.
+4. **Principal invalid input is classified:** negative liquidity or non-ascending ticks returns `unavailable` with `reason: 'quote-input-invalid'` without calling Orca quote math; zero liquidity remains a valid quote input so an empty position can report real zeros.
+5. **Principal quote failure is bounded:** thrown Orca errors return `reason: 'principal-quote-failed'` with error name and a message capped at 200 characters.
+6. **Principal failure is optional:** when live fee/reward quoting succeeds but principal quoting is unavailable, the detail read still succeeds with `principalTokenAmounts: null` and emits exactly one bounded structured warning.
+7. **Primary detail failures remain primary:** position/pool/ownership/live fee-reward failures still return `null`; principal enrichment must not weaken those paths.
+8. **Missing principal is explicit:** a null detail fact serializes as `principalTokenAmounts: null` and adds one `principal_token_amounts_unavailable` warning scoped to position and pool.
+9. **Principal values preserve exactness:** successful bigint amounts, including either or both zeros, serialize as decimal strings with the pool mint/symbol/decimals and the helper completion time.
+10. **Missing price is token-scoped:** every requested pool or non-empty reward mint without a returned quote is absent from `usdPriceQuotes` and adds one `usd_price_quote_unavailable` warning scoped to position and token mint.
+11. **Quote facts are deterministic and authoritative:** successful quote entries are sorted lexicographically by mint and carry the exact source and `quotedAt` returned by `PricePort`.
+12. **Compatibility totals share lineage:** `unclaimedFeesUsd` and `unclaimedRewardsUsd` use the same retained map serialized as `usdPriceQuotes`; missing required decimals/quotes yields `null`, while known zero raw amounts with complete quotes yields `0`.
+13. **Partial is warnings-derived:** on both positions and bundle responses, `dataQuality.partial` equals `warnings.length > 0` after the new warnings are composed.
+14. **Shared HTTP shape remains additive:** `/positions/:walletId` and `/bundle/:walletId` expose the same new position fields while S/R remains only at bundle top level and existing fields/errors remain unchanged.
 
-## Task 1: Enforce adapter response-body deadlines
-
-**Files:**
-
-- Modify: `packages/adapters/src/outbound/regime-engine/CurrentRegimeAdapter.ts` (`isRecord` helper area, `CurrentRegimeAdapter.fetchCurrent`, and `readErrorEnvelope` only)
-- Modify: `packages/adapters/src/outbound/regime-engine/CurrentRegimeAdapter.test.ts` (top-level transport/status cases only)
-- Modify: `packages/adapters/src/outbound/regime-engine/CurrentSrLevelsAdapter.test.ts` (timeout case and timer teardown only)
-
-**Invariants covered:** `adapter success body aborts to the existing fail-soft result`, `regime error-envelope body abort is not swallowed`, `adapter timers clear after body settlement`.
-
-- [ ] **Step 1: Add the failing regime adapter success-body timeout test**
-
-In `CurrentRegimeAdapter.test.ts`, make timer restoration unconditional by adding `vi.useRealTimers()` to the existing `afterEach`. Add this named case near the existing network/JSON transport tests:
-
-```ts
-it('returns kind:"upstream-error" when a 200 body stalls until the 2s deadline', async () => {
-  vi.useFakeTimers();
-  let signal: AbortSignal | undefined;
-  vi.mocked(fetch).mockImplementation((_input, init) => {
-    signal = init?.signal as AbortSignal;
-    return Promise.resolve({
-      status: 200,
-      json: () =>
-        new Promise((_, reject) => {
-          signal!.addEventListener('abort', () => reject({ name: 'AbortError' }), { once: true });
-        }),
-    } as Response);
-  });
-  const adapter = new CurrentRegimeAdapter('https://regime.example.com', obs.port);
-
-  const pending = adapter.fetchCurrent(PARAMS);
-  await vi.advanceTimersByTimeAsync(2_000);
-
-  await expect(pending).resolves.toEqual({ kind: 'upstream-error' });
-  expect(signal?.aborted).toBe(true);
-  expect(obs.logs.some((entry) => entry.level === 'warn')).toBe(true);
-});
-```
-
-- [ ] **Step 2: Add the failing regime error-envelope timeout test**
-
-Add a separate named case beside the existing `404` envelope tests. It must use a `404` response double whose `json()` rejects with `{ name: 'AbortError' }` only after the supplied signal aborts:
-
-```ts
-it('returns kind:"upstream-error" when a 404 error body stalls until the 2s deadline', async () => {
-  vi.useFakeTimers();
-  let signal: AbortSignal | undefined;
-  vi.mocked(fetch).mockImplementation((_input, init) => {
-    signal = init?.signal as AbortSignal;
-    return Promise.resolve({
-      status: 404,
-      json: () =>
-        new Promise((_, reject) => {
-          signal!.addEventListener('abort', () => reject({ name: 'AbortError' }), { once: true });
-        }),
-    } as Response);
-  });
-  const adapter = new CurrentRegimeAdapter('https://regime.example.com', obs.port);
-
-  const pending = adapter.fetchCurrent(PARAMS);
-  await vi.advanceTimersByTimeAsync(2_000);
-
-  await expect(pending).resolves.toEqual({ kind: 'upstream-error' });
-  expect(signal?.aborted).toBe(true);
-});
-```
-
-- [ ] **Step 3: Run the two new regime adapter tests and verify the pre-fix failure**
-
-Run:
-
-```bash
-pnpm --filter @clmm/adapters test -- src/outbound/regime-engine/CurrentRegimeAdapter.test.ts -t 'body stalls until the 2s deadline'
-```
-
-Expected: both tests fail or remain pending before implementation because `fetchCurrent` clears its timeout immediately after headers; the captured signal never transitions to `aborted` during body consumption.
-
-- [ ] **Step 4: Keep `CurrentRegimeAdapter`'s timer alive through status handling and JSON reads**
-
-Add this structural helper beside `isRecord` so React Native/test-double aborts are recognized without relying on `DOMException` identity:
-
-```ts
-function isAbortError(error: unknown): boolean {
-  return isRecord(error) && error['name'] === 'AbortError';
-}
-```
-
-Refactor only the transport/status portion of `fetchCurrent` so one outer `try/finally` owns the timer. Keep URL construction before controller creation. Inside the protected `try`, await `fetch`, classify `200`/`404`/`400`/other statuses, and await every `response.json()` before leaving the scope. Keep the current logs and return unions. The success-body parse catch must rethrow aborts and preserve ordinary invalid-JSON behavior:
-
-```ts
-try {
-  const response = await fetch(url.toString(), { signal: controller.signal });
-
-  if (response.status === 200) {
-    let body: unknown;
-    try {
-      body = await response.json();
-    } catch (error: unknown) {
-      if (isAbortError(error)) throw error;
-      this.observability.log('warn', 'Regime response was not valid JSON');
-      return { kind: 'upstream-error' };
-    }
-    const block = parseUpstream(body);
-    if (!block) {
-      this.observability.log('warn', 'Regime response failed shape validation');
-      return { kind: 'upstream-error' };
-    }
-    return { kind: 'block', block };
-  }
-
-  if (response.status === 404) {
-    const envelope = await this.readErrorEnvelope(response);
-    if (envelope?.code === 'CANDLES_NOT_FOUND') {
-      return { kind: 'not-found' };
-    }
-    this.observability.log('warn', 'Regime upstream 404 with unexpected code', { envelope });
-    return { kind: 'upstream-error' };
-  }
-
-  if (response.status === 400) {
-    const envelope = await this.readErrorEnvelope(response);
-    if (envelope?.code === 'VALIDATION_ERROR') {
-      this.observability.log('warn', 'Regime upstream rejected request as VALIDATION_ERROR', {
-        envelope,
-      });
-      return { kind: 'config-error' };
-    }
-    this.observability.log('warn', 'Regime upstream 400 with unexpected code', { envelope });
-    return { kind: 'upstream-error' };
-  }
-
-  this.observability.log('warn', 'Regime upstream non-2xx', { status: response.status });
-  return { kind: 'upstream-error' };
-} catch (error: unknown) {
-  const message = error instanceof Error ? error.message : String(error);
-  this.observability.log('warn', 'Regime fetch network error', { message });
-  return { kind: 'upstream-error' };
-} finally {
-  clearTimeout(timeout);
-}
-```
-
-Update `readErrorEnvelope` to preserve `null` for ordinary malformed JSON but rethrow an abort to the request-level catch:
-
-```ts
-} catch (error: unknown) {
-  if (isAbortError(error)) throw error;
-  return null;
-}
-```
-
-Remove the old `let response`, fetch-only `try/catch/finally`, and all status/body work that sat after its `finally`. Do not add additional `clearTimeout` calls.
-
-- [ ] **Step 5: Run the focused regime adapter file and verify all existing classifications still pass**
-
-Run:
-
-```bash
-pnpm --filter @clmm/adapters test -- src/outbound/regime-engine/CurrentRegimeAdapter.test.ts
-```
-
-Expected: PASS, including the named 200 and 404 body-stall tests and all pre-existing block/config/not-found/upstream-error cases.
-
-- [ ] **Step 6: Add the S/R adapter regression test without changing its implementation**
-
-In `CurrentSrLevelsAdapter.test.ts`, add `vi.useRealTimers()` to `afterEach` and add this named case beside `returns null on 2s timeout (AbortError)`:
-
-```ts
-it('returns null when a 200 body stalls until the 2s deadline', async () => {
-  vi.useFakeTimers();
-  let signal: AbortSignal | undefined;
-  vi.mocked(fetch).mockImplementation((_input, init) => {
-    signal = init?.signal as AbortSignal;
-    return Promise.resolve({
-      ok: true,
-      status: 200,
-      json: () =>
-        new Promise((_, reject) => {
-          signal!.addEventListener('abort', () => reject({ name: 'AbortError' }), { once: true });
-        }),
-    } as Response);
-  });
-  const adapter = new CurrentSrLevelsAdapter('https://regime.example.com', obs.port);
-
-  const pending = adapter.fetchCurrent('SOL/USDC', 'mco');
-  await vi.advanceTimersByTimeAsync(2_000);
-
-  await expect(pending).resolves.toBeNull();
-  expect(signal?.aborted).toBe(true);
-  expect(obs.logs.some((entry) => entry.message === 'SR levels fetch error')).toBe(true);
-});
-```
-
-This should pass against the current `CurrentSrLevelsAdapter.ts`, proving its existing inner `try/finally` already covers body consumption. Do not create a cosmetic source diff.
-
-- [ ] **Step 7: Add an adapter timer-cleanup regression and run scoped checks**
-
-Add this focused case; it proves early success cannot leave a live timer:
-
-```ts
-it('clears the adapter deadline after the response body settles', async () => {
-  vi.useFakeTimers();
-  let signal: AbortSignal | undefined;
-  vi.mocked(fetch).mockImplementation((_input, init) => {
-    signal = init?.signal as AbortSignal;
-    return Promise.resolve(new Response(JSON.stringify(SAMPLE_UPSTREAM), { status: 200 }));
-  });
-  const adapter = new CurrentRegimeAdapter('https://regime.example.com', obs.port);
-
-  await expect(adapter.fetchCurrent(PARAMS)).resolves.toMatchObject({ kind: 'block' });
-  await vi.advanceTimersByTimeAsync(2_001);
-
-  expect(signal?.aborted).toBe(false);
-});
-```
-
-Run:
-
-```bash
-pnpm --filter @clmm/adapters test -- src/outbound/regime-engine/CurrentRegimeAdapter.test.ts src/outbound/regime-engine/CurrentSrLevelsAdapter.test.ts
-pnpm exec eslint packages/adapters/src/outbound/regime-engine/CurrentRegimeAdapter.ts packages/adapters/src/outbound/regime-engine/CurrentRegimeAdapter.test.ts packages/adapters/src/outbound/regime-engine/CurrentSrLevelsAdapter.test.ts
-pnpm exec prettier --check packages/adapters/src/outbound/regime-engine/CurrentRegimeAdapter.ts packages/adapters/src/outbound/regime-engine/CurrentRegimeAdapter.test.ts packages/adapters/src/outbound/regime-engine/CurrentSrLevelsAdapter.test.ts
-```
-
-Expected: all focused tests pass, ESLint reports no errors, and Prettier reports all three files formatted. The implement loop's automatic `pnpm -r typecheck` gate must also pass before committing.
-
-- [ ] **Step 8: Commit the adapter behavior and regression coverage**
-
-```bash
-git add packages/adapters/src/outbound/regime-engine/CurrentRegimeAdapter.ts packages/adapters/src/outbound/regime-engine/CurrentRegimeAdapter.test.ts packages/adapters/src/outbound/regime-engine/CurrentSrLevelsAdapter.test.ts
-git commit -m "fix: keep insight adapter deadlines through body reads"
-```
-
-## Task 2: Preserve regime client classifications through body deadlines
+## Task 1: Preserve USD price source and cache observation time
 
 **Files:**
 
-- Modify: `apps/app/src/api/regime.ts` (`classifyNotFound` and `fetchCurrentRegime` transport/status/body scope only)
-- Modify: `apps/app/src/api/regime.test.ts` (`fetchCurrentRegime` transport cases and timer teardown only)
+- Modify: `packages/domain/src/positions/index.ts` (`PriceQuote` only)
+- Modify: `packages/testing/src/fixtures/positions.ts` (`FIXTURE_SOL_PRICE_QUOTE` and `FIXTURE_USDC_PRICE_QUOTE` only)
+- Modify: `packages/adapters/src/outbound/price/JupiterPriceAdapter.ts`
+- Modify: `packages/adapters/src/outbound/price/JupiterPriceAdapter.test.ts`
 
-**Invariants covered:** `regime success JSON abort reports timeout`, `regime 404 JSON abort reports timeout`, `regime non-success text abort reports timeout`, `regime non-abort parse classifications remain stable`, `regime timer clears after terminal settlement`.
+**Invariants to test first:** `returns Jupiter source on every quote`, `reuses the original fetchedAt as quotedAt on a cache hit`.
 
-- [ ] **Step 1: Add failing post-header regime-client timeout tests first**
+- [ ] **Step 1: Add failing provider and cache-time tests.** In `JupiterPriceAdapter.test.ts`, use `vi.spyOn(Date, 'now')` with values `1_000` for the first request and `2_000` for the cache hit. Assert the first and second quote both equal `makeClockTimestamp(1_000)` and both have `source === 'jupiter_price_v3'`; restore the spy in `afterEach`.
 
-Add `vi.useRealTimers()` to the existing `afterEach`. Add this test-local response factory after `restoreBffBaseUrl`; it captures the request signal and returns a body promise rejected only by its `abort` event:
+- [ ] **Step 2: Run the focused test before implementation.**
 
-```ts
-function stubStalledBody(status: number, method: 'json' | 'text') {
-  let signal: AbortSignal | undefined;
-  const readBody = () =>
-    new Promise<never>((_resolve, reject) => {
-      signal!.addEventListener('abort', () => reject({ name: 'AbortError' }), { once: true });
-    });
+  ```bash
+  pnpm --filter @clmm/adapters test -- src/outbound/price/JupiterPriceAdapter.test.ts -t 'source|original fetchedAt'
+  ```
 
-  globalThis.fetch = vi
-    .fn()
-    .mockImplementation((_input: string | URL | Request, init?: RequestInit) => {
-      signal = init?.signal as AbortSignal;
-      return Promise.resolve({
-        ok: status >= 200 && status < 300,
-        status,
-        statusText: '',
-        ...(method === 'json' ? { json: readBody } : { text: readBody }),
-      } as Response);
-    }) as typeof fetch;
+  Expected: FAIL because `source` is absent and cache hits currently stamp a new `quotedAt`.
 
-  return { getSignal: () => signal };
-}
-```
+- [ ] **Step 3: Extend the exported domain quote and all typed producers together.** Add the required member to `PriceQuote`:
 
-Use it in these exact named cases within `describe('fetchCurrentRegime')`:
+  ```ts
+  export type PriceQuote = {
+    readonly tokenMint: string;
+    readonly usdValue: number;
+    readonly symbol: string;
+    readonly quotedAt: ClockTimestamp;
+    readonly source: string;
+  };
+  ```
 
-```ts
-it('throws the timeout error when a 200 JSON body stalls after headers', async () => {
-  env.EXPO_PUBLIC_BFF_BASE_URL = 'https://bff.example.test';
-  vi.useFakeTimers();
-  const stalled = stubStalledBody(200, 'json');
+  Add `source: 'test_price_fixture'` to both shared fixtures. In `JupiterPriceAdapter.getPrices`, delete the request-wide `quotedAt` variable and build each result from its cache entry:
 
-  const pending = fetchCurrentRegime(POOL_ID);
-  await vi.advanceTimersByTimeAsync(10_000);
+  ```ts
+  results.push({
+    tokenMint: mint,
+    usdValue: entry.price,
+    symbol: entry.symbol,
+    quotedAt: makeClockTimestamp(entry.fetchedAt),
+    source: 'jupiter_price_v3',
+  });
+  ```
 
-  await expect(pending).rejects.toThrow('Could not load market regime: request timed out');
-  expect(stalled.getSignal()?.aborted).toBe(true);
-});
+- [ ] **Step 4: Verify only this contract slice.**
 
-it('throws the timeout error when a 404 JSON body stalls after headers', async () => {
-  env.EXPO_PUBLIC_BFF_BASE_URL = 'https://bff.example.test';
-  vi.useFakeTimers();
-  const stalled = stubStalledBody(404, 'json');
+  ```bash
+  pnpm --filter @clmm/adapters test -- src/outbound/price/JupiterPriceAdapter.test.ts
+  pnpm exec eslint packages/domain/src/positions/index.ts packages/testing/src/fixtures/positions.ts packages/adapters/src/outbound/price/JupiterPriceAdapter.ts packages/adapters/src/outbound/price/JupiterPriceAdapter.test.ts
+  pnpm exec prettier --check packages/domain/src/positions/index.ts packages/testing/src/fixtures/positions.ts packages/adapters/src/outbound/price/JupiterPriceAdapter.ts packages/adapters/src/outbound/price/JupiterPriceAdapter.test.ts
+  ```
 
-  const pending = fetchCurrentRegime(POOL_ID);
-  await vi.advanceTimersByTimeAsync(10_000);
+  Expected: all Jupiter tests pass, including unchanged batching/error behavior; lint and formatting pass. The implement loop's automatic `pnpm -r typecheck` gate must also pass before commit.
 
-  await expect(pending).rejects.toThrow('Could not load market regime: request timed out');
-  expect(stalled.getSignal()?.aborted).toBe(true);
-});
+- [ ] **Step 5: Commit the truthful quote contract.**
 
-it('throws the timeout error when a 503 text body stalls after headers', async () => {
-  env.EXPO_PUBLIC_BFF_BASE_URL = 'https://bff.example.test';
-  vi.useFakeTimers();
-  const stalled = stubStalledBody(503, 'text');
+  ```bash
+  git add packages/domain/src/positions/index.ts packages/testing/src/fixtures/positions.ts packages/adapters/src/outbound/price/JupiterPriceAdapter.ts packages/adapters/src/outbound/price/JupiterPriceAdapter.test.ts
+  git commit -m "feat: preserve price quote provenance"
+  ```
 
-  const pending = fetchCurrentRegime(POOL_ID);
-  await vi.advanceTimersByTimeAsync(10_000);
+## Task 2: Add the Orca full-liquidity principal quote helper
 
-  await expect(pending).rejects.toThrow('Could not load market regime: request timed out');
-  expect(stalled.getSignal()?.aborted).toBe(true);
-});
-```
+**Files:**
 
-For every case, set `EXPO_PUBLIC_BFF_BASE_URL`, call `vi.useFakeTimers()`, capture `init.signal`, start the request before advancing time, and assert the exact existing message:
+- Create: `packages/adapters/src/outbound/solana-position-reads/OrcaPositionPrincipalQuoteHelper.ts`
+- Create: `packages/adapters/src/outbound/solana-position-reads/OrcaPositionPrincipalQuoteHelper.test.ts`
 
-```ts
-await expect(pending).rejects.toThrow('Could not load market regime: request timed out');
-expect(signal?.aborted).toBe(true);
-```
+**Invariants to test first:** `returns estimated principal amounts for full liquidity`, `preserves successful zero principal amounts`, `rejects invalid principal quote inputs before calling Orca`, `sanitizes a thrown principal quote failure`.
 
-- [ ] **Step 2: Run only the new regime body-timeout cases and verify the pre-fix failure**
+- [ ] **Step 1: Consult the installed-version official Orca API before coding.** Use Context7/current official Orca documentation for `@orca-so/whirlpools-core` v3.1.0 and confirm the installed `decreaseLiquidityQuote(liquidity, slippageToleranceBps, sqrtPrice, tickLowerIndex, tickUpperIndex)` signature and that `tokenEstA`/`tokenEstB` are estimated principal amounts. Do not use `closePositionInstructions`, `tokenMinA`, `tokenMinB`, fee quotes, or reward quotes. If the official v3.1.0 API does not expose an instruction-free estimated-amount function with these semantics, stop under the documented stop condition instead of improvising protocol math.
 
-Run:
+- [ ] **Step 2: Write the new helper tests first.** Mock `decreaseLiquidityQuote` and test exact forwarding of liquidity, current sqrt price, lower tick, and upper tick; assert returned estimates are unchanged. Add separate zero, invalid-liquidity/invalid-bounds, and thrown-error cases. Use these exact test names:
 
-```bash
-pnpm --filter @clmm/app test -- src/api/regime.test.ts -t 'stalls after headers'
-```
+  ```ts
+  it('returns estimated principal amounts for full liquidity', async () => {});
+  it('preserves successful zero principal amounts', async () => {});
+  it('rejects invalid principal quote inputs before calling Orca', async () => {});
+  it('sanitizes a thrown principal quote failure', async () => {});
+  ```
 
-Expected: the cases fail or remain pending because the timer is currently cleared once `fetch()` returns; the body promises never receive an abort.
+- [ ] **Step 3: Run the new test and verify it fails because the helper is absent.**
 
-- [ ] **Step 3: Make 404 JSON classification abort-aware**
+  ```bash
+  pnpm --filter @clmm/adapters test -- src/outbound/solana-position-reads/OrcaPositionPrincipalQuoteHelper.test.ts
+  ```
 
-Change only `classifyNotFound`'s catch so an abort escapes to the request-level timeout classifier while a syntax/read error preserves the existing unexpected-404 message:
+  Expected: FAIL with the helper module missing.
 
-```ts
-} catch (error: unknown) {
-  if (isAbortError(error)) throw error;
-  return new Error('Could not load market regime: unexpected 404');
-}
-```
+- [ ] **Step 4: Implement the focused discriminated-union helper.** Keep it synchronous internally because the core quote is pure, but expose `quote` as a normal method. Use the documented estimated fields and a zero-bps argument only because the SDK signature requires it; the returned contract must never expose minimum amounts:
 
-- [ ] **Step 4: Extend `fetchCurrentRegime`'s single timer through every response-body branch**
+  ```ts
+  import { decreaseLiquidityQuote } from '@orca-so/whirlpools-core';
 
-Keep controller/timer creation as-is. Replace the fetch-only outer scope with one outer `try/catch/finally` covering status classification, `classifyNotFound`, `response.text()`, success `response.json()`, shape validation, and result mapping. A narrow inner catch around `fetch()` preserves its current network-error wrapping. The request-level catch maps propagated aborts and rethrows every already-classified error unchanged:
+  export type PrincipalTokenAmountsQuoteResult =
+    | { kind: 'ok'; amountA: bigint; amountB: bigint }
+    | {
+        kind: 'unavailable';
+        reason: 'quote-input-invalid' | 'principal-quote-failed';
+        errorName?: string;
+        errorMessage?: string;
+      };
 
-```ts
-try {
-  let response: Response;
-  try {
-    response = await fetch(
-      `${getBffBaseUrl()}/regime/pools/${encodeURIComponent(poolId)}/current`,
-      { signal: controller.signal },
-    );
-  } catch (error: unknown) {
-    if (isAbortError(error)) throw error;
-    throw new Error(
-      `Could not load market regime: ${error instanceof Error ? error.message : 'network error'}`,
-    );
-  }
+  export type PrincipalQuoteArgs = {
+    liquidity: bigint;
+    sqrtPrice: bigint;
+    tickLowerIndex: number;
+    tickUpperIndex: number;
+  };
 
-  if (response.status === 404) throw await classifyNotFound(poolId, response);
-
-  if (!response.ok) {
-    let detail: string;
-    try {
-      detail = await response.text();
-    } catch (error: unknown) {
-      if (isAbortError(error)) throw error;
-      detail = `HTTP ${response.status}`;
+  export class OrcaPositionPrincipalQuoteHelper {
+    quote(args: PrincipalQuoteArgs): PrincipalTokenAmountsQuoteResult {
+      if (args.liquidity < 0n || args.tickLowerIndex >= args.tickUpperIndex) {
+        return { kind: 'unavailable', reason: 'quote-input-invalid' };
+      }
+      try {
+        const quote = decreaseLiquidityQuote(
+          args.liquidity,
+          0,
+          args.sqrtPrice,
+          args.tickLowerIndex,
+          args.tickUpperIndex,
+        );
+        return { kind: 'ok', amountA: quote.tokenEstA, amountB: quote.tokenEstB };
+      } catch (error) {
+        const described =
+          error instanceof Error
+            ? { errorName: error.name, errorMessage: error.message.slice(0, 200) }
+            : { errorMessage: String(error).slice(0, 200) };
+        return { kind: 'unavailable', reason: 'principal-quote-failed', ...described };
+      }
     }
-    throw new Error(`Could not load market regime: ${detail || response.statusText}`);
   }
+  ```
 
-  let body: unknown;
-  try {
-    body = await response.json();
-  } catch (error: unknown) {
-    if (isAbortError(error)) throw error;
-    throw new Error('Could not load market regime: response body was not valid JSON');
-  }
+  If official typing uses a named bps wrapper or a different parameter order, mirror that exact official signature while preserving the tested inputs and `tokenEstA`/`tokenEstB` output contract.
 
-  if (!isRecord(body)) {
-    throw new Error('Could not load market regime: malformed response');
-  }
+- [ ] **Step 5: Verify the helper only.**
 
-  const regime = body['regime'];
-  const unavailableReason = isRegimeUnavailableReason(body['unavailableReason'])
-    ? body['unavailableReason']
-    : undefined;
+  ```bash
+  pnpm --filter @clmm/adapters test -- src/outbound/solana-position-reads/OrcaPositionPrincipalQuoteHelper.test.ts
+  pnpm exec eslint packages/adapters/src/outbound/solana-position-reads/OrcaPositionPrincipalQuoteHelper.ts packages/adapters/src/outbound/solana-position-reads/OrcaPositionPrincipalQuoteHelper.test.ts
+  pnpm exec prettier --check packages/adapters/src/outbound/solana-position-reads/OrcaPositionPrincipalQuoteHelper.ts packages/adapters/src/outbound/solana-position-reads/OrcaPositionPrincipalQuoteHelper.test.ts
+  ```
 
-  if (regime === null) {
-    return { regime: null, unavailableReason };
-  }
+  Expected: all four named cases pass; lint and formatting pass. The automatic workspace typecheck gate must pass before commit.
 
-  if (!isRegimeBlock(regime)) {
-    throw new Error('Could not load market regime: malformed regime block');
-  }
+- [ ] **Step 6: Commit the adapter-local quote primitive.**
 
-  return { regime, unavailableReason };
-} catch (error: unknown) {
-  if (isAbortError(error)) {
-    throw new Error('Could not load market regime: request timed out');
-  }
-  throw error;
-} finally {
-  clearTimeout(timeoutId);
-}
-```
+  ```bash
+  git add packages/adapters/src/outbound/solana-position-reads/OrcaPositionPrincipalQuoteHelper.ts packages/adapters/src/outbound/solana-position-reads/OrcaPositionPrincipalQuoteHelper.test.ts
+  git commit -m "feat: quote Orca position principal amounts"
+  ```
 
-There must be no body read after this `finally`, no `.catch(() => fallback)` that can swallow an abort, and no second timer or scattered cleanup call.
+## Task 3: Attach optional principal amounts to the existing detail read
 
-- [ ] **Step 5: Lock in non-abort fallback and exactly-once cleanup behavior**
+**Files:**
 
-Retain the existing unsupported-pool and malformed-response tests. Add these exact cases to distinguish ordinary stream failure from timeout and prove terminal cleanup:
+- Modify: `packages/domain/src/positions/index.ts` (`PositionDetail` only)
+- Modify: `packages/testing/src/fixtures/positions.ts` (`FIXTURE_POSITION_DETAIL` only)
+- Modify: `packages/adapters/src/outbound/solana-position-reads/SolanaPositionSnapshotReader.ts`
+- Modify: `packages/adapters/src/outbound/solana-position-reads/SolanaPositionSnapshotReader.test.ts` (`fetchPositionDetail` describe block only)
+- Modify: `packages/adapters/src/composition/AdaptersModule.ts` (constructor call for `SolanaPositionSnapshotReader`; add principal helper as 4th arg)
+- Modify: `packages/adapters/src/inbound/http/AppModule.ts` (provider registration for `SolanaPositionSnapshotReader`; add principal helper as 4th arg)
+- Modify: `packages/adapters/src/outbound/solana-position-reads/OrcaPositionReadAdapter.test.ts` (update reader instantiation to pass 4th principal helper arg)
+- Modify: `packages/adapters/src/outbound/solana-position-reads/SolanaReadPathEfficiency.integration.test.ts` (integration assertions; update reader instantiation)
+- Modify: `packages/adapters/src/outbound/swap-execution/SolanaExecutionPreparationAdapter.test.ts` (position detail fixture updates; update reader instantiation)
 
-```ts
-it('uses HTTP status fallback when a non-success text body rejects without AbortError', async () => {
-  env.EXPO_PUBLIC_BFF_BASE_URL = 'https://bff.example.test';
-  globalThis.fetch = vi.fn().mockResolvedValue({
-    ok: false,
-    status: 503,
-    statusText: 'Service Unavailable',
-    text: () => Promise.reject(new Error('stream failed')),
-  }) as typeof fetch;
+**Invariants to test first:** `returns principal amounts and their completion time with a successful detail`, `preserves zero amounts from a successful principal quote`, `returns detail with null principal amounts and one warning when principal quoting is unavailable`, `keeps live fee reward failure as a null detail`.
 
-  await expect(fetchCurrentRegime(POOL_ID)).rejects.toThrow(
-    'Could not load market regime: HTTP 503',
+- [ ] **Step 1: Extend the existing reader test setup with an injected principal helper.** Add the four named cases above only inside `describe('fetchPositionDetail')`. Stub `Date.now()` at `1_700_000_000_123` for the success case and assert the principal helper receives `pos.liquidity`, `w.sqrtPrice`, and the fetched bounds. In the unavailable case, assert the detail is non-null, principal is null, and the sole new log call is:
+
+  ```ts
+  expect(observability.log).toHaveBeenCalledWith(
+    'warn',
+    'orca_position_principal_quote_unavailable',
+    expect.objectContaining({
+      positionId: MOCK_POSITION_MINT,
+      walletId: MOCK_WALLET,
+      poolId: MOCK_WHIRLPOOL,
+      lowerTick: -18304,
+      upperTick: -17956,
+      currentTick: -18130,
+      reason: 'principal-quote-failed',
+    }),
   );
-});
+  ```
 
-it('clears the regime deadline after the response body settles', async () => {
-  env.EXPO_PUBLIC_BFF_BASE_URL = 'https://bff.example.test';
-  vi.useFakeTimers();
-  let signal: AbortSignal | undefined;
-  const block = fixtureBlock();
-  globalThis.fetch = vi
-    .fn()
-    .mockImplementation((_input: string | URL | Request, init?: RequestInit) => {
-      signal = init?.signal as AbortSignal;
-      return Promise.resolve({
-        ok: true,
-        status: 200,
-        json: () => Promise.resolve({ regime: block }),
-      } as Response);
-    }) as typeof fetch;
+  Also serialize the log arguments with a bigint-safe replacer and prove they contain no raw account/RPC payload.
 
-  await expect(fetchCurrentRegime(POOL_ID)).resolves.toEqual({ regime: block });
-  await vi.advanceTimersByTimeAsync(10_001);
+- [ ] **Step 2: Run only the new reader cases and confirm failure.**
 
-  expect(signal?.aborted).toBe(false);
-});
-```
+  ```bash
+  pnpm --filter @clmm/adapters test -- src/outbound/solana-position-reads/SolanaPositionSnapshotReader.test.ts -t 'principal|live fee reward failure'
+  ```
 
-- [ ] **Step 6: Run scoped regime-client verification**
+  Expected: FAIL because the reader has no principal helper/result yet.
 
-Run:
+- [ ] **Step 3: Change the exported `PositionDetail` shape and its shared fixture in the same task.** Add:
 
-```bash
-pnpm --filter @clmm/app test -- src/api/regime.test.ts
-pnpm exec eslint apps/app/src/api/regime.ts apps/app/src/api/regime.test.ts
-pnpm exec prettier --check apps/app/src/api/regime.ts apps/app/src/api/regime.test.ts
-```
+  ```ts
+  readonly principalTokenAmounts: {
+    readonly amountA: bigint;
+    readonly amountB: bigint;
+    readonly observedAt: ClockTimestamp;
+  } | null;
+  ```
 
-Expected: all regime client cases pass, ESLint reports no errors, and Prettier reports both files formatted. The implement loop's automatic `pnpm -r typecheck` gate must also pass before committing.
+  Set the shared fixture to `{ amountA: 250_000_000n, amountB: 12_500_000n, observedAt: makeClockTimestamp(1_000_100) }`. Do not add these fields to the older `PositionDetailDto`; this issue extends the insight read model, while the existing position-detail endpoint may continue ignoring the additional raw domain member.
 
-- [ ] **Step 7: Commit the regime client deadline behavior**
+- [ ] **Step 4: Inject and invoke the helper without refetching accounts.** Add a fourth optional constructor parameter after the existing fee/reward helper:
 
-```bash
-git add apps/app/src/api/regime.ts apps/app/src/api/regime.test.ts
-git commit -m "fix: include regime response bodies in request deadline"
-```
+  ```ts
+  private readonly principalQuoteHelper: OrcaPositionPrincipalQuoteHelper =
+    new OrcaPositionPrincipalQuoteHelper(),
+  ```
 
-## Task 3: Preserve S/R client classifications through body deadlines
+  After the live fee/reward quote succeeds, call it with `pos.liquidity`, `w.sqrtPrice`, `pos.tickLowerIndex`, and `pos.tickUpperIndex`. On `ok`, capture `makeClockTimestamp(Date.now())` immediately after completion. On `unavailable`, set the field to `null`, emit one bounded `orca_position_principal_quote_unavailable` warning with position/wallet/pool IDs, bounds, current tick, stable reason, and already-sanitized optional error metadata, then continue returning the detail. Do not include account objects, RPC responses, or liquidity values in the log.
+
+- [ ] **Step 5: Update all `SolanaPositionSnapshotReader` call sites to pass the principal helper (or let the optional default apply).** In `AdaptersModule.ts` and `AppModule.ts`, pass the principal helper as the 4th constructor argument after the fee/reward helper. In `OrcaPositionReadAdapter.test.ts`, `SolanaReadPathEfficiency.integration.test.ts`, and `SolanaExecutionPreparationAdapter.test.ts`, update each `new SolanaPositionSnapshotReader(...)` instantiation to pass the principal helper (or a mock thereof). Since the parameter is optional with a default, 1-arg test instantiations remain valid TypeScript — but test files that want to control or verify the helper should explicitly construct and pass it.
+
+- [ ] **Step 6: Keep primary failure ordering unchanged.** Position fetch, ownership, Whirlpool fetch, and live fee/reward quote must still return `null` before principal quoting. Return the new member beside the existing fields:
+
+  ```ts
+  return {
+    position,
+    poolData,
+    fees: quote.fees,
+    positionLiquidity: pos.liquidity,
+    principalTokenAmounts,
+  };
+  ```
+
+- [ ] **Step 7: Verify the modified detail slice.** Although `SolanaPositionSnapshotReader.test.ts` exceeds 500 lines, this is an implementation task and touches only its existing `fetchPositionDetail` block; do not refactor unrelated reader cases.
+
+  ```bash
+  pnpm --filter @clmm/adapters test -- src/outbound/solana-position-reads/SolanaPositionSnapshotReader.test.ts
+  pnpm --filter @clmm/testing test -- src/contracts/PositionReadPortContract.ts
+  pnpm exec eslint packages/domain/src/positions/index.ts packages/testing/src/fixtures/positions.ts packages/adapters/src/outbound/solana-position-reads/SolanaPositionSnapshotReader.ts packages/adapters/src/outbound/solana-position-reads/SolanaPositionSnapshotReader.test.ts packages/adapters/src/composition/AdaptersModule.ts packages/adapters/src/inbound/http/AppModule.ts packages/adapters/src/outbound/solana-position-reads/OrcaPositionReadAdapter.test.ts packages/adapters/src/outbound/solana-position-reads/SolanaReadPathEfficiency.integration.test.ts packages/adapters/src/outbound/swap-execution/SolanaExecutionPreparationAdapter.test.ts
+  pnpm exec prettier --check packages/domain/src/positions/index.ts packages/testing/src/fixtures/positions.ts packages/adapters/src/outbound/solana-position-reads/SolanaPositionSnapshotReader.ts packages/adapters/src/outbound/solana-position-reads/SolanaPositionSnapshotReader.test.ts packages/adapters/src/composition/AdaptersModule.ts packages/adapters/src/inbound/http/AppModule.ts packages/adapters/src/outbound/solana-position-reads/OrcaPositionReadAdapter.test.ts packages/adapters/src/outbound/solana-position-reads/SolanaReadPathEfficiency.integration.test.ts packages/adapters/src/outbound/swap-execution/SolanaExecutionPreparationAdapter.test.ts
+  ```
+
+  Expected: reader and port-contract tests pass; lint and formatting pass; no owner/position/pool refetch is introduced. The automatic workspace typecheck gate must pass before commit.
+
+- [ ] **Step 8: Commit the complete domain-to-adapter detail contract.**
+
+  ```bash
+  git add packages/domain/src/positions/index.ts packages/testing/src/fixtures/positions.ts packages/adapters/src/outbound/solana-position-reads/SolanaPositionSnapshotReader.ts packages/adapters/src/outbound/solana-position-reads/SolanaPositionSnapshotReader.test.ts packages/adapters/src/composition/AdaptersModule.ts packages/adapters/src/inbound/http/AppModule.ts packages/adapters/src/outbound/solana-position-reads/OrcaPositionReadAdapter.test.ts packages/adapters/src/outbound/solana-position-reads/SolanaReadPathEfficiency.integration.test.ts packages/adapters/src/outbound/swap-execution/SolanaExecutionPreparationAdapter.test.ts
+  git commit -m "feat: enrich position details with principal amounts"
+  ```
+
+## Task 4: Expose raw facts and scoped warnings through both insight responses
 
 **Files:**
 
-- Modify: `apps/app/src/api/srLevels.ts` (`classifyNotFound` and `fetchCurrentSrLevels` transport/status/body scope only)
-- Modify: `apps/app/src/api/srLevels.test.ts` (`fetchCurrentSrLevels` transport cases and timer teardown only)
+- Modify: `packages/application/src/dto/index.ts` (insight warning and SOL/USDC position DTO section only)
+- Modify: `packages/application/src/use-cases/insights/buildSolUsdcPositionInsight.ts`
+- Modify: `packages/application/src/use-cases/insights/buildSolUsdcPositionInsight.test.ts`
+- Modify: `packages/application/src/use-cases/insights/GetSolUsdcInsightPositions.ts` (`fetchPriceMap` and builder call only)
+- Modify: `packages/application/src/use-cases/insights/GetSolUsdcInsightPositions.test.ts`
+- Modify: `packages/application/src/use-cases/insights/GetSolUsdcInsightBundle.test.ts`
+- Modify: `packages/adapters/src/inbound/http/InsightsDataController.test.ts` (successful positions/bundle cases only)
+- Modify: `docs/superpowers/specs/2026-05-01-sol-usdc-insights-data-api-design.md` (DTO, valuation, warning, test, compatibility sections only)
 
-**Invariants covered:** `S/R success JSON abort reports timeout`, `S/R 404 JSON abort reports timeout`, `S/R non-success text abort reports timeout`, `S/R non-abort parse classifications remain stable`, `S/R timer clears after terminal settlement`.
+**Invariants to test first:** `serializes exact principal amounts including zero`, `warns and returns null when principal amounts are unavailable`, `serializes returned price quotes in mint order with exact lineage`, `warns once per requested missing mint and omits its quote`, `computes known zero compatibility totals from serialized quotes`, `sets affected totals null while retaining compatibility warnings`, `sets partial exactly when raw-fact warnings exist`, `returns the same additive facts from positions and bundle without copying S/R`.
 
-- [ ] **Step 1: Add failing post-header S/R-client timeout tests first**
+- [ ] **Step 1: Add builder tests first.** Enrich the test-local price maps with `quotedAt` and `source`. Add the first six named cases above. Assert exact DTO objects, including `'0'`, mint/symbol/decimals, `source: 'orca_full_liquidity_quote'`, `basis: 'principal-only'`, quote times as numbers, and lexicographic mint order. For missing SOL and reward quotes, assert one new token-scoped warning per missing mint plus the existing single `fee_reward_usd_unavailable` compatibility warning; do not fabricate zero quote entries.
 
-Add `vi.useRealTimers()` to `afterEach`. Add this test-local helper after `restoreBffBaseUrl` (the duplication is intentional because app API tests do not share a transport-test utility):
+- [ ] **Step 2: Add use-case, bundle, and controller contract tests before implementation.** In `GetSolUsdcInsightPositions.test.ts`, prove a partial price response preserves its returned lineage and emits missing-mint warnings, and a thrown price port yields an empty quote list plus token warnings. In `GetSolUsdcInsightBundle.test.ts`, assert principal and prices propagate unchanged and `partial === (warnings.length > 0)`. In the two existing successful `InsightsDataController.test.ts` cases, assert the same new position fields are returned from `/positions` and `/bundle`, and assert `srLevels` remains absent from each position.
 
-```ts
-function stubStalledBody(status: number, method: 'json' | 'text') {
-  let signal: AbortSignal | undefined;
-  const readBody = () =>
-    new Promise<never>((_resolve, reject) => {
-      signal!.addEventListener('abort', () => reject({ name: 'AbortError' }), { once: true });
-    });
+- [ ] **Step 3: Run the focused application/HTTP tests and confirm the contract is absent.**
 
-  globalThis.fetch = vi
-    .fn()
-    .mockImplementation((_input: string | URL | Request, init?: RequestInit) => {
-      signal = init?.signal as AbortSignal;
-      return Promise.resolve({
-        ok: status >= 200 && status < 300,
-        status,
-        statusText: '',
-        ...(method === 'json' ? { json: readBody } : { text: readBody }),
-      } as Response);
-    }) as typeof fetch;
+  ```bash
+  pnpm --filter @clmm/application test -- src/use-cases/insights/buildSolUsdcPositionInsight.test.ts src/use-cases/insights/GetSolUsdcInsightPositions.test.ts src/use-cases/insights/GetSolUsdcInsightBundle.test.ts
+  pnpm --filter @clmm/adapters test -- src/inbound/http/InsightsDataController.test.ts -t 'returns the snapshot DTO|returns the bundle DTO'
+  ```
 
-  return { getSignal: () => signal };
-}
-```
+  Expected: FAIL on missing DTO fields, quote lineage, and warning codes.
 
-Add these exact named cases:
+- [ ] **Step 4: Extend the exported application DTOs.** Add the two warning codes and `scope.tokenMint?: string`. Define and attach:
 
-```ts
-it('throws the timeout error when a 200 JSON body stalls after headers', async () => {
-  env.EXPO_PUBLIC_BFF_BASE_URL = 'https://bff.example.test';
-  vi.useFakeTimers();
-  const stalled = stubStalledBody(200, 'json');
+  ```ts
+  export type SolUsdcRawTokenAmountDto = {
+    raw: string;
+    decimals: number;
+    symbol: string;
+    mint: string;
+  };
 
-  const pending = fetchCurrentSrLevels('Pool111111111111111111111111111111111111111');
-  await vi.advanceTimersByTimeAsync(10_000);
+  export type SolUsdcPrincipalTokenAmountsDto = {
+    tokenA: SolUsdcRawTokenAmountDto;
+    tokenB: SolUsdcRawTokenAmountDto;
+    observedAtUnixMs: number;
+    source: 'orca_full_liquidity_quote';
+    basis: 'principal-only';
+  };
 
-  await expect(pending).rejects.toThrow('Could not load market context: request timed out');
-  expect(stalled.getSignal()?.aborted).toBe(true);
-});
+  export type SolUsdcUsdPriceQuoteDto = {
+    mint: string;
+    symbol: string;
+    usdPerToken: number;
+    quotedAtUnixMs: number;
+    source: string;
+  };
+  ```
 
-it('throws the timeout error when a 404 JSON body stalls after headers', async () => {
-  env.EXPO_PUBLIC_BFF_BASE_URL = 'https://bff.example.test';
-  vi.useFakeTimers();
-  const stalled = stubStalledBody(404, 'json');
+  Add required `principalTokenAmounts: SolUsdcPrincipalTokenAmountsDto | null` and `usdPriceQuotes: SolUsdcUsdPriceQuoteDto[]` to `SolUsdcPositionInsightDto`. Keep all existing fields unchanged.
 
-  const pending = fetchCurrentSrLevels('Pool111111111111111111111111111111111111111');
-  await vi.advanceTimersByTimeAsync(10_000);
+- [ ] **Step 5: Retain the complete quote lineage in the shared price map.** Change `PriceMapEntry` to `{ usdValue: number; symbol: string; quotedAt: ClockTimestamp; source: string }` and have `fetchPriceMap` retain all four `PriceQuote` properties. Continue one deduplicated price-port call after sequential detail reads. A thrown price call still produces an empty map for fail-soft building.
 
-  await expect(pending).rejects.toThrow('Could not load market context: request timed out');
-  expect(stalled.getSignal()?.aborted).toBe(true);
-});
+- [ ] **Step 6: Build principal facts and warnings without inventing values.** In `buildSolUsdcPositionInsight`, if `detail.principalTokenAmounts` is non-null and both pool decimals are known, serialize exact strings and pool metadata. If it is null—or decimals are unexpectedly unavailable—return `principalTokenAmounts: null` and add one `principal_token_amounts_unavailable` warning scoped to `positionId` and `poolId`. Never use position liquidity as a token amount.
 
-it('throws the timeout error when a 503 text body stalls after headers', async () => {
-  env.EXPO_PUBLIC_BFF_BASE_URL = 'https://bff.example.test';
-  vi.useFakeTimers();
-  const stalled = stubStalledBody(503, 'text');
+- [ ] **Step 7: Build deterministic price facts and token-scoped warnings.** Construct the requested mint set from pool mints plus every non-empty reward mint, sort it, map only present quotes into `usdPriceQuotes`, and add exactly one `usd_price_quote_unavailable` warning for each absent requested mint with `{ positionId, tokenMint }`. Existing fee/reward totals must continue using `priceMap` and existing fail-closed decimal checks, so their price inputs are identical to the serialized quote facts. Preserve one `fee_reward_usd_unavailable` warning per affected position during the compatibility window.
 
-  const pending = fetchCurrentSrLevels('Pool111111111111111111111111111111111111111');
-  await vi.advanceTimersByTimeAsync(10_000);
+- [ ] **Step 8: Preserve response composition and document migration.** Do not change controller production code. Update the existing insights API spec with the three additive DTO types, requested-mint behavior, deterministic ordering, zero/null rules, actual quote-time meaning, optional principal failure, retained compatibility totals/warnings, and old-server migration rule: consumers treat absent new fields as unavailable during rollout. Retain the documented top-level S/R and primary 503 behavior.
 
-  await expect(pending).rejects.toThrow('Could not load market context: request timed out');
-  expect(stalled.getSignal()?.aborted).toBe(true);
-});
-```
+- [ ] **Step 9: Verify this complete shared contract slice.**
 
-Each case must enable fake timers, set the BFF base URL, start `fetchCurrentSrLevels`, advance 10,000 ms, assert `signal.aborted === true`, and assert exactly:
+  ```bash
+  pnpm --filter @clmm/application test -- src/use-cases/insights/buildSolUsdcPositionInsight.test.ts src/use-cases/insights/GetSolUsdcInsightPositions.test.ts src/use-cases/insights/GetSolUsdcInsightBundle.test.ts
+  pnpm --filter @clmm/adapters test -- src/inbound/http/InsightsDataController.test.ts
+  pnpm exec eslint packages/application/src/dto/index.ts packages/application/src/use-cases/insights/buildSolUsdcPositionInsight.ts packages/application/src/use-cases/insights/buildSolUsdcPositionInsight.test.ts packages/application/src/use-cases/insights/GetSolUsdcInsightPositions.ts packages/application/src/use-cases/insights/GetSolUsdcInsightPositions.test.ts packages/application/src/use-cases/insights/GetSolUsdcInsightBundle.test.ts packages/adapters/src/inbound/http/InsightsDataController.test.ts
+  pnpm exec prettier --check packages/application/src/dto/index.ts packages/application/src/use-cases/insights/buildSolUsdcPositionInsight.ts packages/application/src/use-cases/insights/buildSolUsdcPositionInsight.test.ts packages/application/src/use-cases/insights/GetSolUsdcInsightPositions.ts packages/application/src/use-cases/insights/GetSolUsdcInsightPositions.test.ts packages/application/src/use-cases/insights/GetSolUsdcInsightBundle.test.ts packages/adapters/src/inbound/http/InsightsDataController.test.ts docs/superpowers/specs/2026-05-01-sol-usdc-insights-data-api-design.md
+  ```
 
-```ts
-await expect(pending).rejects.toThrow('Could not load market context: request timed out');
-```
+  Expected: all focused tests pass; both endpoints share the additive facts; warning/partial/zero/null assertions pass; lint and formatting pass. The automatic workspace typecheck gate must pass before commit.
 
-- [ ] **Step 2: Run only the new S/R body-timeout cases and verify the pre-fix failure**
+- [ ] **Step 10: Commit the application and HTTP contract.**
 
-Run:
-
-```bash
-pnpm --filter @clmm/app test -- src/api/srLevels.test.ts -t 'stalls after headers'
-```
-
-Expected: the cases fail or remain pending because the current fetch-only `finally` clears the 10-second timer before `json()` or `text()` begins.
-
-- [ ] **Step 3: Make S/R 404 JSON classification abort-aware**
-
-Change only `classifyNotFound`'s catch to preserve aborts while retaining the existing non-JSON 404 result:
-
-```ts
-} catch (error: unknown) {
-  if (isAbortError(error)) throw error;
-  return new Error('Could not load market context: unexpected 404');
-}
-```
-
-- [ ] **Step 4: Extend `fetchCurrentSrLevels`'s single timer through every response-body branch**
-
-Apply the same scoped lifecycle as Task 2, with S/R-specific strings and the existing S/R result mapping. Use an inner fetch catch for current network wording, abort-aware catches around `response.text()` and `response.json()`, one request-level abort mapper, and one outer cleanup:
-
-```ts
-try {
-  let response: Response;
-  try {
-    response = await fetch(
-      `${getBffBaseUrl()}/sr-levels/pools/${encodeURIComponent(poolId)}/current`,
-      { signal: controller.signal },
-    );
-  } catch (error: unknown) {
-    if (isAbortError(error)) throw error;
-    throw new Error(
-      `Could not load market context: ${error instanceof Error ? error.message : 'network error'}`,
-    );
-  }
-
-  if (response.status === 404) throw await classifyNotFound(poolId, response);
-
-  if (!response.ok) {
-    let detail: string;
-    try {
-      detail = await response.text();
-    } catch (error: unknown) {
-      if (isAbortError(error)) throw error;
-      detail = `HTTP ${response.status}`;
-    }
-    throw new Error(`Could not load market context: ${detail || response.statusText}`);
-  }
-
-  let body: unknown;
-  try {
-    body = await response.json();
-  } catch (error: unknown) {
-    if (isAbortError(error)) throw error;
-    throw new Error('Could not load market context: response body was not valid JSON');
-  }
-
-  if (!isRecord(body)) {
-    throw new Error('Could not load market context: malformed response');
-  }
-
-  const srLevels = body['srLevels'];
-  if (srLevels === null) {
-    return { srLevels: null };
-  }
-
-  if (!isSrLevelsBlock(srLevels)) {
-    throw new Error('Could not load market context: malformed srLevels block');
-  }
-
-  return { srLevels };
-} catch (error: unknown) {
-  if (isAbortError(error)) {
-    throw new Error('Could not load market context: request timed out');
-  }
-  throw error;
-} finally {
-  clearTimeout(timeoutId);
-}
-```
-
-Do not change `SrLevelsUnsupportedPoolError`, exported types/functions, field validation, or error text.
-
-- [ ] **Step 5: Lock in non-abort fallback and exactly-once cleanup behavior**
-
-Preserve the existing non-JSON 404 test and add these exact cases:
-
-```ts
-it('uses HTTP status fallback when a non-success text body rejects without AbortError', async () => {
-  env.EXPO_PUBLIC_BFF_BASE_URL = 'https://bff.example.test';
-  globalThis.fetch = vi.fn().mockResolvedValue({
-    ok: false,
-    status: 503,
-    statusText: 'Service Unavailable',
-    text: () => Promise.reject(new Error('stream failed')),
-  }) as typeof fetch;
-
-  await expect(fetchCurrentSrLevels('Pool111111111111111111111111111111111111111')).rejects.toThrow(
-    'Could not load market context: HTTP 503',
-  );
-});
-
-it('clears the S/R deadline after the response body settles', async () => {
-  env.EXPO_PUBLIC_BFF_BASE_URL = 'https://bff.example.test';
-  vi.useFakeTimers();
-  let signal: AbortSignal | undefined;
-  const block = fixtureBlock();
-  globalThis.fetch = vi
-    .fn()
-    .mockImplementation((_input: string | URL | Request, init?: RequestInit) => {
-      signal = init?.signal as AbortSignal;
-      return Promise.resolve({
-        ok: true,
-        status: 200,
-        json: () => Promise.resolve({ srLevels: block }),
-      } as Response);
-    }) as typeof fetch;
-
-  await expect(
-    fetchCurrentSrLevels('Pool111111111111111111111111111111111111111'),
-  ).resolves.toEqual({ srLevels: block });
-  await vi.advanceTimersByTimeAsync(10_001);
-
-  expect(signal?.aborted).toBe(false);
-});
-```
-
-- [ ] **Step 6: Run scoped S/R-client verification**
-
-Run:
-
-```bash
-pnpm --filter @clmm/app test -- src/api/srLevels.test.ts
-pnpm exec eslint apps/app/src/api/srLevels.ts apps/app/src/api/srLevels.test.ts
-pnpm exec prettier --check apps/app/src/api/srLevels.ts apps/app/src/api/srLevels.test.ts
-```
-
-Expected: all S/R client cases pass, ESLint reports no errors, and Prettier reports both files formatted. The implement loop's automatic `pnpm -r typecheck` gate must also pass before committing.
-
-- [ ] **Step 7: Commit the S/R client deadline behavior**
-
-```bash
-git add apps/app/src/api/srLevels.ts apps/app/src/api/srLevels.test.ts
-git commit -m "fix: include S/R response bodies in request deadline"
-```
+  ```bash
+  git add packages/application/src/dto/index.ts packages/application/src/use-cases/insights/buildSolUsdcPositionInsight.ts packages/application/src/use-cases/insights/buildSolUsdcPositionInsight.test.ts packages/application/src/use-cases/insights/GetSolUsdcInsightPositions.ts packages/application/src/use-cases/insights/GetSolUsdcInsightPositions.test.ts packages/application/src/use-cases/insights/GetSolUsdcInsightBundle.test.ts packages/adapters/src/inbound/http/InsightsDataController.test.ts docs/superpowers/specs/2026-05-01-sol-usdc-insights-data-api-design.md
+  git commit -m "feat: expose raw LP valuation facts"
+  ```
 
 ## Tests to add or update
 
-- Adapter success-body timeout after headers: regime returns `{ kind: 'upstream-error' }`; S/R returns `null`.
-- Regime adapter error-envelope timeout after headers: abort propagates to the existing upstream-error path.
-- Regime client 200 JSON, 404 JSON, and 503 text body timeouts: all use the exact market-regime timeout message.
-- S/R client 200 JSON, 404 JSON, and 503 text body timeouts: all use the exact market-context timeout message.
-- Non-abort 503 text-read rejection in each client: preserve the `HTTP 503` fallback.
-- Successful adapter/client body settlement: later fake-timer advancement does not abort the captured signal.
-- Existing happy paths, typed unsupported-pool errors, ordinary/non-JSON 404s, malformed payloads, unavailable regime reasons, network failures, and immediate aborts remain green.
+- Add a new pure helper suite for all `PrincipalTokenAmountsQuoteResult` arms and exact Orca estimate forwarding.
+- Extend Jupiter adapter tests for stable source and original cache-fetch timestamp.
+- Extend only the existing `fetchPositionDetail` reader block for success, zero, fail-soft principal enrichment, bounded logging, and unchanged live-fee hard failure.
+- Extend builder tests for exact bigint serialization, unavailable principal, deterministic quote order/lineage, missing requested mints, compatibility totals, and zero preservation.
+- Extend positions and bundle use-case tests for shared partial-data behavior and warning-derived `partial`.
+- Extend successful controller tests to lock the additive response shape without changing production controller logic.
+- Do not create broad test-only tasks. The only touched test file above 500 lines is part of the reader implementation task and is restricted to one existing describe block.
 
 ## Validation commands
 
-The commands embedded in each task are the acceptance criteria for that commit and target only files changed by that task. After all three implementation tasks complete, the repository's dedicated validate phase must run the issue-required workspace gates; this is not a standalone implementation task and must not produce unrelated fixes:
+Each task contains file-scoped tests, lint, and formatting commands as acceptance criteria. After all implementation tasks, the repository's dedicated validate phase should run the standard broad checks (not as a standalone implementation task):
 
 ```bash
-pnpm -r typecheck
+pnpm build
 pnpm typecheck
+pnpm lint
+pnpm boundaries
 pnpm test
 ```
 
-Expected: every command exits 0. If the validate phase requires the repository-wide release checklist because the actual diff expands beyond the seven affected files, also run `pnpm build`, `pnpm lint`, and `pnpm boundaries`; expansion itself must first satisfy the stop conditions below.
-
 ## Risk areas
 
-- **Abort misclassification:** a body-reader catch can accidentally turn `AbortError` into invalid JSON, unexpected 404, endpoint-not-found, or `HTTP <status>`. Assert public messages/results, not merely that `abort()` ran.
-- **Swallowed text abort:** replacing `.catch(() => fallback)` incorrectly can preserve the timeout but still emit `HTTP 503`; use an abort-aware catch.
-- **Timer leaks or duplicate cleanup:** early returns and typed errors must still cross exactly one `finally`. Do not retain the old fetch-only cleanup or add branch-local cleanup.
-- **Fake-timer deadlock:** a test promise that ignores the request signal will never settle. Every hanging body double must attach a one-shot `abort` listener, and every modified suite must restore real timers in teardown.
-- **Contract drift during restructuring:** moving branches into a `try` can inadvertently wrap already-classified errors or change logs/messages. Keep nested fetch classification narrow and rethrow non-abort classified errors unchanged.
-- **Runtime cancellation variance:** the plan relies on standard Fetch signal propagation to response-body reads. If a supported runtime demonstrably ignores abort during body consumption, stop rather than silently adding a second deadline mechanism.
-- **Oversized regime adapter test file:** restrict edits to the named transport/status cases. Do not reorganize unrelated metadata/freshness tests as part of this issue.
+- Orca core quote API drift or misunderstanding `tokenEstA`/`tokenEstB` versus minimum/slippage outputs could expose incorrect composition; official installed-version semantics must be confirmed before implementation.
+- Capturing `observedAt` before the quote finishes, or stamping cache hits with lookup time, would overstate temporal freshness.
+- Treating `0n` as falsy/unavailable would erase valid one-sided or empty-liquidity evidence.
+- Adding required members to exported `PositionDetail`, `PriceQuote`, and insight DTOs can break fixtures or downstream exhaustive consumers unless all repository producers are updated in the same task and migration is documented.
+- Duplicate requested reward mints could create duplicate warnings unless the builder uses a set before sorting.
+- Price totals and serialized quote facts could diverge if separate maps or fallback prices are introduced.
+- The reader constructor already has an injected fee/reward helper; adding the principal helper in the wrong parameter position can silently break test/composition call sites.
+- Directional mapping is release-critical and unrelated; any attempt to infer posture from token order, range state, or composition is forbidden.
 
 ## Stop conditions
 
-Abort implementation and report the evidence instead of continuing if any of the following occurs:
-
-- A body read in a supported production runtime does not reject when the request `AbortSignal` aborts; that requires a separate compatibility design such as an explicitly raced deadline.
-- Preserving body deadlines appears to require changing an exported port/interface, DTO, error class surface, BFF endpoint, UI contract, or package boundary.
-- The fix would alter the 2-second/10-second budgets, introduce retry/recovery behavior, or extend into neighboring market-insight clients.
-- Existing typed unsupported-pool, graceful-degradation, `unavailableReason`, or exact user-facing error contracts cannot be preserved with the scoped lifecycle.
-- Any proposed change touches directional exit mapping or attempts to infer it outside `packages/domain/src/exit-policy/DirectionalExitPolicyService`.
-- Focused tests expose unrelated pre-existing failures that cannot be isolated without editing files outside this plan. Record them; do not fold unrelated fixes into these commits.
-- The automatic workspace `pnpm -r typecheck` gate fails after a task and the failure cannot be resolved within that task's declared files.
-
-## Assumptions
-
-- `issue-comments.md` is intentionally empty, so it contributes no additional constraints.
-- The timeout is a total per-attempt budget beginning immediately before `fetch()` and ending after the required body value has materialized; it does not reset after headers.
-- Native Fetch implementations used by Node, Expo/React Native, and supported browsers connect the supplied signal to body consumption.
-- Structural `{ name: 'AbortError' }` detection is the compatibility requirement; `instanceof DOMException` is not reliable across all targets and test doubles.
-- No exported API signature changes are needed, so `task-manifest.json` intentionally omits `signature_changes` for every task.
+- Stop if current official Orca documentation for the installed packages does not establish an instruction-free full-liquidity estimate whose outputs exclude fees and rewards; do not reimplement CLMM math or reuse execution preparation.
+- Stop if the chosen quote requires another position-account/owner scan or execution instruction construction; return to design rather than duplicate the authoritative detail read.
+- Stop if the position/pool state required by the quote cannot be supplied from the accounts already fetched by `fetchPositionDetail`.
+- Stop if any implementation would move Orca/Jupiter/Solana imports into domain or application, or make UI/app shell own business logic.
+- Stop if any task's required exported-type change cannot include all affected repository producers/implementations while keeping the automatic `pnpm -r typecheck` gate green.
+- Stop if tests reveal existing primary detail failures or live fee/reward quote failures have become fail-soft, or if principal-only failure becomes an HTTP 503.
+- Stop if a proposed field or warning requires deriving target asset, exit posture, or swap direction outside `DirectionalExitPolicyService`.

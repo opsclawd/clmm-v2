@@ -105,11 +105,14 @@ export type InsightDataWarning = {
     | 'sr_levels_unavailable'
     | 'actionable_triggers_unavailable'
     | 'fee_reward_usd_unavailable'
-    | 'price_distance_unavailable';
+    | 'price_distance_unavailable'
+    | 'principal_token_amounts_unavailable'
+    | 'usd_price_quote_unavailable';
   message: string;
   scope?: {
     poolId?: string;
     positionId?: string;
+    tokenMint?: string;
   };
 };
 
@@ -149,9 +152,30 @@ export type SolUsdcRewardAmountDto = {
   symbol: string;
 };
 
-export type ExternalBreachDirection =
-  | 'lower-bound-breach'
-  | 'upper-bound-breach';
+export type SolUsdcRawTokenAmountDto = {
+  raw: string;
+  decimals: number;
+  symbol: string;
+  mint: string;
+};
+
+export type SolUsdcPrincipalTokenAmountsDto = {
+  tokenA: SolUsdcRawTokenAmountDto;
+  tokenB: SolUsdcRawTokenAmountDto;
+  observedAtUnixMs: number;
+  source: 'orca_full_liquidity_quote';
+  basis: 'principal-only';
+};
+
+export type SolUsdcUsdPriceQuoteDto = {
+  mint: string;
+  symbol: string;
+  usdPerToken: number;
+  quotedAtUnixMs: number;
+  source: string;
+};
+
+export type ExternalBreachDirection = 'lower-bound-breach' | 'upper-bound-breach';
 
 export type SolUsdcPositionInsightDto = {
   walletId: string;
@@ -182,6 +206,8 @@ export type SolUsdcPositionInsightDto = {
   unclaimedRewards: SolUsdcRewardAmountDto[];
   unclaimedFeesUsd: number | null;
   unclaimedRewardsUsd: number | null;
+  principalTokenAmounts: SolUsdcPrincipalTokenAmountsDto | null;
+  usdPriceQuotes: SolUsdcUsdPriceQuoteDto[];
   positionLiquidity: string;
   poolLiquidity: string;
   hasActionableTrigger: boolean;
@@ -212,10 +238,7 @@ export type SolUsdcInsightInputBundleDto = {
 };
 
 export type SolUsdcInsightErrorDto = {
-  code:
-    | 'pool_snapshot_unavailable'
-    | 'position_list_unavailable'
-    | 'position_detail_unavailable';
+  code: 'pool_snapshot_unavailable' | 'position_list_unavailable' | 'position_detail_unavailable';
   message: string;
   pair: 'SOL/USDC';
   poolId: string;

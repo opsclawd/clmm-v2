@@ -13,7 +13,7 @@ import type {
   SolUsdcRewardAmountDto,
 } from '../../dto/index.js';
 
-export type PriceMapEntry = { usdValue: number; symbol: string };
+export type PriceMapEntry = { usdValue: number; symbol: string; quotedAt: number; source: string };
 
 export type BuildSolUsdcPositionInsightResult = {
   insight: SolUsdcPositionInsightDto;
@@ -164,6 +164,71 @@ export function buildSolUsdcPositionInsight(params: {
     }
   }
 
+  let principalTokenAmounts: SolUsdcPositionInsightDto['principalTokenAmounts'];
+  if (detail.principalTokenAmounts !== null && decimalsKnown) {
+    const dA = decimalsA;
+    const dB = decimalsB;
+    principalTokenAmounts = {
+      tokenA: {
+        raw: detail.principalTokenAmounts.amountA.toString(),
+        decimals: dA,
+        symbol: symbolA,
+        mint: mintA,
+      },
+      tokenB: {
+        raw: detail.principalTokenAmounts.amountB.toString(),
+        decimals: dB,
+        symbol: symbolB,
+        mint: mintB,
+      },
+      observedAtUnixMs: detail.principalTokenAmounts.observedAt,
+      source: 'orca_full_liquidity_quote',
+      basis: 'principal-only',
+    };
+  } else {
+    principalTokenAmounts = null;
+    warnings.push({
+      code: 'principal_token_amounts_unavailable',
+      message: 'Principal token amounts unavailable.',
+      scope: { positionId: position.positionId, poolId: position.poolId },
+    });
+  }
+
+  const requestedMints = new Set<string>();
+  requestedMints.add(mintA);
+  requestedMints.add(mintB);
+  for (const r of fees.rewardInfos) {
+    if (r.mint !== '') requestedMints.add(r.mint);
+  }
+  const sortedRequestedMints = [...requestedMints].sort();
+  const presentMints = new Set<string>();
+  for (const mint of sortedRequestedMints) {
+    if (priceMap.has(mint)) {
+      presentMints.add(mint);
+    }
+  }
+  const usdPriceQuotes = sortedRequestedMints
+    .filter((mint) => presentMints.has(mint))
+    .map((mint) => {
+      const entry = priceMap.get(mint)!;
+      return {
+        mint,
+        symbol: entry.symbol,
+        usdPerToken: entry.usdValue,
+        quotedAtUnixMs: entry.quotedAt,
+        source: entry.source,
+      };
+    });
+  for (const mint of sortedRequestedMints) {
+    if (!presentMints.has(mint)) {
+      warnings.push({
+        code: 'usd_price_quote_unavailable',
+        message: `USD price quote unavailable for mint ${mint}.`,
+        scope: { positionId: position.positionId, tokenMint: mint },
+      });
+    }
+  }
+
   const insight: SolUsdcPositionInsightDto = {
     walletId: position.walletId,
     positionId: position.positionId,
@@ -185,6 +250,8 @@ export function buildSolUsdcPositionInsight(params: {
     unclaimedRewards: rewardEntries,
     unclaimedFeesUsd,
     unclaimedRewardsUsd,
+    principalTokenAmounts,
+    usdPriceQuotes,
     positionLiquidity: positionLiquidity.toString(),
     poolLiquidity: poolData.liquidity.toString(),
     hasActionableTrigger: false,

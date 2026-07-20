@@ -15,6 +15,7 @@ import { OffChainHistoryStorageAdapter } from '../../outbound/storage/OffChainHi
 import { MonitoredWalletStorageAdapter } from '../../outbound/storage/MonitoredWalletStorageAdapter.js';
 import { WalletChallengePostgresAdapter } from '../../outbound/storage/WalletChallengePostgresAdapter.js';
 import { SolanaPositionSnapshotReader } from '../../outbound/solana-position-reads/SolanaPositionSnapshotReader.js';
+import { OrcaPositionPrincipalQuoteHelper } from '../../outbound/solana-position-reads/OrcaPositionPrincipalQuoteHelper.js';
 import {
   OrcaPositionReadAdapter,
   parsePoolDataCacheTtlMs,
@@ -90,7 +91,13 @@ const systemIds: IdGeneratorPort = {
 };
 
 const telemetryEarly = new TelemetryAdapter();
-const snapshotReader = new SolanaPositionSnapshotReader(rpcUrl, telemetryEarly);
+const principalQuoteHelper = new OrcaPositionPrincipalQuoteHelper();
+const snapshotReader = new SolanaPositionSnapshotReader(
+  rpcUrl,
+  telemetryEarly,
+  undefined,
+  principalQuoteHelper,
+);
 const poolDataCacheTtlMs = parsePoolDataCacheTtlMs(
   (process.env as Record<string, string | undefined>)['CLMM_POOL_DATA_CACHE_TTL_MS'],
 );

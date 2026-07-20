@@ -194,11 +194,14 @@ export type InsightDataWarning = {
     | 'sr_levels_unavailable'
     | 'actionable_triggers_unavailable'
     | 'fee_reward_usd_unavailable'
-    | 'price_distance_unavailable';
+    | 'price_distance_unavailable'
+    | 'principal_token_amounts_unavailable'
+    | 'usd_price_quote_unavailable';
   message: string;
   scope?: {
     poolId?: string;
     positionId?: string;
+    tokenMint?: string;
   };
 };
 
@@ -256,6 +259,29 @@ type _AssertBreachDirectionMatch = _BreachDirection['kind'] extends ExternalBrea
     : never
   : never;
 
+export type SolUsdcRawTokenAmountDto = {
+  raw: string;
+  decimals: number;
+  symbol: string;
+  mint: string;
+};
+
+export type SolUsdcPrincipalTokenAmountsDto = {
+  tokenA: SolUsdcRawTokenAmountDto;
+  tokenB: SolUsdcRawTokenAmountDto;
+  observedAtUnixMs: number;
+  source: 'orca_full_liquidity_quote';
+  basis: 'principal-only';
+};
+
+export type SolUsdcUsdPriceQuoteDto = {
+  mint: string;
+  symbol: string;
+  usdPerToken: number;
+  quotedAtUnixMs: number;
+  source: string;
+};
+
 export type SolUsdcPositionInsightDto = {
   walletId: string;
   positionId: string;
@@ -283,10 +309,10 @@ export type SolUsdcPositionInsightDto = {
     feeOwedB: SolUsdcFeeAmountDto;
   };
   unclaimedRewards: SolUsdcRewardAmountDto[];
-  // null distinguishes "valuation unavailable" from a real zero. See spec
-  // §"USD Valuation Flow" — do not collapse to 0.
   unclaimedFeesUsd: number | null;
   unclaimedRewardsUsd: number | null;
+  principalTokenAmounts: SolUsdcPrincipalTokenAmountsDto | null;
+  usdPriceQuotes: SolUsdcUsdPriceQuoteDto[];
   positionLiquidity: string;
   poolLiquidity: string;
   hasActionableTrigger: boolean;

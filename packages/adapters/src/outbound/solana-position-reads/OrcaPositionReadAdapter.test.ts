@@ -8,11 +8,20 @@ import { makePositionId } from '@clmm/domain';
 import type { WalletId } from '@clmm/domain';
 
 vi.mock('./SolanaPositionSnapshotReader', () => ({
-  SolanaPositionSnapshotReader: vi.fn().mockImplementation(() => ({
-    fetchSinglePosition: vi.fn(),
-    fetchWhirlpoolsBatched: vi.fn(),
-    getRpc: vi.fn(() => ({})),
-  })),
+  SolanaPositionSnapshotReader: vi
+    .fn()
+    .mockImplementation(
+      (
+        _rpcUrl: string,
+        _observability?: unknown,
+        _quoteHelper?: unknown,
+        _principalQuoteHelper?: unknown,
+      ) => ({
+        fetchSinglePosition: vi.fn(),
+        fetchWhirlpoolsBatched: vi.fn(),
+        getRpc: vi.fn(() => ({})),
+      }),
+    ),
 }));
 
 vi.mock('@orca-so/whirlpools', () => ({

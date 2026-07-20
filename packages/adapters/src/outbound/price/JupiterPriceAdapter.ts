@@ -36,7 +36,6 @@ export class JupiterPriceAdapter implements PricePort {
       await this.fetchBatched(uncached);
     }
 
-    const quotedAt = makeClockTimestamp(Date.now());
     const results: PriceQuote[] = [];
     for (const mint of tokenMints) {
       const entry = this.cache.get(mint);
@@ -45,7 +44,8 @@ export class JupiterPriceAdapter implements PricePort {
           tokenMint: mint,
           usdValue: entry.price,
           symbol: entry.symbol,
-          quotedAt,
+          quotedAt: makeClockTimestamp(entry.fetchedAt),
+          source: 'jupiter_price_v3',
         });
       }
     }

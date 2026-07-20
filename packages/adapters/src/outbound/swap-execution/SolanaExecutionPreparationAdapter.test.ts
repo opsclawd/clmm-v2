@@ -18,11 +18,20 @@ vi.mock('@orca-so/whirlpools-client', () => ({
 }));
 
 vi.mock('../solana-position-reads/SolanaPositionSnapshotReader', () => ({
-  SolanaPositionSnapshotReader: vi.fn().mockImplementation(() => ({
-    fetchSinglePosition: vi.fn(),
-    fetchWhirlpoolsBatched: vi.fn(),
-    getRpc: vi.fn(() => ({})),
-  })),
+  SolanaPositionSnapshotReader: vi
+    .fn()
+    .mockImplementation(
+      (
+        _rpcUrl: string,
+        _observability?: unknown,
+        _quoteHelper?: unknown,
+        _principalQuoteHelper?: unknown,
+      ) => ({
+        fetchSinglePosition: vi.fn(),
+        fetchWhirlpoolsBatched: vi.fn(),
+        getRpc: vi.fn(() => ({})),
+      }),
+    ),
 }));
 
 describe('SolanaExecutionPreparationAdapter', () => {
