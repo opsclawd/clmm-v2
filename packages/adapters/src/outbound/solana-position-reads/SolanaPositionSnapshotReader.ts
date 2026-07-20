@@ -235,8 +235,7 @@ export class SolanaPositionSnapshotReader {
       return null;
     }
 
-    // eslint-disable-next-line @typescript-eslint/await-thenable
-    const principalQuote = await this.principalQuoteHelper.quote({
+    const principalQuote = this.principalQuoteHelper.quote({
       liquidity: pos.liquidity,
       sqrtPrice: w.sqrtPrice,
       tickLowerIndex: pos.tickLowerIndex,

@@ -1,56 +1,60 @@
-# Harden market insight fetch timeouts through response body reads
+# feat: extend SOL/USDC intelligence bundle with missing raw LP facts
 
 ## Summary
 
-Harden the regime and S/R market insight fetch paths so request timeouts cover both the initial `fetch()` call and response body consumption (`json()` / `text()`).
+Audit and extend the read-only SOL/USDC insights bundle so the intelligence engine can derive the highest-value LP/economics metrics without duplicating wallet-specific chain reads.
 
-Current code clears the `AbortController` timeout after `fetch()` returns, before the response body is read. That means the timeout protects connection/headers but not a slow or hung response body stream.
+## Context
 
-## Impact
+The existing bundle already exposes pool, position, alert, and S/R context. This issue should add only missing **raw facts** that clmm-v2 already owns or can authoritatively read, not derived recommendations.
 
-Practical severity: **low-to-moderate**.
+## Dependency chain
 
-Why it matters:
+- **Audit can start after** INT-TAXONOMY signal taxonomy is defined (to know which evidence families need raw LP inputs).
+- **Implementation should be finalized after** INT-FEATURES (features shape the specific raw facts needed).
+- RE-CONTRACT is a reference dependency only — the bundle shape is driven by evidence feature needs, not by the downstream evidence wire contract.
 
-- A server can return response headers and then stall while streaming the body.
-- `response.json()` / `response.text()` can outlive the intended timeout.
-- UI may remain loading longer than expected.
-- BFF request handlers may stay open longer than intended.
-- Timeout semantics become misleading.
+## Required audit
 
-Why this is not blocking issue #63:
+Compare the current bundle against the evidence needs for:
 
-- Response bodies are tiny JSON.
-- Normal failures are more likely 404/500/network errors than header-success/body-stall.
-- Existing S/R code already uses the same timeout pattern, so this is not a regime-only regression.
+- inventory skew;
+- fee capture;
+- unclaimed fee valuation lineage;
+- position token composition;
+- any additional wallet/position-scoped raw facts required for deterministic evidence derivation.
 
 ## Scope
 
-- Add a small helper or pattern that keeps the abort timeout active through both:
-  1. `fetch(...)`
-  2. response body read (`json()` / `text()`)
-- Apply it to new regime fetch code.
-- Apply it to existing S/R fetch code for consistency.
-- Preserve current graceful degradation behavior.
-- Add tests for slow/hung/rejected body reads where feasible.
+In scope:
 
-## Candidate files
+- DTO updates;
+- application use-case updates;
+- BFF/controller response updates;
+- tests/docs;
+- explicit data-quality warnings for unavailable enrichment.
 
-- `packages/adapters/src/outbound/regime-engine/CurrentRegimeAdapter.ts`
-- `packages/adapters/src/outbound/regime-engine/CurrentSrLevelsAdapter.ts`
-- `apps/app/src/api/regime.ts`
-- `apps/app/src/api/srLevels.ts`
+Out of scope:
+
+- fee APR / fee-to-volatility derivation if those are better computed in intelligence/regime layers;
+- execution slippage logic;
+- final recommendations;
+- new app UI.
+
+## Guardrails
+
+- Expose raw facts, not final judgments.
+- Keep S/R top-level rather than copying per position.
+- Preserve the existing no-execution, read-only character of the insights API.
 
 ## Acceptance criteria
 
-- [ ] Timeout covers response body consumption, not just header receipt.
-- [ ] Regime adapter still returns graceful `null` / unavailable behavior according to its contract.
-- [ ] S/R adapter preserves existing graceful degradation behavior.
-- [ ] App API clients preserve existing error classification behavior.
-- [ ] Tests cover a response whose body read hangs or rejects after headers are returned, at least for the shared helper or one representative adapter/client path.
-- [ ] `pnpm typecheck` passes.
-- [ ] `pnpm test` passes.
+- [ ] Gap audit documents which required evidence fields were already present and which were missing.
+- [ ] Missing raw LP facts with clmm-v2 ownership are added to the bundle.
+- [ ] Data-quality warnings distinguish unavailable raw facts from true zero values.
+- [ ] Existing bundle consumers remain compatible or migrations are documented.
+- [ ] Tests cover the added fields and partial-data cases.
 
-## Notes
+## Parent
 
-This issue should not change market-context product behavior, DTOs, or UI. It is network-hardening tech debt discovered during issue #63 review.
+Part of opsclawd/clmm-v2#90.

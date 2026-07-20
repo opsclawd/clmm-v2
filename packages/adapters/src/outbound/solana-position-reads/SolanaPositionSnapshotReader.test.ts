@@ -537,7 +537,7 @@ describe('SolanaPositionSnapshotReader', () => {
         }),
       };
       const principalHelper = {
-        quote: vi.fn().mockResolvedValue({
+        quote: vi.fn().mockReturnValue({
           kind: 'ok',
           amountA: 250_000_000n,
           amountB: 12_500_000n,
@@ -584,7 +584,7 @@ describe('SolanaPositionSnapshotReader', () => {
         }),
       };
       const principalHelper = {
-        quote: vi.fn().mockResolvedValue({
+        quote: vi.fn().mockReturnValue({
           kind: 'ok',
           amountA: 0n,
           amountB: 0n,
@@ -622,7 +622,7 @@ describe('SolanaPositionSnapshotReader', () => {
         }),
       };
       const principalHelper = {
-        quote: vi.fn().mockResolvedValue({
+        quote: vi.fn().mockReturnValue({
           kind: 'unavailable',
           reason: 'principal-quote-failed',
         }),
@@ -679,7 +679,7 @@ describe('SolanaPositionSnapshotReader', () => {
         }),
       };
       const principalHelper = {
-        quote: vi.fn().mockResolvedValue({
+        quote: vi.fn().mockReturnValue({
           kind: 'ok',
           amountA: 250_000_000n,
           amountB: 12_500_000n,
