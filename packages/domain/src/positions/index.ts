@@ -78,6 +78,7 @@ export type PriceQuote = {
   readonly usdValue: number;
   readonly symbol: string;
   readonly quotedAt: ClockTimestamp;
+  readonly source: string;
 };
 
 export {

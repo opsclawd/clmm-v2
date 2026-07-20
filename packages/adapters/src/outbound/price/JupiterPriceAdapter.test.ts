@@ -1,6 +1,7 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { JupiterPriceAdapter } from './JupiterPriceAdapter.js';
 import { SOL_MINT, USDC_MINT } from './known-tokens.js';
+import { makeClockTimestamp } from '@clmm/domain';
 
 const originalFetch = globalThis.fetch;
 
@@ -20,6 +21,10 @@ function jsonRes(body: unknown, status = 200) {
 describe('JupiterPriceAdapter', () => {
   beforeEach(() => {
     globalThis.fetch = originalFetch;
+  });
+
+  afterEach(() => {
+    vi.restoreAllMocks();
   });
 
   it('fetches prices from Jupiter Price API v3', async () => {
@@ -123,5 +128,52 @@ describe('JupiterPriceAdapter', () => {
     const adapter = new JupiterPriceAdapter();
     const quotes = await adapter.getPrices([]);
     expect(quotes).toEqual([]);
+  });
+
+  it('returns Jupiter source on every quote', async () => {
+    vi.useFakeTimers();
+
+    const fetchSpy = vi.fn(() =>
+      jsonRes({
+        [SOL_MINT]: { usdPrice: 150.5, symbol: 'SOL', decimals: 9 },
+        [USDC_MINT]: { usdPrice: 1.0, symbol: 'USDC', decimals: 6 },
+      }),
+    );
+    mockFetch(fetchSpy);
+
+    vi.setSystemTime(1_000);
+    const adapter = new JupiterPriceAdapter({ apiKey: 'test-key' });
+    const quotes = await adapter.getPrices([SOL_MINT, USDC_MINT]);
+
+    expect(quotes).toHaveLength(2);
+    expect(quotes[0]!.source).toBe('jupiter_price_v3');
+    expect(quotes[1]!.source).toBe('jupiter_price_v3');
+
+    vi.useRealTimers();
+  });
+
+  it('reuses the original fetchedAt as quotedAt on a cache hit', async () => {
+    vi.useFakeTimers();
+
+    const fetchSpy = vi.fn(() =>
+      jsonRes({
+        [SOL_MINT]: { usdPrice: 150.5, symbol: 'SOL', decimals: 9 },
+      }),
+    );
+    mockFetch(fetchSpy);
+
+    vi.setSystemTime(1_000);
+    const adapter = new JupiterPriceAdapter({ cacheTtlMs: 60_000 });
+    await adapter.getPrices([SOL_MINT]);
+
+    vi.setSystemTime(2_000);
+    const quotesFromCacheHit = await adapter.getPrices([SOL_MINT]);
+
+    expect(fetchSpy).toHaveBeenCalledOnce();
+
+    expect(quotesFromCacheHit).toHaveLength(1);
+    expect(quotesFromCacheHit[0]!.quotedAt).toBe(makeClockTimestamp(1_000));
+
+    vi.useRealTimers();
   });
 });
