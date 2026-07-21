@@ -20,6 +20,13 @@ This mapping lives only in `packages/domain/src/exit-policy/DirectionalExitPolic
 It must not be re-derived in adapters, UI, or anywhere outside the domain layer.
 If you are uncertain about direction, stop and ask. Do not infer.
 
+## Cross-Repo Contracts
+
+- Canonical contracts owned by sibling `opsclawd/*` repositories (e.g. `regime-engine`'s `PolicyInsight`, `EvidenceBundle`) are **checked into that repository's own `contracts/<name>/v<n>/` directory** (JSON Schema, valid/invalid fixtures, `schema.sha256`) — never published as npm packages. No `@opsclawd/*-contracts` package exists or is planned for any of these.
+- Consume a sibling repo's contract by **vendoring** it: fetch the pinned commit (e.g. a shallow `git clone --depth 1 --filter=blob:none --sparse` of the upstream repo, `git sparse-checkout set contracts/<name>/v<n>`) and copy the files into this repo at `schemas/<owning-repo>/<name>.v<n>/`, alongside a `provenance.json` recording the source repository, commit, and a sha256 of every vendored asset.
+- `sol-usdc-clmm-intelligence`'s `schemas/regime-engine/evidence-bundle.v1/` is the established, working reference implementation of this pattern — mirror its file layout (`schema.json`, `schema.sha256`, `fixtures/valid/`, `fixtures/invalid/`, `provenance.json`) for any new vendored contract.
+- Do not assume a sibling repo's contract is installable from an npm registry. If a design or plan document proposes installing one, treat that as an unverified assumption to check against the upstream repo's actual `contracts/` directory before implementing, not a fact to build on.
+
 ## Hard Repo Boundaries
 
 - `packages/domain` depends only on itself and contains pure business logic.
