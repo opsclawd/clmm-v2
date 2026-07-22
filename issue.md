@@ -1,60 +1,55 @@
-# feat: extend SOL/USDC intelligence bundle with missing raw LP facts
+# fix: align PolicyInsights adapter and DTOs with regime-engine canonical output
 
 ## Summary
 
-Audit and extend the read-only SOL/USDC insights bundle so the intelligence engine can derive the highest-value LP/economics metrics without duplicating wallet-specific chain reads.
+Update clmm-v2 so its PolicyInsights adapter, DTOs, and app API parser consume the exact canonical output contract emitted by Regime Engine after contract normalization.
 
-## Context
+Additionally, eliminate duplicated hand-written PolicyInsight runtime validation across the BFF/app boundary by consuming one canonical contract artifact/fixture set from Regime Engine.
 
-The existing bundle already exposes pool, position, alert, and S/R context. This issue should add only missing **raw facts** that clmm-v2 already owns or can authoritatively read, not derived recommendations.
+## Current problem
 
-## Dependency chain
+The current reader expects a payload shape that does not match Regime Engine's current live output. This can cause valid policy insight responses to be rejected before the user sees them.
 
-- **Audit can start after** INT-TAXONOMY signal taxonomy is defined (to know which evidence families need raw LP inputs).
-- **Implementation should be finalized after** INT-FEATURES (features shape the specific raw facts needed).
-- RE-CONTRACT is a reference dependency only — the bundle shape is driven by evidence feature needs, not by the downstream evidence wire contract.
-
-## Required audit
-
-Compare the current bundle against the evidence needs for:
-
-- inventory skew;
-- fee capture;
-- unclaimed fee valuation lineage;
-- position token composition;
-- any additional wallet/position-scoped raw facts required for deterministic evidence derivation.
+There is also duplicated hand-rolled validation of the PolicyInsight shape across the adapter and the app layer, which creates a second source of contract truth that drifts independently from the Regime Engine output.
 
 ## Scope
 
 In scope:
 
-- DTO updates;
-- application use-case updates;
-- BFF/controller response updates;
-- tests/docs;
-- explicit data-quality warnings for unavailable enrichment.
+- `CurrentPolicyInsightsAdapter`;
+- application DTOs;
+- app API parser;
+- contract validation/tests;
+- any BFF controller shape updates needed for the canonical contract;
+- consume one shared contract artifact/fixture set from Regime Engine (JSON Schema, fixtures);
+- centralize parser/validation in one shared module rather than duplicating across boundaries.
 
 Out of scope:
 
-- fee APR / fee-to-volatility derivation if those are better computed in intelligence/regime layers;
-- execution slippage logic;
-- final recommendations;
-- new app UI.
-
-## Guardrails
-
-- Expose raw facts, not final judgments.
-- Keep S/R top-level rather than copying per position.
-- Preserve the existing no-execution, read-only character of the insights API.
+- UI design;
+- evidence ingestion;
+- synthesis rules.
 
 ## Acceptance criteria
 
-- [ ] Gap audit documents which required evidence fields were already present and which were missing.
-- [ ] Missing raw LP facts with clmm-v2 ownership are added to the bundle.
-- [ ] Data-quality warnings distinguish unavailable raw facts from true zero values.
-- [ ] Existing bundle consumers remain compatible or migrations are documented.
-- [ ] Tests cover the added fields and partial-data cases.
+- [ ] clmm-v2 consumes the exact canonical Regime Engine wire shape.
+- [ ] No silent field-name or unit conversion remains undocumented.
+- [ ] No duplicated hand-written validation exists across BFF and app boundaries.
+- [ ] Adapter tests include a real canonical payload fixture from Regime Engine.
+- [ ] Malformed payloads still fail closed.
+- [ ] Freshness/status semantics remain intact.
 
 ## Parent
 
 Part of opsclawd/clmm-v2#90.
+
+## Blocked by
+
+- opsclawd/regime-engine#63
+
+## References
+
+See the canonical design spec and execution plan for the full architecture boundary and delivery roadmap:
+
+- [Evidence-Driven Policy Pipeline — Design Spec](https://github.com/opsclawd/regime-engine/blob/main/docs/superpowers/specs/2026-05-09-evidence-driven-policy-pipeline-design.md)
+- [Evidence-Driven Policy Pipeline — Execution Plan](https://github.com/opsclawd/regime-engine/blob/main/docs/superpowers/plans/2026-05-09-evidence-driven-policy-pipeline-execution-plan.md)

@@ -1,421 +1,292 @@
-<!-- plan-review-required -->
+# PolicyInsights Canonical Contract Alignment Implementation Plan
 
-# SOL/USDC Intelligence Bundle Raw LP Facts Implementation Plan
+> **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:test-driven-development while implementing each task. Keep Task 2 atomic through its final workspace typecheck; do not commit a port/DTO-only intermediate state.
 
-> **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
+**Goal:** Make clmm-v2 accept and preserve the exact canonical PolicyInsight wire payload published by Regime Engine, using one strict shared parser instead of separate adapter and app validators.
 
-**Goal:** Extend both successful SOL/USDC position-insight responses with truthful full-liquidity principal token amounts and reusable USD quote lineage, while preserving zero values and degrading optional fact failures to scoped warnings.
+**Architecture:** `@clmm/application` owns the canonical runtime validator and exported DTO. The outbound Regime Engine adapter and Expo BFF client both call that validator, the BFF controller remains a transparent envelope mapper, and the UI view model consumes only canonical presentation fields. The upstream JSON Schema and canonical fixture are vendored from Regime Engine's checked-in `contracts/policy-insight/v1/` directory into this repo's `schemas/regime-engine/policy-insight.v1/` (mirroring `sol-usdc-clmm-intelligence`'s `schemas/regime-engine/evidence-bundle.v1/` pattern), imported locally; Ajv validates without coercion, defaults, mutation, or local field conversion.
 
-**Architecture:** Keep Orca-specific principal math in a focused adapter helper and attach its nullable result to the existing domain `PositionDetail`; do not add another wallet scan, endpoint, or execution quote. Extend `PriceQuote` with provider provenance and preserve the cache entry's actual fetch time, then let the existing application position builder serialize principal and price facts, compute compatibility totals from those same facts, and own consumer-facing warnings. The controller remains a pass-through over the shared `/positions` and `/bundle` use-case path.
-
-**Tech Stack:** TypeScript, Vitest, pnpm workspaces, `@solana/kit` v6, `@orca-so/whirlpools-core` v3.1.0, `@orca-so/whirlpools-client` v6.2.1, Jupiter Price API v3, NestJS.
+**Tech Stack:** TypeScript, pnpm workspaces, Ajv 8, Vitest, NestJS, Expo/Metro.
 
 ---
 
 ## Goal
 
-Expose the raw facts CLMM V2 owns for downstream inventory-composition and valuation-lineage derivation: principal-only token A/B amounts for 100% of position liquidity, and every successfully returned pool/reward mint USD quote with provider and actual quote time. A successful raw `0n` must serialize as `'0'`; unavailable enrichment must remain absent or `null` and produce an explicit scoped warning.
+- Consume the exact canonical Regime Engine PolicyInsight schema and fixture.
+- Export one `parsePolicyInsightBlock(value: unknown): PolicyInsightBlock | null` implementation from `@clmm/application` for both trust boundaries.
+- Preserve canonical field names, units, `status`, and freshness data without aliases, fallbacks, or transformations.
+- Fail closed for malformed or schema-incompatible payloads.
 
 ## Non-goals
 
-- Do not add inventory-skew labels, dominant-asset/one-sided judgments, position USD value, fee APR/APY, fee-to-volatility ratios, recommendations, target posture, or swap direction.
-- Do not change routes, authentication, top-level S/R placement, trigger behavior, primary pool/list/detail failure unions, or existing 503 responses.
-- Do not add a composition endpoint, bundle-only DTO fork, second owner scan, duplicate position-account fetch, execution instruction construction, or `closePositionInstructions` reuse.
-- Do not change the existing live fee/reward fail-closed behavior or fall back to checkpointed Orca accumulators.
-- Do not add retries, historical fee/deposit/withdrawal data, wallet balances, pool TVL/24-hour fees, on-chain receipts, attestations, or UI work.
-- Do not derive the release-blocker lower/upper-bound exit mapping anywhere in this read path.
+- UI layout or component design changes.
+- Evidence ingestion, Regime Engine synthesis, or upstream storage changes.
+- History, timeline, detail, or source-reference UI.
+- Automatic application of policy advice to positions.
+- Domain exit-policy or directional-mapping changes.
+- A compatibility layer for the legacy PolicyInsight shape.
+- Changes to existing timeout, HTTP status, or unavailable-reason behavior.
+
+## Assumptions and authority
+
+- `design.md` and `issue.md` define the intended behavior; `issue-comments.md` is present but empty.
+- Regime Engine checks its canonical contracts into its own repository under `contracts/<name>/v<n>/` (schema, fixtures, `schema.sha256`) rather than publishing npm packages — this is the established, working convention (see `sol-usdc-clmm-intelligence`'s `schemas/regime-engine/evidence-bundle.v1/`, vendored from `opsclawd/regime-engine`'s `contracts/evidence-bundle/v1/`). No `@opsclawd/regime-engine-contracts` npm package exists or is planned; do not attempt to install one.
+- Task 1 vendors `opsclawd/regime-engine`'s `contracts/policy-insight/v1/` directory (verified present on `main` at commit `260d144`) into this repo at `schemas/regime-engine/policy-insight.v1/` via a pinned-commit sparse clone, then imports the local copy — mirroring the intelligence repo's pattern exactly. Locally alias the schema and fixture exports as `policyInsightSchema` and `canonicalPolicyInsightFixture`; do not guess export shapes.
+- The canonical schema, not the current handwritten DTO, decides required fields, enum values, nesting, and units. If the schema and fixture disagree, stop rather than patching either locally.
+- `PolicyInsightsUnavailableReason`, `PolicyInsightsReadResult`, and `PolicyInsightsReadPort.fetchCurrent()` remain unchanged; this plan changes the block contract and adds a shared parser, not the read-port method surface.
+- The release-blocker directional mapping in `packages/domain/src/exit-policy/DirectionalExitPolicyService` is untouched.
 
 ## Affected files
 
-- `packages/domain/src/positions/index.ts` — add `PriceQuote.source` and nullable principal amounts on `PositionDetail`.
-- `packages/testing/src/fixtures/positions.ts` — provide explicit quote provenance and representative principal amounts for shared typed fixtures.
-- `packages/adapters/src/outbound/price/JupiterPriceAdapter.ts` — emit `jupiter_price_v3` and return each cache entry's real fetch timestamp.
-- `packages/adapters/src/outbound/price/JupiterPriceAdapter.test.ts` — cover provider provenance and cache-hit timestamp truthfulness.
-- `packages/adapters/src/outbound/solana-position-reads/OrcaPositionPrincipalQuoteHelper.ts` — new adapter-local full-liquidity principal quote helper.
-- `packages/adapters/src/outbound/solana-position-reads/OrcaPositionPrincipalQuoteHelper.test.ts` — cover success, zeros, invalid input, and sanitized failures.
-- `packages/adapters/src/outbound/solana-position-reads/SolanaPositionSnapshotReader.ts` — invoke the principal helper with already-fetched position/pool state and fail soft with structured logging.
-- `packages/adapters/src/outbound/solana-position-reads/SolanaPositionSnapshotReader.test.ts` — cover principal success and optional-failure behavior in the existing `fetchPositionDetail` block.
-- `packages/adapters/src/composition/AdaptersModule.ts` — update `SolanaPositionSnapshotReader` constructor call to pass the principal helper (位置 after fee/reward helper).
-- `packages/adapters/src/inbound/http/AppModule.ts` — update `SolanaPositionSnapshotReader` provider registration to match new constructor signature.
-- `packages/adapters/src/outbound/solana-position-reads/OrcaPositionReadAdapter.test.ts` — update test fixtures and assertions that reference `PositionDetail` or `SolanaPositionSnapshotReader`.
-- `packages/adapters/src/outbound/solana-position-reads/SolanaReadPathEfficiency.integration.test.ts` — update integration test assertions that reference `PositionDetail` fields.
-- `packages/adapters/src/outbound/swap-execution/SolanaExecutionPreparationAdapter.test.ts` — update test fixtures referencing position detail types.
-- `packages/application/src/dto/index.ts` — add raw principal/price DTOs, position fields, warning codes, and `scope.tokenMint`.
-- `packages/application/src/use-cases/insights/buildSolUsdcPositionInsight.ts` — serialize facts, preserve zero/null semantics, sort quote facts, and emit position/token-scoped warnings.
-- `packages/application/src/use-cases/insights/buildSolUsdcPositionInsight.test.ts` — cover the new builder contract and compatibility valuations.
-- `packages/application/src/use-cases/insights/GetSolUsdcInsightPositions.ts` — retain quote time/source in the shared price map without changing read ordering.
-- `packages/application/src/use-cases/insights/GetSolUsdcInsightPositions.test.ts` — cover missing/throwing quote enrichment and shared snapshot semantics.
-- `packages/application/src/use-cases/insights/GetSolUsdcInsightBundle.test.ts` — verify bundle propagation, top-level S/R placement, and aggregate data quality.
-- `packages/adapters/src/inbound/http/InsightsDataController.test.ts` — verify both successful HTTP surfaces expose the identical additive position shape.
-- `docs/superpowers/specs/2026-05-01-sol-usdc-insights-data-api-design.md` — document the additive raw-fact schema, warning semantics, and compatibility guidance.
+**Dependency and contract preflight**
+
+- `packages/application/package.json`
+- `packages/adapters/package.json`
+- `apps/app/package.json`
+- `pnpm-lock.yaml`
+- `packages/application/src/dto/policyInsightContract.test.ts` (new)
+
+**Atomic contract migration**
+
+- `packages/application/src/dto/policyInsights.ts`
+- `packages/application/src/dto/policyInsightValidator.ts` (new)
+- `packages/application/src/dto/policyInsightValidator.test.ts` (new)
+- `packages/application/src/dto/index.ts`
+- `packages/application/src/index.ts`
+- `packages/application/src/public/index.ts`
+- `packages/application/src/public/policyInsights.exports.test.ts`
+- `packages/adapters/src/outbound/regime-engine/CurrentPolicyInsightsAdapter.ts`
+- `packages/adapters/src/outbound/regime-engine/CurrentPolicyInsightsAdapter.test.ts`
+- `packages/adapters/src/inbound/http/PolicyInsightsController.test.ts`
+- `apps/app/src/api/policyInsights.ts`
+- `apps/app/src/api/policyInsights.test.ts`
+- `packages/ui/src/view-models/PolicyInsightsViewModel.ts`
+- `packages/ui/src/view-models/PolicyInsightsViewModel.test.ts`
+- `packages/ui/src/components/PolicyInsightsSection.test.tsx`
+
+`packages/adapters/src/inbound/http/PolicyInsightsController.ts` and `packages/ui/src/components/PolicyInsightsSection.tsx` are expected to remain unchanged. Their existing designs already provide transparent envelope mapping and thin view-model rendering; tests will prove those properties against the canonical DTO.
 
 ## Behavioral invariants
 
-The named invariants below are mandatory tests written before implementation in the task that owns them:
+- **Canonical acceptance:** Given the package's canonical fixture, schema validation succeeds and the shared parser returns the payload unchanged.
+- **No local normalization:** The parser never renames fields, converts timestamp units, derives missing freshness values, applies defaults, coerces types, or removes properties.
+- **Fail closed:** A missing required field, wrong enum, wrong scalar type, invalid nested object, or schema-forbidden extra property returns `null`.
+- **Adapter outcome:** A 200 response containing the canonical payload becomes `{ kind: 'block', block }`; a 200 response that fails canonical validation becomes `{ kind: 'upstream-error' }` and logs the existing shape-validation warning.
+- **BFF passthrough:** When the read port returns `{ kind: 'block', block }`, the controller returns `{ policyInsight: block }` without cloning, remapping, or dropping canonical fields.
+- **App outcome:** A BFF envelope containing the canonical payload returns that payload; a malformed non-null block throws the existing malformed-block error; null envelopes and unavailable reasons retain current behavior.
+- **Freshness/status semantics:** The view model reads the canonical `status` and canonical freshness timestamp/staleness fields directly. It must not fall back to `asOf`, parse an ISO timestamp into milliseconds, or recompute upstream status.
+- **Directional isolation:** No code in this work derives or changes lower/upper breach exit direction.
 
-1. **Cached quote time is truthful:** a cache hit returns the original entry `fetchedAt` as `quotedAt`, never the later lookup time, and always reports `source: 'jupiter_price_v3'`.
-2. **Principal quote is principal-only:** valid full-liquidity inputs return Orca `tokenEstA`/`tokenEstB` unchanged and never add fee/reward amounts or expose minimum/slippage amounts.
-3. **Principal zero is data:** a successful quote containing zero on either side remains an `ok` result with `0n`; it is never converted to unavailable.
-4. **Principal invalid input is classified:** negative liquidity or non-ascending ticks returns `unavailable` with `reason: 'quote-input-invalid'` without calling Orca quote math; zero liquidity remains a valid quote input so an empty position can report real zeros.
-5. **Principal quote failure is bounded:** thrown Orca errors return `reason: 'principal-quote-failed'` with error name and a message capped at 200 characters.
-6. **Principal failure is optional:** when live fee/reward quoting succeeds but principal quoting is unavailable, the detail read still succeeds with `principalTokenAmounts: null` and emits exactly one bounded structured warning.
-7. **Primary detail failures remain primary:** position/pool/ownership/live fee-reward failures still return `null`; principal enrichment must not weaken those paths.
-8. **Missing principal is explicit:** a null detail fact serializes as `principalTokenAmounts: null` and adds one `principal_token_amounts_unavailable` warning scoped to position and pool.
-9. **Principal values preserve exactness:** successful bigint amounts, including either or both zeros, serialize as decimal strings with the pool mint/symbol/decimals and the helper completion time.
-10. **Missing price is token-scoped:** every requested pool or non-empty reward mint without a returned quote is absent from `usdPriceQuotes` and adds one `usd_price_quote_unavailable` warning scoped to position and token mint.
-11. **Quote facts are deterministic and authoritative:** successful quote entries are sorted lexicographically by mint and carry the exact source and `quotedAt` returned by `PricePort`.
-12. **Compatibility totals share lineage:** `unclaimedFeesUsd` and `unclaimedRewardsUsd` use the same retained map serialized as `usdPriceQuotes`; missing required decimals/quotes yields `null`, while known zero raw amounts with complete quotes yields `0`.
-13. **Partial is warnings-derived:** on both positions and bundle responses, `dataQuality.partial` equals `warnings.length > 0` after the new warnings are composed.
-14. **Shared HTTP shape remains additive:** `/positions/:walletId` and `/bundle/:walletId` expose the same new position fields while S/R remains only at bundle top level and existing fields/errors remain unchanged.
+---
 
-## Task 1: Preserve USD price source and cache observation time
+## Task 1: Vendor the canonical contract and gate the migration on it
+
+**Goal:** Vendor Regime Engine's checked-in `contracts/policy-insight/v1/` into this repo, add the validator dependency, then prove the schema compiles strictly and accepts its own canonical fixture before any exported clmm DTO changes.
 
 **Files:**
 
-- Modify: `packages/domain/src/positions/index.ts` (`PriceQuote` only)
-- Modify: `packages/testing/src/fixtures/positions.ts` (`FIXTURE_SOL_PRICE_QUOTE` and `FIXTURE_USDC_PRICE_QUOTE` only)
-- Modify: `packages/adapters/src/outbound/price/JupiterPriceAdapter.ts`
-- Modify: `packages/adapters/src/outbound/price/JupiterPriceAdapter.test.ts`
+- Create: `schemas/regime-engine/policy-insight.v1/schema.json`
+- Create: `schemas/regime-engine/policy-insight.v1/schema.sha256`
+- Create: `schemas/regime-engine/policy-insight.v1/fixtures/valid/current-pair.json`
+- Create: `schemas/regime-engine/policy-insight.v1/fixtures/valid/current-position.json`
+- Create: `schemas/regime-engine/policy-insight.v1/fixtures/valid/history.json`
+- Create: `schemas/regime-engine/policy-insight.v1/fixtures/invalid/action-position-and-version.json`
+- Create: `schemas/regime-engine/policy-insight.v1/fixtures/invalid/fields-and-enums.json`
+- Create: `schemas/regime-engine/policy-insight.v1/fixtures/invalid/numbers-and-levels.json`
+- Create: `schemas/regime-engine/policy-insight.v1/fixtures/invalid/ordering-and-duplicates.json`
+- Create: `schemas/regime-engine/policy-insight.v1/fixtures/invalid/timestamps-and-freshness.json`
+- Create: `schemas/regime-engine/policy-insight.v1/provenance.json`
+- Modify: `packages/application/package.json`
+- Modify: `pnpm-lock.yaml`
+- Create: `packages/application/src/dto/policyInsightContract.test.ts`
 
-**Invariants to test first:** `returns Jupiter source on every quote`, `reuses the original fetchedAt as quotedAt on a cache hit`.
+**Dependencies:** None.
 
-- [ ] **Step 1: Add failing provider and cache-time tests.** In `JupiterPriceAdapter.test.ts`, use `vi.spyOn(Date, 'now')` with values `1_000` for the first request and `2_000` for the cache hit. Assert the first and second quote both equal `makeClockTimestamp(1_000)` and both have `source === 'jupiter_price_v3'`; restore the spy in `afterEach`.
+**Signature changes:** None.
 
-- [ ] **Step 2: Run the focused test before implementation.**
+**Invariants to write as tests first:**
 
-  ```bash
-  pnpm --filter @clmm/adapters test -- src/outbound/price/JupiterPriceAdapter.test.ts -t 'source|original fetchedAt'
-  ```
+1. `accepts the vendored canonical PolicyInsight fixture with the vendored schema`
+   - Import the local vendored PolicyInsight schema and fixture (`schemas/regime-engine/policy-insight.v1/`).
+   - Compile with Ajv configured with `strict: true`, `coerceTypes: false`, `useDefaults: false`, and `removeAdditional: false`.
+   - Assert validation returns `true`; include `validator.errors` in the assertion message so a contract-vendoring defect is diagnosable.
+2. `does not mutate the canonical PolicyInsight fixture during validation`
+   - Deep-clone the fixture before validation.
+   - Assert the validated value is deeply equal to the clone afterward.
 
-  Expected: FAIL because `source` is absent and cache hits currently stamp a new `quotedAt`.
+**Implementation steps:**
 
-- [ ] **Step 3: Extend the exported domain quote and all typed producers together.** Add the required member to `PriceQuote`:
-
-  ```ts
-  export type PriceQuote = {
-    readonly tokenMint: string;
-    readonly usdValue: number;
-    readonly symbol: string;
-    readonly quotedAt: ClockTimestamp;
-    readonly source: string;
-  };
-  ```
-
-  Add `source: 'test_price_fixture'` to both shared fixtures. In `JupiterPriceAdapter.getPrices`, delete the request-wide `quotedAt` variable and build each result from its cache entry:
-
-  ```ts
-  results.push({
-    tokenMint: mint,
-    usdValue: entry.price,
-    symbol: entry.symbol,
-    quotedAt: makeClockTimestamp(entry.fetchedAt),
-    source: 'jupiter_price_v3',
-  });
-  ```
-
-- [ ] **Step 4: Verify only this contract slice.**
+- [ ] Vendor Regime Engine's contract via a pinned-commit sparse clone (network/`gh`-authenticated git, not a local sibling-directory read):
 
   ```bash
-  pnpm --filter @clmm/adapters test -- src/outbound/price/JupiterPriceAdapter.test.ts
-  pnpm exec eslint packages/domain/src/positions/index.ts packages/testing/src/fixtures/positions.ts packages/adapters/src/outbound/price/JupiterPriceAdapter.ts packages/adapters/src/outbound/price/JupiterPriceAdapter.test.ts
-  pnpm exec prettier --check packages/domain/src/positions/index.ts packages/testing/src/fixtures/positions.ts packages/adapters/src/outbound/price/JupiterPriceAdapter.ts packages/adapters/src/outbound/price/JupiterPriceAdapter.test.ts
+  git clone --depth 1 --filter=blob:none --sparse https://github.com/opsclawd/regime-engine.git /tmp/regime-engine-contract-fetch
+  cd /tmp/regime-engine-contract-fetch && git sparse-checkout set contracts/policy-insight/v1
+  SOURCE_COMMIT=$(git rev-parse HEAD)
+  cd -
+  mkdir -p schemas/regime-engine/policy-insight.v1
+  cp -r /tmp/regime-engine-contract-fetch/contracts/policy-insight/v1/. schemas/regime-engine/policy-insight.v1/
+  rm -rf /tmp/regime-engine-contract-fetch
   ```
 
-  Expected: all Jupiter tests pass, including unchanged batching/error behavior; lint and formatting pass. The implement loop's automatic `pnpm -r typecheck` gate must also pass before commit.
+  Rename the copied `policy-insight.schema.json` to `schema.json` for consistency with the intelligence repo's naming (`sol-usdc-clmm-intelligence`'s `schemas/regime-engine/evidence-bundle.v1/schema.json`).
 
-- [ ] **Step 5: Commit the truthful quote contract.**
+- [ ] Write `provenance.json` recording the source repository, `$SOURCE_COMMIT`, and a sha256 of every vendored asset (schema, `schema.sha256`, and each fixture file) — mirroring the shape of `sol-usdc-clmm-intelligence`'s `schemas/regime-engine/evidence-bundle.v1/provenance.json` (fields: `repository`, `commit`, `schemaPath`, `schemaVersion`, `copiedAt`, `assets[].sourcePath`/`localPath`/`sha256`).
+- [ ] Add `ajv@^8.18.0` to `@clmm/application` runtime dependencies because the built parser imports it at runtime.
 
   ```bash
-  git add packages/domain/src/positions/index.ts packages/testing/src/fixtures/positions.ts packages/adapters/src/outbound/price/JupiterPriceAdapter.ts packages/adapters/src/outbound/price/JupiterPriceAdapter.test.ts
-  git commit -m "feat: preserve price quote provenance"
+  pnpm --filter @clmm/application add ajv@^8.18.0
   ```
 
-## Task 2: Add the Orca full-liquidity principal quote helper
+- [ ] Write `policyInsightContract.test.ts` importing the vendored schema/fixture directly from `schemas/regime-engine/policy-insight.v1/` (a relative import, not a package import) with the two named tests above. Freeze the fixture or validate a deep clone before mutating; the mutation assertion must still compare the before/after wire value.
+- [ ] Run the focused contract test and confirm both tests pass. A compile failure from an unsupported JSON Schema vocabulary or format is a stop condition; do not disable Ajv strictness to get green.
+
+**Acceptance criteria:**
+
+- `schemas/regime-engine/policy-insight.v1/` contains the vendored schema, `schema.sha256`, all 8 fixtures, and a `provenance.json` whose recorded hashes match the vendored files.
+- The schema compiles under strict Ajv configuration.
+- The real fixture validates without mutation.
+- No application DTO, parser, adapter, app client, or UI code has changed yet.
+
+**Task-scoped validation commands:**
+
+```bash
+pnpm install --frozen-lockfile
+pnpm --filter @clmm/application exec vitest run src/dto/policyInsightContract.test.ts
+pnpm --filter @clmm/application typecheck
+pnpm --filter @clmm/application build
+```
+
+**Commit boundary:** Commit the dependency lock and contract preflight together. Do not proceed to Task 2 unless this task is green.
+
+---
+
+## Task 2: Replace every PolicyInsight reader and consumer with the shared canonical parser
+
+**Goal:** Change the exported DTO and parser once, then update all adapter, BFF, app, and UI consumers in the same atomic task so the mandatory workspace typecheck never observes a port/DTO-only intermediate state.
 
 **Files:**
 
-- Create: `packages/adapters/src/outbound/solana-position-reads/OrcaPositionPrincipalQuoteHelper.ts`
-- Create: `packages/adapters/src/outbound/solana-position-reads/OrcaPositionPrincipalQuoteHelper.test.ts`
-
-**Invariants to test first:** `returns estimated principal amounts for full liquidity`, `preserves successful zero principal amounts`, `rejects invalid principal quote inputs before calling Orca`, `sanitizes a thrown principal quote failure`.
-
-- [ ] **Step 1: Consult the installed-version official Orca API before coding.** Use Context7/current official Orca documentation for `@orca-so/whirlpools-core` v3.1.0 and confirm the installed `decreaseLiquidityQuote(liquidity, slippageToleranceBps, sqrtPrice, tickLowerIndex, tickUpperIndex)` signature and that `tokenEstA`/`tokenEstB` are estimated principal amounts. Do not use `closePositionInstructions`, `tokenMinA`, `tokenMinB`, fee quotes, or reward quotes. If the official v3.1.0 API does not expose an instruction-free estimated-amount function with these semantics, stop under the documented stop condition instead of improvising protocol math.
-
-- [ ] **Step 2: Write the new helper tests first.** Mock `decreaseLiquidityQuote` and test exact forwarding of liquidity, current sqrt price, lower tick, and upper tick; assert returned estimates are unchanged. Add separate zero, invalid-liquidity/invalid-bounds, and thrown-error cases. Use these exact test names:
-
-  ```ts
-  it('returns estimated principal amounts for full liquidity', async () => {});
-  it('preserves successful zero principal amounts', async () => {});
-  it('rejects invalid principal quote inputs before calling Orca', async () => {});
-  it('sanitizes a thrown principal quote failure', async () => {});
-  ```
-
-- [ ] **Step 3: Run the new test and verify it fails because the helper is absent.**
-
-  ```bash
-  pnpm --filter @clmm/adapters test -- src/outbound/solana-position-reads/OrcaPositionPrincipalQuoteHelper.test.ts
-  ```
-
-  Expected: FAIL with the helper module missing.
-
-- [ ] **Step 4: Implement the focused discriminated-union helper.** Keep it synchronous internally because the core quote is pure, but expose `quote` as a normal method. Use the documented estimated fields and a zero-bps argument only because the SDK signature requires it; the returned contract must never expose minimum amounts:
-
-  ```ts
-  import { decreaseLiquidityQuote } from '@orca-so/whirlpools-core';
-
-  export type PrincipalTokenAmountsQuoteResult =
-    | { kind: 'ok'; amountA: bigint; amountB: bigint }
-    | {
-        kind: 'unavailable';
-        reason: 'quote-input-invalid' | 'principal-quote-failed';
-        errorName?: string;
-        errorMessage?: string;
-      };
-
-  export type PrincipalQuoteArgs = {
-    liquidity: bigint;
-    sqrtPrice: bigint;
-    tickLowerIndex: number;
-    tickUpperIndex: number;
-  };
-
-  export class OrcaPositionPrincipalQuoteHelper {
-    quote(args: PrincipalQuoteArgs): PrincipalTokenAmountsQuoteResult {
-      if (args.liquidity < 0n || args.tickLowerIndex >= args.tickUpperIndex) {
-        return { kind: 'unavailable', reason: 'quote-input-invalid' };
-      }
-      try {
-        const quote = decreaseLiquidityQuote(
-          args.liquidity,
-          0,
-          args.sqrtPrice,
-          args.tickLowerIndex,
-          args.tickUpperIndex,
-        );
-        return { kind: 'ok', amountA: quote.tokenEstA, amountB: quote.tokenEstB };
-      } catch (error) {
-        const described =
-          error instanceof Error
-            ? { errorName: error.name, errorMessage: error.message.slice(0, 200) }
-            : { errorMessage: String(error).slice(0, 200) };
-        return { kind: 'unavailable', reason: 'principal-quote-failed', ...described };
-      }
-    }
-  }
-  ```
-
-  If official typing uses a named bps wrapper or a different parameter order, mirror that exact official signature while preserving the tested inputs and `tokenEstA`/`tokenEstB` output contract.
-
-- [ ] **Step 5: Verify the helper only.**
-
-  ```bash
-  pnpm --filter @clmm/adapters test -- src/outbound/solana-position-reads/OrcaPositionPrincipalQuoteHelper.test.ts
-  pnpm exec eslint packages/adapters/src/outbound/solana-position-reads/OrcaPositionPrincipalQuoteHelper.ts packages/adapters/src/outbound/solana-position-reads/OrcaPositionPrincipalQuoteHelper.test.ts
-  pnpm exec prettier --check packages/adapters/src/outbound/solana-position-reads/OrcaPositionPrincipalQuoteHelper.ts packages/adapters/src/outbound/solana-position-reads/OrcaPositionPrincipalQuoteHelper.test.ts
-  ```
-
-  Expected: all four named cases pass; lint and formatting pass. The automatic workspace typecheck gate must pass before commit.
-
-- [ ] **Step 6: Commit the adapter-local quote primitive.**
-
-  ```bash
-  git add packages/adapters/src/outbound/solana-position-reads/OrcaPositionPrincipalQuoteHelper.ts packages/adapters/src/outbound/solana-position-reads/OrcaPositionPrincipalQuoteHelper.test.ts
-  git commit -m "feat: quote Orca position principal amounts"
-  ```
-
-## Task 3: Attach optional principal amounts to the existing detail read
-
-**Files:**
-
-- Modify: `packages/domain/src/positions/index.ts` (`PositionDetail` only)
-- Modify: `packages/testing/src/fixtures/positions.ts` (`FIXTURE_POSITION_DETAIL` only)
-- Modify: `packages/adapters/src/outbound/solana-position-reads/SolanaPositionSnapshotReader.ts`
-- Modify: `packages/adapters/src/outbound/solana-position-reads/SolanaPositionSnapshotReader.test.ts` (`fetchPositionDetail` describe block only)
-- Modify: `packages/adapters/src/composition/AdaptersModule.ts` (constructor call for `SolanaPositionSnapshotReader`; add principal helper as 4th arg)
-- Modify: `packages/adapters/src/inbound/http/AppModule.ts` (provider registration for `SolanaPositionSnapshotReader`; add principal helper as 4th arg)
-- Modify: `packages/adapters/src/outbound/solana-position-reads/OrcaPositionReadAdapter.test.ts` (update reader instantiation to pass 4th principal helper arg)
-- Modify: `packages/adapters/src/outbound/solana-position-reads/SolanaReadPathEfficiency.integration.test.ts` (integration assertions; update reader instantiation)
-- Modify: `packages/adapters/src/outbound/swap-execution/SolanaExecutionPreparationAdapter.test.ts` (position detail fixture updates; update reader instantiation)
-
-**Invariants to test first:** `returns principal amounts and their completion time with a successful detail`, `preserves zero amounts from a successful principal quote`, `returns detail with null principal amounts and one warning when principal quoting is unavailable`, `keeps live fee reward failure as a null detail`.
-
-- [ ] **Step 1: Extend the existing reader test setup with an injected principal helper.** Add the four named cases above only inside `describe('fetchPositionDetail')`. Stub `Date.now()` at `1_700_000_000_123` for the success case and assert the principal helper receives `pos.liquidity`, `w.sqrtPrice`, and the fetched bounds. In the unavailable case, assert the detail is non-null, principal is null, and the sole new log call is:
-
-  ```ts
-  expect(observability.log).toHaveBeenCalledWith(
-    'warn',
-    'orca_position_principal_quote_unavailable',
-    expect.objectContaining({
-      positionId: MOCK_POSITION_MINT,
-      walletId: MOCK_WALLET,
-      poolId: MOCK_WHIRLPOOL,
-      lowerTick: -18304,
-      upperTick: -17956,
-      currentTick: -18130,
-      reason: 'principal-quote-failed',
-    }),
-  );
-  ```
-
-  Also serialize the log arguments with a bigint-safe replacer and prove they contain no raw account/RPC payload.
-
-- [ ] **Step 2: Run only the new reader cases and confirm failure.**
-
-  ```bash
-  pnpm --filter @clmm/adapters test -- src/outbound/solana-position-reads/SolanaPositionSnapshotReader.test.ts -t 'principal|live fee reward failure'
-  ```
-
-  Expected: FAIL because the reader has no principal helper/result yet.
-
-- [ ] **Step 3: Change the exported `PositionDetail` shape and its shared fixture in the same task.** Add:
-
-  ```ts
-  readonly principalTokenAmounts: {
-    readonly amountA: bigint;
-    readonly amountB: bigint;
-    readonly observedAt: ClockTimestamp;
-  } | null;
-  ```
-
-  Set the shared fixture to `{ amountA: 250_000_000n, amountB: 12_500_000n, observedAt: makeClockTimestamp(1_000_100) }`. Do not add these fields to the older `PositionDetailDto`; this issue extends the insight read model, while the existing position-detail endpoint may continue ignoring the additional raw domain member.
-
-- [ ] **Step 4: Inject and invoke the helper without refetching accounts.** Add a fourth optional constructor parameter after the existing fee/reward helper:
-
-  ```ts
-  private readonly principalQuoteHelper: OrcaPositionPrincipalQuoteHelper =
-    new OrcaPositionPrincipalQuoteHelper(),
-  ```
-
-  After the live fee/reward quote succeeds, call it with `pos.liquidity`, `w.sqrtPrice`, `pos.tickLowerIndex`, and `pos.tickUpperIndex`. On `ok`, capture `makeClockTimestamp(Date.now())` immediately after completion. On `unavailable`, set the field to `null`, emit one bounded `orca_position_principal_quote_unavailable` warning with position/wallet/pool IDs, bounds, current tick, stable reason, and already-sanitized optional error metadata, then continue returning the detail. Do not include account objects, RPC responses, or liquidity values in the log.
-
-- [ ] **Step 5: Update all `SolanaPositionSnapshotReader` call sites to pass the principal helper (or let the optional default apply).** In `AdaptersModule.ts` and `AppModule.ts`, pass the principal helper as the 4th constructor argument after the fee/reward helper. In `OrcaPositionReadAdapter.test.ts`, `SolanaReadPathEfficiency.integration.test.ts`, and `SolanaExecutionPreparationAdapter.test.ts`, update each `new SolanaPositionSnapshotReader(...)` instantiation to pass the principal helper (or a mock thereof). Since the parameter is optional with a default, 1-arg test instantiations remain valid TypeScript — but test files that want to control or verify the helper should explicitly construct and pass it.
-
-- [ ] **Step 6: Keep primary failure ordering unchanged.** Position fetch, ownership, Whirlpool fetch, and live fee/reward quote must still return `null` before principal quoting. Return the new member beside the existing fields:
-
-  ```ts
-  return {
-    position,
-    poolData,
-    fees: quote.fees,
-    positionLiquidity: pos.liquidity,
-    principalTokenAmounts,
-  };
-  ```
-
-- [ ] **Step 7: Verify the modified detail slice.** Although `SolanaPositionSnapshotReader.test.ts` exceeds 500 lines, this is an implementation task and touches only its existing `fetchPositionDetail` block; do not refactor unrelated reader cases.
-
-  ```bash
-  pnpm --filter @clmm/adapters test -- src/outbound/solana-position-reads/SolanaPositionSnapshotReader.test.ts
-  pnpm --filter @clmm/testing test -- src/contracts/PositionReadPortContract.ts
-  pnpm exec eslint packages/domain/src/positions/index.ts packages/testing/src/fixtures/positions.ts packages/adapters/src/outbound/solana-position-reads/SolanaPositionSnapshotReader.ts packages/adapters/src/outbound/solana-position-reads/SolanaPositionSnapshotReader.test.ts packages/adapters/src/composition/AdaptersModule.ts packages/adapters/src/inbound/http/AppModule.ts packages/adapters/src/outbound/solana-position-reads/OrcaPositionReadAdapter.test.ts packages/adapters/src/outbound/solana-position-reads/SolanaReadPathEfficiency.integration.test.ts packages/adapters/src/outbound/swap-execution/SolanaExecutionPreparationAdapter.test.ts
-  pnpm exec prettier --check packages/domain/src/positions/index.ts packages/testing/src/fixtures/positions.ts packages/adapters/src/outbound/solana-position-reads/SolanaPositionSnapshotReader.ts packages/adapters/src/outbound/solana-position-reads/SolanaPositionSnapshotReader.test.ts packages/adapters/src/composition/AdaptersModule.ts packages/adapters/src/inbound/http/AppModule.ts packages/adapters/src/outbound/solana-position-reads/OrcaPositionReadAdapter.test.ts packages/adapters/src/outbound/solana-position-reads/SolanaReadPathEfficiency.integration.test.ts packages/adapters/src/outbound/swap-execution/SolanaExecutionPreparationAdapter.test.ts
-  ```
-
-  Expected: reader and port-contract tests pass; lint and formatting pass; no owner/position/pool refetch is introduced. The automatic workspace typecheck gate must pass before commit.
-
-- [ ] **Step 8: Commit the complete domain-to-adapter detail contract.**
-
-  ```bash
-  git add packages/domain/src/positions/index.ts packages/testing/src/fixtures/positions.ts packages/adapters/src/outbound/solana-position-reads/SolanaPositionSnapshotReader.ts packages/adapters/src/outbound/solana-position-reads/SolanaPositionSnapshotReader.test.ts packages/adapters/src/composition/AdaptersModule.ts packages/adapters/src/inbound/http/AppModule.ts packages/adapters/src/outbound/solana-position-reads/OrcaPositionReadAdapter.test.ts packages/adapters/src/outbound/solana-position-reads/SolanaReadPathEfficiency.integration.test.ts packages/adapters/src/outbound/swap-execution/SolanaExecutionPreparationAdapter.test.ts
-  git commit -m "feat: enrich position details with principal amounts"
-  ```
-
-## Task 4: Expose raw facts and scoped warnings through both insight responses
-
-**Files:**
-
-- Modify: `packages/application/src/dto/index.ts` (insight warning and SOL/USDC position DTO section only)
-- Modify: `packages/application/src/use-cases/insights/buildSolUsdcPositionInsight.ts`
-- Modify: `packages/application/src/use-cases/insights/buildSolUsdcPositionInsight.test.ts`
-- Modify: `packages/application/src/use-cases/insights/GetSolUsdcInsightPositions.ts` (`fetchPriceMap` and builder call only)
-- Modify: `packages/application/src/use-cases/insights/GetSolUsdcInsightPositions.test.ts`
-- Modify: `packages/application/src/use-cases/insights/GetSolUsdcInsightBundle.test.ts`
-- Modify: `packages/adapters/src/inbound/http/InsightsDataController.test.ts` (successful positions/bundle cases only)
-- Modify: `docs/superpowers/specs/2026-05-01-sol-usdc-insights-data-api-design.md` (DTO, valuation, warning, test, compatibility sections only)
-
-**Invariants to test first:** `serializes exact principal amounts including zero`, `warns and returns null when principal amounts are unavailable`, `serializes returned price quotes in mint order with exact lineage`, `warns once per requested missing mint and omits its quote`, `computes known zero compatibility totals from serialized quotes`, `sets affected totals null while retaining compatibility warnings`, `sets partial exactly when raw-fact warnings exist`, `returns the same additive facts from positions and bundle without copying S/R`.
-
-- [ ] **Step 1: Add builder tests first.** Enrich the test-local price maps with `quotedAt` and `source`. Add the first six named cases above. Assert exact DTO objects, including `'0'`, mint/symbol/decimals, `source: 'orca_full_liquidity_quote'`, `basis: 'principal-only'`, quote times as numbers, and lexicographic mint order. For missing SOL and reward quotes, assert one new token-scoped warning per missing mint plus the existing single `fee_reward_usd_unavailable` compatibility warning; do not fabricate zero quote entries.
-
-- [ ] **Step 2: Add use-case, bundle, and controller contract tests before implementation.** In `GetSolUsdcInsightPositions.test.ts`, prove a partial price response preserves its returned lineage and emits missing-mint warnings, and a thrown price port yields an empty quote list plus token warnings. In `GetSolUsdcInsightBundle.test.ts`, assert principal and prices propagate unchanged and `partial === (warnings.length > 0)`. In the two existing successful `InsightsDataController.test.ts` cases, assert the same new position fields are returned from `/positions` and `/bundle`, and assert `srLevels` remains absent from each position.
-
-- [ ] **Step 3: Run the focused application/HTTP tests and confirm the contract is absent.**
-
-  ```bash
-  pnpm --filter @clmm/application test -- src/use-cases/insights/buildSolUsdcPositionInsight.test.ts src/use-cases/insights/GetSolUsdcInsightPositions.test.ts src/use-cases/insights/GetSolUsdcInsightBundle.test.ts
-  pnpm --filter @clmm/adapters test -- src/inbound/http/InsightsDataController.test.ts -t 'returns the snapshot DTO|returns the bundle DTO'
-  ```
-
-  Expected: FAIL on missing DTO fields, quote lineage, and warning codes.
-
-- [ ] **Step 4: Extend the exported application DTOs.** Add the two warning codes and `scope.tokenMint?: string`. Define and attach:
-
-  ```ts
-  export type SolUsdcRawTokenAmountDto = {
-    raw: string;
-    decimals: number;
-    symbol: string;
-    mint: string;
-  };
-
-  export type SolUsdcPrincipalTokenAmountsDto = {
-    tokenA: SolUsdcRawTokenAmountDto;
-    tokenB: SolUsdcRawTokenAmountDto;
-    observedAtUnixMs: number;
-    source: 'orca_full_liquidity_quote';
-    basis: 'principal-only';
-  };
-
-  export type SolUsdcUsdPriceQuoteDto = {
-    mint: string;
-    symbol: string;
-    usdPerToken: number;
-    quotedAtUnixMs: number;
-    source: string;
-  };
-  ```
-
-  Add required `principalTokenAmounts: SolUsdcPrincipalTokenAmountsDto | null` and `usdPriceQuotes: SolUsdcUsdPriceQuoteDto[]` to `SolUsdcPositionInsightDto`. Keep all existing fields unchanged.
-
-- [ ] **Step 5: Retain the complete quote lineage in the shared price map.** Change `PriceMapEntry` to `{ usdValue: number; symbol: string; quotedAt: ClockTimestamp; source: string }` and have `fetchPriceMap` retain all four `PriceQuote` properties. Continue one deduplicated price-port call after sequential detail reads. A thrown price call still produces an empty map for fail-soft building.
-
-- [ ] **Step 6: Build principal facts and warnings without inventing values.** In `buildSolUsdcPositionInsight`, if `detail.principalTokenAmounts` is non-null and both pool decimals are known, serialize exact strings and pool metadata. If it is null—or decimals are unexpectedly unavailable—return `principalTokenAmounts: null` and add one `principal_token_amounts_unavailable` warning scoped to `positionId` and `poolId`. Never use position liquidity as a token amount.
-
-- [ ] **Step 7: Build deterministic price facts and token-scoped warnings.** Construct the requested mint set from pool mints plus every non-empty reward mint, sort it, map only present quotes into `usdPriceQuotes`, and add exactly one `usd_price_quote_unavailable` warning for each absent requested mint with `{ positionId, tokenMint }`. Existing fee/reward totals must continue using `priceMap` and existing fail-closed decimal checks, so their price inputs are identical to the serialized quote facts. Preserve one `fee_reward_usd_unavailable` warning per affected position during the compatibility window.
-
-- [ ] **Step 8: Preserve response composition and document migration.** Do not change controller production code. Update the existing insights API spec with the three additive DTO types, requested-mint behavior, deterministic ordering, zero/null rules, actual quote-time meaning, optional principal failure, retained compatibility totals/warnings, and old-server migration rule: consumers treat absent new fields as unavailable during rollout. Retain the documented top-level S/R and primary 503 behavior.
-
-- [ ] **Step 9: Verify this complete shared contract slice.**
-
-  ```bash
-  pnpm --filter @clmm/application test -- src/use-cases/insights/buildSolUsdcPositionInsight.test.ts src/use-cases/insights/GetSolUsdcInsightPositions.test.ts src/use-cases/insights/GetSolUsdcInsightBundle.test.ts
-  pnpm --filter @clmm/adapters test -- src/inbound/http/InsightsDataController.test.ts
-  pnpm exec eslint packages/application/src/dto/index.ts packages/application/src/use-cases/insights/buildSolUsdcPositionInsight.ts packages/application/src/use-cases/insights/buildSolUsdcPositionInsight.test.ts packages/application/src/use-cases/insights/GetSolUsdcInsightPositions.ts packages/application/src/use-cases/insights/GetSolUsdcInsightPositions.test.ts packages/application/src/use-cases/insights/GetSolUsdcInsightBundle.test.ts packages/adapters/src/inbound/http/InsightsDataController.test.ts
-  pnpm exec prettier --check packages/application/src/dto/index.ts packages/application/src/use-cases/insights/buildSolUsdcPositionInsight.ts packages/application/src/use-cases/insights/buildSolUsdcPositionInsight.test.ts packages/application/src/use-cases/insights/GetSolUsdcInsightPositions.ts packages/application/src/use-cases/insights/GetSolUsdcInsightPositions.test.ts packages/application/src/use-cases/insights/GetSolUsdcInsightBundle.test.ts packages/adapters/src/inbound/http/InsightsDataController.test.ts docs/superpowers/specs/2026-05-01-sol-usdc-insights-data-api-design.md
-  ```
-
-  Expected: all focused tests pass; both endpoints share the additive facts; warning/partial/zero/null assertions pass; lint and formatting pass. The automatic workspace typecheck gate must pass before commit.
-
-- [ ] **Step 10: Commit the application and HTTP contract.**
-
-  ```bash
-  git add packages/application/src/dto/index.ts packages/application/src/use-cases/insights/buildSolUsdcPositionInsight.ts packages/application/src/use-cases/insights/buildSolUsdcPositionInsight.test.ts packages/application/src/use-cases/insights/GetSolUsdcInsightPositions.ts packages/application/src/use-cases/insights/GetSolUsdcInsightPositions.test.ts packages/application/src/use-cases/insights/GetSolUsdcInsightBundle.test.ts packages/adapters/src/inbound/http/InsightsDataController.test.ts docs/superpowers/specs/2026-05-01-sol-usdc-insights-data-api-design.md
-  git commit -m "feat: expose raw LP valuation facts"
-  ```
+- Modify: `packages/application/src/dto/policyInsights.ts`
+- Create: `packages/application/src/dto/policyInsightValidator.ts`
+- Create: `packages/application/src/dto/policyInsightValidator.test.ts`
+- Modify: `packages/application/src/dto/index.ts`
+- Modify: `packages/application/src/index.ts`
+- Modify: `packages/application/src/public/index.ts`
+- Modify: `packages/application/src/public/policyInsights.exports.test.ts`
+- Modify: `packages/adapters/src/outbound/regime-engine/CurrentPolicyInsightsAdapter.ts`
+- Modify: `packages/adapters/src/outbound/regime-engine/CurrentPolicyInsightsAdapter.test.ts`
+- Modify: `packages/adapters/src/inbound/http/PolicyInsightsController.test.ts`
+- Modify: `apps/app/src/api/policyInsights.ts`
+- Modify: `apps/app/src/api/policyInsights.test.ts`
+- Modify: `packages/ui/src/view-models/PolicyInsightsViewModel.ts`
+- Modify: `packages/ui/src/view-models/PolicyInsightsViewModel.test.ts`
+- Modify: `packages/ui/src/components/PolicyInsightsSection.test.tsx`
+
+**Dependencies:** Task 1.
+
+**Exported signature changes:**
+
+- Modify `PolicyInsightBlock` and any nested exported PolicyInsight DTOs in `packages/application/src/dto/policyInsights.ts` whose members differ from the published schema. Preserve a one-to-one wire representation; do not retain legacy-only members as optional compatibility aliases.
+- Add `parsePolicyInsightBlock(value: unknown): PolicyInsightBlock | null` in `packages/application/src/dto/policyInsightValidator.ts` and export it through both `@clmm/application` and `@clmm/application/public`.
+- Keep `PolicyInsightsReadPort.fetchCurrent(): Promise<PolicyInsightsReadResult>` unchanged. All implementations and consumers are nevertheless updated in this same task because `PolicyInsightsReadResult` contains the modified `PolicyInsightBlock`.
+
+**Invariants to write as tests first:**
+
+1. `returns the canonical fixture unchanged`
+   - `parsePolicyInsightBlock(canonicalPolicyInsightFixture)` returns the same object reference and deep value.
+2. `returns null when a canonical required field is missing`
+   - Clone the fixture, delete one schema-required top-level field, and expect `null`.
+3. `returns null for a coercible but incorrectly typed canonical field`
+   - Replace a canonical numeric or boolean field with its string representation and expect `null`.
+4. `returns null for a schema-forbidden additional property`
+   - Add `legacyAlias` to a clone and expect `null`.
+5. `returns null for the legacy freshness fallback shape`
+   - Remove the canonical freshness timestamp member and supply only the legacy ISO/fallback input previously accepted by the handwritten readers; expect `null`.
+6. `returns kind:"block" with the real canonical fixture on 200`
+   - Adapter test imports the real package fixture, mocks a 200 JSON response, and expects the returned block to deeply equal the fixture with canonical freshness/status values intact.
+7. `returns kind:"upstream-error" when a 200 payload violates the canonical schema`
+   - Adapter test corrupts one required nested value and verifies the existing warning path.
+8. `passes the canonical block through the BFF envelope without modification`
+   - Controller test returns the canonical fixture from the fake port and asserts `{ policyInsight: fixture }`, including reference identity.
+9. `returns the canonical BFF policyInsight without modification`
+   - App test serves the real fixture in the BFF envelope and asserts reference/deep equality.
+10. `throws when the BFF policyInsight violates the canonical schema`
+    - App test corrupts the same representative nested field and expects the existing `malformed policyInsight block` error.
+11. `derives freshness and stale presentation only from canonical status and freshness fields`
+    - View-model tests use canonical fresh and stale fixtures and assert label/isStale output without `asOf` or ISO fallback behavior.
+12. `renders the existing PolicyInsights card from a canonical block`
+    - Component test updates its typed fixture to the canonical DTO and preserves existing labels, warning, and advisory-copy assertions.
+
+**Implementation steps:**
+
+- [ ] Update the test fixtures and add `policyInsightValidator.test.ts` first. Run the focused tests and confirm they fail because the shared parser/export and canonical DTO do not exist yet. Do not commit this red intermediate state.
+- [ ] Rewrite `policyInsights.ts` from the published schema and fixture, preserving exact property names, requiredness, enum literals, nesting, and units. Remove the current drift-guard comment that instructs maintainers to synchronize two validators; replace it with a pointer to the canonical contract package and shared parser.
+- [ ] Implement one module-level Ajv instance and precompiled validator in `policyInsightValidator.ts`. Configure `strict: true`, `coerceTypes: false`, `useDefaults: false`, and `removeAdditional: false`; return the original value when valid and `null` when invalid. Do not catch schema-compilation errors at module load, because an invalid shipped schema is a build/deploy defect rather than malformed user input.
+- [ ] Export the DTO types through `dto/index.ts`, export the parser from `src/index.ts`, and export the parser plus required types from `src/public/index.ts`. Update `policyInsights.exports.test.ts` to prove both the canonical type surface and runtime parser are available from the UI/app-safe public entry point.
+- [ ] Replace all `VALID_*` sets, record walkers, array readers, `parseFreshness`, and `parseUpstream` code in `CurrentPolicyInsightsAdapter.ts` with a call to `parsePolicyInsightBlock`. Keep URL construction, timeout behavior, status mapping, logging, and error-envelope parsing unchanged.
+- [ ] Replace the duplicated DTO-validation helpers in `apps/app/src/api/policyInsights.ts` with the public `parsePolicyInsightBlock` import. Keep BFF envelope validation, unavailable-reason validation, abort handling, and error messages unchanged.
+- [ ] Update `PolicyInsightsController.test.ts` to use the real fixture and assert transparent pass-through. Keep `PolicyInsightsController.ts` unchanged; do not map the block field-by-field.
+- [ ] Update `PolicyInsightsViewModel.ts` to use only canonical action/risk/confidence/data-quality/status/freshness members. Remove fallback conversion from `asOf` or legacy freshness fields. Preserve the view-model's ownership of labels, severity, reasoning selection, and advisory copy.
+- [ ] Update the view-model and component fixtures to satisfy the canonical DTO. Do not import the external contract package from `packages/ui`; UI remains dependent only on `@clmm/application/public`.
+- [ ] Run the focused tests, package typechecks/builds/lints, the exact changed-path boundary check, and the automatic workspace-wide `pnpm -r typecheck` gate before committing.
+
+**Acceptance criteria:**
+
+- Exactly one handwritten/runtime PolicyInsight parser remains: `parsePolicyInsightBlock` in application. Adapter and app client contain no PolicyInsight field allowlists or freshness normalization.
+- The canonical package fixture passes the parser, adapter, controller, and app-client paths without field or unit conversion.
+- Representative malformed, legacy-only, coercible, and extra-property payloads fail closed.
+- Freshness/status display behavior uses the canonical values directly.
+- Existing 404, 503, config, timeout, network, invalid-JSON, null-envelope, and unavailable-reason tests remain green.
+- `PolicyInsightsReadPort` and its adapter implementation stay type-compatible in the same commit.
+- UI and testing boundaries remain intact; no domain or execution-policy file changes.
+
+**Task-scoped validation commands:**
+
+```bash
+pnpm --filter @clmm/application exec vitest run src/dto/policyInsightValidator.test.ts src/public/policyInsights.exports.test.ts
+pnpm --filter @clmm/adapters exec vitest run src/outbound/regime-engine/CurrentPolicyInsightsAdapter.test.ts src/inbound/http/PolicyInsightsController.test.ts
+pnpm --filter @clmm/app exec vitest run --config vitest.config.ts src/api/policyInsights.test.ts
+pnpm --filter @clmm/ui exec vitest run src/view-models/PolicyInsightsViewModel.test.ts src/components/PolicyInsightsSection.test.tsx
+pnpm --filter @clmm/application typecheck
+pnpm --filter @clmm/adapters typecheck
+pnpm --filter @clmm/app typecheck
+pnpm --filter @clmm/ui typecheck
+pnpm --filter @clmm/application build
+pnpm --filter @clmm/adapters build
+pnpm --filter @clmm/ui build
+pnpm --filter @clmm/app build
+pnpm --filter @clmm/application lint
+pnpm --filter @clmm/adapters lint
+pnpm --filter @clmm/app lint
+pnpm --filter @clmm/ui lint
+pnpm exec depcruise --config packages/config/boundaries/dependency-cruiser.cjs packages/application/src/dto/policyInsights.ts packages/application/src/dto/policyInsightValidator.ts packages/application/src/dto/index.ts packages/application/src/index.ts packages/application/src/public/index.ts packages/adapters/src/outbound/regime-engine/CurrentPolicyInsightsAdapter.ts apps/app/src/api/policyInsights.ts packages/ui/src/view-models/PolicyInsightsViewModel.ts
+```
+
+**Commit boundary:** Commit the DTO, parser, every implementation consumer, and all affected tests together. This is the deliberate exception to small per-layer commits because the exported DTO is embedded in the read-port result and the implementation loop runs workspace-wide typechecking after each task.
+
+---
 
 ## Tests to add or update
 
-- Add a new pure helper suite for all `PrincipalTokenAmountsQuoteResult` arms and exact Orca estimate forwarding.
-- Extend Jupiter adapter tests for stable source and original cache-fetch timestamp.
-- Extend only the existing `fetchPositionDetail` reader block for success, zero, fail-soft principal enrichment, bounded logging, and unchanged live-fee hard failure.
-- Extend builder tests for exact bigint serialization, unavailable principal, deterministic quote order/lineage, missing requested mints, compatibility totals, and zero preservation.
-- Extend positions and bundle use-case tests for shared partial-data behavior and warning-derived `partial`.
-- Extend successful controller tests to lock the additive response shape without changing production controller logic.
-- Do not create broad test-only tasks. The only touched test file above 500 lines is part of the reader implementation task and is restricted to one existing describe block.
+**New tests**
+
+- `packages/application/src/dto/policyInsightContract.test.ts`: published schema/fixture compatibility and validator non-mutation preflight.
+- `packages/application/src/dto/policyInsightValidator.test.ts`: canonical acceptance, missing required field, type coercion rejection, extra-property rejection, and legacy freshness rejection.
+
+**Updated tests**
+
+- `packages/application/src/public/policyInsights.exports.test.ts`: canonical DTO construction and public runtime parser export.
+- `packages/adapters/src/outbound/regime-engine/CurrentPolicyInsightsAdapter.test.ts`: real canonical fixture, exact block preservation, malformed canonical payload failure, and unchanged HTTP outcome coverage.
+- `packages/adapters/src/inbound/http/PolicyInsightsController.test.ts`: real canonical fixture and reference-preserving envelope passthrough.
+- `apps/app/src/api/policyInsights.test.ts`: real canonical fixture, shared-parser rejection, and unchanged fetch/envelope/abort behavior.
+- `packages/ui/src/view-models/PolicyInsightsViewModel.test.ts`: canonical status/freshness semantics and existing presentation derivations.
+- `packages/ui/src/components/PolicyInsightsSection.test.tsx`: canonical typed fixture with existing render-state coverage.
+
+The adapter, app-client, view-model, and component test files exceed ten cases in their current form, but Task 2 is not a standalone test-update task: their fixture/test edits are inseparable from the atomic exported-contract migration. Do not create separate test-only commits that leave the workspace typecheck red.
 
 ## Validation commands
 
-Each task contains file-scoped tests, lint, and formatting commands as acceptance criteria. After all implementation tasks, the repository's dedicated validate phase should run the standard broad checks (not as a standalone implementation task):
+After both implementation tasks complete, the repository's dedicated validate phase must run the full cross-package gates required for a shared contract change. This is not a standalone implementation task.
 
 ```bash
 pnpm build
@@ -425,23 +296,40 @@ pnpm boundaries
 pnpm test
 ```
 
+Expected result: every command exits 0. The Expo build is specifically required to prove Metro can bundle application code that statically imports Ajv and the package schema.
+
 ## Risk areas
 
-- Orca core quote API drift or misunderstanding `tokenEstA`/`tokenEstB` versus minimum/slippage outputs could expose incorrect composition; official installed-version semantics must be confirmed before implementation.
-- Capturing `observedAt` before the quote finishes, or stamping cache hits with lookup time, would overstate temporal freshness.
-- Treating `0n` as falsy/unavailable would erase valid one-sided or empty-liquidity evidence.
-- Adding required members to exported `PositionDetail`, `PriceQuote`, and insight DTOs can break fixtures or downstream exhaustive consumers unless all repository producers are updated in the same task and migration is documented.
-- Duplicate requested reward mints could create duplicate warnings unless the builder uses a set before sorting.
-- Price totals and serialized quote facts could diverge if separate maps or fallback prices are introduced.
-- The reader constructor already has an injected fee/reward helper; adding the principal helper in the wrong parameter position can silently break test/composition call sites.
-- Directional mapping is release-critical and unrelated; any attempt to infer posture from token order, range state, or composition is forbidden.
+- **Upstream package readiness:** The package may be unpublished, inaccessible, missing declared exports, or blocked by Regime Engine issue 63.
+- **Schema/fixture disagreement:** A package fixture that fails its own schema makes the canonical source unusable.
+- **Ajv strict compilation:** Unknown formats, unsupported vocabularies, or non-strict schema constructs may fail at module initialization. Do not weaken strict mode silently.
+- **Unknown-property policy:** Rejection of extra properties depends on the canonical schema declaring the intended closed-object constraints. Do not add a second local schema to compensate.
+- **Expo/Metro bundling:** Ajv or the contract package may expose Node-only modules, dynamic filesystem access, CommonJS/ESM incompatibilities, or package exports that fail under the app's `unstable_enablePackageExports = false` configuration.
+- **Breaking DTO blast radius:** Tests and UI fixtures currently construct the legacy shape. All typed consumers must change in Task 2's atomic commit.
+- **Mutation or normalization:** Ajv options or local mapping could silently coerce/default/remove data, violating exact wire preservation.
+- **UI semantic drift:** Removing freshness fallbacks must not accidentally recompute upstream status or introduce a client-owned stale threshold.
+- **Bundle size/startup cost:** A module-level precompiled validator avoids recompilation per request, but Ajv still becomes part of the Expo bundle; the app build is the compatibility gate.
 
 ## Stop conditions
 
-- Stop if current official Orca documentation for the installed packages does not establish an instruction-free full-liquidity estimate whose outputs exclude fees and rewards; do not reimplement CLMM math or reuse execution preparation.
-- Stop if the chosen quote requires another position-account/owner scan or execution instruction construction; return to design rather than duplicate the authoritative detail read.
-- Stop if the position/pool state required by the quote cannot be supplied from the accounts already fetched by `fetchPositionDetail`.
-- Stop if any implementation would move Orca/Jupiter/Solana imports into domain or application, or make UI/app shell own business logic.
-- Stop if any task's required exported-type change cannot include all affected repository producers/implementations while keeping the automatic `pnpm -r typecheck` gate green.
-- Stop if tests reveal existing primary detail failures or live fee/reward quote failures have become fail-soft, or if principal-only failure becomes an HTTP 503.
-- Stop if a proposed field or warning requires deriving target asset, exit posture, or swap direction outside `DirectionalExitPolicyService`.
+Abort implementation instead of improvising if any of the following occurs:
+
+- Regime Engine's `contracts/policy-insight/v1/` directory cannot be fetched (network/auth failure) or is missing the schema, `schema.sha256`, or fixtures at the pinned commit.
+- The vendored schema and fixture do not validate together under strict Ajv.
+- The schema permits legacy aliases, undocumented unit conversion, or additional properties contrary to `design.md`; resolve the upstream contract rather than layering a clmm-only schema over it.
+- The schema uses formats/vocabularies Ajv cannot compile strictly and the required extension is not part of the approved design/dependency scope.
+- The package or Ajv requires Node-only runtime behavior that cannot be statically bundled by Expo/Metro without an architectural change.
+- The canonical contract removes or changes `status`/freshness semantics such that the existing UI behavior cannot be preserved without a product decision.
+- Implementing the contract would require changing `PolicyInsightsReadPort.fetchCurrent`, any adapter method signature, or another exported port beyond the block type without updating every implementation in the same task.
+- Any proposed change touches domain directional mapping, execution policy, Solana transaction logic, evidence ingestion, or Regime Engine synthesis.
+- A validation failure is unrelated to the explicitly changed files and cannot be resolved without expanding scope; report it rather than editing unrelated code.
+
+## Definition of done
+
+- The canonical fixture is the positive test source at the application, adapter, controller, and app trust boundaries.
+- One shared application parser validates both adapter and app payloads.
+- DTOs match the published schema with no undocumented renames, aliases, defaults, or unit conversions.
+- Malformed and legacy-only payloads fail closed.
+- Freshness/status semantics reach the view model unchanged.
+- Every task-scoped command and the final dedicated validate phase passes.
+- The final diff contains only the files listed in this plan and no abandoned compatibility or experimental code.

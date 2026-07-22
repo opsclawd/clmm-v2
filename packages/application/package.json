@@ -15,11 +15,13 @@
     "lint": "eslint src --ext .ts"
   },
   "dependencies": {
-    "@clmm/domain": "workspace:*"
+    "@clmm/domain": "workspace:*",
+    "ajv": "^8.18.0",
+    "ajv-formats": "^3.0.0"
   },
   "devDependencies": {
     "@clmm/config": "workspace:*",
-    "vitest": "^1.6.0",
-    "typescript": "^5.4.0"
+    "typescript": "^5.4.0",
+    "vitest": "^1.6.0"
   }
 }
