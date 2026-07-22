@@ -161,7 +161,7 @@ export function PolicyInsightsSection({
         accessibilityLabel={`Max capital: ${vm.maxDeploymentLabel}`}
         style={{ color: colors.textBody, fontSize: typography.fontSize.sm, marginTop: 2 }}
       >
-        Max capital: {vm.maxDeploymentLabel}
+        {vm.maxDeploymentLabel}
       </Text>
       <Text
         testID="policy-insights-risk"
