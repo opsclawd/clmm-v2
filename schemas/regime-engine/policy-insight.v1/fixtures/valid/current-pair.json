@@ -1,6 +1,6 @@
 {
   "schemaVersion": "policy-insight.v1",
-  "insightId": "a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1",
+  "insightId": "a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1a1",
   "rulesetVersion": "sol-usdc-policy.v1.2026-07",
   "pair": "SOL/USDC",
   "position": null,

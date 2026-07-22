@@ -12,47 +12,47 @@ const ajv = new Ajv2020({
   removeAdditional: false,
 });
 
-const validate = ajv.compile(schema);
+const schemaId = (schema as { $id: string }).$id;
+ajv.addSchema(schema);
+
+const validateInsight = ajv.compile({ $ref: `${schemaId}#/$defs/PolicyInsightRead` });
+const validateHistory = ajv.compile({ $ref: `${schemaId}#/$defs/PolicyInsightHistoryResponse` });
 
 function deepClone<T>(obj: T): T {
   return JSON.parse(JSON.stringify(obj)) as T;
 }
 
 describe('PolicyInsight contract validation', () => {
-  describe('accepts the vendored canonical PolicyInsight fixture with the vendored schema', () => {
-    it('validates current-pair.json fixture', () => {
-      const valid = validate(deepClone(currentPairFixture));
-      expect(valid, `Validation failed: ${JSON.stringify(validate.errors, null, 2)}`).toBe(true);
-    });
+  it('accepts the vendored canonical PolicyInsight fixture with the vendored schema', () => {
+    const pairValid = validateInsight(deepClone(currentPairFixture));
+    expect(pairValid, `Validation failed: ${JSON.stringify(validateInsight.errors, null, 2)}`).toBe(
+      true,
+    );
 
-    it('validates current-position.json fixture', () => {
-      const valid = validate(deepClone(currentPositionFixture));
-      expect(valid, `Validation failed: ${JSON.stringify(validate.errors, null, 2)}`).toBe(true);
-    });
+    const positionValid = validateInsight(deepClone(currentPositionFixture));
+    expect(
+      positionValid,
+      `Validation failed: ${JSON.stringify(validateInsight.errors, null, 2)}`,
+    ).toBe(true);
 
-    it('validates history.json fixture', () => {
-      const valid = validate(deepClone(historyFixture));
-      expect(valid, `Validation failed: ${JSON.stringify(validate.errors, null, 2)}`).toBe(true);
-    });
+    const historyValid = validateHistory(deepClone(historyFixture));
+    expect(
+      historyValid,
+      `Validation failed: ${JSON.stringify(validateHistory.errors, null, 2)}`,
+    ).toBe(true);
   });
 
-  describe('does not mutate the canonical PolicyInsight fixture during validation', () => {
-    it('does not mutate current-pair.json fixture', () => {
-      const target = deepClone(currentPairFixture);
-      validate(target);
-      expect(target).toEqual(currentPairFixture);
-    });
+  it('does not mutate the canonical PolicyInsight fixture during validation', () => {
+    const pairTarget = deepClone(currentPairFixture);
+    validateInsight(pairTarget);
+    expect(pairTarget).toEqual(currentPairFixture);
 
-    it('does not mutate current-position.json fixture', () => {
-      const target = deepClone(currentPositionFixture);
-      validate(target);
-      expect(target).toEqual(currentPositionFixture);
-    });
+    const positionTarget = deepClone(currentPositionFixture);
+    validateInsight(positionTarget);
+    expect(positionTarget).toEqual(currentPositionFixture);
 
-    it('does not mutate history.json fixture', () => {
-      const target = deepClone(historyFixture);
-      validate(target);
-      expect(target).toEqual(historyFixture);
-    });
+    const historyTarget = deepClone(historyFixture);
+    validateHistory(historyTarget);
+    expect(historyTarget).toEqual(historyFixture);
   });
 });

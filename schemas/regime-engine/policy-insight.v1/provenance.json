@@ -11,19 +11,24 @@
       "sha256": "80487b0a9374d0b535accf535ef9819f2b2de00e1d65980deb73c97afaa02800"
     },
     {
+      "sourcePath": "contracts/policy-insight/v1/schema.sha256",
+      "localPath": "schemas/regime-engine/policy-insight.v1/schema.sha256",
+      "sha256": "07088c2a12e326fe3f20de63239bcfadec9ea983a18f8dd43e1226cc407fa76b"
+    },
+    {
       "sourcePath": "contracts/policy-insight/v1/fixtures/valid/current-pair.json",
       "localPath": "schemas/regime-engine/policy-insight.v1/fixtures/valid/current-pair.json",
-      "sha256": "8930da6822f678f938889024eb9f6ca7a2588feff534f943520d89e8f6ba52fa"
+      "sha256": "a6c1002cd0d0fffcc0a5d0fb654f74877cea36bb21596fef9e448841eca12104"
     },
     {
       "sourcePath": "contracts/policy-insight/v1/fixtures/valid/current-position.json",
       "localPath": "schemas/regime-engine/policy-insight.v1/fixtures/valid/current-position.json",
-      "sha256": "3248dcc71a0067caf022d8b1973a0ff3d8cdb122aa97e4abb6c619a2d0db9044"
+      "sha256": "a674a38c1396cfc62e0c00744807be33b3a652875835250df929a20327d95096"
     },
     {
       "sourcePath": "contracts/policy-insight/v1/fixtures/valid/history.json",
       "localPath": "schemas/regime-engine/policy-insight.v1/fixtures/valid/history.json",
-      "sha256": "07dde1dfe4638ff30d340f85d11230ae384fc3465f4abaa1b6931e5afbf20d1b"
+      "sha256": "d978038e9def12631f0d2e961035e59ee6dee62f679829631ecda32c42f03724"
     },
     {
       "sourcePath": "contracts/policy-insight/v1/fixtures/invalid/action-position-and-version.json",
