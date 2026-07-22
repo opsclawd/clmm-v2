@@ -3,40 +3,56 @@ import { afterEach, describe, expect, it } from 'vitest';
 import { cleanup, render, screen } from '@testing-library/react';
 import type { PolicyInsightBlock } from '@clmm/application/public';
 import { PolicyInsightsSection } from './PolicyInsightsSection.js';
+import canonicalCurrentPair from '../../../../schemas/regime-engine/policy-insight.v1/fixtures/valid/current-pair.json';
+import canonicalCurrentPosition from '../../../../schemas/regime-engine/policy-insight.v1/fixtures/valid/current-position.json';
 
 afterEach(() => {
   cleanup();
 });
 
-const NOW = Date.parse('2026-05-07T12:30:00Z');
+const NOW = Date.parse('2026-07-19T12:30:00Z');
 
 function fixture(overrides: Partial<PolicyInsightBlock> = {}): PolicyInsightBlock {
   return {
-    schemaVersion: '1.0',
+    schemaVersion: 'policy-insight.v1',
+    insightId: 'a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1a1',
+    rulesetVersion: 'sol-usdc-policy.v1.2026-07',
     pair: 'SOL/USDC',
-    asOf: '2026-05-07T12:00:00Z',
-    source: 'openclaw',
-    runId: 'run-1',
-    status: 'FRESH',
+    position: null,
+    generatedAt: '2026-07-19T12:00:00.000Z',
+    asOf: '2026-07-19T11:59:00.000Z',
+    expiresAt: '2026-07-19T13:00:00.000Z',
     marketRegime: 'UP',
-    fundamentalRegime: 'CONSTRUCTIVE',
-    recommendedAction: 'hold',
-    confidence: 'medium',
-    riskLevel: 'normal',
-    dataQuality: 'complete',
+    fundamentalRegime: 'BULLISH',
+    posture: 'AGGRESSIVE',
+    recommendedAction: 'HOLD',
+    riskLevel: 'NORMAL',
     clmmPolicy: {
-      posture: 'wide',
-      rangeBias: 'symmetric',
-      rebalanceSensitivity: 'low',
-      maxCapitalDeploymentPct: 0.5,
+      rangeBias: 'MEDIUM',
+      rebalanceSensitivity: 'NORMAL',
+      maxCapitalDeploymentBps: 7500,
     },
-    levels: { supports: [], resistances: [] },
-    reasoning: ['Trend constructive', 'Vol muted', 'Funding neutral'],
-    sourceRefs: ['msg-1'],
-    expiresAt: '2026-05-07T13:00:00Z',
-    payloadHash: 'h',
-    receivedAtIso: '2026-05-07T12:00:01Z',
-    freshness: { capturedAtUnixMs: Date.parse('2026-05-07T12:00:00Z'), stale: false },
+    levels: {
+      supportsUsdcPerSol: [],
+      resistancesUsdcPerSol: [],
+    },
+    evidence: {
+      selectionStatus: 'FULL',
+      selectionPolicyVersion: 'selector.v1.2026-07',
+      selectedBundleRefs: [],
+      selectedSourceRefs: [],
+    },
+    confidenceBps: 7500,
+    dataQuality: 'COMPLETE',
+    reasonCodes: ['MARKET_REGIME_UP', 'ADVISORY_ONLY'],
+    reasoning:
+      'Market regime is UP with bullish fundamental signals. No position-specific triggers present.',
+    warnings: [],
+    freshness: {
+      status: 'FRESH',
+      evaluatedAt: '2026-07-19T12:00:00.000Z',
+      ageSeconds: 60,
+    },
     ...overrides,
   };
 }
@@ -70,22 +86,26 @@ describe('PolicyInsightsSection', () => {
     expect(screen.getByText('PolicyInsights')).toBeTruthy();
     expect(screen.getByText('Advisory CLMM policy signal. Nothing has been applied.')).toBeTruthy();
     expect(screen.getByText('Hold')).toBeTruthy();
-    expect(screen.getByText('Posture: wide')).toBeTruthy();
-    expect(screen.getByText('Range bias: symmetric')).toBeTruthy();
-    expect(screen.getByText('Rebalance sensitivity: low')).toBeTruthy();
-    expect(screen.getByText('Max capital: 50%')).toBeTruthy();
+    expect(screen.getByText('Posture: AGGRESSIVE')).toBeTruthy();
+    expect(screen.getByText('Range bias: MEDIUM')).toBeTruthy();
+    expect(screen.getByText('Rebalance sensitivity: NORMAL')).toBeTruthy();
+    expect(screen.getByText('75%')).toBeTruthy();
     expect(screen.getByText('Normal risk')).toBeTruthy();
-    expect(screen.getByText('Medium confidence')).toBeTruthy();
+    expect(screen.getByText('75% confidence')).toBeTruthy();
     expect(screen.getByText('Complete data')).toBeTruthy();
-    expect(screen.getByText('Trend constructive')).toBeTruthy();
-    expect(screen.getByText('Vol muted')).toBeTruthy();
-    expect(screen.getByText('Funding neutral')).toBeTruthy();
+    expect(
+      screen.getByText(
+        'Market regime is UP with bullish fundamental signals. No position-specific triggers present.',
+      ),
+    ).toBeTruthy();
   });
 
-  it('renders a stale warning line when status is STALE', () => {
+  it('renders a stale warning line when freshness.status is STALE', () => {
     render(
       <PolicyInsightsSection
-        policyInsight={fixture({ status: 'STALE' })}
+        policyInsight={fixture({
+          freshness: { status: 'STALE', evaluatedAt: '2026-07-19T12:00:00.000Z', ageSeconds: 3600 },
+        })}
         isLoading={false}
         isError={false}
         isEnabled
@@ -99,7 +119,7 @@ describe('PolicyInsightsSection', () => {
   it('uses danger styling for critical risk', () => {
     render(
       <PolicyInsightsSection
-        policyInsight={fixture({ riskLevel: 'critical' })}
+        policyInsight={fixture({ riskLevel: 'CRITICAL' })}
         isLoading={false}
         isError={false}
         isEnabled
@@ -111,10 +131,10 @@ describe('PolicyInsightsSection', () => {
     expect(screen.getByText('Critical risk')).toBeTruthy();
   });
 
-  it('uses warning styling for pause_rebalances', () => {
+  it('uses warning styling for STAND_DOWN', () => {
     render(
       <PolicyInsightsSection
-        policyInsight={fixture({ recommendedAction: 'pause_rebalances' })}
+        policyInsight={fixture({ recommendedAction: 'STAND_DOWN' })}
         isLoading={false}
         isError={false}
         isEnabled
@@ -122,7 +142,37 @@ describe('PolicyInsightsSection', () => {
         now={NOW}
       />,
     );
-    expect(screen.getByText('Pause rebalances')).toBeTruthy();
+    expect(screen.getByText('Stand down')).toBeTruthy();
+  });
+
+  it('renders the canonical pair fixture correctly', () => {
+    render(
+      <PolicyInsightsSection
+        policyInsight={canonicalCurrentPair as PolicyInsightBlock}
+        isLoading={false}
+        isError={false}
+        isEnabled
+        unavailableReason={null}
+        now={NOW}
+      />,
+    );
+    expect(screen.getByText('Hold')).toBeTruthy();
+    expect(screen.getByText('Normal risk')).toBeTruthy();
+  });
+
+  it('renders the canonical position fixture correctly', () => {
+    render(
+      <PolicyInsightsSection
+        policyInsight={canonicalCurrentPosition as PolicyInsightBlock}
+        isLoading={false}
+        isError={false}
+        isEnabled
+        unavailableReason={null}
+        now={NOW}
+      />,
+    );
+    expect(screen.getByText('Exit to SOL')).toBeTruthy();
+    expect(screen.getByText('Elevated risk')).toBeTruthy();
   });
 
   it('renders unavailable copy for not-found', () => {

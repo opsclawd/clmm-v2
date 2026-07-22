@@ -2,6 +2,8 @@
   "extends": "@clmm/config/tsconfig/react-native",
   "compilerOptions": {
     "outDir": "dist",
+    "resolveJsonModule": true,
+    "esModuleInterop": true,
     "disableSourceOfProjectReferenceRedirect": true,
     "paths": {
       "@clmm/application/public": ["../../packages/application/src/public/index.ts"],

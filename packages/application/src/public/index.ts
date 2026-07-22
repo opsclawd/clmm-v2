@@ -31,11 +31,23 @@ export type {
   PolicyInsightLevels,
   PolicyInsightFreshness,
   PolicyInsightRecommendedAction,
-  PolicyInsightConfidence,
   PolicyInsightRiskLevel,
   PolicyInsightDataQuality,
-  PolicyInsightStatus,
   PolicyInsightsUnavailableReason,
+  PolicyInsightMarketRegime,
+  PolicyInsightFundamentalRegime,
+  PolicyInsightPosture,
+  PolicyInsightRangeBias,
+  PolicyInsightRebalanceSensitivity,
+  PolicyInsightFreshnessStatus,
+  PolicyInsightSelectionStatus,
+  PolicyInsightWarningCode,
+  PolicyInsightReasonCode,
+  PolicyInsightPositionScope,
+  PolicyInsightBundleRef,
+  PolicyInsightSourceRef,
+  PolicyInsightEvidence,
+  PolicyInsightWarning,
   PositionValueMetricDto,
   UnclaimedFeesMetricDto,
   PoolTvlMetricDto,
@@ -43,6 +55,8 @@ export type {
   PoolFinancialMetricsDto,
   PositionListFinancialMetricsDto,
 } from '../dto/index.js';
+
+export { parsePolicyInsightBlock } from '../dto/policyInsightValidator.js';
 
 // Port types needed by UI (capability + permission state)
 export type { PlatformCapabilityState } from '../ports/index.js';

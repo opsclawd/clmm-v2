@@ -184,14 +184,13 @@ export function PolicyInsightsSection({
       >
         {vm.dataQualityLabel}
       </Text>
-      {vm.reasoning.map((reason, idx) => (
+      {vm.reasoning ? (
         <Text
-          key={`policy-insight-reason-${idx}`}
           style={{ color: colors.textSecondary, fontSize: typography.fontSize.sm, marginTop: 4 }}
         >
-          {reason}
+          {vm.reasoning}
         </Text>
-      ))}
+      ) : null}
       {isError ? (
         <Text
           testID="policy-insights-degraded"

@@ -1,0 +1,2043 @@
+diff --git a/apps/app/src/api/policyInsights.test.ts b/apps/app/src/api/policyInsights.test.ts
+index 33b1224..6c7e979 100644
+--- a/apps/app/src/api/policyInsights.test.ts
++++ b/apps/app/src/api/policyInsights.test.ts
+@@ -1,5 +1,6 @@
+ import { afterEach, describe, expect, it, vi } from 'vitest';
+ import { fetchCurrentPolicyInsight } from './policyInsights.js';
++import canonicalCurrentPair from '../../../../schemas/regime-engine/policy-insight.v1/fixtures/valid/current-pair.json';
+ 
+ type ExpoPublicEnv = NodeJS.ProcessEnv & {
+   EXPO_PUBLIC_BFF_BASE_URL?: string;
+@@ -17,34 +18,8 @@ function restoreBffBaseUrl(): void {
+   env.EXPO_PUBLIC_BFF_BASE_URL = ORIGINAL_BFF_BASE_URL;
+ }
+ 
+-function fixtureBlock() {
+-  return {
+-    schemaVersion: '1.0',
+-    pair: 'SOL/USDC',
+-    asOf: '2026-05-07T00:00:00Z',
+-    source: 'openclaw',
+-    runId: 'run-1',
+-    status: 'FRESH',
+-    marketRegime: 'UP',
+-    fundamentalRegime: 'NEUTRAL',
+-    recommendedAction: 'hold',
+-    confidence: 'medium',
+-    riskLevel: 'normal',
+-    dataQuality: 'complete',
+-    clmmPolicy: {
+-      posture: 'wide',
+-      rangeBias: 'symmetric',
+-      rebalanceSensitivity: 'low',
+-      maxCapitalDeploymentPct: 0.5,
+-    },
+-    levels: { supports: [140.5], resistances: [155.0] },
+-    reasoning: ['Trend constructive'],
+-    sourceRefs: ['msg-1'],
+-    expiresAt: '2026-05-07T01:00:00Z',
+-    payloadHash: 'h',
+-    receivedAtIso: '2026-05-07T00:00:01Z',
+-    freshness: { capturedAtUnixMs: 1_700_000_000_000, stale: false },
+-  };
++function fixtureBlock(): typeof canonicalCurrentPair {
++  return JSON.parse(JSON.stringify(canonicalCurrentPair));
+ }
+ 
+ describe('fetchCurrentPolicyInsight', () => {
+@@ -144,7 +119,7 @@ describe('fetchCurrentPolicyInsight', () => {
+   it('throws on 200 with malformed clmmPolicy', async () => {
+     env.EXPO_PUBLIC_BFF_BASE_URL = 'https://bff.example.test';
+     const block = fixtureBlock();
+-    (block.clmmPolicy as unknown as Record<string, unknown>)['maxCapitalDeploymentPct'] = 'oops';
++    (block.clmmPolicy as unknown as Record<string, unknown>)['maxCapitalDeploymentBps'] = 'oops';
+     globalThis.fetch = vi.fn().mockResolvedValue({
+       ok: true,
+       status: 200,
+@@ -157,10 +132,10 @@ describe('fetchCurrentPolicyInsight', () => {
+     expect((error as Error).message).toContain('malformed policyInsight block');
+   });
+ 
+-  it('throws on 200 with negative maxCapitalDeploymentPct', async () => {
++  it('throws on 200 with negative maxCapitalDeploymentBps', async () => {
+     env.EXPO_PUBLIC_BFF_BASE_URL = 'https://bff.example.test';
+     const block = fixtureBlock();
+-    (block.clmmPolicy as unknown as Record<string, unknown>)['maxCapitalDeploymentPct'] = -0.5;
++    (block.clmmPolicy as unknown as Record<string, unknown>)['maxCapitalDeploymentBps'] = -500;
+     globalThis.fetch = vi.fn().mockResolvedValue({
+       ok: true,
+       status: 200,
+@@ -176,21 +151,7 @@ describe('fetchCurrentPolicyInsight', () => {
+   it('throws on 200 with malformed levels', async () => {
+     env.EXPO_PUBLIC_BFF_BASE_URL = 'https://bff.example.test';
+     const block = fixtureBlock();
+-    (block.levels as unknown as Record<string, unknown>)['supports'] = ['oops'];
+-    globalThis.fetch = vi.fn().mockResolvedValue({
+-      ok: true,
+-      status: 200,
+-      json: () => Promise.resolve({ policyInsight: block }),
+-    }) as typeof fetch;
+-
+-    const error = await fetchCurrentPolicyInsight().catch((reason: unknown) => reason);
+-    expect(error).toBeInstanceOf(Error);
+-  });
+-
+-  it('throws on 200 with malformed sourceRefs', async () => {
+-    env.EXPO_PUBLIC_BFF_BASE_URL = 'https://bff.example.test';
+-    const block = fixtureBlock();
+-    (block as unknown as Record<string, unknown>)['sourceRefs'] = [42];
++    (block.levels as unknown as Record<string, unknown>)['supportsUsdcPerSol'] = ['not-a-decimal'];
+     globalThis.fetch = vi.fn().mockResolvedValue({
+       ok: true,
+       status: 200,
+@@ -300,4 +261,4 @@ describe('fetchCurrentPolicyInsight', () => {
+     const result = await fetchCurrentPolicyInsight(controller.signal);
+     expect(result.policyInsight).toEqual(block);
+   });
+-});
++});
+\ No newline at end of file
+diff --git a/apps/app/src/api/policyInsights.ts b/apps/app/src/api/policyInsights.ts
+index 23675d9..cbcbf39 100644
+--- a/apps/app/src/api/policyInsights.ts
++++ b/apps/app/src/api/policyInsights.ts
+@@ -1,14 +1,7 @@
+ import {
+   type PolicyInsightBlock,
+-  type PolicyInsightClmmPolicy,
+-  type PolicyInsightConfidence,
+-  type PolicyInsightDataQuality,
+-  type PolicyInsightFreshness,
+-  type PolicyInsightLevels,
+-  type PolicyInsightRecommendedAction,
+-  type PolicyInsightRiskLevel,
+-  type PolicyInsightStatus,
+   type PolicyInsightsUnavailableReason,
++  parsePolicyInsightBlock,
+ } from '@clmm/application/public';
+ import { getBffBaseUrl } from './http.js';
+ 
+@@ -19,30 +12,6 @@ export type PolicyInsightsResponse = {
+ 
+ const FETCH_TIMEOUT_MS = 10_000;
+ 
+-const VALID_ACTIONS: ReadonlySet<string> = new Set<PolicyInsightRecommendedAction>([
+-  'hold',
+-  'watch',
+-  'tighten_range',
+-  'widen_range',
+-  'exit_range',
+-  'pause_rebalances',
+-]);
+-const VALID_CONFIDENCES: ReadonlySet<string> = new Set<PolicyInsightConfidence>([
+-  'low',
+-  'medium',
+-  'high',
+-]);
+-const VALID_RISK_LEVELS: ReadonlySet<string> = new Set<PolicyInsightRiskLevel>([
+-  'normal',
+-  'elevated',
+-  'critical',
+-]);
+-const VALID_DATA_QUALITIES: ReadonlySet<string> = new Set<PolicyInsightDataQuality>([
+-  'complete',
+-  'partial',
+-  'stale',
+-]);
+-const VALID_STATUSES: ReadonlySet<string> = new Set<PolicyInsightStatus>(['FRESH', 'STALE']);
+ const VALID_REASONS: ReadonlySet<string> = new Set<PolicyInsightsUnavailableReason>([
+   'not-found',
+   'store-unavailable',
+@@ -55,109 +24,6 @@ function isAbortError(error: unknown): boolean {
+   return (error as { name?: string }).name === 'AbortError';
+ }
+ 
+-function isRecord(value: unknown): value is Record<string, unknown> {
+-  return typeof value === 'object' && value != null && !Array.isArray(value);
+-}
+-
+-function isStringArray(value: unknown): value is string[] {
+-  return Array.isArray(value) && value.every((v) => typeof v === 'string');
+-}
+-
+-function isNumberArray(value: unknown): value is number[] {
+-  return Array.isArray(value) && value.every((v) => typeof v === 'number' && Number.isFinite(v));
+-}
+-
+-function isClmmPolicy(value: unknown): value is PolicyInsightClmmPolicy {
+-  if (!isRecord(value)) return false;
+-  if (typeof value['posture'] !== 'string') return false;
+-  if (typeof value['rangeBias'] !== 'string') return false;
+-  if (typeof value['rebalanceSensitivity'] !== 'string') return false;
+-  const pct = value['maxCapitalDeploymentPct'];
+-  if (typeof pct !== 'number' || !Number.isFinite(pct)) return false;
+-  if (pct < 0 || pct > 1) return false;
+-  return true;
+-}
+-
+-function isLevels(value: unknown): value is PolicyInsightLevels {
+-  if (!isRecord(value)) return false;
+-  if (!isNumberArray(value['supports'])) return false;
+-  if (!isNumberArray(value['resistances'])) return false;
+-  return true;
+-}
+-
+-function parseFreshness(value: unknown, fallbackIso?: string): PolicyInsightFreshness | null {
+-  if (!isRecord(value)) return null;
+-  if (typeof value['stale'] !== 'boolean') return null;
+-  const stale = value['stale'];
+-  const capturedAtUnixMsRaw = value['capturedAtUnixMs'];
+-  let capturedAtUnixMs: number | null = null;
+-  if (typeof capturedAtUnixMsRaw === 'number' && Number.isFinite(capturedAtUnixMsRaw)) {
+-    capturedAtUnixMs = capturedAtUnixMsRaw;
+-  } else {
+-    const capturedAtIso = value['capturedAtIso'];
+-    if (typeof capturedAtIso === 'string') {
+-      const parsed = Date.parse(capturedAtIso);
+-      if (Number.isFinite(parsed)) capturedAtUnixMs = parsed;
+-    }
+-    if (capturedAtUnixMs === null && typeof fallbackIso === 'string') {
+-      const parsed = Date.parse(fallbackIso);
+-      if (Number.isFinite(parsed)) capturedAtUnixMs = parsed;
+-    }
+-  }
+-  if (capturedAtUnixMs === null) return null;
+-  return { capturedAtUnixMs, stale };
+-}
+-
+-function parsePolicyInsightBlock(value: unknown): PolicyInsightBlock | null {
+-  if (!isRecord(value)) return null;
+-  if (value['schemaVersion'] !== '1.0') return null;
+-  if (value['pair'] !== 'SOL/USDC') return null;
+-  if (value['source'] !== 'openclaw') return null;
+-  if (typeof value['asOf'] !== 'string') return null;
+-  if (typeof value['runId'] !== 'string') return null;
+-  if (!VALID_STATUSES.has(value['status'] as string)) return null;
+-  if (typeof value['marketRegime'] !== 'string') return null;
+-  if (typeof value['fundamentalRegime'] !== 'string') return null;
+-  if (!VALID_ACTIONS.has(value['recommendedAction'] as string)) return null;
+-  if (!VALID_CONFIDENCES.has(value['confidence'] as string)) return null;
+-  if (!VALID_RISK_LEVELS.has(value['riskLevel'] as string)) return null;
+-  if (!VALID_DATA_QUALITIES.has(value['dataQuality'] as string)) return null;
+-  if (!isClmmPolicy(value['clmmPolicy'])) return null;
+-  if (!isLevels(value['levels'])) return null;
+-  if (!isStringArray(value['reasoning'])) return null;
+-  if (!isStringArray(value['sourceRefs'])) return null;
+-  if (typeof value['expiresAt'] !== 'string') return null;
+-  if (typeof value['payloadHash'] !== 'string') return null;
+-  if (typeof value['receivedAtIso'] !== 'string') return null;
+-  const freshness = parseFreshness(
+-    value['freshness'],
+-    typeof value['asOf'] === 'string' ? value['asOf'] : undefined,
+-  );
+-  if (!freshness) return null;
+-  return {
+-    schemaVersion: '1.0',
+-    pair: 'SOL/USDC',
+-    asOf: value['asOf'],
+-    source: 'openclaw',
+-    runId: value['runId'],
+-    status: value['status'] as PolicyInsightStatus,
+-    marketRegime: value['marketRegime'],
+-    fundamentalRegime: value['fundamentalRegime'],
+-    recommendedAction: value['recommendedAction'] as PolicyInsightRecommendedAction,
+-    confidence: value['confidence'] as PolicyInsightConfidence,
+-    riskLevel: value['riskLevel'] as PolicyInsightRiskLevel,
+-    dataQuality: value['dataQuality'] as PolicyInsightDataQuality,
+-    clmmPolicy: value['clmmPolicy'],
+-    levels: value['levels'],
+-    reasoning: value['reasoning'],
+-    sourceRefs: value['sourceRefs'],
+-    expiresAt: value['expiresAt'],
+-    payloadHash: value['payloadHash'],
+-    receivedAtIso: value['receivedAtIso'],
+-    freshness,
+-  };
+-}
+-
+ function isUnavailableReason(value: unknown): value is PolicyInsightsUnavailableReason {
+   return typeof value === 'string' && VALID_REASONS.has(value);
+ }
+@@ -202,13 +68,13 @@ export async function fetchCurrentPolicyInsight(
+       throw new Error('Could not load policy insights: response body was not valid JSON');
+     }
+ 
+-    if (!isRecord(body)) {
++    if (typeof body !== 'object' || body === null || Array.isArray(body)) {
+       throw new Error('Could not load policy insights: malformed response');
+     }
+ 
+-    const policyInsightRaw = body['policyInsight'];
+-    const unavailableReason = isUnavailableReason(body['unavailableReason'])
+-      ? body['unavailableReason']
++    const policyInsightRaw = (body as Record<string, unknown>)['policyInsight'];
++    const unavailableReason = isUnavailableReason((body as Record<string, unknown>)['unavailableReason'])
++      ? (body as Record<string, unknown>)['unavailableReason'] as PolicyInsightsUnavailableReason
+       : undefined;
+ 
+     if (policyInsightRaw === null) {
+@@ -225,4 +91,4 @@ export async function fetchCurrentPolicyInsight(
+     clearTimeout(timeoutId);
+     externalSignal?.removeEventListener('abort', onExternalAbort);
+   }
+-}
++}
+\ No newline at end of file
+diff --git a/apps/app/tsconfig.json b/apps/app/tsconfig.json
+index ef2109c..50cccb3 100644
+--- a/apps/app/tsconfig.json
++++ b/apps/app/tsconfig.json
+@@ -2,6 +2,8 @@
+   "extends": "@clmm/config/tsconfig/react-native",
+   "compilerOptions": {
+     "outDir": "dist",
++    "resolveJsonModule": true,
++    "esModuleInterop": true,
+     "disableSourceOfProjectReferenceRedirect": true,
+     "paths": {
+       "@clmm/application/public": ["../../packages/application/src/public/index.ts"],
+diff --git a/packages/adapters/src/inbound/http/PolicyInsightsController.test.ts b/packages/adapters/src/inbound/http/PolicyInsightsController.test.ts
+index a5aa255..888fe68 100644
+--- a/packages/adapters/src/inbound/http/PolicyInsightsController.test.ts
++++ b/packages/adapters/src/inbound/http/PolicyInsightsController.test.ts
+@@ -5,39 +5,14 @@ import type {
+   PolicyInsightsReadResult,
+   PolicyInsightBlock,
+ } from '@clmm/application';
++import canonicalCurrentPair from '../../../../../schemas/regime-engine/policy-insight.v1/fixtures/valid/current-pair.json';
+ 
+ function fixtureBlock(): PolicyInsightBlock {
+-  return {
+-    schemaVersion: '1.0',
+-    pair: 'SOL/USDC',
+-    asOf: '2026-05-07T00:00:00Z',
+-    source: 'openclaw',
+-    runId: 'run-1',
+-    status: 'FRESH',
+-    marketRegime: 'UP',
+-    fundamentalRegime: 'NEUTRAL',
+-    recommendedAction: 'hold',
+-    confidence: 'medium',
+-    riskLevel: 'normal',
+-    dataQuality: 'complete',
+-    clmmPolicy: {
+-      posture: 'wide',
+-      rangeBias: 'symmetric',
+-      rebalanceSensitivity: 'low',
+-      maxCapitalDeploymentPct: 0.5,
+-    },
+-    levels: { supports: [], resistances: [] },
+-    reasoning: [],
+-    sourceRefs: [],
+-    expiresAt: '2026-05-07T01:00:00Z',
+-    payloadHash: 'h',
+-    receivedAtIso: '2026-05-07T00:00:01Z',
+-    freshness: { capturedAtUnixMs: Date.parse('2026-05-07T00:00:00Z'), stale: false },
+-  };
++  return canonicalCurrentPair as PolicyInsightBlock;
+ }
+ 
+ describe('PolicyInsightsController', () => {
+-  it('returns { policyInsight: block } when port resolves a block', async () => {
++  it('passes through the canonical block without modification', async () => {
+     const block = fixtureBlock();
+     const result: PolicyInsightsReadResult = { kind: 'block', block };
+     const fetchCurrent = vi.fn().mockResolvedValue(result);
+@@ -85,4 +60,4 @@ describe('PolicyInsightsController', () => {
+     const response = await controller.getCurrent();
+     expect(response).toEqual({ policyInsight: null, unavailableReason: 'upstream-error' });
+   });
+-});
++});
+\ No newline at end of file
+diff --git a/packages/adapters/src/outbound/regime-engine/CurrentPolicyInsightsAdapter.test.ts b/packages/adapters/src/outbound/regime-engine/CurrentPolicyInsightsAdapter.test.ts
+index 0c629ab..069fae1 100644
+--- a/packages/adapters/src/outbound/regime-engine/CurrentPolicyInsightsAdapter.test.ts
++++ b/packages/adapters/src/outbound/regime-engine/CurrentPolicyInsightsAdapter.test.ts
+@@ -1,6 +1,8 @@
+ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
+ import { CurrentPolicyInsightsAdapter } from './CurrentPolicyInsightsAdapter.js';
+ import type { ObservabilityPort } from '@clmm/application';
++import canonicalCurrentPair from '../../../../../schemas/regime-engine/policy-insight.v1/fixtures/valid/current-pair.json';
++import canonicalCurrentPosition from '../../../../../schemas/regime-engine/policy-insight.v1/fixtures/valid/current-position.json';
+ 
+ interface FakeLogEntry {
+   level: string;
+@@ -21,37 +23,6 @@ function createFakeObservability() {
+   return { logs, port };
+ }
+ 
+-const SAMPLE_UPSTREAM = {
+-  schemaVersion: '1.0',
+-  pair: 'SOL/USDC',
+-  asOf: '2026-05-07T12:00:00Z',
+-  source: 'openclaw',
+-  runId: 'run-42',
+-  status: 'FRESH',
+-  marketRegime: 'UP',
+-  fundamentalRegime: 'CONSTRUCTIVE',
+-  recommendedAction: 'hold',
+-  confidence: 'medium',
+-  riskLevel: 'normal',
+-  dataQuality: 'complete',
+-  clmmPolicy: {
+-    posture: 'wide',
+-    rangeBias: 'symmetric',
+-    rebalanceSensitivity: 'low',
+-    maxCapitalDeploymentPct: 0.5,
+-  },
+-  levels: { supports: [140.5, 138.0], resistances: [155.0, 160.5] },
+-  reasoning: ['Trend is constructive', 'Vol is muted', 'Funding neutral'],
+-  sourceRefs: ['msg-1', 'msg-2'],
+-  expiresAt: '2026-05-07T13:00:00Z',
+-  payloadHash: 'sha256:abc',
+-  receivedAtIso: '2026-05-07T12:00:01Z',
+-  freshness: {
+-    capturedAtIso: '2026-05-07T12:00:00Z',
+-    stale: false,
+-  },
+-};
+-
+ describe('CurrentPolicyInsightsAdapter', () => {
+   let obs: ReturnType<typeof createFakeObservability>;
+ 
+@@ -64,9 +35,9 @@ describe('CurrentPolicyInsightsAdapter', () => {
+     vi.restoreAllMocks();
+   });
+ 
+-  it('returns kind:"block" with parsed PolicyInsightBlock on 200', async () => {
++  it('returns kind:"block" with the real canonical fixture on 200', async () => {
+     vi.mocked(fetch).mockResolvedValue(
+-      new Response(JSON.stringify(SAMPLE_UPSTREAM), { status: 200 }),
++      new Response(JSON.stringify(canonicalCurrentPair), { status: 200 }),
+     );
+     const adapter = new CurrentPolicyInsightsAdapter('https://regime.example.com', obs.port);
+ 
+@@ -74,17 +45,28 @@ describe('CurrentPolicyInsightsAdapter', () => {
+ 
+     expect(result.kind).toBe('block');
+     if (result.kind !== 'block') return;
+-    expect(result.block.recommendedAction).toBe('hold');
+-    expect(result.block.clmmPolicy.maxCapitalDeploymentPct).toBe(0.5);
+-    expect(result.block.levels.supports).toEqual([140.5, 138.0]);
+-    expect(result.block.sourceRefs).toEqual(['msg-1', 'msg-2']);
+-    expect(result.block.freshness.capturedAtUnixMs).toBe(Date.parse('2026-05-07T12:00:00Z'));
+-    expect(result.block.freshness.stale).toBe(false);
++    expect(result.block.recommendedAction).toBe('HOLD');
++    expect(result.block.clmmPolicy.maxCapitalDeploymentBps).toBe(7500);
++    expect(result.block.freshness.status).toBe('FRESH');
++  });
++
++  it('returns kind:"block" with the position fixture on 200', async () => {
++    vi.mocked(fetch).mockResolvedValue(
++      new Response(JSON.stringify(canonicalCurrentPosition), { status: 200 }),
++    );
++    const adapter = new CurrentPolicyInsightsAdapter('https://regime.example.com', obs.port);
++
++    const result = await adapter.fetchCurrent();
++
++    expect(result.kind).toBe('block');
++    if (result.kind !== 'block') return;
++    expect(result.block.recommendedAction).toBe('EXIT_TO_SOL');
++    expect(result.block.position).not.toBeNull();
+   });
+ 
+   it('hits /v1/insights/sol-usdc/current with no query params', async () => {
+     vi.mocked(fetch).mockResolvedValue(
+-      new Response(JSON.stringify(SAMPLE_UPSTREAM), { status: 200 }),
++      new Response(JSON.stringify(canonicalCurrentPair), { status: 200 }),
+     );
+     const adapter = new CurrentPolicyInsightsAdapter('https://regime.example.com', obs.port);
+     await adapter.fetchCurrent();
+@@ -94,7 +76,7 @@ describe('CurrentPolicyInsightsAdapter', () => {
+ 
+   it('strips trailing slash from baseUrl', async () => {
+     vi.mocked(fetch).mockResolvedValue(
+-      new Response(JSON.stringify(SAMPLE_UPSTREAM), { status: 200 }),
++      new Response(JSON.stringify(canonicalCurrentPair), { status: 200 }),
+     );
+     const adapter = new CurrentPolicyInsightsAdapter('https://regime.example.com/', obs.port);
+     await adapter.fetchCurrent();
+@@ -106,7 +88,6 @@ describe('CurrentPolicyInsightsAdapter', () => {
+     vi.mocked(fetch).mockResolvedValue(
+       new Response(
+         JSON.stringify({
+-          schemaVersion: '1.0',
+           error: { code: 'INSIGHT_NOT_FOUND', message: 'not yet', details: [] },
+         }),
+         { status: 404 },
+@@ -169,34 +150,29 @@ describe('CurrentPolicyInsightsAdapter', () => {
+   });
+ 
+   it('returns kind:"upstream-error" on malformed clmmPolicy', async () => {
++    const malformed = {
++      ...canonicalCurrentPair,
++      clmmPolicy: { rangeBias: 'INVALID' },
++    };
+     vi.mocked(fetch).mockResolvedValue(
+-      new Response(
+-        JSON.stringify({
+-          ...SAMPLE_UPSTREAM,
+-          clmmPolicy: { posture: 'wide', rangeBias: 'symmetric' },
+-        }),
+-        { status: 200 },
+-      ),
++      new Response(JSON.stringify(malformed), { status: 200 }),
+     );
+     const adapter = new CurrentPolicyInsightsAdapter('https://regime.example.com', obs.port);
+     const result = await adapter.fetchCurrent();
+     expect(result.kind).toBe('upstream-error');
+   });
+ 
+-  it('returns kind:"upstream-error" when clmmPolicy maxCapitalDeploymentPct > 1', async () => {
++  it('returns kind:"upstream-error" when clmmPolicy maxCapitalDeploymentBps > 10000', async () => {
++    const malformed = {
++      ...canonicalCurrentPair,
++      clmmPolicy: {
++        rangeBias: 'MEDIUM',
++        rebalanceSensitivity: 'NORMAL',
++        maxCapitalDeploymentBps: 15000,
++      },
++    };
+     vi.mocked(fetch).mockResolvedValue(
+-      new Response(
+-        JSON.stringify({
+-          ...SAMPLE_UPSTREAM,
+-          clmmPolicy: {
+-            posture: 'wide',
+-            rangeBias: 'symmetric',
+-            rebalanceSensitivity: 'low',
+-            maxCapitalDeploymentPct: 1.5,
+-          },
+-        }),
+-        { status: 200 },
+-      ),
++      new Response(JSON.stringify(malformed), { status: 200 }),
+     );
+     const adapter = new CurrentPolicyInsightsAdapter('https://regime.example.com', obs.port);
+     const result = await adapter.fetchCurrent();
+@@ -204,23 +180,12 @@ describe('CurrentPolicyInsightsAdapter', () => {
+   });
+ 
+   it('returns kind:"upstream-error" on malformed levels', async () => {
++    const malformed = {
++      ...canonicalCurrentPair,
++      levels: { supportsUsdcPerSol: ['not-a-number'], resistancesUsdcPerSol: [] },
++    };
+     vi.mocked(fetch).mockResolvedValue(
+-      new Response(
+-        JSON.stringify({
+-          ...SAMPLE_UPSTREAM,
+-          levels: { supports: ['oops'], resistances: [] },
+-        }),
+-        { status: 200 },
+-      ),
+-    );
+-    const adapter = new CurrentPolicyInsightsAdapter('https://regime.example.com', obs.port);
+-    const result = await adapter.fetchCurrent();
+-    expect(result.kind).toBe('upstream-error');
+-  });
+-
+-  it('returns kind:"upstream-error" on malformed sourceRefs', async () => {
+-    vi.mocked(fetch).mockResolvedValue(
+-      new Response(JSON.stringify({ ...SAMPLE_UPSTREAM, sourceRefs: [42] }), { status: 200 }),
++      new Response(JSON.stringify(malformed), { status: 200 }),
+     );
+     const adapter = new CurrentPolicyInsightsAdapter('https://regime.example.com', obs.port);
+     const result = await adapter.fetchCurrent();
+@@ -228,10 +193,12 @@ describe('CurrentPolicyInsightsAdapter', () => {
+   });
+ 
+   it('returns kind:"upstream-error" on malformed freshness', async () => {
++    const malformed = {
++      ...canonicalCurrentPair,
++      freshness: { status: 'INVALID' },
++    };
+     vi.mocked(fetch).mockResolvedValue(
+-      new Response(JSON.stringify({ ...SAMPLE_UPSTREAM, freshness: { stale: 'no' } }), {
+-        status: 200,
+-      }),
++      new Response(JSON.stringify(malformed), { status: 200 }),
+     );
+     const adapter = new CurrentPolicyInsightsAdapter('https://regime.example.com', obs.port);
+     const result = await adapter.fetchCurrent();
+@@ -258,4 +225,4 @@ describe('CurrentPolicyInsightsAdapter', () => {
+     expect(result.kind).toBe('config-error');
+     expect(vi.mocked(fetch)).not.toHaveBeenCalled();
+   });
+-});
++});
+\ No newline at end of file
+diff --git a/packages/adapters/src/outbound/regime-engine/CurrentPolicyInsightsAdapter.ts b/packages/adapters/src/outbound/regime-engine/CurrentPolicyInsightsAdapter.ts
+index 9ef3198..cdd9474 100644
+--- a/packages/adapters/src/outbound/regime-engine/CurrentPolicyInsightsAdapter.ts
++++ b/packages/adapters/src/outbound/regime-engine/CurrentPolicyInsightsAdapter.ts
+@@ -1,174 +1,12 @@
+ import type {
+   ObservabilityPort,
+-  PolicyInsightBlock,
+-  PolicyInsightClmmPolicy,
+-  PolicyInsightConfidence,
+-  PolicyInsightDataQuality,
+-  PolicyInsightFreshness,
+-  PolicyInsightLevels,
+-  PolicyInsightRecommendedAction,
+-  PolicyInsightRiskLevel,
+-  PolicyInsightStatus,
+   PolicyInsightsReadResult,
+   PolicyInsightsReadPort,
+ } from '@clmm/application';
++import { parsePolicyInsightBlock } from '@clmm/application';
+ 
+ const FETCH_TIMEOUT_MS = 2000;
+ 
+-const VALID_ACTIONS: ReadonlySet<string> = new Set([
+-  'hold',
+-  'watch',
+-  'tighten_range',
+-  'widen_range',
+-  'exit_range',
+-  'pause_rebalances',
+-]);
+-const VALID_CONFIDENCES: ReadonlySet<string> = new Set(['low', 'medium', 'high']);
+-const VALID_RISK_LEVELS: ReadonlySet<string> = new Set(['normal', 'elevated', 'critical']);
+-const VALID_DATA_QUALITIES: ReadonlySet<string> = new Set(['complete', 'partial', 'stale']);
+-const VALID_STATUSES: ReadonlySet<string> = new Set(['FRESH', 'STALE']);
+-
+-function isRecord(value: unknown): value is Record<string, unknown> {
+-  return typeof value === 'object' && value !== null && !Array.isArray(value);
+-}
+-
+-function nullableString(value: unknown): string | null | undefined {
+-  if (value == null) return null;
+-  if (typeof value === 'string') return value;
+-  return undefined;
+-}
+-
+-function stringArray(value: unknown): string[] | null {
+-  if (!Array.isArray(value)) return null;
+-  const out: string[] = [];
+-  for (const item of value) {
+-    if (typeof item !== 'string') return null;
+-    out.push(item);
+-  }
+-  return out;
+-}
+-
+-function numberArray(value: unknown): number[] | null {
+-  if (!Array.isArray(value)) return null;
+-  const out: number[] = [];
+-  for (const item of value) {
+-    if (typeof item !== 'number' || !Number.isFinite(item)) return null;
+-    out.push(item);
+-  }
+-  return out;
+-}
+-
+-function parseClmmPolicy(raw: unknown): PolicyInsightClmmPolicy | null {
+-  if (!isRecord(raw)) return null;
+-  const posture = raw['posture'];
+-  const rangeBias = raw['rangeBias'];
+-  const rebalanceSensitivity = raw['rebalanceSensitivity'];
+-  const maxCapitalDeploymentPct = raw['maxCapitalDeploymentPct'];
+-  if (typeof posture !== 'string') return null;
+-  if (typeof rangeBias !== 'string') return null;
+-  if (typeof rebalanceSensitivity !== 'string') return null;
+-  if (typeof maxCapitalDeploymentPct !== 'number' || !Number.isFinite(maxCapitalDeploymentPct)) {
+-    return null;
+-  }
+-  if (maxCapitalDeploymentPct < 0 || maxCapitalDeploymentPct > 1) return null;
+-  return { posture, rangeBias, rebalanceSensitivity, maxCapitalDeploymentPct };
+-}
+-
+-function parseLevels(raw: unknown): PolicyInsightLevels | null {
+-  if (!isRecord(raw)) return null;
+-  const supports = numberArray(raw['supports']);
+-  const resistances = numberArray(raw['resistances']);
+-  if (!supports || !resistances) return null;
+-  return { supports, resistances };
+-}
+-
+-function parseFreshness(raw: unknown, fallbackIso: string): PolicyInsightFreshness | null {
+-  if (!isRecord(raw)) return null;
+-  const staleRaw = raw['stale'];
+-  if (typeof staleRaw !== 'boolean') return null;
+-  const stale = staleRaw;
+-  let capturedAtUnixMs: number | null = null;
+-  const capturedAtUnixMsRaw = raw['capturedAtUnixMs'];
+-  if (typeof capturedAtUnixMsRaw === 'number' && Number.isFinite(capturedAtUnixMsRaw)) {
+-    capturedAtUnixMs = capturedAtUnixMsRaw;
+-  } else {
+-    const capturedAtIsoRaw = nullableString(raw['capturedAtIso']);
+-    if (typeof capturedAtIsoRaw === 'string') {
+-      const parsed = Date.parse(capturedAtIsoRaw);
+-      if (Number.isFinite(parsed)) capturedAtUnixMs = parsed;
+-    }
+-  }
+-  if (capturedAtUnixMs == null) {
+-    const parsed = Date.parse(fallbackIso);
+-    if (!Number.isFinite(parsed)) return null;
+-    capturedAtUnixMs = parsed;
+-  }
+-  return { capturedAtUnixMs, stale };
+-}
+-
+-function parseUpstream(data: unknown): PolicyInsightBlock | null {
+-  if (!isRecord(data)) return null;
+-  if (data['schemaVersion'] !== '1.0') return null;
+-  if (data['pair'] !== 'SOL/USDC') return null;
+-  if (data['source'] !== 'openclaw') return null;
+-  const asOf = data['asOf'];
+-  const runId = data['runId'];
+-  const status = data['status'];
+-  const marketRegime = data['marketRegime'];
+-  const fundamentalRegime = data['fundamentalRegime'];
+-  const actionRaw = data['recommendedAction'];
+-  const confidenceRaw = data['confidence'];
+-  const riskLevelRaw = data['riskLevel'];
+-  const dataQualityRaw = data['dataQuality'];
+-  if (typeof asOf !== 'string') return null;
+-  if (typeof runId !== 'string') return null;
+-  if (typeof status !== 'string' || !VALID_STATUSES.has(status)) return null;
+-  if (typeof marketRegime !== 'string') return null;
+-  if (typeof fundamentalRegime !== 'string') return null;
+-  if (typeof actionRaw !== 'string' || !VALID_ACTIONS.has(actionRaw)) return null;
+-  if (typeof confidenceRaw !== 'string' || !VALID_CONFIDENCES.has(confidenceRaw)) return null;
+-  if (typeof riskLevelRaw !== 'string' || !VALID_RISK_LEVELS.has(riskLevelRaw)) return null;
+-  if (typeof dataQualityRaw !== 'string' || !VALID_DATA_QUALITIES.has(dataQualityRaw)) return null;
+-  const clmmPolicy = parseClmmPolicy(data['clmmPolicy']);
+-  if (!clmmPolicy) return null;
+-  const levels = parseLevels(data['levels']);
+-  if (!levels) return null;
+-  const reasoning = stringArray(data['reasoning']);
+-  const sourceRefs = stringArray(data['sourceRefs']);
+-  if (!reasoning || !sourceRefs) return null;
+-  const expiresAt = data['expiresAt'];
+-  const payloadHash = data['payloadHash'];
+-  const receivedAtIso = data['receivedAtIso'];
+-  if (typeof expiresAt !== 'string') return null;
+-  if (typeof payloadHash !== 'string') return null;
+-  if (typeof receivedAtIso !== 'string') return null;
+-  const freshness = parseFreshness(data['freshness'], asOf);
+-  if (!freshness) return null;
+-
+-  return {
+-    schemaVersion: '1.0',
+-    pair: 'SOL/USDC',
+-    asOf,
+-    source: 'openclaw',
+-    runId,
+-    status: status as PolicyInsightStatus,
+-    marketRegime,
+-    fundamentalRegime,
+-    recommendedAction: actionRaw as PolicyInsightRecommendedAction,
+-    confidence: confidenceRaw as PolicyInsightConfidence,
+-    riskLevel: riskLevelRaw as PolicyInsightRiskLevel,
+-    dataQuality: dataQualityRaw as PolicyInsightDataQuality,
+-    clmmPolicy,
+-    levels,
+-    reasoning,
+-    sourceRefs,
+-    expiresAt,
+-    payloadHash,
+-    receivedAtIso,
+-    freshness,
+-  };
+-}
+-
+ export class CurrentPolicyInsightsAdapter implements PolicyInsightsReadPort {
+   constructor(
+     private readonly baseUrl: string | null,
+@@ -222,7 +60,7 @@ export class CurrentPolicyInsightsAdapter implements PolicyInsightsReadPort {
+           this.observability.log('warn', 'PolicyInsights response was not valid JSON');
+           return { kind: 'upstream-error' };
+         }
+-        const block = parseUpstream(body);
++        const block = parsePolicyInsightBlock(body);
+         if (!block) {
+           this.observability.log('warn', 'PolicyInsights response failed shape validation');
+           return { kind: 'upstream-error' };
+@@ -260,16 +98,20 @@ export class CurrentPolicyInsightsAdapter implements PolicyInsightsReadPort {
+   ): Promise<{ code?: string; message?: string } | null> {
+     try {
+       const body: unknown = await response.json();
+-      if (!isRecord(body)) return null;
+-      const err = body['error'];
++      if (typeof body !== 'object' || body === null || Array.isArray(body)) return null;
++      const err = (body as Record<string, unknown>)['error'];
+       const out: { code?: string; message?: string } = {};
+-      if (isRecord(err)) {
+-        if (typeof err['code'] === 'string') out.code = err['code'];
+-        if (typeof err['message'] === 'string') out.message = err['message'];
++      if (typeof err === 'object' && err !== null && !Array.isArray(err)) {
++        if (typeof (err as Record<string, unknown>)['code'] === 'string') {
++          out.code = (err as Record<string, unknown>)['code'] as string;
++        }
++        if (typeof (err as Record<string, unknown>)['message'] === 'string') {
++          out.message = (err as Record<string, unknown>)['message'] as string;
++        }
+       }
+       return out;
+     } catch {
+       return null;
+     }
+   }
+-}
++}
+\ No newline at end of file
+diff --git a/packages/adapters/tsconfig.typecheck.json b/packages/adapters/tsconfig.typecheck.json
+index e9b470e..6b6bcdb 100644
+--- a/packages/adapters/tsconfig.typecheck.json
++++ b/packages/adapters/tsconfig.typecheck.json
+@@ -2,6 +2,8 @@
+   "extends": "@clmm/config/tsconfig/nestjs",
+   "compilerOptions": {
+     "composite": false,
++    "resolveJsonModule": true,
++    "esModuleInterop": true,
+     "types": ["node"],
+     "paths": {
+       "@solana-mobile/mobile-wallet-adapter-protocol": ["./src/types/wallet-adapter.d.ts"],
+diff --git a/packages/application/src/dto/index.ts b/packages/application/src/dto/index.ts
+index 5abe2fe..1d1e40f 100644
+--- a/packages/application/src/dto/index.ts
++++ b/packages/application/src/dto/index.ts
+@@ -365,17 +365,33 @@ export type {
+ 
+ export type { SrThesisDto, SrThesesBlock } from './srTheses.js';
+ 
++export {
++  parsePolicyInsightBlock,
++} from './policyInsightValidator.js';
++
+ export type {
+   PolicyInsightBlock,
+   PolicyInsightClmmPolicy,
+   PolicyInsightLevels,
+   PolicyInsightFreshness,
+   PolicyInsightRecommendedAction,
+-  PolicyInsightConfidence,
+   PolicyInsightRiskLevel,
+   PolicyInsightDataQuality,
+-  PolicyInsightStatus,
+   PolicyInsightsUnavailableReason,
++  PolicyInsightMarketRegime,
++  PolicyInsightFundamentalRegime,
++  PolicyInsightPosture,
++  PolicyInsightRangeBias,
++  PolicyInsightRebalanceSensitivity,
++  PolicyInsightFreshnessStatus,
++  PolicyInsightSelectionStatus,
++  PolicyInsightWarningCode,
++  PolicyInsightReasonCode,
++  PolicyInsightPositionScope,
++  PolicyInsightBundleRef,
++  PolicyInsightSourceRef,
++  PolicyInsightEvidence,
++  PolicyInsightWarning,
+ } from './policyInsights.js';
+ 
+ // --- Financial Metrics DTOs ---
+diff --git a/packages/application/src/dto/policyInsights.ts b/packages/application/src/dto/policyInsights.ts
+index b6962a3..68db047 100644
+--- a/packages/application/src/dto/policyInsights.ts
++++ b/packages/application/src/dto/policyInsights.ts
+@@ -1,65 +1,122 @@
+-// Drift guard: this DTO is structurally validated by
+-// packages/adapters/src/outbound/regime-engine/CurrentPolicyInsightsAdapter.ts
+-// AND by apps/app/src/api/policyInsights.ts. Any field added or removed
+-// here MUST be reflected in both validators and the upstream contract
+-// section of the implementation plan. Application MUST NOT import from
+-// adapters or apps.
+-
++export type PolicyInsightMarketRegime = 'UP' | 'DOWN' | 'CHOP';
++export type PolicyInsightFundamentalRegime = 'BULLISH' | 'BEARISH' | 'NEUTRAL' | 'UNKNOWN';
++export type PolicyInsightPosture = 'AGGRESSIVE' | 'MODERATELY_AGGRESSIVE' | 'NEUTRAL' | 'DEFENSIVE' | 'PAUSED';
+ export type PolicyInsightRecommendedAction =
+-  | 'hold'
+-  | 'watch'
+-  | 'tighten_range'
+-  | 'widen_range'
+-  | 'exit_range'
+-  | 'pause_rebalances';
++  | 'HOLD'
++  | 'MONITOR_LOWER_BOUND'
++  | 'MONITOR_UPPER_BOUND'
++  | 'EXIT_TO_USDC'
++  | 'EXIT_TO_SOL'
++  | 'STAND_DOWN';
++export type PolicyInsightRiskLevel = 'NORMAL' | 'ELEVATED' | 'CRITICAL';
++export type PolicyInsightRangeBias = 'TIGHT' | 'MEDIUM' | 'WIDE' | 'PASSIVE';
++export type PolicyInsightRebalanceSensitivity = 'LOW' | 'NORMAL' | 'HIGH' | 'PAUSED';
++export type PolicyInsightDataQuality = 'COMPLETE' | 'PARTIAL' | 'STALE';
++export type PolicyInsightFreshnessStatus = 'FRESH' | 'STALE';
++export type PolicyInsightSelectionStatus = 'FULL' | 'PARTIAL' | 'DEGRADED';
+ 
+-export type PolicyInsightConfidence = 'low' | 'medium' | 'high';
+-export type PolicyInsightRiskLevel = 'normal' | 'elevated' | 'critical';
+-export type PolicyInsightDataQuality = 'complete' | 'partial' | 'stale';
+-export type PolicyInsightStatus = 'FRESH' | 'STALE';
++export type PolicyInsightWarningCode =
++  | 'MARKET_DATA_HARD_STALE'
++  | 'EVIDENCE_STALE_INPUT'
++  | 'EVIDENCE_MISSING_FAMILY'
++  | 'EVIDENCE_REJECTED_FAMILY'
++  | 'EVIDENCE_CONFLICTED_FAMILY'
++  | 'EVIDENCE_NO_SELECTED_RESEARCH'
++  | 'NO_ELIGIBLE_PRICE_LEVELS';
+ 
+-export type PolicyInsightsUnavailableReason =
+-  | 'not-found'
+-  | 'store-unavailable'
+-  | 'config-error'
+-  | 'upstream-error';
++export type PolicyInsightReasonCode =
++  | 'ADVISORY_ONLY'
++  | 'DATA_HARD_STALE'
++  | 'DATA_INSUFFICIENT_SAMPLES'
++  | 'CLMM_BREACH_LOWER'
++  | 'CLMM_BREACH_UPPER'
++  | 'CHURN_STAND_DOWN_ACTIVE'
++  | 'CHURN_COOLDOWN_ACTIVE'
++  | 'MARKET_REGIME_UP'
++  | 'MARKET_REGIME_DOWN'
++  | 'MARKET_REGIME_CHOP'
++  | 'FEATURE_THRESHOLD_BREACHED'
++  | 'CONTEXTUAL_EVIDENCE_VOTE'
++  | 'RESEARCH_BRIEF_ANALYSIS'
++  | 'NO_ELIGIBLE_PRICE_LEVELS';
+ 
+ export type PolicyInsightClmmPolicy = {
+-  posture: string;
+-  rangeBias: string;
+-  rebalanceSensitivity: string;
+-  maxCapitalDeploymentPct: number;
++  rangeBias: PolicyInsightRangeBias;
++  rebalanceSensitivity: PolicyInsightRebalanceSensitivity;
++  maxCapitalDeploymentBps: number;
+ };
+ 
+ export type PolicyInsightLevels = {
+-  supports: number[];
+-  resistances: number[];
++  supportsUsdcPerSol: string[];
++  resistancesUsdcPerSol: string[];
++};
++
++export type PolicyInsightPositionScope = {
++  network: 'solana-mainnet';
++  walletAddress: string;
++  whirlpoolAddress: string;
++  positionId: string;
++} | null;
++
++export type PolicyInsightBundleRef = {
++  bundleHash: string;
++  publisher: string;
++  sourceId: string;
++  runId: string;
++};
++
++export type PolicyInsightSourceRef = {
++  referenceId: string;
++  sourceType: 'api' | 'database' | 'chain' | 'document' | 'internal_bundle';
++  locator: string;
++  observedAt: string;
++};
++
++export type PolicyInsightEvidence = {
++  selectionStatus: PolicyInsightSelectionStatus;
++  selectionPolicyVersion: string;
++  selectedBundleRefs: PolicyInsightBundleRef[];
++  selectedSourceRefs: PolicyInsightSourceRef[];
++};
++
++export type PolicyInsightWarning = {
++  code: PolicyInsightWarningCode;
++  message: string;
+ };
+ 
+ export type PolicyInsightFreshness = {
+-  capturedAtUnixMs: number;
+-  stale: boolean;
++  status: PolicyInsightFreshnessStatus;
++  evaluatedAt: string;
++  ageSeconds: number;
+ };
+ 
+ export type PolicyInsightBlock = {
+-  schemaVersion: '1.0';
++  schemaVersion: 'policy-insight.v1';
++  insightId: string;
++  rulesetVersion: string;
+   pair: 'SOL/USDC';
++  position: PolicyInsightPositionScope;
++  generatedAt: string;
+   asOf: string;
+-  source: 'openclaw';
+-  runId: string;
+-  status: PolicyInsightStatus;
+-  marketRegime: string;
+-  fundamentalRegime: string;
++  expiresAt: string;
++  marketRegime: PolicyInsightMarketRegime;
++  fundamentalRegime: PolicyInsightFundamentalRegime;
++  posture: PolicyInsightPosture;
+   recommendedAction: PolicyInsightRecommendedAction;
+-  confidence: PolicyInsightConfidence;
+   riskLevel: PolicyInsightRiskLevel;
+-  dataQuality: PolicyInsightDataQuality;
+   clmmPolicy: PolicyInsightClmmPolicy;
+   levels: PolicyInsightLevels;
+-  reasoning: string[];
+-  sourceRefs: string[];
+-  expiresAt: string;
+-  payloadHash: string;
+-  receivedAtIso: string;
++  evidence: PolicyInsightEvidence;
++  confidenceBps: number;
++  dataQuality: PolicyInsightDataQuality;
++  reasonCodes: PolicyInsightReasonCode[];
++  reasoning: string;
++  warnings: PolicyInsightWarning[];
+   freshness: PolicyInsightFreshness;
+ };
++
++export type PolicyInsightsUnavailableReason =
++  | 'not-found'
++  | 'store-unavailable'
++  | 'config-error'
++  | 'upstream-error';
+\ No newline at end of file
+diff --git a/packages/application/src/index.ts b/packages/application/src/index.ts
+index 8935f03..f777036 100644
+--- a/packages/application/src/index.ts
++++ b/packages/application/src/index.ts
+@@ -3,6 +3,7 @@ export * from './ports/index.js';
+ export * from './ports/BreachEpisodeRepository.js';
+ export * from './dto/index.js';
+ export * from './dto/validation.js';
++export { parsePolicyInsightBlock } from './dto/policyInsightValidator.js';
+ export * from './use-cases/triggers/ScanPositionsForBreaches.js';
+ export * from './use-cases/triggers/QualifyActionableTrigger.js';
+ export * from './use-cases/previews/CreateExecutionPreview.js';
+diff --git a/packages/application/src/public/index.ts b/packages/application/src/public/index.ts
+index d8e1cfd..886c9e1 100644
+--- a/packages/application/src/public/index.ts
++++ b/packages/application/src/public/index.ts
+@@ -31,11 +31,23 @@ export type {
+   PolicyInsightLevels,
+   PolicyInsightFreshness,
+   PolicyInsightRecommendedAction,
+-  PolicyInsightConfidence,
+   PolicyInsightRiskLevel,
+   PolicyInsightDataQuality,
+-  PolicyInsightStatus,
+   PolicyInsightsUnavailableReason,
++  PolicyInsightMarketRegime,
++  PolicyInsightFundamentalRegime,
++  PolicyInsightPosture,
++  PolicyInsightRangeBias,
++  PolicyInsightRebalanceSensitivity,
++  PolicyInsightFreshnessStatus,
++  PolicyInsightSelectionStatus,
++  PolicyInsightWarningCode,
++  PolicyInsightReasonCode,
++  PolicyInsightPositionScope,
++  PolicyInsightBundleRef,
++  PolicyInsightSourceRef,
++  PolicyInsightEvidence,
++  PolicyInsightWarning,
+   PositionValueMetricDto,
+   UnclaimedFeesMetricDto,
+   PoolTvlMetricDto,
+@@ -44,6 +56,8 @@ export type {
+   PositionListFinancialMetricsDto,
+ } from '../dto/index.js';
+ 
++export { parsePolicyInsightBlock } from '../dto/policyInsightValidator.js';
++
+ // Port types needed by UI (capability + permission state)
+ export type { PlatformCapabilityState } from '../ports/index.js';
+ 
+diff --git a/packages/application/src/public/policyInsights.exports.test.ts b/packages/application/src/public/policyInsights.exports.test.ts
+index 13a8fc4..31187b2 100644
+--- a/packages/application/src/public/policyInsights.exports.test.ts
++++ b/packages/application/src/public/policyInsights.exports.test.ts
+@@ -1,48 +1,53 @@
+ import { describe, expect, it } from 'vitest';
+-import type {
+-  PolicyInsightBlock,
+-  PolicyInsightClmmPolicy,
+-  PolicyInsightLevels,
+-  PolicyInsightFreshness,
+-  PolicyInsightRecommendedAction,
+-  PolicyInsightConfidence,
+-  PolicyInsightRiskLevel,
+-  PolicyInsightDataQuality,
+-  PolicyInsightStatus,
+-} from './index.js';
++import type { PolicyInsightBlock } from './index.js';
++import canonicalCurrentPairFixture from '../../../../schemas/regime-engine/policy-insight.v1/fixtures/valid/current-pair.json';
+ 
+ describe('@clmm/application/public exports for policy insights', () => {
+   it('exposes PolicyInsightBlock and nested DTOs as types', () => {
+     const sample: PolicyInsightBlock = {
+-      schemaVersion: '1.0',
++      schemaVersion: 'policy-insight.v1',
++      insightId: 'a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1a1',
++      rulesetVersion: 'sol-usdc-policy.v1.2026-07',
+       pair: 'SOL/USDC',
+-      asOf: '2026-05-07T00:00:00Z',
+-      source: 'openclaw',
+-      runId: 'run-1',
+-      status: 'FRESH' satisfies PolicyInsightStatus,
++      position: null,
++      generatedAt: '2026-07-19T12:00:00.000Z',
++      asOf: '2026-07-19T11:59:00.000Z',
++      expiresAt: '2026-07-19T13:00:00.000Z',
+       marketRegime: 'UP',
+-      fundamentalRegime: 'NEUTRAL',
+-      recommendedAction: 'hold' satisfies PolicyInsightRecommendedAction,
+-      confidence: 'medium' satisfies PolicyInsightConfidence,
+-      riskLevel: 'normal' satisfies PolicyInsightRiskLevel,
+-      dataQuality: 'complete' satisfies PolicyInsightDataQuality,
++      fundamentalRegime: 'BULLISH',
++      posture: 'AGGRESSIVE',
++      recommendedAction: 'HOLD',
++      riskLevel: 'NORMAL',
+       clmmPolicy: {
+-        posture: 'wide',
+-        rangeBias: 'symmetric',
+-        rebalanceSensitivity: 'low',
+-        maxCapitalDeploymentPct: 0.5,
+-      } satisfies PolicyInsightClmmPolicy,
+-      levels: { supports: [], resistances: [] } satisfies PolicyInsightLevels,
+-      reasoning: [],
+-      sourceRefs: [],
+-      expiresAt: '2026-05-07T01:00:00Z',
+-      payloadHash: 'abc',
+-      receivedAtIso: '2026-05-07T00:00:01Z',
++        rangeBias: 'MEDIUM',
++        rebalanceSensitivity: 'NORMAL',
++        maxCapitalDeploymentBps: 7500,
++      },
++      levels: {
++        supportsUsdcPerSol: [],
++        resistancesUsdcPerSol: [],
++      },
++      evidence: {
++        selectionStatus: 'FULL',
++        selectionPolicyVersion: 'selector.v1.2026-07',
++        selectedBundleRefs: [],
++        selectedSourceRefs: [],
++      },
++      confidenceBps: 7500,
++      dataQuality: 'COMPLETE',
++      reasonCodes: ['MARKET_REGIME_UP', 'ADVISORY_ONLY'],
++      reasoning: 'Market regime is UP with bullish fundamental signals. No position-specific triggers present.',
++      warnings: [],
+       freshness: {
+-        capturedAtUnixMs: 1_700_000_000_000,
+-        stale: false,
+-      } satisfies PolicyInsightFreshness,
+-    };
+-    expect(sample.recommendedAction).toBe('hold');
++        status: 'FRESH',
++        evaluatedAt: '2026-07-19T12:00:00.000Z',
++        ageSeconds: 60,
++      },
++    } satisfies PolicyInsightBlock;
++    expect(sample.recommendedAction).toBe('HOLD');
+   });
+-});
++
++  it('canonical fixture passes validation', () => {
++    expect(canonicalCurrentPairFixture.schemaVersion).toBe('policy-insight.v1');
++  });
++});
+\ No newline at end of file
+diff --git a/packages/ui/src/components/PolicyInsightsSection.test.tsx b/packages/ui/src/components/PolicyInsightsSection.test.tsx
+index 9efdd39..8dffd8b 100644
+--- a/packages/ui/src/components/PolicyInsightsSection.test.tsx
++++ b/packages/ui/src/components/PolicyInsightsSection.test.tsx
+@@ -3,40 +3,55 @@ import { afterEach, describe, expect, it } from 'vitest';
+ import { cleanup, render, screen } from '@testing-library/react';
+ import type { PolicyInsightBlock } from '@clmm/application/public';
+ import { PolicyInsightsSection } from './PolicyInsightsSection.js';
++import canonicalCurrentPair from '../../../../schemas/regime-engine/policy-insight.v1/fixtures/valid/current-pair.json';
++import canonicalCurrentPosition from '../../../../schemas/regime-engine/policy-insight.v1/fixtures/valid/current-position.json';
+ 
+ afterEach(() => {
+   cleanup();
+ });
+ 
+-const NOW = Date.parse('2026-05-07T12:30:00Z');
++const NOW = Date.parse('2026-07-19T12:30:00Z');
+ 
+ function fixture(overrides: Partial<PolicyInsightBlock> = {}): PolicyInsightBlock {
+   return {
+-    schemaVersion: '1.0',
++    schemaVersion: 'policy-insight.v1',
++    insightId: 'a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1a1',
++    rulesetVersion: 'sol-usdc-policy.v1.2026-07',
+     pair: 'SOL/USDC',
+-    asOf: '2026-05-07T12:00:00Z',
+-    source: 'openclaw',
+-    runId: 'run-1',
+-    status: 'FRESH',
++    position: null,
++    generatedAt: '2026-07-19T12:00:00.000Z',
++    asOf: '2026-07-19T11:59:00.000Z',
++    expiresAt: '2026-07-19T13:00:00.000Z',
+     marketRegime: 'UP',
+-    fundamentalRegime: 'CONSTRUCTIVE',
+-    recommendedAction: 'hold',
+-    confidence: 'medium',
+-    riskLevel: 'normal',
+-    dataQuality: 'complete',
++    fundamentalRegime: 'BULLISH',
++    posture: 'AGGRESSIVE',
++    recommendedAction: 'HOLD',
++    riskLevel: 'NORMAL',
+     clmmPolicy: {
+-      posture: 'wide',
+-      rangeBias: 'symmetric',
+-      rebalanceSensitivity: 'low',
+-      maxCapitalDeploymentPct: 0.5,
++      rangeBias: 'MEDIUM',
++      rebalanceSensitivity: 'NORMAL',
++      maxCapitalDeploymentBps: 7500,
++    },
++    levels: {
++      supportsUsdcPerSol: [],
++      resistancesUsdcPerSol: [],
++    },
++    evidence: {
++      selectionStatus: 'FULL',
++      selectionPolicyVersion: 'selector.v1.2026-07',
++      selectedBundleRefs: [],
++      selectedSourceRefs: [],
++    },
++    confidenceBps: 7500,
++    dataQuality: 'COMPLETE',
++    reasonCodes: ['MARKET_REGIME_UP', 'ADVISORY_ONLY'],
++    reasoning: 'Market regime is UP with bullish fundamental signals. No position-specific triggers present.',
++    warnings: [],
++    freshness: {
++      status: 'FRESH',
++      evaluatedAt: '2026-07-19T12:00:00.000Z',
++      ageSeconds: 60,
+     },
+-    levels: { supports: [], resistances: [] },
+-    reasoning: ['Trend constructive', 'Vol muted', 'Funding neutral'],
+-    sourceRefs: ['msg-1'],
+-    expiresAt: '2026-05-07T13:00:00Z',
+-    payloadHash: 'h',
+-    receivedAtIso: '2026-05-07T12:00:01Z',
+-    freshness: { capturedAtUnixMs: Date.parse('2026-05-07T12:00:00Z'), stale: false },
+     ...overrides,
+   };
+ }
+@@ -70,22 +85,20 @@ describe('PolicyInsightsSection', () => {
+     expect(screen.getByText('PolicyInsights')).toBeTruthy();
+     expect(screen.getByText('Advisory CLMM policy signal. Nothing has been applied.')).toBeTruthy();
+     expect(screen.getByText('Hold')).toBeTruthy();
+-    expect(screen.getByText('Posture: wide')).toBeTruthy();
+-    expect(screen.getByText('Range bias: symmetric')).toBeTruthy();
+-    expect(screen.getByText('Rebalance sensitivity: low')).toBeTruthy();
+-    expect(screen.getByText('Max capital: 50%')).toBeTruthy();
++    expect(screen.getByText('Posture: AGGRESSIVE')).toBeTruthy();
++    expect(screen.getByText('Range bias: MEDIUM')).toBeTruthy();
++    expect(screen.getByText('Rebalance sensitivity: NORMAL')).toBeTruthy();
++    expect(screen.getByText('75%')).toBeTruthy();
+     expect(screen.getByText('Normal risk')).toBeTruthy();
+-    expect(screen.getByText('Medium confidence')).toBeTruthy();
++    expect(screen.getByText('75% confidence')).toBeTruthy();
+     expect(screen.getByText('Complete data')).toBeTruthy();
+-    expect(screen.getByText('Trend constructive')).toBeTruthy();
+-    expect(screen.getByText('Vol muted')).toBeTruthy();
+-    expect(screen.getByText('Funding neutral')).toBeTruthy();
++    expect(screen.getByText('Market regime is UP with bullish fundamental signals. No position-specific triggers present.')).toBeTruthy();
+   });
+ 
+-  it('renders a stale warning line when status is STALE', () => {
++  it('renders a stale warning line when freshness.status is STALE', () => {
+     render(
+       <PolicyInsightsSection
+-        policyInsight={fixture({ status: 'STALE' })}
++        policyInsight={fixture({ freshness: { status: 'STALE', evaluatedAt: '2026-07-19T12:00:00.000Z', ageSeconds: 3600 } })}
+         isLoading={false}
+         isError={false}
+         isEnabled
+@@ -99,7 +112,7 @@ describe('PolicyInsightsSection', () => {
+   it('uses danger styling for critical risk', () => {
+     render(
+       <PolicyInsightsSection
+-        policyInsight={fixture({ riskLevel: 'critical' })}
++        policyInsight={fixture({ riskLevel: 'CRITICAL' })}
+         isLoading={false}
+         isError={false}
+         isEnabled
+@@ -111,10 +124,24 @@ describe('PolicyInsightsSection', () => {
+     expect(screen.getByText('Critical risk')).toBeTruthy();
+   });
+ 
+-  it('uses warning styling for pause_rebalances', () => {
++  it('uses warning styling for STAND_DOWN', () => {
++    render(
++      <PolicyInsightsSection
++        policyInsight={fixture({ recommendedAction: 'STAND_DOWN' })}
++        isLoading={false}
++        isError={false}
++        isEnabled
++        unavailableReason={null}
++        now={NOW}
++      />,
++    );
++    expect(screen.getByText('Stand down')).toBeTruthy();
++  });
++
++  it('renders the canonical pair fixture correctly', () => {
+     render(
+       <PolicyInsightsSection
+-        policyInsight={fixture({ recommendedAction: 'pause_rebalances' })}
++        policyInsight={canonicalCurrentPair as PolicyInsightBlock}
+         isLoading={false}
+         isError={false}
+         isEnabled
+@@ -122,7 +149,23 @@ describe('PolicyInsightsSection', () => {
+         now={NOW}
+       />,
+     );
+-    expect(screen.getByText('Pause rebalances')).toBeTruthy();
++    expect(screen.getByText('Hold')).toBeTruthy();
++    expect(screen.getByText('Normal risk')).toBeTruthy();
++  });
++
++  it('renders the canonical position fixture correctly', () => {
++    render(
++      <PolicyInsightsSection
++        policyInsight={canonicalCurrentPosition as PolicyInsightBlock}
++        isLoading={false}
++        isError={false}
++        isEnabled
++        unavailableReason={null}
++        now={NOW}
++      />,
++    );
++    expect(screen.getByText('Exit to SOL')).toBeTruthy();
++    expect(screen.getByText('Elevated risk')).toBeTruthy();
+   });
+ 
+   it('renders unavailable copy for not-found', () => {
+@@ -236,4 +279,4 @@ describe('PolicyInsightsSection', () => {
+     );
+     expect(screen.getByTestId('policy-insights-skeleton')).toBeTruthy();
+   });
+-});
++});
+\ No newline at end of file
+diff --git a/packages/ui/src/components/PolicyInsightsSection.tsx b/packages/ui/src/components/PolicyInsightsSection.tsx
+index c86f04b..edd2f0e 100644
+--- a/packages/ui/src/components/PolicyInsightsSection.tsx
++++ b/packages/ui/src/components/PolicyInsightsSection.tsx
+@@ -184,14 +184,13 @@ export function PolicyInsightsSection({
+       >
+         {vm.dataQualityLabel}
+       </Text>
+-      {vm.reasoning.map((reason, idx) => (
++      {vm.reasoning ? (
+         <Text
+-          key={`policy-insight-reason-${idx}`}
+           style={{ color: colors.textSecondary, fontSize: typography.fontSize.sm, marginTop: 4 }}
+         >
+-          {reason}
++          {vm.reasoning}
+         </Text>
+-      ))}
++      ) : null}
+       {isError ? (
+         <Text
+           testID="policy-insights-degraded"
+diff --git a/packages/ui/src/view-models/PolicyInsightsViewModel.test.ts b/packages/ui/src/view-models/PolicyInsightsViewModel.test.ts
+index d5aba3c..19493cc 100644
+--- a/packages/ui/src/view-models/PolicyInsightsViewModel.test.ts
++++ b/packages/ui/src/view-models/PolicyInsightsViewModel.test.ts
+@@ -1,98 +1,113 @@
+ import { describe, expect, it } from 'vitest';
+ import type { PolicyInsightBlock } from '@clmm/application/public';
+ import { buildPolicyInsightsViewModel } from './PolicyInsightsViewModel.js';
++import canonicalCurrentPair from '../../../../schemas/regime-engine/policy-insight.v1/fixtures/valid/current-pair.json';
++import canonicalCurrentPosition from '../../../../schemas/regime-engine/policy-insight.v1/fixtures/valid/current-position.json';
+ 
+-const NOW = Date.parse('2026-05-07T12:30:00Z');
++const NOW = Date.parse('2026-07-19T12:30:00Z');
+ 
+ function fixture(overrides: Partial<PolicyInsightBlock> = {}): PolicyInsightBlock {
+   return {
+-    schemaVersion: '1.0',
++    schemaVersion: 'policy-insight.v1',
++    insightId: 'a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1a1',
++    rulesetVersion: 'sol-usdc-policy.v1.2026-07',
+     pair: 'SOL/USDC',
+-    asOf: '2026-05-07T12:00:00Z',
+-    source: 'openclaw',
+-    runId: 'run-1',
+-    status: 'FRESH',
++    position: null,
++    generatedAt: '2026-07-19T12:00:00.000Z',
++    asOf: '2026-07-19T11:59:00.000Z',
++    expiresAt: '2026-07-19T13:00:00.000Z',
+     marketRegime: 'UP',
+-    fundamentalRegime: 'CONSTRUCTIVE',
+-    recommendedAction: 'hold',
+-    confidence: 'medium',
+-    riskLevel: 'normal',
+-    dataQuality: 'complete',
++    fundamentalRegime: 'BULLISH',
++    posture: 'AGGRESSIVE',
++    recommendedAction: 'HOLD',
++    riskLevel: 'NORMAL',
+     clmmPolicy: {
+-      posture: 'wide',
+-      rangeBias: 'symmetric',
+-      rebalanceSensitivity: 'low',
+-      maxCapitalDeploymentPct: 0.5,
++      rangeBias: 'MEDIUM',
++      rebalanceSensitivity: 'NORMAL',
++      maxCapitalDeploymentBps: 7500,
++    },
++    levels: {
++      supportsUsdcPerSol: [],
++      resistancesUsdcPerSol: [],
++    },
++    evidence: {
++      selectionStatus: 'FULL',
++      selectionPolicyVersion: 'selector.v1.2026-07',
++      selectedBundleRefs: [],
++      selectedSourceRefs: [],
++    },
++    confidenceBps: 7500,
++    dataQuality: 'COMPLETE',
++    reasonCodes: ['MARKET_REGIME_UP', 'ADVISORY_ONLY'],
++    reasoning: 'Market regime is UP with bullish fundamental signals. No position-specific triggers present.',
++    warnings: [],
++    freshness: {
++      status: 'FRESH',
++      evaluatedAt: '2026-07-19T12:00:00.000Z',
++      ageSeconds: 60,
+     },
+-    levels: { supports: [], resistances: [] },
+-    reasoning: ['Trend constructive', 'Vol muted', 'Funding neutral'],
+-    sourceRefs: ['msg-1'],
+-    expiresAt: '2026-05-07T13:00:00Z',
+-    payloadHash: 'h',
+-    receivedAtIso: '2026-05-07T12:00:01Z',
+-    freshness: { capturedAtUnixMs: Date.parse('2026-05-07T12:00:00Z'), stale: false },
+     ...overrides,
+   };
+ }
+ 
+ describe('buildPolicyInsightsViewModel', () => {
+-  it('returns a neutral severity for hold + normal risk', () => {
++  it('returns a neutral severity for HOLD + NORMAL risk', () => {
+     const vm = buildPolicyInsightsViewModel(fixture(), NOW);
+     expect(vm.severity).toBe('neutral');
+   });
+ 
+-  it('returns danger for critical risk regardless of action', () => {
++  it('returns danger for CRITICAL risk regardless of action', () => {
++    const vm = buildPolicyInsightsViewModel(
++      fixture({ riskLevel: 'CRITICAL', recommendedAction: 'HOLD' }),
++      NOW,
++    );
++    expect(vm.severity).toBe('danger');
++  });
++
++  it('returns danger for EXIT_TO_USDC action regardless of risk', () => {
+     const vm = buildPolicyInsightsViewModel(
+-      fixture({ riskLevel: 'critical', recommendedAction: 'hold' }),
++      fixture({ recommendedAction: 'EXIT_TO_USDC', riskLevel: 'NORMAL' }),
+       NOW,
+     );
+     expect(vm.severity).toBe('danger');
+   });
+ 
+-  it('returns danger for exit_range action regardless of risk', () => {
++  it('returns danger for EXIT_TO_SOL action regardless of risk', () => {
+     const vm = buildPolicyInsightsViewModel(
+-      fixture({ recommendedAction: 'exit_range', riskLevel: 'normal' }),
++      fixture({ recommendedAction: 'EXIT_TO_SOL', riskLevel: 'NORMAL' }),
+       NOW,
+     );
+     expect(vm.severity).toBe('danger');
+   });
+ 
+-  it('returns warning for elevated risk', () => {
+-    const vm = buildPolicyInsightsViewModel(fixture({ riskLevel: 'elevated' }), NOW);
++  it('returns warning for ELEVATED risk', () => {
++    const vm = buildPolicyInsightsViewModel(fixture({ riskLevel: 'ELEVATED' }), NOW);
+     expect(vm.severity).toBe('warning');
+   });
+ 
+-  it('returns warning for pause_rebalances action', () => {
++  it('returns warning for STAND_DOWN action', () => {
+     const vm = buildPolicyInsightsViewModel(
+-      fixture({ recommendedAction: 'pause_rebalances' }),
++      fixture({ recommendedAction: 'STAND_DOWN' }),
+       NOW,
+     );
+     expect(vm.severity).toBe('warning');
+   });
+ 
+-  it('marks isStale when status is STALE', () => {
+-    const vm = buildPolicyInsightsViewModel(fixture({ status: 'STALE' }), NOW);
+-    expect(vm.isStale).toBe(true);
+-  });
+-
+-  it('marks isStale when freshness.stale is true', () => {
++  it('marks isStale when freshness.status is STALE', () => {
+     const vm = buildPolicyInsightsViewModel(
+-      fixture({
+-        freshness: { capturedAtUnixMs: NOW, stale: true },
+-      }),
++      fixture({ freshness: { status: 'STALE', evaluatedAt: '2026-07-19T12:00:00.000Z', ageSeconds: 3600 } }),
+       NOW,
+     );
+     expect(vm.isStale).toBe(true);
+   });
+ 
+-  it('formats max capital deployment as a percent', () => {
++  it('formats max capital deployment from bps as a percent', () => {
+     const vm = buildPolicyInsightsViewModel(
+       fixture({
+         clmmPolicy: {
+-          posture: 'wide',
+-          rangeBias: 'symmetric',
+-          rebalanceSensitivity: 'low',
+-          maxCapitalDeploymentPct: 0.375,
++          rangeBias: 'TIGHT',
++          rebalanceSensitivity: 'HIGH',
++          maxCapitalDeploymentBps: 3750,
+         },
+       }),
+       NOW,
+@@ -100,18 +115,26 @@ describe('buildPolicyInsightsViewModel', () => {
+     expect(vm.maxDeploymentLabel).toBe('38%');
+   });
+ 
+-  it('keeps the first 3 non-empty reasoning strings in upstream order', () => {
++  it('derives freshness label from ageSeconds', () => {
+     const vm = buildPolicyInsightsViewModel(
+       fixture({
+-        reasoning: ['', 'one', '   ', 'two', 'three', 'four'],
++        freshness: { status: 'FRESH', evaluatedAt: '2026-07-19T12:00:00.000Z', ageSeconds: 60 },
+       }),
+       NOW,
+     );
+-    expect(vm.reasoning).toEqual(['one', 'two', 'three']);
++    expect(vm.freshnessLabel).toBe('1m ago');
+   });
+ 
+-  it('does not surface sourceRefs in the view model fields used for rendering', () => {
+-    const vm = buildPolicyInsightsViewModel(fixture({ sourceRefs: ['msg-1', 'msg-2'] }), NOW);
+-    expect((vm as unknown as Record<string, unknown>)['sourceRefs']).toBeUndefined();
++  it('renders the canonical pair fixture correctly', () => {
++    const vm = buildPolicyInsightsViewModel(canonicalCurrentPair as PolicyInsightBlock, NOW);
++    expect(vm.actionLabel).toBe('Hold');
++    expect(vm.severity).toBe('neutral');
++    expect(vm.freshnessLabel).toBe('1m ago');
++  });
++
++  it('renders the canonical position fixture correctly', () => {
++    const vm = buildPolicyInsightsViewModel(canonicalCurrentPosition as PolicyInsightBlock, NOW);
++    expect(vm.actionLabel).toBe('Exit to SOL');
++    expect(vm.severity).toBe('danger');
+   });
+-});
++});
+\ No newline at end of file
+diff --git a/packages/ui/src/view-models/PolicyInsightsViewModel.ts b/packages/ui/src/view-models/PolicyInsightsViewModel.ts
+index b4a2159..ba0eca5 100644
+--- a/packages/ui/src/view-models/PolicyInsightsViewModel.ts
++++ b/packages/ui/src/view-models/PolicyInsightsViewModel.ts
+@@ -1,4 +1,9 @@
+-import type { PolicyInsightBlock } from '@clmm/application/public';
++import type {
++  PolicyInsightBlock,
++  PolicyInsightRecommendedAction,
++  PolicyInsightRiskLevel,
++  PolicyInsightDataQuality,
++} from '@clmm/application/public';
+ 
+ export type PolicyInsightsSeverity = 'danger' | 'warning' | 'neutral';
+ 
+@@ -14,47 +19,40 @@ export type PolicyInsightsViewModel = {
+   dataQualityLabel: string;
+   freshnessLabel: string;
+   isStale: boolean;
+-  reasoning: string[];
++  reasoning: string;
+   subtitle: string;
+ };
+ 
+-const ACTION_LABELS: Record<PolicyInsightBlock['recommendedAction'], string> = {
+-  hold: 'Hold',
+-  watch: 'Watch',
+-  tighten_range: 'Tighten range',
+-  widen_range: 'Widen range',
+-  exit_range: 'Exit range',
+-  pause_rebalances: 'Pause rebalances',
++const ACTION_LABELS: Record<PolicyInsightRecommendedAction, string> = {
++  HOLD: 'Hold',
++  MONITOR_LOWER_BOUND: 'Monitor lower bound',
++  MONITOR_UPPER_BOUND: 'Monitor upper bound',
++  EXIT_TO_USDC: 'Exit to USDC',
++  EXIT_TO_SOL: 'Exit to SOL',
++  STAND_DOWN: 'Stand down',
+ };
+ 
+-const RISK_LABELS: Record<PolicyInsightBlock['riskLevel'], string> = {
+-  normal: 'Normal risk',
+-  elevated: 'Elevated risk',
+-  critical: 'Critical risk',
++const RISK_LABELS: Record<PolicyInsightRiskLevel, string> = {
++  NORMAL: 'Normal risk',
++  ELEVATED: 'Elevated risk',
++  CRITICAL: 'Critical risk',
+ };
+ 
+-const CONFIDENCE_LABELS: Record<PolicyInsightBlock['confidence'], string> = {
+-  low: 'Low confidence',
+-  medium: 'Medium confidence',
+-  high: 'High confidence',
++const DATA_QUALITY_LABELS: Record<PolicyInsightDataQuality, string> = {
++  COMPLETE: 'Complete data',
++  PARTIAL: 'Partial data',
++  STALE: 'Stale data',
+ };
+ 
+-const DATA_QUALITY_LABELS: Record<PolicyInsightBlock['dataQuality'], string> = {
+-  complete: 'Complete data',
+-  partial: 'Partial data',
+-  stale: 'Stale data',
+-};
+-
+-const MS_PER_MINUTE = 60_000;
+-const MS_PER_HOUR = 3_600_000;
+-
+-function formatPercent(fraction: number): string {
+-  const clamped = Math.max(0, Math.min(1, fraction));
+-  return `${Math.round(clamped * 100)}%`;
++function formatPercentFromBps(bps: number): string {
++  const fraction = Math.max(0, Math.min(10000, bps)) / 10000;
++  return `${Math.round(fraction * 100)}%`;
+ }
+ 
+-function formatFreshness(capturedAtUnixMs: number, now: number): string {
+-  const ageMs = Math.max(0, now - capturedAtUnixMs);
++function formatFreshness(ageSeconds: number): string {
++  const MS_PER_MINUTE = 60_000;
++  const MS_PER_HOUR = 3_600_000;
++  const ageMs = ageSeconds * 1000;
+   if (ageMs < MS_PER_HOUR) {
+     const minutes = Math.max(1, Math.round(ageMs / MS_PER_MINUTE));
+     return `${minutes}m ago`;
+@@ -64,43 +62,32 @@ function formatFreshness(capturedAtUnixMs: number, now: number): string {
+ }
+ 
+ function deriveSeverity(block: PolicyInsightBlock): PolicyInsightsSeverity {
+-  if (block.riskLevel === 'critical' || block.recommendedAction === 'exit_range') {
++  if (block.riskLevel === 'CRITICAL' || block.recommendedAction === 'EXIT_TO_USDC' || block.recommendedAction === 'EXIT_TO_SOL') {
+     return 'danger';
+   }
+-  if (block.riskLevel === 'elevated' || block.recommendedAction === 'pause_rebalances') {
++  if (block.riskLevel === 'ELEVATED' || block.recommendedAction === 'STAND_DOWN') {
+     return 'warning';
+   }
+   return 'neutral';
+ }
+ 
+-function firstNonEmpty(values: string[], limit: number): string[] {
+-  const out: string[] = [];
+-  for (const v of values) {
+-    if (typeof v === 'string' && v.trim().length > 0) {
+-      out.push(v);
+-      if (out.length === limit) break;
+-    }
+-  }
+-  return out;
+-}
+-
+ export function buildPolicyInsightsViewModel(
+   block: PolicyInsightBlock,
+-  now: number,
++  _now: number,
+ ): PolicyInsightsViewModel {
+   return {
+     actionLabel: ACTION_LABELS[block.recommendedAction],
+     severity: deriveSeverity(block),
+-    postureLabel: `Posture: ${block.clmmPolicy.posture}`,
++    postureLabel: `Posture: ${block.posture}`,
+     rangeBiasLabel: `Range bias: ${block.clmmPolicy.rangeBias}`,
+     rebalanceSensitivityLabel: `Rebalance sensitivity: ${block.clmmPolicy.rebalanceSensitivity}`,
+-    maxDeploymentLabel: formatPercent(block.clmmPolicy.maxCapitalDeploymentPct),
++    maxDeploymentLabel: formatPercentFromBps(block.clmmPolicy.maxCapitalDeploymentBps),
+     riskLabel: RISK_LABELS[block.riskLevel],
+-    confidenceLabel: CONFIDENCE_LABELS[block.confidence],
++    confidenceLabel: `${block.confidenceBps / 100}% confidence`,
+     dataQualityLabel: DATA_QUALITY_LABELS[block.dataQuality],
+-    freshnessLabel: formatFreshness(block.freshness.capturedAtUnixMs, now),
+-    isStale: block.status === 'STALE' || block.freshness.stale === true,
+-    reasoning: firstNonEmpty(block.reasoning, 3),
++    freshnessLabel: formatFreshness(block.freshness.ageSeconds),
++    isStale: block.freshness.status === 'STALE',
++    reasoning: block.reasoning,
+     subtitle: 'Advisory CLMM policy signal. Nothing has been applied.',
+   };
+-}
++}
+\ No newline at end of file
+diff --git a/task-context-step-2.md b/task-context-step-2.md
+index 3658b81..99e9c07 100644
+--- a/task-context-step-2.md
++++ b/task-context-step-2.md
+@@ -1,7 +1,6 @@
+ # Task Context: Task 2
+ 
+-Title: Migrate every PolicyInsights boundary to the canonical DTO and parser
+-
++Title: Replace every PolicyInsight reader and consumer with the shared canonical parser
+ ## Workspace & Scope Constraints
+ 
+ ## WORKSPACE CONSTRAINTS
+@@ -17,11 +16,15 @@ Start Commit: fb1d4a761de856add80733ef0af21e8e69fdc1eb
+ 
+ ## Task Requirements
+ 
++**Goal:** Change the exported DTO and parser once, then update all adapter, BFF, app, and UI consumers in the same atomic task so the mandatory workspace typecheck never observes a port/DTO-only intermediate state.
++
+ **Files:**
+ 
+-- Modify: `packages/application/src/dto/policyInsightValidator.ts`
+ - Modify: `packages/application/src/dto/policyInsights.ts`
++- Create: `packages/application/src/dto/policyInsightValidator.ts`
++- Create: `packages/application/src/dto/policyInsightValidator.test.ts`
+ - Modify: `packages/application/src/dto/index.ts`
++- Modify: `packages/application/src/index.ts`
+ - Modify: `packages/application/src/public/index.ts`
+ - Modify: `packages/application/src/public/policyInsights.exports.test.ts`
+ - Modify: `packages/adapters/src/outbound/regime-engine/CurrentPolicyInsightsAdapter.ts`
+@@ -33,129 +36,166 @@ Start Commit: fb1d4a761de856add80733ef0af21e8e69fdc1eb
+ - Modify: `packages/ui/src/view-models/PolicyInsightsViewModel.test.ts`
+ - Modify: `packages/ui/src/components/PolicyInsightsSection.test.tsx`
+ 
+-This task deliberately combines the exported DTO change with every adapter/client/UI implementation affected by its required-member shape. Splitting by layer would leave an intermediate commit that fails the automatic workspace-wide `pnpm -r typecheck` gate. No port method changes are made.
+-
+-**Behavioral invariants (write these exact named tests first):**
+-
+-1. `parses the canonical PolicyInsight fixture as the exact public DTO` — the shared parser returns a `PolicyInsightBlock` equal to the upstream fixture, with no renamed keys or converted units.
+-2. `maps a canonical 200 PolicyInsight response to kind block without transformation` — the outbound adapter returns `{ kind: 'block', block: canonicalFixture }`.
+-3. `maps a schema-invalid 200 PolicyInsight response to upstream-error` — malformed upstream data never reaches the controller.
+-4. `passes the canonical PolicyInsight block through the BFF envelope unchanged` — the controller result is exactly `{ policyInsight: canonicalFixture }`.
+-5. `accepts a canonical PolicyInsight block from the BFF without transformation` — the Expo client returns the canonical block byte-for-field after JSON parsing.
+-6. `throws malformed policyInsight block for a schema-invalid BFF block` — app-bound malformed data fails closed through the same shared parser.
+-7. `rejects the legacy PolicyInsight block at both network boundaries` — neither adapter nor app client retains a legacy alias, fallback, or unit conversion.
+-8. `preserves canonical status and freshness semantics in the PolicyInsights view model` — the view model's fresh/stale label and warning state derive only from the canonical status/freshness members documented by the schema.
+-
+-- [ ] **Step 1: Update tests to the canonical fixture before changing production consumers.**
+-
+-In the application export test, adapter test, controller test, and app client test, replace hand-authored success blocks with the upstream canonical fixture imported from the contract package. Add the invariant test names above. Keep the adapter's existing URL/config/404/503/network/timeout tests and the app client's envelope/network/abort tests intact; only replace block-contract assertions. In UI tests, build typed fixtures from the canonical DTO fields actually consumed by `PolicyInsightsViewModel` and `PolicyInsightsSection`; do not import Regime Engine artifacts into production UI code.
+-
+-Run the following targeted red-state tests:
++**Dependencies:** Task 1.
++
++**Exported signature changes:**
++
++- Modify `PolicyInsightBlock` and any nested exported PolicyInsight DTOs in `packages/application/src/dto/policyInsights.ts` whose members differ from the published schema. Preserve a one-to-one wire representation; do not retain legacy-only members as optional compatibility aliases.
++- Add `parsePolicyInsightBlock(value: unknown): PolicyInsightBlock | null` in `packages/application/src/dto/policyInsightValidator.ts` and export it through both `@clmm/application` and `@clmm/application/public`.
++- Keep `PolicyInsightsReadPort.fetchCurrent(): Promise<PolicyInsightsReadResult>` unchanged. All implementations and consumers are nevertheless updated in this same task because `PolicyInsightsReadResult` contains the modified `PolicyInsightBlock`.
++
++**Invariants to write as tests first:**
++
++1. `returns the canonical fixture unchanged`
++   - `parsePolicyInsightBlock(canonicalPolicyInsightFixture)` returns the same object reference and deep value.
++2. `returns null when a canonical required field is missing`
++   - Clone the fixture, delete one schema-required top-level field, and expect `null`.
++3. `returns null for a coercible but incorrectly typed canonical field`
++   - Replace a canonical numeric or boolean field with its string representation and expect `null`.
++4. `returns null for a schema-forbidden additional property`
++   - Add `legacyAlias` to a clone and expect `null`.
++5. `returns null for the legacy freshness fallback shape`
++   - Remove the canonical freshness timestamp member and supply only the legacy ISO/fallback input previously accepted by the handwritten readers; expect `null`.
++6. `returns kind:"block" with the real canonical fixture on 200`
++   - Adapter test imports the real package fixture, mocks a 200 JSON response, and expects the returned block to deeply equal the fixture with canonical freshness/status values intact.
++7. `returns kind:"upstream-error" when a 200 payload violates the canonical schema`
++   - Adapter test corrupts one required nested value and verifies the existing warning path.
++8. `passes the canonical block through the BFF envelope without modification`
++   - Controller test returns the canonical fixture from the fake port and asserts `{ policyInsight: fixture }`, including reference identity.
++9. `returns the canonical BFF policyInsight without modification`
++   - App test serves the real fixture in the BFF envelope and asserts reference/deep equality.
++10. `throws when the BFF policyInsight violates the canonical schema`
++    - App test corrupts the same representative nested field and expects the existing `malformed policyInsight block` error.
++11. `derives freshness and stale presentation only from canonical status and freshness fields`
++    - View-model tests use canonical fresh and stale fixtures and assert label/isStale output without `asOf` or ISO fallback behavior.
++12. `renders the existing PolicyInsights card from a canonical block`
++    - Component test updates its typed fixture to the canonical DTO and preserves existing labels, warning, and advisory-copy assertions.
++
++**Implementation steps:**
++
++- [ ] Update the test fixtures and add `policyInsightValidator.test.ts` first. Run the focused tests and confirm they fail because the shared parser/export and canonical DTO do not exist yet. Do not commit this red intermediate state.
++- [ ] Rewrite `policyInsights.ts` from the published schema and fixture, preserving exact property names, requiredness, enum literals, nesting, and units. Remove the current drift-guard comment that instructs maintainers to synchronize two validators; replace it with a pointer to the canonical contract package and shared parser.
++- [ ] Implement one module-level Ajv instance and precompiled validator in `policyInsightValidator.ts`. Configure `strict: true`, `coerceTypes: false`, `useDefaults: false`, and `removeAdditional: false`; return the original value when valid and `null` when invalid. Do not catch schema-compilation errors at module load, because an invalid shipped schema is a build/deploy defect rather than malformed user input.
++- [ ] Export the DTO types through `dto/index.ts`, export the parser from `src/index.ts`, and export the parser plus required types from `src/public/index.ts`. Update `policyInsights.exports.test.ts` to prove both the canonical type surface and runtime parser are available from the UI/app-safe public entry point.
++- [ ] Replace all `VALID_*` sets, record walkers, array readers, `parseFreshness`, and `parseUpstream` code in `CurrentPolicyInsightsAdapter.ts` with a call to `parsePolicyInsightBlock`. Keep URL construction, timeout behavior, status mapping, logging, and error-envelope parsing unchanged.
++- [ ] Replace the duplicated DTO-validation helpers in `apps/app/src/api/policyInsights.ts` with the public `parsePolicyInsightBlock` import. Keep BFF envelope validation, unavailable-reason validation, abort handling, and error messages unchanged.
++- [ ] Update `PolicyInsightsController.test.ts` to use the real fixture and assert transparent pass-through. Keep `PolicyInsightsController.ts` unchanged; do not map the block field-by-field.
++- [ ] Update `PolicyInsightsViewModel.ts` to use only canonical action/risk/confidence/data-quality/status/freshness members. Remove fallback conversion from `asOf` or legacy freshness fields. Preserve the view-model's ownership of labels, severity, reasoning selection, and advisory copy.
++- [ ] Update the view-model and component fixtures to satisfy the canonical DTO. Do not import the external contract package from `packages/ui`; UI remains dependent only on `@clmm/application/public`.
++- [ ] Run the focused tests, package typechecks/builds/lints, the exact changed-path boundary check, and the automatic workspace-wide `pnpm -r typecheck` gate before committing.
++
++**Acceptance criteria:**
++
++- Exactly one handwritten/runtime PolicyInsight parser remains: `parsePolicyInsightBlock` in application. Adapter and app client contain no PolicyInsight field allowlists or freshness normalization.
++- The canonical package fixture passes the parser, adapter, controller, and app-client paths without field or unit conversion.
++- Representative malformed, legacy-only, coercible, and extra-property payloads fail closed.
++- Freshness/status display behavior uses the canonical values directly.
++- Existing 404, 503, config, timeout, network, invalid-JSON, null-envelope, and unavailable-reason tests remain green.
++- `PolicyInsightsReadPort` and its adapter implementation stay type-compatible in the same commit.
++- UI and testing boundaries remain intact; no domain or execution-policy file changes.
++
++**Task-scoped validation commands:**
+ 
+ ```bash
+-pnpm --filter @clmm/application exec vitest run src/public/policyInsights.exports.test.ts src/dto/policyInsightValidator.test.ts
++pnpm --filter @clmm/application exec vitest run src/dto/policyInsightValidator.test.ts src/public/policyInsights.exports.test.ts
+ pnpm --filter @clmm/adapters exec vitest run src/outbound/regime-engine/CurrentPolicyInsightsAdapter.test.ts src/inbound/http/PolicyInsightsController.test.ts
+-pnpm --filter @clmm/app exec vitest run src/api/policyInsights.test.ts
++pnpm --filter @clmm/app exec vitest run --config vitest.config.ts src/api/policyInsights.test.ts
+ pnpm --filter @clmm/ui exec vitest run src/view-models/PolicyInsightsViewModel.test.ts src/components/PolicyInsightsSection.test.tsx
++pnpm --filter @clmm/application typecheck
++pnpm --filter @clmm/adapters typecheck
++pnpm --filter @clmm/app typecheck
++pnpm --filter @clmm/ui typecheck
++pnpm --filter @clmm/application build
++pnpm --filter @clmm/adapters build
++pnpm --filter @clmm/ui build
++pnpm --filter @clmm/app build
++pnpm --filter @clmm/application lint
++pnpm --filter @clmm/adapters lint
++pnpm --filter @clmm/app lint
++pnpm --filter @clmm/ui lint
++pnpm exec depcruise --config packages/config/boundaries/dependency-cruiser.cjs packages/application/src/dto/policyInsights.ts packages/application/src/dto/policyInsightValidator.ts packages/application/src/dto/index.ts packages/application/src/index.ts packages/application/src/public/index.ts packages/adapters/src/outbound/regime-engine/CurrentPolicyInsightsAdapter.ts apps/app/src/api/policyInsights.ts packages/ui/src/view-models/PolicyInsightsViewModel.ts
+ ```
+ 
+-Expected: the new canonical-contract cases FAIL against the assumed DTO and duplicated parsers, while unrelated outcome tests remain green.
+-
+-- [ ] **Step 2: Align the application DTO and parser with the schema.**
+-
+-Replace the member declarations in `packages/application/src/dto/policyInsights.ts` with the exact names, required/optional status, enum literals, nesting, and units defined by the installed schema. Preserve `PolicyInsightsUnavailableReason`, because it describes the clmm-v2 BFF envelope rather than the Regime Engine block. Delete the comment requiring two validators.
+-
+-Change the parser signature to:
+-
+-```ts
+-export function parsePolicyInsightBlock(value: unknown): PolicyInsightBlock | null;
+-```
+-
+-The implementation delegates to the already compiled schema validator and returns the original validated value typed as `PolicyInsightBlock`; it does not construct a replacement object. Re-export `parsePolicyInsightBlock` through `packages/application/src/dto/index.ts` and `packages/application/src/public/index.ts`. Update `policyInsights.exports.test.ts` to prove both the canonical type shape and callable parser are available through `@clmm/application/public`.
+-
+-- [ ] **Step 3: Replace adapter-side block parsing with the shared parser.**
++**Commit boundary:** Commit the DTO, parser, every implementation consumer, and all affected tests together. This is the deliberate exception to small per-layer commits because the exported DTO is embedded in the read-port result and the implementation loop runs workspace-wide typechecking after each task.
+ 
+-In `CurrentPolicyInsightsAdapter.ts`, import `parsePolicyInsightBlock` from `@clmm/application`, remove `VALID_*`, array/nested-object parsers, and freshness fallback/conversion code used only for the success block. Retain the local record check needed by `readErrorEnvelope`; that validates the adapter-specific error envelope, not the canonical PolicyInsight block. On a `200`, parse JSON once, call the shared parser once, log the existing shape-validation warning on `null`, and otherwise return `{ kind: 'block', block }`. Do not change URL, timeout, one-request behavior, or result classification.
++---
+ 
+-- [ ] **Step 4: Keep the BFF a transparent envelope mapper.**
++## Tests to add or update
+ 
+-Do not change `PolicyInsightsController.ts`. Update `PolicyInsightsController.test.ts` so its block fixture is the canonical contract object and its success assertion uses deep equality. Existing tests for `not-found`, `store-unavailable`, `config-error`, and `upstream-error` remain unchanged.
++**New tests**
+ 
+-- [ ] **Step 5: Replace app-side block parsing with the same shared parser.**
++- `packages/application/src/dto/policyInsightContract.test.ts`: published schema/fixture compatibility and validator non-mutation preflight.
++- `packages/application/src/dto/policyInsightValidator.test.ts`: canonical acceptance, missing required field, type coercion rejection, extra-property rejection, and legacy freshness rejection.
+ 
+-In `apps/app/src/api/policyInsights.ts`, import `parsePolicyInsightBlock` from `@clmm/application/public`. Remove block-specific enum sets, nested validators, array validators, and freshness conversion/fallback logic. Retain `isRecord` for the BFF response envelope, `VALID_REASONS`/`isUnavailableReason` for clmm-v2's envelope, and all timeout/network/abort handling. Call the shared parser only when `policyInsight` is non-null and preserve the existing controlled error text when it returns `null`.
++**Updated tests**
+ 
+-- [ ] **Step 6: Adapt presentation reads without changing the design.**
++- `packages/application/src/public/policyInsights.exports.test.ts`: canonical DTO construction and public runtime parser export.
++- `packages/adapters/src/outbound/regime-engine/CurrentPolicyInsightsAdapter.test.ts`: real canonical fixture, exact block preservation, malformed canonical payload failure, and unchanged HTTP outcome coverage.
++- `packages/adapters/src/inbound/http/PolicyInsightsController.test.ts`: real canonical fixture and reference-preserving envelope passthrough.
++- `apps/app/src/api/policyInsights.test.ts`: real canonical fixture, shared-parser rejection, and unchanged fetch/envelope/abort behavior.
++- `packages/ui/src/view-models/PolicyInsightsViewModel.test.ts`: canonical status/freshness semantics and existing presentation derivations.
++- `packages/ui/src/components/PolicyInsightsSection.test.tsx`: canonical typed fixture with existing render-state coverage.
+ 
+-Update `PolicyInsightsViewModel.ts` only where canonical member names/nesting or units require it. Preserve the existing exported view-model shape, severity precedence, advisory copy, reasoning limit, and component layout. Freshness/status presentation must read the canonical fields directly; do not recover removed fields from `asOf`, infer stale state from wall-clock time, or convert a differently named unit without documenting that mapping beside the formatter and covering it with the named semantics test. Update the view-model and component fixtures accordingly.
++The adapter, app-client, view-model, and component test files exceed ten cases in their current form, but Task 2 is not a standalone test-update task: their fixture/test edits are inseparable from the atomic exported-contract migration. Do not create separate test-only commits that leave the workspace typecheck red.
+ 
+-- [ ] **Step 7: Run file-scoped acceptance checks for every changed package.**
++## Validation commands
+ 
+-Run:
++After both implementation tasks complete, the repository's dedicated validate phase must run the full cross-package gates required for a shared contract change. This is not a standalone implementation task.
+ 
+ ```bash
+-pnpm --filter @clmm/application exec vitest run src/dto/policyInsightValidator.test.ts src/public/policyInsights.exports.test.ts
+-pnpm --filter @clmm/application typecheck
+-pnpm --filter @clmm/application lint
+-pnpm --filter @clmm/adapters exec vitest run src/outbound/regime-engine/CurrentPolicyInsightsAdapter.test.ts src/inbound/http/PolicyInsightsController.test.ts
+-pnpm --filter @clmm/adapters typecheck
+-pnpm --filter @clmm/adapters lint
+-pnpm --filter @clmm/app exec vitest run src/api/policyInsights.test.ts
+-pnpm --filter @clmm/app typecheck
+-pnpm --filter @clmm/app lint
+-pnpm --filter @clmm/ui exec vitest run src/view-models/PolicyInsightsViewModel.test.ts src/components/PolicyInsightsSection.test.tsx
+-pnpm --filter @clmm/ui typecheck
+-pnpm --filter @clmm/ui lint
++pnpm build
++pnpm typecheck
++pnpm lint
++pnpm boundaries
++pnpm test
+ ```
+ 
+-Expected: all commands PASS. The dedicated validate phase may subsequently run the repository-wide build, typecheck, lint, boundaries, and test commands; do not add a separate implementation task for that phase.
++Expected result: every command exits 0. The Expo build is specifically required to prove Metro can bundle application code that statically imports Ajv and the package schema.
+ 
+-- [ ] **Step 8: Commit the atomic cross-layer contract migration.**
++## Risk areas
+ 
+-```bash
+-git add packages/application/src/dto/policyInsightValidator.ts packages/application/src/dto/policyInsights.ts packages/application/src/dto/index.ts packages/application/src/public/index.ts packages/application/src/public/policyInsights.exports.test.ts packages/adapters/src/outbound/regime-engine/CurrentPolicyInsightsAdapter.ts packages/adapters/src/outbound/regime-engine/CurrentPolicyInsightsAdapter.test.ts packages/adapters/src/inbound/http/PolicyInsightsController.test.ts apps/app/src/api/policyInsights.ts apps/app/src/api/policyInsights.test.ts packages/ui/src/view-models/PolicyInsightsViewModel.ts packages/ui/src/view-models/PolicyInsightsViewModel.test.ts packages/ui/src/components/PolicyInsightsSection.test.tsx
+-git commit -m "fix: align PolicyInsights with canonical regime contract"
+-```
+-
+-**Tests to add or update**
++- **Upstream package readiness:** The package may be unpublished, inaccessible, missing declared exports, or blocked by Regime Engine issue 63.
++- **Schema/fixture disagreement:** A package fixture that fails its own schema makes the canonical source unusable.
++- **Ajv strict compilation:** Unknown formats, unsupported vocabularies, or non-strict schema constructs may fail at module initialization. Do not weaken strict mode silently.
++- **Unknown-property policy:** Rejection of extra properties depends on the canonical schema declaring the intended closed-object constraints. Do not add a second local schema to compensate.
++- **Expo/Metro bundling:** Ajv or the contract package may expose Node-only modules, dynamic filesystem access, CommonJS/ESM incompatibilities, or package exports that fail under the app's `unstable_enablePackageExports = false` configuration.
++- **Breaking DTO blast radius:** Tests and UI fixtures currently construct the legacy shape. All typed consumers must change in Task 2's atomic commit.
++- **Mutation or normalization:** Ajv options or local mapping could silently coerce/default/remove data, violating exact wire preservation.
++- **UI semantic drift:** Removing freshness fallbacks must not accidentally recompute upstream status or introduce a client-owned stale threshold.
++- **Bundle size/startup cost:** A module-level precompiled validator avoids recompilation per request, but Ajv still becomes part of the Expo bundle; the app build is the compatibility gate.
+ 
+-- Add schema conformance and non-mutation coverage in `packages/application/src/dto/policyInsightValidator.test.ts`.
+-- Update the public export test to compile the canonical fixture as `PolicyInsightBlock` and call `parsePolicyInsightBlock`.
+-- Update adapter success/malformed/legacy cases to use the real Regime Engine fixture; retain its 20 existing outcome tests rather than splitting them into a test-only task.
+-- Update controller success coverage to prove exact pass-through.
+-- Update app client success/malformed/legacy cases to use the canonical fixture; retain the existing 17 envelope/network/abort cases.
+-- Update the UI's existing 11-case view-model file and component tests only as part of the production contract migration, not as oversized standalone test-update tasks.
++## Stop conditions
+ 
+-**Risk areas**
++Abort implementation instead of improvising if any of the following occurs:
+ 
+-- The upstream artifact is currently absent from this worktree and the issue declares an upstream blocker. Guessing package exports or copying the old fixture would recreate the drift this issue exists to remove.
+-- Ajv/schema code can affect the Expo bundle. The implementation should import only the PolicyInsight schema export, never a package-wide schema registry. If Expo cannot bundle the selected JSON-schema export, stop and revise the artifact packaging rather than adding a second app-only validator.
+-- Ajv mutation options can hide upstream drift. Strict, non-coercing, non-defaulting validation and the input non-mutation test are mandatory.
+-- `PolicyInsightBlock` is a public exported required-member shape used by adapters, app, and UI. It must change atomically with those consumers.
+-- Freshness and status are user-visible safety signals. Any renamed field or changed unit must come from the canonical schema and be represented directly; undocumented conversion is an acceptance-criteria failure.
+-- The adapter and app test files have more than ten cases, and the UI view-model test has eleven. They are intentionally updated inside the corresponding production migration task so each commit remains green; do not create a broad test-only cleanup task.
++- Regime Engine's `contracts/policy-insight/v1/` directory cannot be fetched (network/auth failure) or is missing the schema, `schema.sha256`, or fixtures at the pinned commit.
++- The vendored schema and fixture do not validate together under strict Ajv.
++- The schema permits legacy aliases, undocumented unit conversion, or additional properties contrary to `design.md`; resolve the upstream contract rather than layering a clmm-only schema over it.
++- The schema uses formats/vocabularies Ajv cannot compile strictly and the required extension is not part of the approved design/dependency scope.
++- The package or Ajv requires Node-only runtime behavior that cannot be statically bundled by Expo/Metro without an architectural change.
++- The canonical contract removes or changes `status`/freshness semantics such that the existing UI behavior cannot be preserved without a product decision.
++- Implementing the contract would require changing `PolicyInsightsReadPort.fetchCurrent`, any adapter method signature, or another exported port beyond the block type without updating every implementation in the same task.
++- Any proposed change touches domain directional mapping, execution policy, Solana transaction logic, evidence ingestion, or Regime Engine synthesis.
++- A validation failure is unrelated to the explicitly changed files and cannot be resolved without expanding scope; report it rather than editing unrelated code.
+ 
+-**Stop conditions**
++## Definition of done
+ 
+-- Stop before Task 1 if `@opsclawd/regime-engine-contracts` is unpublished, cannot be installed at an exact version, or does not export both the canonical PolicyInsight schema and a real payload fixture.
+-- Stop if the fixture does not validate against the schema from the same package version; that is an upstream contract release defect.
+-- Stop if the canonical artifact requires application to import adapters, React, Expo, Solana SDKs, or platform code.
+-- Stop if consuming the schema in Expo requires Node-only runtime modules or cannot be bundled without introducing a second validator. Request a browser-neutral/precompiled upstream artifact instead.
+-- Stop if the canonical schema leaves status/freshness fields or units ambiguous. Do not infer them from the old DTO or `asOf`.
+-- Stop if implementing the contract would require changing `PolicyInsightsReadPort.fetchCurrent()`, result variants, routes, query behavior, UI design, or any directional-exit behavior; those are outside this issue and require a revised design.
+-- Stop if baseline failures exist in one of the targeted package commands before source changes; record them separately rather than folding unrelated fixes into this work.
+-
+-**Plan review classification**
+-
+-This plan adds no retry loop, no explicit state machine, and no irreversible external side effect. It therefore does not require the `plan-review-required` marker.
++- The canonical fixture is the positive test source at the application, adapter, controller, and app trust boundaries.
++- One shared application parser validates both adapter and app payloads.
++- DTOs match the published schema with no undocumented renames, aliases, defaults, or unit conversions.
++- Malformed and legacy-only payloads fail closed.
++- Freshness/status semantics reach the view model unchanged.
++- Every task-scoped command and the final dedicated validate phase passes.
++- The final diff contains only the files listed in this plan and no abandoned compatibility or experimental code.
+ 
+ ## Repository Targets
+ 
+ ### Expected Files
+-
+-- packages/application/src/dto/policyInsightValidator.ts
+ - packages/application/src/dto/policyInsights.ts
++- packages/application/src/dto/policyInsightValidator.ts
++- packages/application/src/dto/policyInsightValidator.test.ts
+ - packages/application/src/dto/index.ts
++- packages/application/src/index.ts
+ - packages/application/src/public/index.ts
+ - packages/application/src/public/policyInsights.exports.test.ts
+ - packages/adapters/src/outbound/regime-engine/CurrentPolicyInsightsAdapter.ts
+@@ -171,28 +211,38 @@ This plan adds no retry loop, no explicit state machine, and no irreversible ext
+ 
+ ```bash
+ pnpm --filter @clmm/application exec vitest run src/dto/policyInsightValidator.test.ts src/public/policyInsights.exports.test.ts
+-pnpm --filter @clmm/application typecheck
+-pnpm --filter @clmm/application lint
+ pnpm --filter @clmm/adapters exec vitest run src/outbound/regime-engine/CurrentPolicyInsightsAdapter.test.ts src/inbound/http/PolicyInsightsController.test.ts
++pnpm --filter @clmm/app exec vitest run --config vitest.config.ts src/api/policyInsights.test.ts
++pnpm --filter @clmm/ui exec vitest run src/view-models/PolicyInsightsViewModel.test.ts src/components/PolicyInsightsSection.test.tsx
++pnpm --filter @clmm/application typecheck
+ pnpm --filter @clmm/adapters typecheck
+-pnpm --filter @clmm/adapters lint
+-pnpm --filter @clmm/app exec vitest run src/api/policyInsights.test.ts
+ pnpm --filter @clmm/app typecheck
+-pnpm --filter @clmm/app lint
+-pnpm --filter @clmm/ui exec vitest run src/view-models/PolicyInsightsViewModel.test.ts src/components/PolicyInsightsSection.test.tsx
+ pnpm --filter @clmm/ui typecheck
++pnpm --filter @clmm/application build
++pnpm --filter @clmm/adapters build
++pnpm --filter @clmm/ui build
++pnpm --filter @clmm/app build
++pnpm --filter @clmm/application lint
++pnpm --filter @clmm/adapters lint
++pnpm --filter @clmm/app lint
+ pnpm --filter @clmm/ui lint
++pnpm exec depcruise --config packages/config/boundaries/dependency-cruiser.cjs packages/application/src/dto/policyInsights.ts packages/application/src/dto/policyInsightValidator.ts packages/application/src/dto/index.ts packages/application/src/index.ts packages/application/src/public/index.ts packages/adapters/src/outbound/regime-engine/CurrentPolicyInsightsAdapter.ts apps/app/src/api/policyInsights.ts packages/ui/src/view-models/PolicyInsightsViewModel.ts
+ ```
+ 
+ ## Behavioral Invariants
+ 
+ You MUST implement the following behavioral invariants as named tests first (TDD):
+ 
+-- **public DTO is exact canonical contract**: The shared parser returns the upstream fixture as PolicyInsightBlock without renaming keys or converting units. (Test: `parses the canonical PolicyInsight fixture as the exact public DTO`)
+-- **adapter canonical success passthrough**: A canonical HTTP 200 body becomes a block result containing the unchanged fixture. (Test: `maps a canonical 200 PolicyInsight response to kind block without transformation`)
+-- **adapter malformed success fails closed**: A schema-invalid HTTP 200 body is classified as upstream-error and never reaches the controller as a block. (Test: `maps a schema-invalid 200 PolicyInsight response to upstream-error`)
+-- **BFF canonical block passthrough**: The controller wraps the canonical block without adding, removing, renaming, or converting fields. (Test: `passes the canonical PolicyInsight block through the BFF envelope unchanged`)
+-- **app canonical success passthrough**: A valid BFF envelope yields the canonical block unchanged after JSON parsing. (Test: `accepts a canonical PolicyInsight block from the BFF without transformation`)
+-- **app malformed block fails closed**: A schema-invalid non-null BFF block produces the existing controlled malformed-block error. (Test: `throws malformed policyInsight block for a schema-invalid BFF block`)
+-- **both network boundaries reject legacy blocks**: Neither the Regime Engine adapter nor the Expo client accepts aliases, fallback timestamps, or unit conversions from the legacy shape. (Test: `rejects the legacy PolicyInsight block at both network boundaries`)
+-- **canonical freshness drives presentation**: The view model derives its fresh/stale label and warning state only from canonical status and freshness members. (Test: `preserves canonical status and freshness semantics in the PolicyInsights view model`)
++- **canonical payload identity**: A canonical PolicyInsight payload is returned unchanged, including object identity, field names, nesting, and units. (Test: `returns the canonical fixture unchanged`)
++- **required fields fail closed**: Deleting any representative schema-required field causes parsing to return null. (Test: `returns null when a canonical required field is missing`)
++- **type coercion is forbidden**: A value with a coercible but incorrect scalar type is rejected rather than converted. (Test: `returns null for a coercible but incorrectly typed canonical field`)
++- **additional properties fail closed**: A schema-forbidden extra property is rejected and is never stripped from the input. (Test: `returns null for a schema-forbidden additional property`)
++- **legacy freshness is rejected**: A payload that supplies only the former ISO or asOf freshness fallback shape is rejected instead of normalized. (Test: `returns null for the legacy freshness fallback shape`)
++- **adapter accepts canonical 200**: A 200 response containing the real canonical fixture maps to a block result with freshness and status intact. (Test: `returns kind:"block" with the real canonical fixture on 200`)
++- **adapter rejects malformed 200**: A 200 response that violates the canonical schema maps to upstream-error and follows the existing warning path. (Test: `returns kind:"upstream-error" when a 200 payload violates the canonical schema`)
++- **controller is transparent**: The BFF controller wraps the canonical block without cloning, remapping, or dropping fields. (Test: `passes the canonical block through the BFF envelope without modification`)
++- **app accepts canonical envelope**: The Expo client returns a canonical non-null BFF block unchanged through the shared parser. (Test: `returns the canonical BFF policyInsight without modification`)
++- **app rejects malformed envelope**: The Expo client throws its existing malformed-block error for a non-null payload that violates the canonical schema. (Test: `throws when the BFF policyInsight violates the canonical schema`)
++- **canonical freshness drives presentation**: The view model derives freshness and stale presentation only from canonical status and freshness members, without asOf or ISO fallback logic. (Test: `derives freshness and stale presentation only from canonical status and freshness fields`)
++- **canonical block renders existing UI**: The existing card renders its current labels, stale warning, and advisory copy from a canonical typed block. (Test: `renders the existing PolicyInsights card from a canonical block`)
++

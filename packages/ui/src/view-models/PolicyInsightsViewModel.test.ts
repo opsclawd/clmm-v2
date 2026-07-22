@@ -1,98 +1,113 @@
 import { describe, expect, it } from 'vitest';
 import type { PolicyInsightBlock } from '@clmm/application/public';
 import { buildPolicyInsightsViewModel } from './PolicyInsightsViewModel.js';
+import canonicalCurrentPair from '../../../../schemas/regime-engine/policy-insight.v1/fixtures/valid/current-pair.json';
+import canonicalCurrentPosition from '../../../../schemas/regime-engine/policy-insight.v1/fixtures/valid/current-position.json';
 
-const NOW = Date.parse('2026-05-07T12:30:00Z');
+const NOW = Date.parse('2026-07-19T12:30:00Z');
 
 function fixture(overrides: Partial<PolicyInsightBlock> = {}): PolicyInsightBlock {
   return {
-    schemaVersion: '1.0',
+    schemaVersion: 'policy-insight.v1',
+    insightId: 'a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1a1',
+    rulesetVersion: 'sol-usdc-policy.v1.2026-07',
     pair: 'SOL/USDC',
-    asOf: '2026-05-07T12:00:00Z',
-    source: 'openclaw',
-    runId: 'run-1',
-    status: 'FRESH',
+    position: null,
+    generatedAt: '2026-07-19T12:00:00.000Z',
+    asOf: '2026-07-19T11:59:00.000Z',
+    expiresAt: '2026-07-19T13:00:00.000Z',
     marketRegime: 'UP',
-    fundamentalRegime: 'CONSTRUCTIVE',
-    recommendedAction: 'hold',
-    confidence: 'medium',
-    riskLevel: 'normal',
-    dataQuality: 'complete',
+    fundamentalRegime: 'BULLISH',
+    posture: 'AGGRESSIVE',
+    recommendedAction: 'HOLD',
+    riskLevel: 'NORMAL',
     clmmPolicy: {
-      posture: 'wide',
-      rangeBias: 'symmetric',
-      rebalanceSensitivity: 'low',
-      maxCapitalDeploymentPct: 0.5,
+      rangeBias: 'MEDIUM',
+      rebalanceSensitivity: 'NORMAL',
+      maxCapitalDeploymentBps: 7500,
     },
-    levels: { supports: [], resistances: [] },
-    reasoning: ['Trend constructive', 'Vol muted', 'Funding neutral'],
-    sourceRefs: ['msg-1'],
-    expiresAt: '2026-05-07T13:00:00Z',
-    payloadHash: 'h',
-    receivedAtIso: '2026-05-07T12:00:01Z',
-    freshness: { capturedAtUnixMs: Date.parse('2026-05-07T12:00:00Z'), stale: false },
+    levels: {
+      supportsUsdcPerSol: [],
+      resistancesUsdcPerSol: [],
+    },
+    evidence: {
+      selectionStatus: 'FULL',
+      selectionPolicyVersion: 'selector.v1.2026-07',
+      selectedBundleRefs: [],
+      selectedSourceRefs: [],
+    },
+    confidenceBps: 7500,
+    dataQuality: 'COMPLETE',
+    reasonCodes: ['MARKET_REGIME_UP', 'ADVISORY_ONLY'],
+    reasoning:
+      'Market regime is UP with bullish fundamental signals. No position-specific triggers present.',
+    warnings: [],
+    freshness: {
+      status: 'FRESH',
+      evaluatedAt: '2026-07-19T12:00:00.000Z',
+      ageSeconds: 60,
+    },
     ...overrides,
   };
 }
 
 describe('buildPolicyInsightsViewModel', () => {
-  it('returns a neutral severity for hold + normal risk', () => {
+  it('returns a neutral severity for HOLD + NORMAL risk', () => {
     const vm = buildPolicyInsightsViewModel(fixture(), NOW);
     expect(vm.severity).toBe('neutral');
   });
 
-  it('returns danger for critical risk regardless of action', () => {
+  it('returns danger for CRITICAL risk regardless of action', () => {
     const vm = buildPolicyInsightsViewModel(
-      fixture({ riskLevel: 'critical', recommendedAction: 'hold' }),
+      fixture({ riskLevel: 'CRITICAL', recommendedAction: 'HOLD' }),
       NOW,
     );
     expect(vm.severity).toBe('danger');
   });
 
-  it('returns danger for exit_range action regardless of risk', () => {
+  it('returns danger for EXIT_TO_USDC action regardless of risk', () => {
     const vm = buildPolicyInsightsViewModel(
-      fixture({ recommendedAction: 'exit_range', riskLevel: 'normal' }),
+      fixture({ recommendedAction: 'EXIT_TO_USDC', riskLevel: 'NORMAL' }),
       NOW,
     );
     expect(vm.severity).toBe('danger');
   });
 
-  it('returns warning for elevated risk', () => {
-    const vm = buildPolicyInsightsViewModel(fixture({ riskLevel: 'elevated' }), NOW);
-    expect(vm.severity).toBe('warning');
-  });
-
-  it('returns warning for pause_rebalances action', () => {
+  it('returns danger for EXIT_TO_SOL action regardless of risk', () => {
     const vm = buildPolicyInsightsViewModel(
-      fixture({ recommendedAction: 'pause_rebalances' }),
+      fixture({ recommendedAction: 'EXIT_TO_SOL', riskLevel: 'NORMAL' }),
       NOW,
     );
+    expect(vm.severity).toBe('danger');
+  });
+
+  it('returns warning for ELEVATED risk', () => {
+    const vm = buildPolicyInsightsViewModel(fixture({ riskLevel: 'ELEVATED' }), NOW);
     expect(vm.severity).toBe('warning');
   });
 
-  it('marks isStale when status is STALE', () => {
-    const vm = buildPolicyInsightsViewModel(fixture({ status: 'STALE' }), NOW);
-    expect(vm.isStale).toBe(true);
+  it('returns warning for STAND_DOWN action', () => {
+    const vm = buildPolicyInsightsViewModel(fixture({ recommendedAction: 'STAND_DOWN' }), NOW);
+    expect(vm.severity).toBe('warning');
   });
 
-  it('marks isStale when freshness.stale is true', () => {
+  it('marks isStale when freshness.status is STALE', () => {
     const vm = buildPolicyInsightsViewModel(
       fixture({
-        freshness: { capturedAtUnixMs: NOW, stale: true },
+        freshness: { status: 'STALE', evaluatedAt: '2026-07-19T12:00:00.000Z', ageSeconds: 3600 },
       }),
       NOW,
     );
     expect(vm.isStale).toBe(true);
   });
 
-  it('formats max capital deployment as a percent', () => {
+  it('formats max capital deployment from bps as a percent', () => {
     const vm = buildPolicyInsightsViewModel(
       fixture({
         clmmPolicy: {
-          posture: 'wide',
-          rangeBias: 'symmetric',
-          rebalanceSensitivity: 'low',
-          maxCapitalDeploymentPct: 0.375,
+          rangeBias: 'TIGHT',
+          rebalanceSensitivity: 'HIGH',
+          maxCapitalDeploymentBps: 3750,
         },
       }),
       NOW,
@@ -100,18 +115,26 @@ describe('buildPolicyInsightsViewModel', () => {
     expect(vm.maxDeploymentLabel).toBe('38%');
   });
 
-  it('keeps the first 3 non-empty reasoning strings in upstream order', () => {
+  it('derives freshness label from ageSeconds', () => {
     const vm = buildPolicyInsightsViewModel(
       fixture({
-        reasoning: ['', 'one', '   ', 'two', 'three', 'four'],
+        freshness: { status: 'FRESH', evaluatedAt: '2026-07-19T12:00:00.000Z', ageSeconds: 60 },
       }),
       NOW,
     );
-    expect(vm.reasoning).toEqual(['one', 'two', 'three']);
+    expect(vm.freshnessLabel).toBe('1m ago');
   });
 
-  it('does not surface sourceRefs in the view model fields used for rendering', () => {
-    const vm = buildPolicyInsightsViewModel(fixture({ sourceRefs: ['msg-1', 'msg-2'] }), NOW);
-    expect((vm as unknown as Record<string, unknown>)['sourceRefs']).toBeUndefined();
+  it('renders the canonical pair fixture correctly', () => {
+    const vm = buildPolicyInsightsViewModel(canonicalCurrentPair as PolicyInsightBlock, NOW);
+    expect(vm.actionLabel).toBe('Hold');
+    expect(vm.severity).toBe('neutral');
+    expect(vm.freshnessLabel).toBe('1m ago');
+  });
+
+  it('renders the canonical position fixture correctly', () => {
+    const vm = buildPolicyInsightsViewModel(canonicalCurrentPosition as PolicyInsightBlock, NOW);
+    expect(vm.actionLabel).toBe('Exit to SOL');
+    expect(vm.severity).toBe('danger');
   });
 });

@@ -1,6 +1,8 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { CurrentPolicyInsightsAdapter } from './CurrentPolicyInsightsAdapter.js';
 import type { ObservabilityPort } from '@clmm/application';
+import canonicalCurrentPair from '../../../../../schemas/regime-engine/policy-insight.v1/fixtures/valid/current-pair.json';
+import canonicalCurrentPosition from '../../../../../schemas/regime-engine/policy-insight.v1/fixtures/valid/current-position.json';
 
 interface FakeLogEntry {
   level: string;
@@ -21,37 +23,6 @@ function createFakeObservability() {
   return { logs, port };
 }
 
-const SAMPLE_UPSTREAM = {
-  schemaVersion: '1.0',
-  pair: 'SOL/USDC',
-  asOf: '2026-05-07T12:00:00Z',
-  source: 'openclaw',
-  runId: 'run-42',
-  status: 'FRESH',
-  marketRegime: 'UP',
-  fundamentalRegime: 'CONSTRUCTIVE',
-  recommendedAction: 'hold',
-  confidence: 'medium',
-  riskLevel: 'normal',
-  dataQuality: 'complete',
-  clmmPolicy: {
-    posture: 'wide',
-    rangeBias: 'symmetric',
-    rebalanceSensitivity: 'low',
-    maxCapitalDeploymentPct: 0.5,
-  },
-  levels: { supports: [140.5, 138.0], resistances: [155.0, 160.5] },
-  reasoning: ['Trend is constructive', 'Vol is muted', 'Funding neutral'],
-  sourceRefs: ['msg-1', 'msg-2'],
-  expiresAt: '2026-05-07T13:00:00Z',
-  payloadHash: 'sha256:abc',
-  receivedAtIso: '2026-05-07T12:00:01Z',
-  freshness: {
-    capturedAtIso: '2026-05-07T12:00:00Z',
-    stale: false,
-  },
-};
-
 describe('CurrentPolicyInsightsAdapter', () => {
   let obs: ReturnType<typeof createFakeObservability>;
 
@@ -64,9 +35,9 @@ describe('CurrentPolicyInsightsAdapter', () => {
     vi.restoreAllMocks();
   });
 
-  it('returns kind:"block" with parsed PolicyInsightBlock on 200', async () => {
+  it('returns kind:"block" with the real canonical fixture on 200', async () => {
     vi.mocked(fetch).mockResolvedValue(
-      new Response(JSON.stringify(SAMPLE_UPSTREAM), { status: 200 }),
+      new Response(JSON.stringify(canonicalCurrentPair), { status: 200 }),
     );
     const adapter = new CurrentPolicyInsightsAdapter('https://regime.example.com', obs.port);
 
@@ -74,17 +45,26 @@ describe('CurrentPolicyInsightsAdapter', () => {
 
     expect(result.kind).toBe('block');
     if (result.kind !== 'block') return;
-    expect(result.block.recommendedAction).toBe('hold');
-    expect(result.block.clmmPolicy.maxCapitalDeploymentPct).toBe(0.5);
-    expect(result.block.levels.supports).toEqual([140.5, 138.0]);
-    expect(result.block.sourceRefs).toEqual(['msg-1', 'msg-2']);
-    expect(result.block.freshness.capturedAtUnixMs).toBe(Date.parse('2026-05-07T12:00:00Z'));
-    expect(result.block.freshness.stale).toBe(false);
+    expect(result.block).toEqual(canonicalCurrentPair);
+  });
+
+  it('returns kind:"block" with the position fixture on 200', async () => {
+    vi.mocked(fetch).mockResolvedValue(
+      new Response(JSON.stringify(canonicalCurrentPosition), { status: 200 }),
+    );
+    const adapter = new CurrentPolicyInsightsAdapter('https://regime.example.com', obs.port);
+
+    const result = await adapter.fetchCurrent();
+
+    expect(result.kind).toBe('block');
+    if (result.kind !== 'block') return;
+    expect(result.block.recommendedAction).toBe('EXIT_TO_SOL');
+    expect(result.block.position).not.toBeNull();
   });
 
   it('hits /v1/insights/sol-usdc/current with no query params', async () => {
     vi.mocked(fetch).mockResolvedValue(
-      new Response(JSON.stringify(SAMPLE_UPSTREAM), { status: 200 }),
+      new Response(JSON.stringify(canonicalCurrentPair), { status: 200 }),
     );
     const adapter = new CurrentPolicyInsightsAdapter('https://regime.example.com', obs.port);
     await adapter.fetchCurrent();
@@ -94,7 +74,7 @@ describe('CurrentPolicyInsightsAdapter', () => {
 
   it('strips trailing slash from baseUrl', async () => {
     vi.mocked(fetch).mockResolvedValue(
-      new Response(JSON.stringify(SAMPLE_UPSTREAM), { status: 200 }),
+      new Response(JSON.stringify(canonicalCurrentPair), { status: 200 }),
     );
     const adapter = new CurrentPolicyInsightsAdapter('https://regime.example.com/', obs.port);
     await adapter.fetchCurrent();
@@ -106,7 +86,6 @@ describe('CurrentPolicyInsightsAdapter', () => {
     vi.mocked(fetch).mockResolvedValue(
       new Response(
         JSON.stringify({
-          schemaVersion: '1.0',
           error: { code: 'INSIGHT_NOT_FOUND', message: 'not yet', details: [] },
         }),
         { status: 404 },
@@ -159,7 +138,7 @@ describe('CurrentPolicyInsightsAdapter', () => {
     expect(result.kind).toBe('upstream-error');
   });
 
-  it('returns kind:"upstream-error" on malformed top-level shape', async () => {
+  it('returns kind:"upstream-error" when a 200 payload violates the canonical schema', async () => {
     vi.mocked(fetch).mockResolvedValue(
       new Response(JSON.stringify({ recommendedAction: 'INVALID' }), { status: 200 }),
     );
@@ -169,70 +148,48 @@ describe('CurrentPolicyInsightsAdapter', () => {
   });
 
   it('returns kind:"upstream-error" on malformed clmmPolicy', async () => {
-    vi.mocked(fetch).mockResolvedValue(
-      new Response(
-        JSON.stringify({
-          ...SAMPLE_UPSTREAM,
-          clmmPolicy: { posture: 'wide', rangeBias: 'symmetric' },
-        }),
-        { status: 200 },
-      ),
-    );
+    const malformed = {
+      ...canonicalCurrentPair,
+      clmmPolicy: { rangeBias: 'INVALID' },
+    };
+    vi.mocked(fetch).mockResolvedValue(new Response(JSON.stringify(malformed), { status: 200 }));
     const adapter = new CurrentPolicyInsightsAdapter('https://regime.example.com', obs.port);
     const result = await adapter.fetchCurrent();
     expect(result.kind).toBe('upstream-error');
   });
 
-  it('returns kind:"upstream-error" when clmmPolicy maxCapitalDeploymentPct > 1', async () => {
-    vi.mocked(fetch).mockResolvedValue(
-      new Response(
-        JSON.stringify({
-          ...SAMPLE_UPSTREAM,
-          clmmPolicy: {
-            posture: 'wide',
-            rangeBias: 'symmetric',
-            rebalanceSensitivity: 'low',
-            maxCapitalDeploymentPct: 1.5,
-          },
-        }),
-        { status: 200 },
-      ),
-    );
+  it('returns kind:"upstream-error" when clmmPolicy maxCapitalDeploymentBps > 10000', async () => {
+    const malformed = {
+      ...canonicalCurrentPair,
+      clmmPolicy: {
+        rangeBias: 'MEDIUM',
+        rebalanceSensitivity: 'NORMAL',
+        maxCapitalDeploymentBps: 15000,
+      },
+    };
+    vi.mocked(fetch).mockResolvedValue(new Response(JSON.stringify(malformed), { status: 200 }));
     const adapter = new CurrentPolicyInsightsAdapter('https://regime.example.com', obs.port);
     const result = await adapter.fetchCurrent();
     expect(result.kind).toBe('upstream-error');
   });
 
   it('returns kind:"upstream-error" on malformed levels', async () => {
-    vi.mocked(fetch).mockResolvedValue(
-      new Response(
-        JSON.stringify({
-          ...SAMPLE_UPSTREAM,
-          levels: { supports: ['oops'], resistances: [] },
-        }),
-        { status: 200 },
-      ),
-    );
-    const adapter = new CurrentPolicyInsightsAdapter('https://regime.example.com', obs.port);
-    const result = await adapter.fetchCurrent();
-    expect(result.kind).toBe('upstream-error');
-  });
-
-  it('returns kind:"upstream-error" on malformed sourceRefs', async () => {
-    vi.mocked(fetch).mockResolvedValue(
-      new Response(JSON.stringify({ ...SAMPLE_UPSTREAM, sourceRefs: [42] }), { status: 200 }),
-    );
+    const malformed = {
+      ...canonicalCurrentPair,
+      levels: { supportsUsdcPerSol: ['not-a-number'], resistancesUsdcPerSol: [] },
+    };
+    vi.mocked(fetch).mockResolvedValue(new Response(JSON.stringify(malformed), { status: 200 }));
     const adapter = new CurrentPolicyInsightsAdapter('https://regime.example.com', obs.port);
     const result = await adapter.fetchCurrent();
     expect(result.kind).toBe('upstream-error');
   });
 
   it('returns kind:"upstream-error" on malformed freshness', async () => {
-    vi.mocked(fetch).mockResolvedValue(
-      new Response(JSON.stringify({ ...SAMPLE_UPSTREAM, freshness: { stale: 'no' } }), {
-        status: 200,
-      }),
-    );
+    const malformed = {
+      ...canonicalCurrentPair,
+      freshness: { status: 'INVALID' },
+    };
+    vi.mocked(fetch).mockResolvedValue(new Response(JSON.stringify(malformed), { status: 200 }));
     const adapter = new CurrentPolicyInsightsAdapter('https://regime.example.com', obs.port);
     const result = await adapter.fetchCurrent();
     expect(result.kind).toBe('upstream-error');

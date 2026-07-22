@@ -1,5 +1,6 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { fetchCurrentPolicyInsight } from './policyInsights.js';
+import canonicalCurrentPair from '../../../../schemas/regime-engine/policy-insight.v1/fixtures/valid/current-pair.json';
 
 type ExpoPublicEnv = NodeJS.ProcessEnv & {
   EXPO_PUBLIC_BFF_BASE_URL?: string;
@@ -17,34 +18,8 @@ function restoreBffBaseUrl(): void {
   env.EXPO_PUBLIC_BFF_BASE_URL = ORIGINAL_BFF_BASE_URL;
 }
 
-function fixtureBlock() {
-  return {
-    schemaVersion: '1.0',
-    pair: 'SOL/USDC',
-    asOf: '2026-05-07T00:00:00Z',
-    source: 'openclaw',
-    runId: 'run-1',
-    status: 'FRESH',
-    marketRegime: 'UP',
-    fundamentalRegime: 'NEUTRAL',
-    recommendedAction: 'hold',
-    confidence: 'medium',
-    riskLevel: 'normal',
-    dataQuality: 'complete',
-    clmmPolicy: {
-      posture: 'wide',
-      rangeBias: 'symmetric',
-      rebalanceSensitivity: 'low',
-      maxCapitalDeploymentPct: 0.5,
-    },
-    levels: { supports: [140.5], resistances: [155.0] },
-    reasoning: ['Trend constructive'],
-    sourceRefs: ['msg-1'],
-    expiresAt: '2026-05-07T01:00:00Z',
-    payloadHash: 'h',
-    receivedAtIso: '2026-05-07T00:00:01Z',
-    freshness: { capturedAtUnixMs: 1_700_000_000_000, stale: false },
-  };
+function fixtureBlock(): typeof canonicalCurrentPair {
+  return JSON.parse(JSON.stringify(canonicalCurrentPair)) as typeof canonicalCurrentPair;
 }
 
 describe('fetchCurrentPolicyInsight', () => {
@@ -144,7 +119,7 @@ describe('fetchCurrentPolicyInsight', () => {
   it('throws on 200 with malformed clmmPolicy', async () => {
     env.EXPO_PUBLIC_BFF_BASE_URL = 'https://bff.example.test';
     const block = fixtureBlock();
-    (block.clmmPolicy as unknown as Record<string, unknown>)['maxCapitalDeploymentPct'] = 'oops';
+    (block.clmmPolicy as unknown as Record<string, unknown>)['maxCapitalDeploymentBps'] = 'oops';
     globalThis.fetch = vi.fn().mockResolvedValue({
       ok: true,
       status: 200,
@@ -157,10 +132,10 @@ describe('fetchCurrentPolicyInsight', () => {
     expect((error as Error).message).toContain('malformed policyInsight block');
   });
 
-  it('throws on 200 with negative maxCapitalDeploymentPct', async () => {
+  it('throws on 200 with negative maxCapitalDeploymentBps', async () => {
     env.EXPO_PUBLIC_BFF_BASE_URL = 'https://bff.example.test';
     const block = fixtureBlock();
-    (block.clmmPolicy as unknown as Record<string, unknown>)['maxCapitalDeploymentPct'] = -0.5;
+    (block.clmmPolicy as unknown as Record<string, unknown>)['maxCapitalDeploymentBps'] = -500;
     globalThis.fetch = vi.fn().mockResolvedValue({
       ok: true,
       status: 200,
@@ -176,21 +151,7 @@ describe('fetchCurrentPolicyInsight', () => {
   it('throws on 200 with malformed levels', async () => {
     env.EXPO_PUBLIC_BFF_BASE_URL = 'https://bff.example.test';
     const block = fixtureBlock();
-    (block.levels as unknown as Record<string, unknown>)['supports'] = ['oops'];
-    globalThis.fetch = vi.fn().mockResolvedValue({
-      ok: true,
-      status: 200,
-      json: () => Promise.resolve({ policyInsight: block }),
-    }) as typeof fetch;
-
-    const error = await fetchCurrentPolicyInsight().catch((reason: unknown) => reason);
-    expect(error).toBeInstanceOf(Error);
-  });
-
-  it('throws on 200 with malformed sourceRefs', async () => {
-    env.EXPO_PUBLIC_BFF_BASE_URL = 'https://bff.example.test';
-    const block = fixtureBlock();
-    (block as unknown as Record<string, unknown>)['sourceRefs'] = [42];
+    (block.levels as unknown as Record<string, unknown>)['supportsUsdcPerSol'] = ['not-a-decimal'];
     globalThis.fetch = vi.fn().mockResolvedValue({
       ok: true,
       status: 200,
