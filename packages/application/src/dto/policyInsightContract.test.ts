@@ -1,6 +1,5 @@
 import { describe, expect, it } from 'vitest';
 import { Ajv2020 } from 'ajv/dist/2020.js';
-import addFormats from 'ajv-formats';
 import * as schema from '../../../../schemas/regime-engine/policy-insight.v1/schema.json';
 import currentPairFixture from '../../../../schemas/regime-engine/policy-insight.v1/fixtures/valid/current-pair.json';
 import currentPositionFixture from '../../../../schemas/regime-engine/policy-insight.v1/fixtures/valid/current-position.json';
@@ -12,7 +11,6 @@ const ajv = new Ajv2020({
   useDefaults: false,
   removeAdditional: false,
 });
-addFormats(ajv);
 
 const validate = ajv.compile(schema);
 

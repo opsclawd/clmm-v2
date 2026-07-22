@@ -161,7 +161,7 @@ importers:
         version: 5.9.3
       vitest:
         specifier: ^1.6.0
-        version: 1.6.1(@types/node@25.5.0)(jsdom@25.0.1(bufferutil@4.1.0))(lightningcss@1.32.0)(terser@5.46.1)
+        version: 1.6.1(@types/node@25.5.0)(jsdom@25.0.1(bufferutil@4.1.0)(utf-8-validate@6.0.6))(lightningcss@1.32.0)(terser@5.46.1)
 
   packages/adapters:
     dependencies:
@@ -246,7 +246,7 @@ importers:
         version: 5.9.3
       vitest:
         specifier: ^1.6.0
-        version: 1.6.1(@types/node@25.5.0)(jsdom@25.0.1(bufferutil@4.1.0))(lightningcss@1.32.0)(terser@5.46.1)
+        version: 1.6.1(@types/node@25.5.0)(jsdom@25.0.1(bufferutil@4.1.0)(utf-8-validate@6.0.6))(lightningcss@1.32.0)(terser@5.46.1)
 
   packages/application:
     dependencies:
@@ -256,9 +256,6 @@ importers:
       ajv:
         specifier: ^8.18.0
         version: 8.18.0
-      ajv-formats:
-        specifier: ^3.0.0
-        version: 3.0.1(ajv@8.18.0)
     devDependencies:
       '@clmm/config':
         specifier: workspace:*
@@ -268,13 +265,13 @@ importers:
         version: 5.9.3
       vitest:
         specifier: ^1.6.0
-        version: 1.6.1(@types/node@25.5.0)(jsdom@25.0.1(bufferutil@4.1.0))(lightningcss@1.32.0)(terser@5.46.1)
+        version: 1.6.1(@types/node@25.5.0)(jsdom@25.0.1(bufferutil@4.1.0)(utf-8-validate@6.0.6))(lightningcss@1.32.0)(terser@5.46.1)
 
   packages/config:
     devDependencies:
       vitest:
         specifier: ^1.6.0
-        version: 1.6.1(@types/node@25.5.0)(jsdom@25.0.1(bufferutil@4.1.0))(lightningcss@1.32.0)(terser@5.46.1)
+        version: 1.6.1(@types/node@25.5.0)(jsdom@25.0.1(bufferutil@4.1.0)(utf-8-validate@6.0.6))(lightningcss@1.32.0)(terser@5.46.1)
 
   packages/domain:
     devDependencies:
@@ -289,7 +286,7 @@ importers:
         version: 5.9.3
       vitest:
         specifier: ^1.6.0
-        version: 1.6.1(@types/node@25.5.0)(jsdom@25.0.1(bufferutil@4.1.0))(lightningcss@1.32.0)(terser@5.46.1)
+        version: 1.6.1(@types/node@25.5.0)(jsdom@25.0.1(bufferutil@4.1.0)(utf-8-validate@6.0.6))(lightningcss@1.32.0)(terser@5.46.1)
 
   packages/testing:
     dependencies:
@@ -308,7 +305,7 @@ importers:
         version: 5.9.3
       vitest:
         specifier: ^1.6.0
-        version: 1.6.1(@types/node@25.5.0)(jsdom@25.0.1(bufferutil@4.1.0))(lightningcss@1.32.0)(terser@5.46.1)
+        version: 1.6.1(@types/node@25.5.0)(jsdom@25.0.1(bufferutil@4.1.0)(utf-8-validate@6.0.6))(lightningcss@1.32.0)(terser@5.46.1)
 
   packages/ui:
     dependencies:
@@ -342,7 +339,7 @@ importers:
         version: 5.9.3
       vitest:
         specifier: ^1.6.0
-        version: 1.6.1(@types/node@25.5.0)(jsdom@25.0.1(bufferutil@4.1.0))(lightningcss@1.32.0)(terser@5.46.1)
+        version: 1.6.1(@types/node@25.5.0)(jsdom@25.0.1(bufferutil@4.1.0)(utf-8-validate@6.0.6))(lightningcss@1.32.0)(terser@5.46.1)
 
 packages:
 
@@ -13417,7 +13414,7 @@ snapshots:
       std-env: 3.10.0
       strip-literal: 2.1.1
       test-exclude: 6.0.0
-      vitest: 1.6.1(@types/node@25.5.0)(jsdom@25.0.1(bufferutil@4.1.0))(lightningcss@1.32.0)(terser@5.46.1)
+      vitest: 1.6.1(@types/node@25.5.0)(jsdom@25.0.1(bufferutil@4.1.0)(utf-8-validate@6.0.6))(lightningcss@1.32.0)(terser@5.46.1)
     transitivePeerDependencies:
       - supports-color
 
@@ -18417,7 +18414,7 @@ snapshots:
       lightningcss: 1.32.0
       terser: 5.46.1
 
-  vitest@1.6.1(@types/node@25.5.0)(jsdom@25.0.1(bufferutil@4.1.0))(lightningcss@1.32.0)(terser@5.46.1):
+  vitest@1.6.1(@types/node@25.5.0)(jsdom@25.0.1(bufferutil@4.1.0)(utf-8-validate@6.0.6))(lightningcss@1.32.0)(terser@5.46.1):
     dependencies:
       '@vitest/expect': 1.6.1
       '@vitest/runner': 1.6.1
