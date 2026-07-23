@@ -25,6 +25,8 @@ export class PolicyInsightsController {
         return { policyInsight: null, unavailableReason: 'store-unavailable' as const };
       case 'config-error':
         return { policyInsight: null, unavailableReason: 'config-error' as const };
+      case 'malformed':
+        return { policyInsight: null, unavailableReason: 'malformed' as const };
       case 'upstream-error':
         return { policyInsight: null, unavailableReason: 'upstream-error' as const };
     }

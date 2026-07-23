@@ -1,72 +1,71 @@
-# Design Document: PolicyInsights Canonical Contract Alignment
+# PolicyInsight UI Delta Design Document (Issue #93)
 
 ## 1. Problem Being Solved and Why It Matters
 
-Currently, `clmm-v2` duplicates PolicyInsight response validation across its backend adapter (`CurrentPolicyInsightsAdapter.ts`) and its frontend client (`apps/app/src/api/policyInsights.ts`). Both implementations use hand-rolled type checking and manual parsing logic. This approach is problematic because:
+Issue #93 requires completing the UI presentation for the canonical `PolicyInsight v1` contract. Pull Request #92 successfully centralized contract parsing and DTO mapping, ensuring that the frontend only ever receives validated view models. However, the UI component (`PolicyInsightsSection`) and its View-Model (`PolicyInsightsViewModel`) do not yet display several critical pieces of canonical data, nor do they fully implement the distinct presentation states (like `degraded` and `malformed`) required by the product rules.
 
-- **Drift:** Hand-rolled parsers easily fall out of sync with the upstream Regime Engine output.
-- **Silent Failures:** The current manual readers expect a legacy payload shape, meaning valid policy insight responses emitted by the Regime Engine may be rejected before they ever reach the user.
-- **Redundancy & Maintenance Overhead:** Keeping two parsing implementations (and their tests) aligned across the BFF/App boundary wastes engineering effort and violates single-source-of-truth principles.
-
-Aligning with the canonical contract ensures that the exact shape emitted by Regime Engine is reliably parsed, preserving critical safety signals (such as freshness and status) without silent conversions.
+Implementing this delta ensures users have the complete, accurate context—such as market regime, support/resistance levels, and evidence quality—needed to make informed manual exit decisions without relying on raw, confusing JSON dumps.
 
 ## 2. Key Design Decisions and Trade-offs
 
-- **Single Source of Truth via Schema:** Use an authoritative JSON schema and fixture vendored from Regime Engine's checked-in `contracts/policy-insight/v1/` directory, copied into this repo at `schemas/regime-engine/policy-insight.v1/` with a `provenance.json` recording the source commit and per-asset sha256 — the same pattern `sol-usdc-clmm-intelligence` already uses for its EvidenceBundle v1 contract (`schemas/regime-engine/evidence-bundle.v1/`). Cross-repo contracts in this project are checked-in files consumed via a vendored copy, never a private npm package — no such package exists or is planned for `policy-insight.v1`.
-  - _Trade-off:_ We add a schema validation library (`ajv`) and a manual (scripted) sync step against the upstream repo, but we gain absolute certainty that our application strictly honors the upstream contract, with drift detectable via the provenance hash.
-- **Centralized Validator:** The validation logic will live exclusively in `@clmm/application`, exposing a single parser (`parsePolicyInsightBlock`).
-  - _Trade-off:_ Both the Node backend and the Expo frontend must bundle and execute the same validation logic. We trade a small bundle size increase for deterministic fail-closed behavior on both ends.
-- **Strict Validation Strategy:** `ajv` will run in strict mode (no type coercion, no defaults, no stripping of unknown keys).
-  - _Trade-off:_ Any minor upstream schema change that breaks the contract will loudly fail (fail closed) rather than silently being ignored. This prioritizes safety over resilience.
+- **View-Model Centralization**: All formatting and conditional logic for the new fields will reside in `PolicyInsightsViewModel.ts`. The React component will only receive pre-formatted strings or boolean flags.
+  - _Trade-off_: Slightly larger View-Model, but ensures the UI remains purely presentational and easily unit-testable.
+- **Distinct `malformed` State**: The acceptance criteria demand that `malformed` and `upstream-error` be _distinct_ states. Currently, `CurrentPolicyInsightsAdapter` maps shape validation failures (supplied by #92) to `upstream-error`. We will update the adapter and port definitions to explicitly return a `malformed` kind.
+  - _Trade-off_: Requires a minor change to the adapter boundary, but is necessary to fulfill the "distinct and tested" UI requirement without duplicating parsing logic.
+- **Evidence Summary Conciseness**: Instead of displaying raw `bundleHash` or `referenceId` arrays, the UI will summarize the evidence (e.g., "Full evidence based on 3 sources").
+  - _Rationale_: Aligns with the product rule "Do not dump raw evidence internals" while satisfying "selected evidence/bundle summary appropriate for a user".
 
-## 3. Proposed Approach with Rationale
+## 3. Proposed Approach
 
-1. **Vendor the Contract:** Copy Regime Engine's `contracts/policy-insight/v1/` (schema, valid/invalid fixtures, `schema.sha256`) into this repo at `schemas/regime-engine/policy-insight.v1/` via a pinned-commit sparse clone, with a `provenance.json` recording the source commit and per-asset sha256. Add `ajv` to the workspace.
-2. **Centralized Validator Module:**
-   - Create `packages/application/src/dto/policyInsightValidator.ts`.
-   - Initialize an `ajv` instance in strict mode using the exported JSON schema.
-   - Expose `parsePolicyInsightBlock` which takes `unknown`, validates it against the schema, and returns the strictly typed `PolicyInsightBlock` or `null`.
-3. **DTO Alignment:**
-   - Update `packages/application/src/dto/policyInsights.ts` to perfectly match the canonical schema's fields, removing any legacy aliases or manual mapping logic.
-4. **Adapter Refactoring:**
-   - Update `CurrentPolicyInsightsAdapter.ts` to call the shared `parsePolicyInsightBlock` and remove all the `VALID_*` sets and manual type-checking functions.
-5. **App Client Refactoring:**
-   - Update `apps/app/src/api/policyInsights.ts` to use the exact same shared parser, removing its own duplicated validation logic.
-6. **BFF Passthrough:**
-   - Ensure the `PolicyInsightsController` remains a transparent envelope mapper, passing the validated block through without modification.
-7. **UI View Model:**
-   - Update `PolicyInsightsViewModel.ts` to rely strictly on the canonical presentation fields (e.g., `status` and `freshness`), removing any manual fallback logic (like falling back to `asOf` if `capturedAtUnixMs` is missing).
+### 3.1 View-Model Extensions (`PolicyInsightsViewModel.ts`)
+
+Add the following to the view-model:
+
+- `marketRegimeLabel`: Formatted string for `block.marketRegime`.
+- `fundamentalRegimeLabel`: Formatted string for `block.fundamentalRegime`.
+- `supportLevels` & `resistanceLevels`: Arrays of strings representing valid price levels. Empty levels will be filtered out.
+- `evidenceSummary`: A concise string derived from `block.evidence.selectionStatus` and the lengths of `selectedBundleRefs`/`selectedSourceRefs`.
+- `warningsList`: Array of human-readable warning strings mapped from `block.warnings` and `block.reasonCodes`.
+- `isDegraded`: Boolean set to `true` if `selectionStatus` is `PARTIAL` or `DEGRADED`, or if `dataQuality` is not `COMPLETE`.
+
+### 3.2 UI Component Updates (`PolicyInsightsSection.tsx`)
+
+- **Layout**: Inject the new regimes and levels next to the existing `postureLabel` to keep market context grouped.
+- **Missing Levels**: If `supportLevels` or `resistanceLevels` are empty, display "No eligible levels" or omit the line entirely. Never render `0` or `0.00`.
+- **Degraded State**: If `vm.isDegraded` is true, apply a visual warning treatment (e.g., `colors.warn` text or a distinct border) alongside the `evidenceSummary`.
+- **Unavailable Mapping**: Add support for the new `malformed` unavailable reason to the `unavailableCopy` helper, rendering a fail-closed message: "Policy insight payload was malformed."
+
+### 3.3 Application Port & Adapter Updates
+
+- **`PolicyInsightsUnavailableReason` & `PolicyInsightsReadResult`**: Add `'malformed'` to these types in `@clmm/application/public` and `@clmm/application/ports`.
+- **`CurrentPolicyInsightsAdapter.ts`**: Update line 66 so that if `parsePolicyInsightBlock(body)` returns `null`, the adapter returns `{ kind: 'malformed' }` rather than `{ kind: 'upstream-error' }`.
+- **`PolicyInsightsController` (BFF)**: Ensure the HTTP controller propagates the `malformed` state to the client payload.
 
 ## 4. Assumptions Made
 
-- **Contract Availability:** Regime Engine's `contracts/policy-insight/v1/` directory (schema + valid/invalid fixtures + `schema.sha256`) is present and checked in on `main` (verified at commit `260d144`). No npm package exists or is required for this contract; it is consumed by vendoring the checked-in files, identically to how `sol-usdc-clmm-intelligence` consumes `contracts/evidence-bundle/v1/`.
-- **Expo Bundler Compatibility:** The Expo bundler can correctly resolve and bundle `ajv` and the JSON schema export without requiring Node-only built-in modules or throwing bundle errors.
-- **Schema Completeness:** The canonical schema guarantees the presence of required fields like `status` and `freshness.capturedAtUnixMs`, making legacy fallback logic obsolete.
-- **Invariant Scope:** This feature only handles reading advisory signals and does not change any directional mapping or execution rules in the domain layer.
+1.  **Adapter modification is acceptable**: Modifying `CurrentPolicyInsightsAdapter` to return `malformed` is assumed to be within scope, as it's the only way to satisfy the AC requiring `malformed` and `upstream-error` to be strictly distinct without writing a second parser.
+2.  **`PARTIAL` maps to Degraded**: The canonical DTO uses `FULL`, `PARTIAL`, and `DEGRADED` for `selectionStatus`. I assume `PARTIAL` should trigger the same visually degraded presentation state as `DEGRADED`.
+3.  **Loading State Behavior**: I assume "Do not show stale placeholder values as current" means the UI should overlay a loading indicator or dim the existing values when a background refresh is triggered, rather than completely unmounting the card (which would cause layout shift).
+4.  **No `NONE` enum**: The issue description mentions a `NONE` selection status, but the canonical DTO (`PolicyInsightSelectionStatus`) does not include it. I assume the canonical DTO is the source of truth, and `PARTIAL`/`DEGRADED` handle the suboptimal evidence states.
 
 ## 5. Scope
 
 **In Scope:**
 
-- `CurrentPolicyInsightsAdapter` implementation and tests.
-- Application DTOs (`packages/application/src/dto/policyInsights.ts`).
-- App API parser (`apps/app/src/api/policyInsights.ts`).
-- BFF controller validation and tests updates to use the fixture.
-- Creation of a new centralized validator in `packages/application`.
-- Vendoring the JSON schema and fixtures from Regime Engine's checked-in `contracts/policy-insight/v1/` directory into `schemas/regime-engine/policy-insight.v1/`.
+- Adding `marketRegime`, `fundamentalRegime`, `supportsUsdcPerSol`, `resistancesUsdcPerSol` to the view-model and UI.
+- Formatting an evidence summary and mapping warnings/reason codes to stable copy.
+- Modifying `PolicyInsightsUnavailableReason`, the read port, and `CurrentPolicyInsightsAdapter` to distinctly support the `malformed` state.
+- Implementing distinct visual states for degraded evidence and malformed contracts.
+- Writing fixture-driven tests for the new view-model fields and component states.
 
 **Out of Scope:**
 
-- UI component design modifications.
-- Evidence ingestion pipelines.
-- Upstream synthesis rules inside Regime Engine.
-- History, timeline, or detail views for PolicyInsights.
-- Source references display in the UI.
-- Applying policy changes automatically to positions.
+- Creating a new `PolicyInsight` parser.
+- Modifying the canonical wire contract schema (`schemas/regime-engine/policy-insight.v1`).
+- Modifying the deterministic execution preview/sign/submit screens.
+- General redesign of the Positions list screen.
 
-## 6. Risks or Concerns Identified from Code Analysis
+## 6. Risks or Concerns Identified
 
-- **Expo / Ajv Compatibility:** `ajv` can occasionally struggle with React Native / Expo bundling if the schema relies on filesystem reads or dynamic imports. The schema must be imported statically.
-- **Strict Validation Brittleness:** Because validation will be extremely strict (no additional keys allowed, no type coercion), any undocumented field addition by Regime Engine will cause `clmm-v2` to fail closed (returning `null`). This requires strict lockstep deployments or careful schema versioning upstream.
-- **Fixture Mismatches:** If the vendored fixture copied from Regime Engine's `contracts/policy-insight/v1/` doesn't pass its own schema validator, our test suite will fail at step 1.
-- **Cross-Layer Atomicity:** `PolicyInsightBlock` is used heavily across the UI, App, and Adapter layers. The refactor requires changing all of them in a single, atomic operation to ensure the workspace typecheck remains green.
+- **UI Clutter**: Appending regimes, arrays of price levels, warnings, and evidence summaries to a single `PolicyInsightsSection` risks violating the rule to "Keep the UI concise and decision-focused". Care must be taken to format levels compactly (e.g., comma-separated on a single line) and only show warnings if they exist.
+- **Adapter Blast Radius**: Changing `CurrentPolicyInsightsAdapter` to return `malformed` requires ensuring that `PolicyInsightsController` explicitly maps this to the same HTTP 200 null-envelope pattern used by all other unavailable reasons (`not-found`, `store-unavailable`, `config-error`, `upstream-error`), otherwise the client might fail to distinguish malformed from other error types.

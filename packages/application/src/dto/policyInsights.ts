@@ -124,4 +124,5 @@ export type PolicyInsightsUnavailableReason =
   | 'not-found'
   | 'store-unavailable'
   | 'config-error'
+  | 'malformed'
   | 'upstream-error';

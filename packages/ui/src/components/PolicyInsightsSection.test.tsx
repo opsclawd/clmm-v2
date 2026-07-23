@@ -84,11 +84,15 @@ describe('PolicyInsightsSection', () => {
       />,
     );
     expect(screen.getByText('PolicyInsights')).toBeTruthy();
-    expect(screen.getByText('Advisory CLMM policy signal. Nothing has been applied.')).toBeTruthy();
+    expect(
+      screen.getByText(
+        'Advisory policy context only. Nothing is signed or applied; deterministic stop-loss monitoring continues independently.',
+      ),
+    ).toBeTruthy();
     expect(screen.getByText('Hold')).toBeTruthy();
-    expect(screen.getByText('Posture: AGGRESSIVE')).toBeTruthy();
-    expect(screen.getByText('Range bias: MEDIUM')).toBeTruthy();
-    expect(screen.getByText('Rebalance sensitivity: NORMAL')).toBeTruthy();
+    expect(screen.getByText('Aggressive')).toBeTruthy();
+    expect(screen.getByText('Medium')).toBeTruthy();
+    expect(screen.getByText('Normal')).toBeTruthy();
     expect(screen.getByText('75%')).toBeTruthy();
     expect(screen.getByText('Normal risk')).toBeTruthy();
     expect(screen.getByText('75% confidence')).toBeTruthy();
@@ -186,7 +190,11 @@ describe('PolicyInsightsSection', () => {
         now={NOW}
       />,
     );
-    expect(screen.getByText('No policy insight available yet.')).toBeTruthy();
+    expect(
+      screen.getByText(
+        'No policy insight is available yet. Position monitoring and deterministic stop-loss protection continue independently.',
+      ),
+    ).toBeTruthy();
   });
 
   it('renders unavailable copy for store-unavailable', () => {
@@ -200,11 +208,15 @@ describe('PolicyInsightsSection', () => {
         now={NOW}
       />,
     );
-    expect(screen.getByText('Policy insights unavailable.')).toBeTruthy();
+    expect(
+      screen.getByText(
+        'The policy insight store is temporarily unavailable. Position monitoring and deterministic stop-loss protection continue independently.',
+      ),
+    ).toBeTruthy();
   });
 
-  it('renders the same unavailable copy for config-error and upstream-error', () => {
-    const { rerender } = render(
+  it('renders distinct unavailable copy for config-error', () => {
+    render(
       <PolicyInsightsSection
         policyInsight={null}
         isLoading={false}
@@ -214,9 +226,15 @@ describe('PolicyInsightsSection', () => {
         now={NOW}
       />,
     );
-    expect(screen.getByText('Policy insights unavailable.')).toBeTruthy();
+    expect(
+      screen.getByText(
+        'Policy analysis is not configured. Position monitoring and deterministic stop-loss protection continue independently.',
+      ),
+    ).toBeTruthy();
+  });
 
-    rerender(
+  it('renders distinct unavailable copy for upstream-error', () => {
+    render(
       <PolicyInsightsSection
         policyInsight={null}
         isLoading={false}
@@ -226,7 +244,54 @@ describe('PolicyInsightsSection', () => {
         now={NOW}
       />,
     );
-    expect(screen.getByText('Policy insights unavailable.')).toBeTruthy();
+    expect(
+      screen.getByText(
+        'The policy insight service could not be reached. Position monitoring and deterministic stop-loss protection continue independently.',
+      ),
+    ).toBeTruthy();
+  });
+
+  it('renders fail-closed unavailable copy for malformed', () => {
+    render(
+      <PolicyInsightsSection
+        policyInsight={null}
+        isLoading={false}
+        isError={false}
+        isEnabled
+        unavailableReason="malformed"
+        now={NOW}
+      />,
+    );
+    expect(screen.getByTestId('policy-insights-unavailable')).toBeTruthy();
+    expect(
+      screen.getByText(
+        'The policy insight payload was malformed, so guidance was withheld. Position monitoring and deterministic stop-loss protection continue independently.',
+      ),
+    ).toBeTruthy();
+  });
+
+  it('renders distinct bounded copy for every unavailable reason', () => {
+    const reasons = [
+      'not-found',
+      'store-unavailable',
+      'config-error',
+      'upstream-error',
+      'malformed',
+    ] as const;
+    for (const reason of reasons) {
+      cleanup();
+      render(
+        <PolicyInsightsSection
+          policyInsight={null}
+          isLoading={false}
+          isError={false}
+          isEnabled
+          unavailableReason={reason}
+          now={NOW}
+        />,
+      );
+      expect(screen.getByTestId('policy-insights-unavailable')).toBeTruthy();
+    }
   });
 
   it('renders a degraded warning when isError but cached data is shown', () => {
@@ -270,7 +335,11 @@ describe('PolicyInsightsSection', () => {
       />,
     );
     expect(screen.getByTestId('policy-insights-unavailable')).toBeTruthy();
-    expect(screen.getByText('Policy insights unavailable.')).toBeTruthy();
+    expect(
+      screen.getByText(
+        'The policy insight service could not be reached. Position monitoring and deterministic stop-loss protection continue independently.',
+      ),
+    ).toBeTruthy();
   });
 
   it('renders a skeleton when loading with no data', () => {
@@ -285,5 +354,191 @@ describe('PolicyInsightsSection', () => {
       />,
     );
     expect(screen.getByTestId('policy-insights-skeleton')).toBeTruthy();
+  });
+
+  it('labels cached data as updating during an active refresh', () => {
+    render(
+      <PolicyInsightsSection
+        policyInsight={fixture()}
+        isLoading={true}
+        isError={false}
+        isEnabled
+        unavailableReason={null}
+        now={NOW}
+      />,
+    );
+    expect(screen.getByTestId('policy-insights-updating')).toBeTruthy();
+    expect(screen.getByText('Updating policy insight…')).toBeTruthy();
+  });
+
+  it('renders fresh full-evidence insight with current timing context', () => {
+    render(
+      <PolicyInsightsSection
+        policyInsight={fixture()}
+        isLoading={false}
+        isError={false}
+        isEnabled
+        unavailableReason={null}
+        now={NOW}
+      />,
+    );
+    expect(screen.getByTestId('policy-insights-card')).toBeTruthy();
+    expect(screen.getByTestId('policy-insights-freshness')).toBeTruthy();
+    expect(screen.getByText('1m ago')).toBeTruthy();
+  });
+
+  it('renders market regimes multiple levels and evidence summary from the canonical position fixture', () => {
+    render(
+      <PolicyInsightsSection
+        policyInsight={canonicalCurrentPosition as PolicyInsightBlock}
+        isLoading={false}
+        isError={false}
+        isEnabled
+        unavailableReason={null}
+        now={NOW}
+      />,
+    );
+    expect(screen.getByText('Up market')).toBeTruthy();
+    expect(screen.getByText('Bullish')).toBeTruthy();
+    expect(screen.getByText('Moderately aggressive')).toBeTruthy();
+    expect(screen.getByText('138.5, 135.2 USDC/SOL')).toBeTruthy();
+    expect(screen.getByText('142.0, 145.5 USDC/SOL')).toBeTruthy();
+    expect(screen.getByText('Partial evidence coverage (1 bundle, 1 source)')).toBeTruthy();
+  });
+
+  it('renders one unavailable-level line for empty canonical level arrays', () => {
+    render(
+      <PolicyInsightsSection
+        policyInsight={fixture({
+          levels: {
+            supportsUsdcPerSol: [],
+            resistancesUsdcPerSol: [],
+          },
+        })}
+        isLoading={false}
+        isError={false}
+        isEnabled
+        unavailableReason={null}
+        now={NOW}
+      />,
+    );
+    expect(screen.getByText('No eligible support or resistance levels')).toBeTruthy();
+    expect(screen.queryByText('USDC/SOL')).toBeNull();
+  });
+
+  it('renders degraded evidence and bounded stable warning copy', () => {
+    render(
+      <PolicyInsightsSection
+        policyInsight={fixture({
+          evidence: {
+            selectionStatus: 'PARTIAL',
+            selectionPolicyVersion: 'selector.v1.2026-07',
+            selectedBundleRefs: [],
+            selectedSourceRefs: [],
+          },
+          warnings: [
+            { code: 'EVIDENCE_STALE_INPUT', message: 'Some free-form upstream warning message' },
+          ],
+        })}
+        isLoading={false}
+        isError={false}
+        isEnabled
+        unavailableReason={null}
+        now={NOW}
+      />,
+    );
+    expect(screen.getByText('Partial evidence coverage')).toBeTruthy();
+    expect(screen.getByText('Evidence stale input')).toBeTruthy();
+    expect(screen.queryByText(/free-form/i)).toBeNull();
+  });
+
+  it('renders stale as-of and expiry context with weaker treatment', () => {
+    render(
+      <PolicyInsightsSection
+        policyInsight={fixture({
+          freshness: { status: 'STALE', evaluatedAt: '2026-07-19T12:00:00.000Z', ageSeconds: 3600 },
+          expiresAt: '2026-07-19T12:29:59.000Z',
+        })}
+        isLoading={false}
+        isError={false}
+        isEnabled
+        unavailableReason={null}
+        now={NOW}
+      />,
+    );
+    expect(screen.getByTestId('policy-insights-card')).toBeTruthy();
+    expect(screen.getByTestId('policy-insights-stale-warning')).toBeTruthy();
+    expect(screen.getByText(/Stale/)).toBeTruthy();
+  });
+
+  it('keeps refresh failure distinct from canonical evidence degradation', () => {
+    render(
+      <PolicyInsightsSection
+        policyInsight={fixture({
+          evidence: {
+            selectionStatus: 'DEGRADED',
+            selectionPolicyVersion: 'selector.v1.2026-07',
+            selectedBundleRefs: [],
+            selectedSourceRefs: [],
+          },
+        })}
+        isLoading={false}
+        isError={true}
+        isEnabled
+        unavailableReason={null}
+        now={NOW}
+      />,
+    );
+    expect(screen.getByTestId('policy-insights-degraded')).toBeTruthy();
+    expect(
+      screen.getByText('Refresh failed — showing last available policy insight.'),
+    ).toBeTruthy();
+    expect(screen.getByText('Limited evidence coverage')).toBeTruthy();
+  });
+
+  it('keeps EXIT_TO_USDC and EXIT_TO_SOL advisory and non-executable', () => {
+    const exitUsdcFixture = fixture({ recommendedAction: 'EXIT_TO_USDC' });
+    const { rerender: rerenderUsdc } = render(
+      <PolicyInsightsSection
+        policyInsight={exitUsdcFixture}
+        isLoading={false}
+        isError={false}
+        isEnabled
+        unavailableReason={null}
+        now={NOW}
+      />,
+    );
+    expect(screen.getByText('Exit to USDC')).toBeTruthy();
+    expect(screen.queryByTestId('policy-insights-action')).toBeTruthy();
+
+    const exitSolFixture = fixture({ recommendedAction: 'EXIT_TO_SOL' });
+    rerenderUsdc(
+      <PolicyInsightsSection
+        policyInsight={exitSolFixture}
+        isLoading={false}
+        isError={false}
+        isEnabled
+        unavailableReason={null}
+        now={NOW}
+      />,
+    );
+    expect(screen.getByText('Exit to SOL')).toBeTruthy();
+  });
+
+  it('does not render raw evidence identifiers or upstream warning messages', () => {
+    render(
+      <PolicyInsightsSection
+        policyInsight={canonicalCurrentPosition as PolicyInsightBlock}
+        isLoading={false}
+        isError={false}
+        isEnabled
+        unavailableReason={null}
+        now={NOW}
+      />,
+    );
+    expect(screen.queryByText(/abcd1234/)).toBeNull();
+    expect(screen.queryByText(/src111111/)).toBeNull();
+    expect(screen.queryByText(/locator/i)).toBeNull();
+    expect(screen.queryByText(/Support\/resistance evidence conflicts/i)).toBeNull();
   });
 });

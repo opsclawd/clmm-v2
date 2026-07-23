@@ -102,6 +102,20 @@ describe('fetchCurrentPolicyInsight', () => {
     expect(result.unavailableReason).toBe('upstream-error');
   });
 
+  it('returns { policyInsight: null, unavailableReason } for malformed', async () => {
+    env.EXPO_PUBLIC_BFF_BASE_URL = 'https://bff.example.test';
+    globalThis.fetch = vi.fn().mockResolvedValue({
+      ok: true,
+      status: 200,
+      json: () => Promise.resolve({ policyInsight: null, unavailableReason: 'malformed' }),
+    }) as typeof fetch;
+
+    const result = await fetchCurrentPolicyInsight();
+
+    expect(result.policyInsight).toBeNull();
+    expect(result.unavailableReason).toBe('malformed');
+  });
+
   it('throws on 200 with malformed top-level block', async () => {
     env.EXPO_PUBLIC_BFF_BASE_URL = 'https://bff.example.test';
     globalThis.fetch = vi.fn().mockResolvedValue({

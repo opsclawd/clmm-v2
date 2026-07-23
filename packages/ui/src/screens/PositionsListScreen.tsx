@@ -57,6 +57,7 @@ type Props = {
     | 'not-found'
     | 'store-unavailable'
     | 'config-error'
+    | 'malformed'
     | 'upstream-error'
     | null
     | undefined;
@@ -313,6 +314,7 @@ function ConnectedPositionsList({
     | 'not-found'
     | 'store-unavailable'
     | 'config-error'
+    | 'malformed'
     | 'upstream-error'
     | null
     | undefined;

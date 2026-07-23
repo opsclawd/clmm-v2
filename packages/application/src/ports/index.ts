@@ -327,6 +327,7 @@ export type PolicyInsightsReadResult =
   | { kind: 'not-found' }
   | { kind: 'store-unavailable' }
   | { kind: 'config-error' }
+  | { kind: 'malformed' }
   | { kind: 'upstream-error' };
 
 export interface PolicyInsightsReadPort {

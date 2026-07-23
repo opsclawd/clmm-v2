@@ -138,16 +138,30 @@ describe('CurrentPolicyInsightsAdapter', () => {
     expect(result.kind).toBe('upstream-error');
   });
 
-  it('returns kind:"upstream-error" when a 200 payload violates the canonical schema', async () => {
+  it('returns kind:"malformed" when a 200 payload violates the canonical schema', async () => {
     vi.mocked(fetch).mockResolvedValue(
       new Response(JSON.stringify({ recommendedAction: 'INVALID' }), { status: 200 }),
     );
     const adapter = new CurrentPolicyInsightsAdapter('https://regime.example.com', obs.port);
     const result = await adapter.fetchCurrent();
-    expect(result.kind).toBe('upstream-error');
+    expect(result.kind).toBe('malformed');
   });
 
-  it('returns kind:"upstream-error" on malformed clmmPolicy', async () => {
+  it('logs contract validation failure when returning kind:"malformed"', async () => {
+    vi.mocked(fetch).mockResolvedValue(
+      new Response(JSON.stringify({ recommendedAction: 'INVALID' }), { status: 200 }),
+    );
+    const adapter = new CurrentPolicyInsightsAdapter('https://regime.example.com', obs.port);
+    await adapter.fetchCurrent();
+    expect(obs.logs).toContainEqual(
+      expect.objectContaining({
+        level: 'warn',
+        message: 'PolicyInsights response failed shape validation',
+      }),
+    );
+  });
+
+  it('returns kind:"malformed" on malformed clmmPolicy', async () => {
     const malformed = {
       ...canonicalCurrentPair,
       clmmPolicy: { rangeBias: 'INVALID' },
@@ -155,10 +169,10 @@ describe('CurrentPolicyInsightsAdapter', () => {
     vi.mocked(fetch).mockResolvedValue(new Response(JSON.stringify(malformed), { status: 200 }));
     const adapter = new CurrentPolicyInsightsAdapter('https://regime.example.com', obs.port);
     const result = await adapter.fetchCurrent();
-    expect(result.kind).toBe('upstream-error');
+    expect(result.kind).toBe('malformed');
   });
 
-  it('returns kind:"upstream-error" when clmmPolicy maxCapitalDeploymentBps > 10000', async () => {
+  it('returns kind:"malformed" when clmmPolicy maxCapitalDeploymentBps > 10000', async () => {
     const malformed = {
       ...canonicalCurrentPair,
       clmmPolicy: {
@@ -170,10 +184,10 @@ describe('CurrentPolicyInsightsAdapter', () => {
     vi.mocked(fetch).mockResolvedValue(new Response(JSON.stringify(malformed), { status: 200 }));
     const adapter = new CurrentPolicyInsightsAdapter('https://regime.example.com', obs.port);
     const result = await adapter.fetchCurrent();
-    expect(result.kind).toBe('upstream-error');
+    expect(result.kind).toBe('malformed');
   });
 
-  it('returns kind:"upstream-error" on malformed levels', async () => {
+  it('returns kind:"malformed" on malformed levels', async () => {
     const malformed = {
       ...canonicalCurrentPair,
       levels: { supportsUsdcPerSol: ['not-a-number'], resistancesUsdcPerSol: [] },
@@ -181,10 +195,10 @@ describe('CurrentPolicyInsightsAdapter', () => {
     vi.mocked(fetch).mockResolvedValue(new Response(JSON.stringify(malformed), { status: 200 }));
     const adapter = new CurrentPolicyInsightsAdapter('https://regime.example.com', obs.port);
     const result = await adapter.fetchCurrent();
-    expect(result.kind).toBe('upstream-error');
+    expect(result.kind).toBe('malformed');
   });
 
-  it('returns kind:"upstream-error" on malformed freshness', async () => {
+  it('returns kind:"malformed" on malformed freshness', async () => {
     const malformed = {
       ...canonicalCurrentPair,
       freshness: { status: 'INVALID' },
@@ -192,7 +206,7 @@ describe('CurrentPolicyInsightsAdapter', () => {
     vi.mocked(fetch).mockResolvedValue(new Response(JSON.stringify(malformed), { status: 200 }));
     const adapter = new CurrentPolicyInsightsAdapter('https://regime.example.com', obs.port);
     const result = await adapter.fetchCurrent();
-    expect(result.kind).toBe('upstream-error');
+    expect(result.kind).toBe('malformed');
   });
 
   it('returns kind:"config-error" when baseUrl is null', async () => {

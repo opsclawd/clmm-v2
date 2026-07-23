@@ -143,7 +143,7 @@ export default function PositionsRoute() {
       srThesesUnavailableReason={srThesesQuery.data?.unavailableReason ?? null}
       policyInsight={policyInsightsQuery.data?.policyInsight}
       policyInsightsLoading={
-        policyInsightsQuery.isLoading && policyInsightsQuery.fetchStatus !== 'idle'
+        policyInsightsQuery.isFetching && policyInsightsQuery.fetchStatus !== 'idle'
       }
       policyInsightsError={policyInsightsQuery.isError}
       policyInsightsEnabled={policyInsightsEnabled}
