@@ -10,6 +10,7 @@ import type {
   PolicyInsightDataQuality,
   PolicyInsightSelectionStatus,
   PolicyInsightWarningCode,
+  PolicyInsightReasonCode,
 } from '@clmm/application/public';
 
 export type PolicyInsightsSeverity = 'danger' | 'warning' | 'neutral';
@@ -103,22 +104,6 @@ const EVIDENCE_STATUS_LABELS: Record<PolicyInsightSelectionStatus, string> = {
   DEGRADED: 'Limited evidence coverage',
 };
 
-type PolicyInsightReasonCode =
-  | 'ADVISORY_ONLY'
-  | 'DATA_HARD_STALE'
-  | 'DATA_INSUFFICIENT_SAMPLES'
-  | 'CLMM_BREACH_LOWER'
-  | 'CLMM_BREACH_UPPER'
-  | 'CHURN_STAND_DOWN_ACTIVE'
-  | 'CHURN_COOLDOWN_ACTIVE'
-  | 'MARKET_REGIME_UP'
-  | 'MARKET_REGIME_DOWN'
-  | 'MARKET_REGIME_CHOP'
-  | 'FEATURE_THRESHOLD_BREACHED'
-  | 'CONTEXTUAL_EVIDENCE_VOTE'
-  | 'RESEARCH_BRIEF_ANALYSIS'
-  | 'NO_ELIGIBLE_PRICE_LEVELS';
-
 const WARNING_CODE_LABELS: Record<PolicyInsightWarningCode, string> = {
   MARKET_DATA_HARD_STALE: 'Market data hard stale',
   EVIDENCE_STALE_INPUT: 'Evidence stale input',
@@ -146,7 +131,7 @@ const REASON_CODE_LABELS: Record<PolicyInsightReasonCode, string> = {
   NO_ELIGIBLE_PRICE_LEVELS: 'No eligible price levels',
 };
 
-const LEXICAL_ZERO_VALUES = new Set(['0', '0.0', '0.00']);
+const LEXICAL_ZERO_PATTERN = /^0(?:\.0+)?$/;
 
 function formatPercentFromBps(bps: number): string {
   const percent = bps / 100;
@@ -167,7 +152,7 @@ function formatFreshness(ageSeconds: number): string {
 }
 
 function filterZeroLevels(levels: string[]): string[] {
-  return levels.filter((level) => !LEXICAL_ZERO_VALUES.has(level));
+  return levels.filter((level) => !LEXICAL_ZERO_PATTERN.test(level));
 }
 
 function formatLevelsLabel(levels: string[]): string | null {
@@ -182,7 +167,7 @@ function formatEvidenceSummary(
   sourceCount: number,
 ): string {
   const label = EVIDENCE_STATUS_LABELS[selectionStatus];
-  if (selectionStatus === 'FULL' || (bundleCount === 0 && sourceCount === 0)) {
+  if (bundleCount === 0 && sourceCount === 0) {
     return label;
   }
   const bundleStr = `${bundleCount} bundle${bundleCount !== 1 ? 's' : ''}`;
@@ -283,7 +268,7 @@ export function buildPolicyInsightsViewModel(
     rebalanceSensitivityLabel: REBALANCE_SENSITIVITY_LABELS[block.clmmPolicy.rebalanceSensitivity],
     maxDeploymentLabel: formatPercentFromBps(block.clmmPolicy.maxCapitalDeploymentBps),
     riskLabel: RISK_LABELS[block.riskLevel],
-    confidenceLabel: `${block.confidenceBps / 100}% confidence`,
+    confidenceLabel: `${formatPercentFromBps(block.confidenceBps)} confidence`,
     dataQualityLabel: DATA_QUALITY_LABELS[block.dataQuality],
     freshnessLabel: formatFreshness(block.freshness.ageSeconds),
     asOfLabel: block.asOf.replace(/\.\d{3}Z$/, 'Z'),

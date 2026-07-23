@@ -1,4 +1,9 @@
-import type { AssetSymbol, PostExitAssetPosture, TokenAmount } from '../shared/index.js';
+import type {
+  AssetSymbol,
+  PostExitAssetPosture,
+  TokenAmount,
+  BreachDirection,
+} from '../shared/index.js';
 
 export type SwapInstruction = {
   readonly fromAsset: AssetSymbol;
@@ -6,6 +11,9 @@ export type SwapInstruction = {
   readonly policyReason: string;
   readonly amountBasis?: TokenAmount;
 };
+
+export type PlanId = string & { readonly _brand: 'PlanId' };
+export type CanonicalHash = string & { readonly _brand: 'CanonicalHash' };
 
 export type ExecutionStep =
   | { readonly kind: 'remove-liquidity' }
@@ -53,3 +61,15 @@ export type ExecutionAttempt = {
   readonly completedSteps: ReadonlyArray<ExecutionStep['kind']>;
   readonly transactionReferences: readonly TransactionReference[];
 };
+
+export type ExecutionOrigin =
+  | {
+      readonly kind: 'qualified-breach';
+      readonly breachDirection: BreachDirection;
+    }
+  | {
+      readonly kind: 'regime-plan';
+      readonly planId: PlanId;
+      readonly canonicalHash: CanonicalHash;
+      readonly canonicalExitIntent: 'exit-to-usdc' | 'exit-to-sol';
+    };

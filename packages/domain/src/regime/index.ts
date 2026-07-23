@@ -5,13 +5,13 @@ export type {
   PositionPlan,
   PlanLifecycleState,
   PlanLifecycleEvent,
+  PlanAction,
   ExecutionOrigin,
-  AdvisoryAction,
   NonExecutedOutcome,
   RegimeResponse,
   PlanId,
   CanonicalHash,
-} from './PlanLifecycleReducer.js';
+} from './PositionPlan.js';
 
 export {
   makePositionPlan,
