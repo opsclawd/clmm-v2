@@ -71,6 +71,37 @@ export function PolicyInsightsSection({
     );
   }
 
+  if (isLoading && policyInsight != null) {
+    return (
+      <View
+        testID="policy-insights-card"
+        accessibilityLabel="Policy insights: updating"
+        style={{ ...cardStyle, borderColor: severityBorder('neutral') }}
+      >
+        <Text
+          style={{
+            color: colors.textPrimary,
+            fontSize: typography.fontSize.sm,
+            fontWeight: typography.fontWeight.semibold,
+          }}
+        >
+          PolicyInsights
+        </Text>
+        <Text
+          style={{ color: colors.textSecondary, fontSize: typography.fontSize.xs, marginTop: 2 }}
+        >
+          {buildPolicyInsightsViewModel(policyInsight, now).subtitle}
+        </Text>
+        <Text
+          testID="policy-insights-updating"
+          style={{ color: colors.textTertiary, fontSize: typography.fontSize.xs, marginTop: 8 }}
+        >
+          Updating policy insight…
+        </Text>
+      </View>
+    );
+  }
+
   if (policyInsight == null) {
     if (!unavailableReason && !isError) return null;
     return (
@@ -94,6 +125,8 @@ export function PolicyInsightsSection({
   }
 
   const vm = buildPolicyInsightsViewModel(policyInsight, now);
+  const evidenceTextColor = vm.isDegraded || vm.isLowConfidence ? colors.warn : colors.textBody;
+
   return (
     <View
       testID="policy-insights-card"
@@ -142,16 +175,30 @@ export function PolicyInsightsSection({
         </Text>
       )}
       <Text
+        testID="policy-insights-market-regime"
+        accessibilityLabel={vm.marketRegimeLabel}
+        style={{ color: colors.textBody, fontSize: typography.fontSize.sm, marginTop: 6 }}
+      >
+        {vm.marketRegimeLabel}
+      </Text>
+      <Text
+        testID="policy-insights-fundamental-regime"
+        accessibilityLabel={vm.fundamentalRegimeLabel}
+        style={{ color: colors.textBody, fontSize: typography.fontSize.sm, marginTop: 2 }}
+      >
+        {vm.fundamentalRegimeLabel}
+      </Text>
+      <Text
         testID="policy-insights-posture"
         accessibilityLabel={vm.postureLabel}
-        style={{ color: colors.textBody, fontSize: typography.fontSize.sm, marginTop: 6 }}
+        style={{ color: colors.textBody, fontSize: typography.fontSize.sm, marginTop: 2 }}
       >
         {vm.postureLabel}
       </Text>
       <Text
         testID="policy-insights-range-bias"
         accessibilityLabel={vm.rangeBiasLabel}
-        style={{ color: colors.textBody, fontSize: typography.fontSize.sm, marginTop: 2 }}
+        style={{ color: colors.textBody, fontSize: typography.fontSize.sm, marginTop: 6 }}
       >
         {vm.rangeBiasLabel}
       </Text>
@@ -176,6 +223,40 @@ export function PolicyInsightsSection({
       >
         {vm.riskLabel}
       </Text>
+      {vm.supportsLabel != null ? (
+        <Text
+          testID="policy-insights-supports"
+          accessibilityLabel={vm.supportsLabel}
+          style={{ color: colors.textBody, fontSize: typography.fontSize.sm, marginTop: 6 }}
+        >
+          {vm.supportsLabel}
+        </Text>
+      ) : null}
+      {vm.resistancesLabel != null ? (
+        <Text
+          testID="policy-insights-resistances"
+          accessibilityLabel={vm.resistancesLabel}
+          style={{ color: colors.textBody, fontSize: typography.fontSize.sm, marginTop: 2 }}
+        >
+          {vm.resistancesLabel}
+        </Text>
+      ) : null}
+      {vm.levelsUnavailableLabel != null ? (
+        <Text
+          testID="policy-insights-levels-unavailable"
+          accessibilityLabel={vm.levelsUnavailableLabel}
+          style={{ color: colors.textBody, fontSize: typography.fontSize.sm, marginTop: 6 }}
+        >
+          {vm.levelsUnavailableLabel}
+        </Text>
+      ) : null}
+      <Text
+        testID="policy-insights-evidence-summary"
+        accessibilityLabel={vm.evidenceSummary}
+        style={{ color: evidenceTextColor, fontSize: typography.fontSize.sm, marginTop: 6 }}
+      >
+        {vm.evidenceSummary}
+      </Text>
       <Text
         testID="policy-insights-confidence"
         accessibilityLabel={vm.confidenceLabel}
@@ -189,6 +270,32 @@ export function PolicyInsightsSection({
         style={{ color: colors.textBody, fontSize: typography.fontSize.sm, marginTop: 2 }}
       >
         {vm.dataQualityLabel}
+      </Text>
+      {vm.warningLabels.length > 0 ? (
+        <View style={{ marginTop: 4 }}>
+          {vm.warningLabels.slice(0, 3).map((label, index) => (
+            <Text
+              key={index}
+              style={{ color: colors.warn, fontSize: typography.fontSize.xs, marginTop: 2 }}
+            >
+              {label}
+            </Text>
+          ))}
+        </View>
+      ) : null}
+      <Text
+        testID="policy-insights-as-of"
+        accessibilityLabel={`As of ${vm.asOfLabel}`}
+        style={{ color: colors.textTertiary, fontSize: typography.fontSize.xs, marginTop: 6 }}
+      >
+        As of {vm.asOfLabel}
+      </Text>
+      <Text
+        testID="policy-insights-expires"
+        accessibilityLabel={`Expires ${vm.expiresLabel}`}
+        style={{ color: colors.textTertiary, fontSize: typography.fontSize.xs, marginTop: 2 }}
+      >
+        Expires {vm.expiresLabel}
       </Text>
       {vm.reasoning ? (
         <Text
