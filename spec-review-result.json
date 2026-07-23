@@ -1,0 +1,9 @@
+{
+  "result": "fail",
+  "findings": [
+    {
+      "severity": "P0",
+      "summary": "Task 1 was not implemented. The implementation aborted due to a missing upstream dependency (@opsclawd/regime-engine-contracts), resulting in no code changes. The required test file (packages/application/src/dto/policyInsightContract.test.ts) and package.json modifications were not created."
+    }
+  ]
+}

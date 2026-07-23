@@ -1,48 +1,60 @@
 import { describe, expect, it } from 'vitest';
-import type {
-  PolicyInsightBlock,
-  PolicyInsightClmmPolicy,
-  PolicyInsightLevels,
-  PolicyInsightFreshness,
-  PolicyInsightRecommendedAction,
-  PolicyInsightConfidence,
-  PolicyInsightRiskLevel,
-  PolicyInsightDataQuality,
-  PolicyInsightStatus,
-} from './index.js';
+import type { PolicyInsightBlock } from './index.js';
+import { parsePolicyInsightBlock } from './index.js';
+import canonicalCurrentPairFixture from '../../../../schemas/regime-engine/policy-insight.v1/fixtures/valid/current-pair.json';
 
 describe('@clmm/application/public exports for policy insights', () => {
   it('exposes PolicyInsightBlock and nested DTOs as types', () => {
     const sample: PolicyInsightBlock = {
-      schemaVersion: '1.0',
+      schemaVersion: 'policy-insight.v1',
+      insightId: 'a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1a1',
+      rulesetVersion: 'sol-usdc-policy.v1.2026-07',
       pair: 'SOL/USDC',
-      asOf: '2026-05-07T00:00:00Z',
-      source: 'openclaw',
-      runId: 'run-1',
-      status: 'FRESH' satisfies PolicyInsightStatus,
+      position: null,
+      generatedAt: '2026-07-19T12:00:00.000Z',
+      asOf: '2026-07-19T11:59:00.000Z',
+      expiresAt: '2026-07-19T13:00:00.000Z',
       marketRegime: 'UP',
-      fundamentalRegime: 'NEUTRAL',
-      recommendedAction: 'hold' satisfies PolicyInsightRecommendedAction,
-      confidence: 'medium' satisfies PolicyInsightConfidence,
-      riskLevel: 'normal' satisfies PolicyInsightRiskLevel,
-      dataQuality: 'complete' satisfies PolicyInsightDataQuality,
+      fundamentalRegime: 'BULLISH',
+      posture: 'AGGRESSIVE',
+      recommendedAction: 'HOLD',
+      riskLevel: 'NORMAL',
       clmmPolicy: {
-        posture: 'wide',
-        rangeBias: 'symmetric',
-        rebalanceSensitivity: 'low',
-        maxCapitalDeploymentPct: 0.5,
-      } satisfies PolicyInsightClmmPolicy,
-      levels: { supports: [], resistances: [] } satisfies PolicyInsightLevels,
-      reasoning: [],
-      sourceRefs: [],
-      expiresAt: '2026-05-07T01:00:00Z',
-      payloadHash: 'abc',
-      receivedAtIso: '2026-05-07T00:00:01Z',
+        rangeBias: 'MEDIUM',
+        rebalanceSensitivity: 'NORMAL',
+        maxCapitalDeploymentBps: 7500,
+      },
+      levels: {
+        supportsUsdcPerSol: [],
+        resistancesUsdcPerSol: [],
+      },
+      evidence: {
+        selectionStatus: 'FULL',
+        selectionPolicyVersion: 'selector.v1.2026-07',
+        selectedBundleRefs: [],
+        selectedSourceRefs: [],
+      },
+      confidenceBps: 7500,
+      dataQuality: 'COMPLETE',
+      reasonCodes: ['MARKET_REGIME_UP', 'ADVISORY_ONLY'],
+      reasoning:
+        'Market regime is UP with bullish fundamental signals. No position-specific triggers present.',
+      warnings: [],
       freshness: {
-        capturedAtUnixMs: 1_700_000_000_000,
-        stale: false,
-      } satisfies PolicyInsightFreshness,
-    };
-    expect(sample.recommendedAction).toBe('hold');
+        status: 'FRESH',
+        evaluatedAt: '2026-07-19T12:00:00.000Z',
+        ageSeconds: 60,
+      },
+    } satisfies PolicyInsightBlock;
+    expect(sample.recommendedAction).toBe('HOLD');
+  });
+
+  it('canonical fixture passes validation', () => {
+    expect(canonicalCurrentPairFixture.schemaVersion).toBe('policy-insight.v1');
+  });
+
+  it('parsePolicyInsightBlock is publicly exported and callable', () => {
+    const result = parsePolicyInsightBlock(canonicalCurrentPairFixture);
+    expect(result).toEqual(canonicalCurrentPairFixture);
   });
 });

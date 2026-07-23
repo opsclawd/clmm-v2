@@ -365,17 +365,31 @@ export type {
 
 export type { SrThesisDto, SrThesesBlock } from './srTheses.js';
 
+export { parsePolicyInsightBlock } from './policyInsightValidator.js';
+
 export type {
   PolicyInsightBlock,
   PolicyInsightClmmPolicy,
   PolicyInsightLevels,
   PolicyInsightFreshness,
   PolicyInsightRecommendedAction,
-  PolicyInsightConfidence,
   PolicyInsightRiskLevel,
   PolicyInsightDataQuality,
-  PolicyInsightStatus,
   PolicyInsightsUnavailableReason,
+  PolicyInsightMarketRegime,
+  PolicyInsightFundamentalRegime,
+  PolicyInsightPosture,
+  PolicyInsightRangeBias,
+  PolicyInsightRebalanceSensitivity,
+  PolicyInsightFreshnessStatus,
+  PolicyInsightSelectionStatus,
+  PolicyInsightWarningCode,
+  PolicyInsightReasonCode,
+  PolicyInsightPositionScope,
+  PolicyInsightBundleRef,
+  PolicyInsightSourceRef,
+  PolicyInsightEvidence,
+  PolicyInsightWarning,
 } from './policyInsights.js';
 
 // --- Financial Metrics DTOs ---

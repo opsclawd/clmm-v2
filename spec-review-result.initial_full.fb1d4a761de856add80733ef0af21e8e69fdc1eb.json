@@ -1,0 +1,9 @@
+{
+  "result": "fail",
+  "findings": [
+    {
+      "severity": "P0",
+      "summary": "Task 1 was not completed as the implementer reported being blocked by an unavailable upstream dependency."
+    }
+  ]
+}

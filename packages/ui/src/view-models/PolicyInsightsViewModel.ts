@@ -1,4 +1,9 @@
-import type { PolicyInsightBlock } from '@clmm/application/public';
+import type {
+  PolicyInsightBlock,
+  PolicyInsightRecommendedAction,
+  PolicyInsightRiskLevel,
+  PolicyInsightDataQuality,
+} from '@clmm/application/public';
 
 export type PolicyInsightsSeverity = 'danger' | 'warning' | 'neutral';
 
@@ -14,47 +19,40 @@ export type PolicyInsightsViewModel = {
   dataQualityLabel: string;
   freshnessLabel: string;
   isStale: boolean;
-  reasoning: string[];
+  reasoning: string;
   subtitle: string;
 };
 
-const ACTION_LABELS: Record<PolicyInsightBlock['recommendedAction'], string> = {
-  hold: 'Hold',
-  watch: 'Watch',
-  tighten_range: 'Tighten range',
-  widen_range: 'Widen range',
-  exit_range: 'Exit range',
-  pause_rebalances: 'Pause rebalances',
+const ACTION_LABELS: Record<PolicyInsightRecommendedAction, string> = {
+  HOLD: 'Hold',
+  MONITOR_LOWER_BOUND: 'Monitor lower bound',
+  MONITOR_UPPER_BOUND: 'Monitor upper bound',
+  EXIT_TO_USDC: 'Exit to USDC',
+  EXIT_TO_SOL: 'Exit to SOL',
+  STAND_DOWN: 'Stand down',
 };
 
-const RISK_LABELS: Record<PolicyInsightBlock['riskLevel'], string> = {
-  normal: 'Normal risk',
-  elevated: 'Elevated risk',
-  critical: 'Critical risk',
+const RISK_LABELS: Record<PolicyInsightRiskLevel, string> = {
+  NORMAL: 'Normal risk',
+  ELEVATED: 'Elevated risk',
+  CRITICAL: 'Critical risk',
 };
 
-const CONFIDENCE_LABELS: Record<PolicyInsightBlock['confidence'], string> = {
-  low: 'Low confidence',
-  medium: 'Medium confidence',
-  high: 'High confidence',
+const DATA_QUALITY_LABELS: Record<PolicyInsightDataQuality, string> = {
+  COMPLETE: 'Complete data',
+  PARTIAL: 'Partial data',
+  STALE: 'Stale data',
 };
 
-const DATA_QUALITY_LABELS: Record<PolicyInsightBlock['dataQuality'], string> = {
-  complete: 'Complete data',
-  partial: 'Partial data',
-  stale: 'Stale data',
-};
-
-const MS_PER_MINUTE = 60_000;
-const MS_PER_HOUR = 3_600_000;
-
-function formatPercent(fraction: number): string {
-  const clamped = Math.max(0, Math.min(1, fraction));
-  return `${Math.round(clamped * 100)}%`;
+function formatPercentFromBps(bps: number): string {
+  const fraction = Math.max(0, Math.min(10000, bps)) / 10000;
+  return `${Math.round(fraction * 100)}%`;
 }
 
-function formatFreshness(capturedAtUnixMs: number, now: number): string {
-  const ageMs = Math.max(0, now - capturedAtUnixMs);
+function formatFreshness(ageSeconds: number): string {
+  const MS_PER_MINUTE = 60_000;
+  const MS_PER_HOUR = 3_600_000;
+  const ageMs = ageSeconds * 1000;
   if (ageMs < MS_PER_HOUR) {
     const minutes = Math.max(1, Math.round(ageMs / MS_PER_MINUTE));
     return `${minutes}m ago`;
@@ -64,43 +62,36 @@ function formatFreshness(capturedAtUnixMs: number, now: number): string {
 }
 
 function deriveSeverity(block: PolicyInsightBlock): PolicyInsightsSeverity {
-  if (block.riskLevel === 'critical' || block.recommendedAction === 'exit_range') {
+  if (
+    block.riskLevel === 'CRITICAL' ||
+    block.recommendedAction === 'EXIT_TO_USDC' ||
+    block.recommendedAction === 'EXIT_TO_SOL'
+  ) {
     return 'danger';
   }
-  if (block.riskLevel === 'elevated' || block.recommendedAction === 'pause_rebalances') {
+  if (block.riskLevel === 'ELEVATED' || block.recommendedAction === 'STAND_DOWN') {
     return 'warning';
   }
   return 'neutral';
 }
 
-function firstNonEmpty(values: string[], limit: number): string[] {
-  const out: string[] = [];
-  for (const v of values) {
-    if (typeof v === 'string' && v.trim().length > 0) {
-      out.push(v);
-      if (out.length === limit) break;
-    }
-  }
-  return out;
-}
-
 export function buildPolicyInsightsViewModel(
   block: PolicyInsightBlock,
-  now: number,
+  _now: number,
 ): PolicyInsightsViewModel {
   return {
     actionLabel: ACTION_LABELS[block.recommendedAction],
     severity: deriveSeverity(block),
-    postureLabel: `Posture: ${block.clmmPolicy.posture}`,
+    postureLabel: `Posture: ${block.posture}`,
     rangeBiasLabel: `Range bias: ${block.clmmPolicy.rangeBias}`,
     rebalanceSensitivityLabel: `Rebalance sensitivity: ${block.clmmPolicy.rebalanceSensitivity}`,
-    maxDeploymentLabel: formatPercent(block.clmmPolicy.maxCapitalDeploymentPct),
+    maxDeploymentLabel: formatPercentFromBps(block.clmmPolicy.maxCapitalDeploymentBps),
     riskLabel: RISK_LABELS[block.riskLevel],
-    confidenceLabel: CONFIDENCE_LABELS[block.confidence],
+    confidenceLabel: `${block.confidenceBps / 100}% confidence`,
     dataQualityLabel: DATA_QUALITY_LABELS[block.dataQuality],
-    freshnessLabel: formatFreshness(block.freshness.capturedAtUnixMs, now),
-    isStale: block.status === 'STALE' || block.freshness.stale === true,
-    reasoning: firstNonEmpty(block.reasoning, 3),
+    freshnessLabel: formatFreshness(block.freshness.ageSeconds),
+    isStale: block.freshness.status === 'STALE',
+    reasoning: block.reasoning,
     subtitle: 'Advisory CLMM policy signal. Nothing has been applied.',
   };
 }

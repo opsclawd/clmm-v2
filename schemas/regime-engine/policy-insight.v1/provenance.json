@@ -1,0 +1,59 @@
+{
+  "repository": "https://github.com/opsclawd/regime-engine",
+  "commit": "260d144f653fc95e1b86d3d65c7305b80170e0a0",
+  "schemaPath": "contracts/policy-insight/v1/policy-insight.schema.json",
+  "schemaVersion": "v1",
+  "copiedAt": "2026-07-22T13:16:00Z",
+  "assets": [
+    {
+      "sourcePath": "contracts/policy-insight/v1/policy-insight.schema.json",
+      "localPath": "schemas/regime-engine/policy-insight.v1/schema.json",
+      "sha256": "80487b0a9374d0b535accf535ef9819f2b2de00e1d65980deb73c97afaa02800"
+    },
+    {
+      "sourcePath": "contracts/policy-insight/v1/schema.sha256",
+      "localPath": "schemas/regime-engine/policy-insight.v1/schema.sha256",
+      "sha256": "07088c2a12e326fe3f20de63239bcfadec9ea983a18f8dd43e1226cc407fa76b"
+    },
+    {
+      "sourcePath": "contracts/policy-insight/v1/fixtures/valid/current-pair.json",
+      "localPath": "schemas/regime-engine/policy-insight.v1/fixtures/valid/current-pair.json",
+      "sha256": "a6c1002cd0d0fffcc0a5d0fb654f74877cea36bb21596fef9e448841eca12104"
+    },
+    {
+      "sourcePath": "contracts/policy-insight/v1/fixtures/valid/current-position.json",
+      "localPath": "schemas/regime-engine/policy-insight.v1/fixtures/valid/current-position.json",
+      "sha256": "a674a38c1396cfc62e0c00744807be33b3a652875835250df929a20327d95096"
+    },
+    {
+      "sourcePath": "contracts/policy-insight/v1/fixtures/valid/history.json",
+      "localPath": "schemas/regime-engine/policy-insight.v1/fixtures/valid/history.json",
+      "sha256": "d978038e9def12631f0d2e961035e59ee6dee62f679829631ecda32c42f03724"
+    },
+    {
+      "sourcePath": "contracts/policy-insight/v1/fixtures/invalid/action-position-and-version.json",
+      "localPath": "schemas/regime-engine/policy-insight.v1/fixtures/invalid/action-position-and-version.json",
+      "sha256": "40505f0848683d7a20c4cf47778fba1b8184eff9e2e721daf95897c34c06cadd"
+    },
+    {
+      "sourcePath": "contracts/policy-insight/v1/fixtures/invalid/fields-and-enums.json",
+      "localPath": "schemas/regime-engine/policy-insight.v1/fixtures/invalid/fields-and-enums.json",
+      "sha256": "b97b7352f2990e1a74d7e4b9176adb19a0f0a5b913e7b1c317a66ea17e5f21ca"
+    },
+    {
+      "sourcePath": "contracts/policy-insight/v1/fixtures/invalid/numbers-and-levels.json",
+      "localPath": "schemas/regime-engine/policy-insight.v1/fixtures/invalid/numbers-and-levels.json",
+      "sha256": "2ece45203f29784c88e71d91c3e45a80bca41822c68c29a372348d21b8cd5677"
+    },
+    {
+      "sourcePath": "contracts/policy-insight/v1/fixtures/invalid/ordering-and-duplicates.json",
+      "localPath": "schemas/regime-engine/policy-insight.v1/fixtures/invalid/ordering-and-duplicates.json",
+      "sha256": "4bfe9138f140d02896ff37860b6ff00a3a9a1276d3fe4428ab39faafb2f493c9"
+    },
+    {
+      "sourcePath": "contracts/policy-insight/v1/fixtures/invalid/timestamps-and-freshness.json",
+      "localPath": "schemas/regime-engine/policy-insight.v1/fixtures/invalid/timestamps-and-freshness.json",
+      "sha256": "2745fd6c8f389caef59c4e81a27003010c1bc35bc24c5eb8999fd0e77efbb766"
+    }
+  ]
+}

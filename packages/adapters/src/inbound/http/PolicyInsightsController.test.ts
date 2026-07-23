@@ -5,39 +5,14 @@ import type {
   PolicyInsightsReadResult,
   PolicyInsightBlock,
 } from '@clmm/application';
+import canonicalCurrentPair from '../../../../../schemas/regime-engine/policy-insight.v1/fixtures/valid/current-pair.json';
 
 function fixtureBlock(): PolicyInsightBlock {
-  return {
-    schemaVersion: '1.0',
-    pair: 'SOL/USDC',
-    asOf: '2026-05-07T00:00:00Z',
-    source: 'openclaw',
-    runId: 'run-1',
-    status: 'FRESH',
-    marketRegime: 'UP',
-    fundamentalRegime: 'NEUTRAL',
-    recommendedAction: 'hold',
-    confidence: 'medium',
-    riskLevel: 'normal',
-    dataQuality: 'complete',
-    clmmPolicy: {
-      posture: 'wide',
-      rangeBias: 'symmetric',
-      rebalanceSensitivity: 'low',
-      maxCapitalDeploymentPct: 0.5,
-    },
-    levels: { supports: [], resistances: [] },
-    reasoning: [],
-    sourceRefs: [],
-    expiresAt: '2026-05-07T01:00:00Z',
-    payloadHash: 'h',
-    receivedAtIso: '2026-05-07T00:00:01Z',
-    freshness: { capturedAtUnixMs: Date.parse('2026-05-07T00:00:00Z'), stale: false },
-  };
+  return canonicalCurrentPair as PolicyInsightBlock;
 }
 
 describe('PolicyInsightsController', () => {
-  it('returns { policyInsight: block } when port resolves a block', async () => {
+  it('passes through the canonical block without modification', async () => {
     const block = fixtureBlock();
     const result: PolicyInsightsReadResult = { kind: 'block', block };
     const fetchCurrent = vi.fn().mockResolvedValue(result);

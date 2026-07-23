@@ -161,7 +161,7 @@ export function PolicyInsightsSection({
         accessibilityLabel={`Max capital: ${vm.maxDeploymentLabel}`}
         style={{ color: colors.textBody, fontSize: typography.fontSize.sm, marginTop: 2 }}
       >
-        Max capital: {vm.maxDeploymentLabel}
+        {vm.maxDeploymentLabel}
       </Text>
       <Text
         testID="policy-insights-risk"
@@ -184,14 +184,13 @@ export function PolicyInsightsSection({
       >
         {vm.dataQualityLabel}
       </Text>
-      {vm.reasoning.map((reason, idx) => (
+      {vm.reasoning ? (
         <Text
-          key={`policy-insight-reason-${idx}`}
           style={{ color: colors.textSecondary, fontSize: typography.fontSize.sm, marginTop: 4 }}
         >
-          {reason}
+          {vm.reasoning}
         </Text>
-      ))}
+      ) : null}
       {isError ? (
         <Text
           testID="policy-insights-degraded"
