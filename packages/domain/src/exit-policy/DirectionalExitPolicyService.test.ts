@@ -92,3 +92,21 @@ describe('DirectionalExitPolicyService', () => {
     });
   });
 });
+
+describe('lower breach still exits to USDC', () => {
+  it('applies correct exit policy for lower-bound breach', () => {
+    const result = applyDirectionalExitPolicy(LOWER_BOUND_BREACH);
+    expect(result.postExitPosture.kind).toBe('exit-to-usdc');
+    expect(result.swapInstruction.fromAsset).toBe('SOL');
+    expect(result.swapInstruction.toAsset).toBe('USDC');
+  });
+});
+
+describe('upper breach still exits to SOL', () => {
+  it('applies correct exit policy for upper-bound breach', () => {
+    const result = applyDirectionalExitPolicy(UPPER_BOUND_BREACH);
+    expect(result.postExitPosture.kind).toBe('exit-to-sol');
+    expect(result.swapInstruction.fromAsset).toBe('USDC');
+    expect(result.swapInstruction.toAsset).toBe('SOL');
+  });
+});
