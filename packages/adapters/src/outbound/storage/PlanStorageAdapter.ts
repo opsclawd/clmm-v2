@@ -435,18 +435,32 @@ export class PlanStorageAdapter implements PlanRepository {
   }
 
   async completeDelivery(params: PlanDeliveryCompletionParams): Promise<void> {
-    await this.db
-      .update(planResultOutbox)
-      .set({ deliveredAt: params.deliveredAt })
-      .where(eq(planResultOutbox.resultId, params.resultId));
+    await this.db.transaction(async (tx) => {
+      const outboxRows = await tx
+        .select({ planId: planResultOutbox.planId })
+        .from(planResultOutbox)
+        .where(eq(planResultOutbox.resultId, params.resultId))
+        .limit(1);
 
-    await this.db
-      .update(positionPlans)
-      .set({
-        lifecycleKind: 'reported',
-        deliveredAt: params.deliveredAt,
-      })
-      .where(eq(positionPlans.resultIdempotencyKey, ''));
+      if (outboxRows.length === 0) {
+        return;
+      }
+
+      const { planId } = outboxRows[0]!;
+
+      await tx
+        .update(planResultOutbox)
+        .set({ deliveredAt: params.deliveredAt })
+        .where(eq(planResultOutbox.resultId, params.resultId));
+
+      await tx
+        .update(positionPlans)
+        .set({
+          lifecycleKind: 'reported',
+          deliveredAt: params.deliveredAt,
+        })
+        .where(eq(positionPlans.planId, planId));
+    });
   }
 
   async recordPermanentFailure(params: PlanPermanentFailureParams): Promise<void> {
