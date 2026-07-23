@@ -84,11 +84,15 @@ describe('PolicyInsightsSection', () => {
       />,
     );
     expect(screen.getByText('PolicyInsights')).toBeTruthy();
-    expect(screen.getByText('Advisory CLMM policy signal. Nothing has been applied.')).toBeTruthy();
+    expect(
+      screen.getByText(
+        'Advisory policy context only. Nothing is signed or applied; deterministic stop-loss monitoring continues independently.',
+      ),
+    ).toBeTruthy();
     expect(screen.getByText('Hold')).toBeTruthy();
-    expect(screen.getByText('Posture: AGGRESSIVE')).toBeTruthy();
-    expect(screen.getByText('Range bias: MEDIUM')).toBeTruthy();
-    expect(screen.getByText('Rebalance sensitivity: NORMAL')).toBeTruthy();
+    expect(screen.getByText('Aggressive')).toBeTruthy();
+    expect(screen.getByText('Medium')).toBeTruthy();
+    expect(screen.getByText('Normal')).toBeTruthy();
     expect(screen.getByText('75%')).toBeTruthy();
     expect(screen.getByText('Normal risk')).toBeTruthy();
     expect(screen.getByText('75% confidence')).toBeTruthy();
