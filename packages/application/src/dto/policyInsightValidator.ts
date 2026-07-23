@@ -1,5 +1,5 @@
 import { Ajv2020 } from 'ajv/dist/2020.js';
-import * as schema from '../../../../schemas/regime-engine/policy-insight.v1/schema.json';
+import schema from '../../../../schemas/regime-engine/policy-insight.v1/schema.json' with { type: 'json' };
 import type { PolicyInsightBlock } from './policyInsights.js';
 
 const ajv = new Ajv2020({
@@ -9,7 +9,7 @@ const ajv = new Ajv2020({
   removeAdditional: false,
 });
 
-const schemaId = (schema as { $id: string }).$id;
+const schemaId = schema.$id;
 ajv.addSchema(schema);
 
 const validatePolicyInsight = ajv.compile<PolicyInsightBlock>({
