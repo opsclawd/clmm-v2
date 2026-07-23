@@ -354,10 +354,7 @@ export class PlanStorageAdapter implements PlanRepository {
         return { kind: 'plan-not-found' };
       }
 
-      const lifecycleKind =
-        params.outcome.kind === 'executed' || params.outcome.kind === 'failed'
-          ? 'result-pending'
-          : 'result-pending';
+      const lifecycleKind = 'result-pending';
 
       const now = params.committedAt;
 
@@ -368,8 +365,6 @@ export class PlanStorageAdapter implements PlanRepository {
           lifecycleKind,
           canonicalResultJson: params.canonicalResult.payload,
           resultIdempotencyKey: params.resultIdempotencyKey,
-          deliveryAttempts: 0,
-          nextAttemptAt: now + 300000,
         })
         .where(eq(positionPlans.planId, params.planId));
 
@@ -443,6 +438,7 @@ export class PlanStorageAdapter implements PlanRepository {
         .select({ planId: planResultOutbox.planId })
         .from(planResultOutbox)
         .where(eq(planResultOutbox.resultId, params.resultId))
+        .for('update')
         .limit(1);
 
       if (outboxRows.length === 0) {
