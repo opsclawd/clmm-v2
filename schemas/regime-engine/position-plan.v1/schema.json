@@ -1,0 +1,164 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://contracts.opsclawd.dev/regime-engine/position-plan/v1/position-plan.schema.json",
+  "title": "PositionPlan",
+  "type": "object",
+  "required": [
+    "schemaVersion",
+    "planId",
+    "planHash",
+    "asOfUnixMs",
+    "expiresAtUnixMs",
+    "scope",
+    "regime",
+    "actions",
+    "constraints",
+    "reasons"
+  ],
+  "additionalProperties": false,
+  "properties": {
+    "schemaVersion": {
+      "type": "string",
+      "const": "position-plan.v1"
+    },
+    "planId": {
+      "type": "string",
+      "minLength": 1
+    },
+    "planHash": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{64}$"
+    },
+    "asOfUnixMs": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "expiresAtUnixMs": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "scope": {
+      "type": "object",
+      "required": ["kind", "positionId", "poolAddress", "symbol"],
+      "additionalProperties": false,
+      "properties": {
+        "kind": {
+          "type": "string",
+          "const": "position"
+        },
+        "positionId": {
+          "type": "string",
+          "minLength": 1
+        },
+        "poolAddress": {
+          "type": "string",
+          "minLength": 1
+        },
+        "symbol": {
+          "type": "string",
+          "minLength": 1
+        }
+      }
+    },
+    "regime": {
+      "type": "string",
+      "enum": ["UP", "DOWN", "CHOP"]
+    },
+    "actions": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "$ref": "#/$defs/PlanAction"
+      }
+    },
+    "constraints": {
+      "type": "object",
+      "required": ["cooldownUntilUnixMs", "standDownUntilUnixMs", "notes"],
+      "additionalProperties": false,
+      "properties": {
+        "cooldownUntilUnixMs": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "standDownUntilUnixMs": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "notes": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        }
+      }
+    },
+    "reasons": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["code", "severity", "message"],
+        "additionalProperties": false,
+        "properties": {
+          "code": {
+            "type": "string",
+            "minLength": 1
+          },
+          "severity": {
+            "type": "string",
+            "enum": ["INFO", "WARN", "ERROR"]
+          },
+          "message": {
+            "type": "string"
+          }
+        }
+      }
+    }
+  },
+  "$defs": {
+    "PlanAction": {
+      "type": "object",
+      "required": ["type", "reasonCode"],
+      "additionalProperties": false,
+      "properties": {
+        "type": {
+          "type": "string",
+          "enum": ["HOLD", "STAND_DOWN", "REQUEST_EXIT_CLMM"]
+        },
+        "reasonCode": {
+          "type": "string",
+          "minLength": 1
+        },
+        "exitIntent": {
+          "$ref": "#/$defs/PlanExitIntent"
+        }
+      },
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "type": { "const": "REQUEST_EXIT_CLMM" }
+            },
+            "required": ["type"]
+          },
+          "then": {
+            "properties": {
+              "exitIntent": { "$ref": "#/$defs/PlanExitIntent" }
+            },
+            "required": ["exitIntent"]
+          }
+        }
+      ]
+    },
+    "PlanExitIntent": {
+      "type": "object",
+      "required": ["posture"],
+      "additionalProperties": false,
+      "properties": {
+        "posture": {
+          "type": "string",
+          "enum": ["ExitToUSDC", "ExitToSOL"]
+        }
+      }
+    }
+  }
+}

@@ -1,0 +1,12 @@
+{
+  "schemaVersion": "execution-result.v1",
+  "planId": "plan_exit_987654321",
+  "planHash": "f9e8d7c6b5a40123456789abcdef0123456789abcdef0123456789abcdef0123",
+  "positionId": "pos_sol_usdc_02",
+  "requestedAction": "REQUEST_EXIT_CLMM",
+  "status": "SUCCESS",
+  "reasonCode": "EXECUTED_BY_USER",
+  "completedAtUnixMs": 1700000100000,
+  "idempotencyKey": "idem_exit_987654321_01",
+  "forbiddenField": "not_allowed"
+}

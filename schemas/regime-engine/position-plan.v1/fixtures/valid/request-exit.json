@@ -1,0 +1,35 @@
+{
+  "schemaVersion": "position-plan.v1",
+  "planId": "plan_exit_987654321",
+  "planHash": "f9e8d7c6b5a40123456789abcdef0123456789abcdef0123456789abcdef0123",
+  "asOfUnixMs": 1700000000000,
+  "expiresAtUnixMs": 1700003600000,
+  "scope": {
+    "kind": "position",
+    "positionId": "pos_sol_usdc_02",
+    "poolAddress": "Czfq3xZZDmsdGdUyrNLtRhGc47cXcZtLG4crryfu44zE",
+    "symbol": "SOL/USDC"
+  },
+  "regime": "DOWN",
+  "actions": [
+    {
+      "type": "REQUEST_EXIT_CLMM",
+      "reasonCode": "OUT_OF_RANGE_DOWNTREND",
+      "exitIntent": {
+        "posture": "ExitToUSDC"
+      }
+    }
+  ],
+  "constraints": {
+    "cooldownUntilUnixMs": 0,
+    "standDownUntilUnixMs": 0,
+    "notes": ["Downtrend risk detected"]
+  },
+  "reasons": [
+    {
+      "code": "OUT_OF_RANGE_DOWNTREND",
+      "severity": "WARN",
+      "message": "Market crossed lower bound in downtrend."
+    }
+  ]
+}

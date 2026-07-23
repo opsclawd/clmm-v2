@@ -439,3 +439,20 @@ export type PositionListFinancialMetricsDto = {
   unclaimedFees: UnclaimedFeesMetricDto | null;
   poolsById: Readonly<Record<string, PoolFinancialMetricsDto>>;
 };
+
+export type {
+  RegimePlanActionType,
+  RegimePlanExitPosture,
+  RegimePlanExitIntent,
+  RegimePlanAction,
+  RegimePlanScope,
+  RegimePlanConstraints,
+  RegimePlanReason,
+  RegimePlanRequest,
+  RegimePlanResponse,
+  RegimeExecutionResultStatus,
+  RegimeExecutionResultCosts,
+  RegimeExecutionResult,
+} from './regimePlan.js';
+
+export { parseRegimePlanResponse, parseRegimeExecutionResult } from './regimePlanValidator.js';

@@ -1,0 +1,82 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://contracts.opsclawd.dev/regime-engine/execution-result/v1/execution-result.schema.json",
+  "title": "RegimeExecutionResult",
+  "type": "object",
+  "required": [
+    "schemaVersion",
+    "planId",
+    "planHash",
+    "positionId",
+    "requestedAction",
+    "status",
+    "reasonCode",
+    "completedAtUnixMs",
+    "idempotencyKey"
+  ],
+  "additionalProperties": false,
+  "properties": {
+    "schemaVersion": {
+      "type": "string",
+      "const": "execution-result.v1"
+    },
+    "planId": {
+      "type": "string",
+      "minLength": 1
+    },
+    "planHash": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{64}$"
+    },
+    "positionId": {
+      "type": "string",
+      "minLength": 1
+    },
+    "requestedAction": {
+      "type": "string",
+      "enum": ["HOLD", "STAND_DOWN", "REQUEST_EXIT_CLMM"]
+    },
+    "status": {
+      "type": "string",
+      "enum": ["SUCCESS", "FAILED", "SKIPPED"]
+    },
+    "reasonCode": {
+      "type": "string",
+      "minLength": 1
+    },
+    "completedAtUnixMs": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "idempotencyKey": {
+      "type": "string",
+      "minLength": 1
+    },
+    "attemptId": {
+      "type": "string",
+      "minLength": 1
+    },
+    "txSignature": {
+      "type": "string",
+      "minLength": 1
+    },
+    "costs": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "txFeesUsd": {
+          "type": "number",
+          "minimum": 0
+        },
+        "priorityFeesUsd": {
+          "type": "number",
+          "minimum": 0
+        },
+        "slippageUsd": {
+          "type": "number",
+          "minimum": 0
+        }
+      }
+    }
+  }
+}

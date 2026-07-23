@@ -54,9 +54,22 @@ export type {
   PoolFees24hMetricDto,
   PoolFinancialMetricsDto,
   PositionListFinancialMetricsDto,
+  RegimePlanActionType,
+  RegimePlanExitPosture,
+  RegimePlanExitIntent,
+  RegimePlanAction,
+  RegimePlanScope,
+  RegimePlanConstraints,
+  RegimePlanReason,
+  RegimePlanRequest,
+  RegimePlanResponse,
+  RegimeExecutionResultStatus,
+  RegimeExecutionResultCosts,
+  RegimeExecutionResult,
 } from '../dto/index.js';
 
 export { parsePolicyInsightBlock } from '../dto/policyInsightValidator.js';
+export { parseRegimePlanResponse, parseRegimeExecutionResult } from '../dto/regimePlanValidator.js';
 
 // Port types needed by UI (capability + permission state)
 export type { PlatformCapabilityState } from '../ports/index.js';
