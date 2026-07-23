@@ -60,4 +60,13 @@ describe('PolicyInsightsController', () => {
     const response = await controller.getCurrent();
     expect(response).toEqual({ policyInsight: null, unavailableReason: 'upstream-error' });
   });
+
+  it('maps malformed to { policyInsight: null, unavailableReason: "malformed" }', async () => {
+    const result: PolicyInsightsReadResult = { kind: 'malformed' };
+    const fetchCurrent = vi.fn().mockResolvedValue(result);
+    const port: PolicyInsightsReadPort = { fetchCurrent };
+    const controller = new PolicyInsightsController(port);
+    const response = await controller.getCurrent();
+    expect(response).toEqual({ policyInsight: null, unavailableReason: 'malformed' });
+  });
 });

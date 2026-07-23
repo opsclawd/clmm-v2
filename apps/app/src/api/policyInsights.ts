@@ -16,6 +16,7 @@ const VALID_REASONS: ReadonlySet<string> = new Set<PolicyInsightsUnavailableReas
   'not-found',
   'store-unavailable',
   'config-error',
+  'malformed',
   'upstream-error',
 ]);
 

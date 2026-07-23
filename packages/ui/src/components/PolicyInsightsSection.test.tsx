@@ -186,7 +186,11 @@ describe('PolicyInsightsSection', () => {
         now={NOW}
       />,
     );
-    expect(screen.getByText('No policy insight available yet.')).toBeTruthy();
+    expect(
+      screen.getByText(
+        'No policy insight is available yet. Position monitoring and deterministic stop-loss protection continue independently.',
+      ),
+    ).toBeTruthy();
   });
 
   it('renders unavailable copy for store-unavailable', () => {
@@ -200,11 +204,15 @@ describe('PolicyInsightsSection', () => {
         now={NOW}
       />,
     );
-    expect(screen.getByText('Policy insights unavailable.')).toBeTruthy();
+    expect(
+      screen.getByText(
+        'The policy insight store is temporarily unavailable. Position monitoring and deterministic stop-loss protection continue independently.',
+      ),
+    ).toBeTruthy();
   });
 
-  it('renders the same unavailable copy for config-error and upstream-error', () => {
-    const { rerender } = render(
+  it('renders distinct unavailable copy for config-error', () => {
+    render(
       <PolicyInsightsSection
         policyInsight={null}
         isLoading={false}
@@ -214,9 +222,15 @@ describe('PolicyInsightsSection', () => {
         now={NOW}
       />,
     );
-    expect(screen.getByText('Policy insights unavailable.')).toBeTruthy();
+    expect(
+      screen.getByText(
+        'Policy analysis is not configured. Position monitoring and deterministic stop-loss protection continue independently.',
+      ),
+    ).toBeTruthy();
+  });
 
-    rerender(
+  it('renders distinct unavailable copy for upstream-error', () => {
+    render(
       <PolicyInsightsSection
         policyInsight={null}
         isLoading={false}
@@ -226,7 +240,54 @@ describe('PolicyInsightsSection', () => {
         now={NOW}
       />,
     );
-    expect(screen.getByText('Policy insights unavailable.')).toBeTruthy();
+    expect(
+      screen.getByText(
+        'The policy insight service could not be reached. Position monitoring and deterministic stop-loss protection continue independently.',
+      ),
+    ).toBeTruthy();
+  });
+
+  it('renders fail-closed unavailable copy for malformed', () => {
+    render(
+      <PolicyInsightsSection
+        policyInsight={null}
+        isLoading={false}
+        isError={false}
+        isEnabled
+        unavailableReason="malformed"
+        now={NOW}
+      />,
+    );
+    expect(screen.getByTestId('policy-insights-unavailable')).toBeTruthy();
+    expect(
+      screen.getByText(
+        'The policy insight payload was malformed, so guidance was withheld. Position monitoring and deterministic stop-loss protection continue independently.',
+      ),
+    ).toBeTruthy();
+  });
+
+  it('renders distinct bounded copy for every unavailable reason', () => {
+    const reasons = [
+      'not-found',
+      'store-unavailable',
+      'config-error',
+      'upstream-error',
+      'malformed',
+    ] as const;
+    for (const reason of reasons) {
+      cleanup();
+      render(
+        <PolicyInsightsSection
+          policyInsight={null}
+          isLoading={false}
+          isError={false}
+          isEnabled
+          unavailableReason={reason}
+          now={NOW}
+        />,
+      );
+      expect(screen.getByTestId('policy-insights-unavailable')).toBeTruthy();
+    }
   });
 
   it('renders a degraded warning when isError but cached data is shown', () => {
@@ -270,7 +331,11 @@ describe('PolicyInsightsSection', () => {
       />,
     );
     expect(screen.getByTestId('policy-insights-unavailable')).toBeTruthy();
-    expect(screen.getByText('Policy insights unavailable.')).toBeTruthy();
+    expect(
+      screen.getByText(
+        'The policy insight service could not be reached. Position monitoring and deterministic stop-loss protection continue independently.',
+      ),
+    ).toBeTruthy();
   });
 
   it('renders a skeleton when loading with no data', () => {

@@ -37,13 +37,19 @@ function severityBorder(severity: 'danger' | 'warning' | 'neutral'): string {
 }
 
 function unavailableCopy(reason: PolicyInsightsUnavailableReason): string {
+  const suffix =
+    ' Position monitoring and deterministic stop-loss protection continue independently.';
   switch (reason) {
     case 'not-found':
-      return 'No policy insight available yet.';
+      return 'No policy insight is available yet.' + suffix;
     case 'store-unavailable':
+      return 'The policy insight store is temporarily unavailable.' + suffix;
     case 'config-error':
+      return 'Policy analysis is not configured.' + suffix;
+    case 'malformed':
+      return 'The policy insight payload was malformed, so guidance was withheld.' + suffix;
     case 'upstream-error':
-      return 'Policy insights unavailable.';
+      return 'The policy insight service could not be reached.' + suffix;
   }
 }
 

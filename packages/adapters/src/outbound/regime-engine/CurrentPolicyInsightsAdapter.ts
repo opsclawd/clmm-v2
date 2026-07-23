@@ -63,7 +63,7 @@ export class CurrentPolicyInsightsAdapter implements PolicyInsightsReadPort {
         const block = parsePolicyInsightBlock(body);
         if (!block) {
           this.observability.log('warn', 'PolicyInsights response failed shape validation');
-          return { kind: 'upstream-error' };
+          return { kind: 'malformed' };
         }
         return { kind: 'block', block };
       }
