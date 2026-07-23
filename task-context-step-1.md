@@ -1,6 +1,6 @@
 # Task Context: Task 1
 
-Title: Vendor the canonical contract and gate the migration on it
+Title: Propagate a distinct malformed outcome through the existing read path
 
 ## Workspace & Scope Constraints
 
@@ -10,123 +10,155 @@ Your working directory is a dedicated git worktree with the repository's complet
 
 .ai-orchestrator.local.json, if one exists, lives only in the main checkout and is intentionally not copied into your worktree — it is operator-machine-specific and not part of your task. Do not search for it or read it outside this directory. Reason about configuration using only .ai-orchestrator.json in your own working directory; treat it as the effective config for your task.
 
-Working Directory: /home/gary/.openclaw/workspace/clmm-superpowers-v2/.ai-worktrees/issue-92
+Working Directory: /home/gary/.openclaw/workspace/clmm-superpowers-v2/.ai-worktrees/issue-93
 Repository: opsclawd/clmm-v2
-Branch: ai/issue-92
-Start Commit: fb1d4a761de856add80733ef0af21e8e69fdc1eb
+Branch: ai/issue-93
+Start Commit: ea439d93e9d2ece2778fd487e370173c295002c9
 
 ## Task Requirements
 
-**Goal:** Vendor Regime Engine's checked-in `contracts/policy-insight/v1/` into this repo, add the validator dependency, then prove the schema compiles strictly and accepts its own canonical fixture before any exported clmm DTO changes.
-
 **Files:**
 
-- Create: `schemas/regime-engine/policy-insight.v1/schema.json`
-- Create: `schemas/regime-engine/policy-insight.v1/schema.sha256`
-- Create: `schemas/regime-engine/policy-insight.v1/fixtures/valid/current-pair.json`
-- Create: `schemas/regime-engine/policy-insight.v1/fixtures/valid/current-position.json`
-- Create: `schemas/regime-engine/policy-insight.v1/fixtures/valid/history.json`
-- Create: `schemas/regime-engine/policy-insight.v1/fixtures/invalid/action-position-and-version.json`
-- Create: `schemas/regime-engine/policy-insight.v1/fixtures/invalid/fields-and-enums.json`
-- Create: `schemas/regime-engine/policy-insight.v1/fixtures/invalid/numbers-and-levels.json`
-- Create: `schemas/regime-engine/policy-insight.v1/fixtures/invalid/ordering-and-duplicates.json`
-- Create: `schemas/regime-engine/policy-insight.v1/fixtures/invalid/timestamps-and-freshness.json`
-- Create: `schemas/regime-engine/policy-insight.v1/provenance.json`
-- Modify: `packages/application/package.json`
-- Modify: `pnpm-lock.yaml`
-- Create: `packages/application/src/dto/policyInsightContract.test.ts`
+- Modify: `packages/application/src/dto/policyInsights.ts`
+- Modify: `packages/application/src/ports/index.ts`
+- Modify: `packages/adapters/src/outbound/regime-engine/CurrentPolicyInsightsAdapter.ts`
+- Modify: `packages/adapters/src/outbound/regime-engine/CurrentPolicyInsightsAdapter.test.ts`
+- Modify: `packages/adapters/src/inbound/http/PolicyInsightsController.ts`
+- Modify: `packages/adapters/src/inbound/http/PolicyInsightsController.test.ts`
+- Modify: `apps/app/src/api/policyInsights.ts`
+- Modify: `apps/app/src/api/policyInsights.test.ts`
+- Modify: `packages/ui/src/components/PolicyInsightsSection.tsx`
+- Modify: `packages/ui/src/components/PolicyInsightsSection.test.tsx`
+- Modify: `packages/ui/src/screens/PositionsListScreen.tsx`
 
-**Dependencies:** None.
+**Behavioral invariants:**
 
-**Signature changes:** None.
+- A syntactically valid `200` JSON body rejected by `parsePolicyInsightBlock` yields `{ kind: 'malformed' }`, logs the existing shape-validation warning, and never yields a block.
+- Invalid JSON, a timeout, a network error, and non-2xx responses remain `upstream-error`; malformed is reserved for canonical schema rejection after JSON decoding.
+- The controller maps `malformed` to `{ policyInsight: null, unavailableReason: 'malformed' }`.
+- The app client accepts the typed malformed null envelope but still throws when the BFF itself sends a malformed top-level envelope or invalid embedded block.
+- The UI renders malformed as a fail-closed unavailable card and never calls the view-model builder for absent/rejected data.
+- Every unavailable copy states that position monitoring and deterministic stop-loss protection continue independently; not-found, store-unavailable, config-error, upstream-error, and malformed use distinct text.
 
-**Invariants to write as tests first:**
+- [ ] **Step 1: Write the failing boundary tests**
 
-1. `accepts the vendored canonical PolicyInsight fixture with the vendored schema`
-   - Import the local vendored PolicyInsight schema and fixture (`schemas/regime-engine/policy-insight.v1/`).
-   - Compile with Ajv configured with `strict: true`, `coerceTypes: false`, `useDefaults: false`, and `removeAdditional: false`.
-   - Assert validation returns `true`; include `validator.errors` in the assertion message so a contract-vendoring defect is diagnosable.
-2. `does not mutate the canonical PolicyInsight fixture during validation`
-   - Deep-clone the fixture before validation.
-   - Assert the validated value is deeply equal to the clone afterward.
+Update the existing focused cases and add exact tests named:
 
-**Implementation steps:**
-
-- [ ] Vendor Regime Engine's contract via a pinned-commit sparse clone (network/`gh`-authenticated git, not a local sibling-directory read):
-
-  ```bash
-  git clone --depth 1 --filter=blob:none --sparse https://github.com/opsclawd/regime-engine.git /tmp/regime-engine-contract-fetch
-  cd /tmp/regime-engine-contract-fetch && git sparse-checkout set contracts/policy-insight/v1
-  SOURCE_COMMIT=$(git rev-parse HEAD)
-  cd -
-  mkdir -p schemas/regime-engine/policy-insight.v1
-  cp -r /tmp/regime-engine-contract-fetch/contracts/policy-insight/v1/. schemas/regime-engine/policy-insight.v1/
-  rm -rf /tmp/regime-engine-contract-fetch
-  ```
-
-  Rename the copied `policy-insight.schema.json` to `schema.json` for consistency with the intelligence repo's naming (`sol-usdc-clmm-intelligence`'s `schemas/regime-engine/evidence-bundle.v1/schema.json`).
-
-- [ ] Write `provenance.json` recording the source repository, `$SOURCE_COMMIT`, and a sha256 of every vendored asset (schema, `schema.sha256`, and each fixture file) — mirroring the shape of `sol-usdc-clmm-intelligence`'s `schemas/regime-engine/evidence-bundle.v1/provenance.json` (fields: `repository`, `commit`, `schemaPath`, `schemaVersion`, `copiedAt`, `assets[].sourcePath`/`localPath`/`sha256`).
-- [ ] Add `ajv@^8.18.0` to `@clmm/application` runtime dependencies because the built parser imports it at runtime.
-
-  ```bash
-  pnpm --filter @clmm/application add ajv@^8.18.0
-  ```
-
-- [ ] Write `policyInsightContract.test.ts` importing the vendored schema/fixture directly from `schemas/regime-engine/policy-insight.v1/` (a relative import, not a package import) with the two named tests above. Freeze the fixture or validate a deep clone before mutating; the mutation assertion must still compare the before/after wire value.
-- [ ] Run the focused contract test and confirm both tests pass. A compile failure from an unsupported JSON Schema vocabulary or format is a stop condition; do not disable Ajv strictness to get green.
-
-**Acceptance criteria:**
-
-- `schemas/regime-engine/policy-insight.v1/` contains the vendored schema, `schema.sha256`, all 8 fixtures, and a `provenance.json` whose recorded hashes match the vendored files.
-- The schema compiles under strict Ajv configuration.
-- The real fixture validates without mutation.
-- No application DTO, parser, adapter, app client, or UI code has changed yet.
-
-**Task-scoped validation commands:**
-
-```bash
-pnpm install --frozen-lockfile
-pnpm --filter @clmm/application exec vitest run src/dto/policyInsightContract.test.ts
-pnpm --filter @clmm/application typecheck
-pnpm --filter @clmm/application build
+```text
+returns kind:"malformed" when a 200 payload violates the canonical schema
+logs contract validation failure when returning kind:"malformed"
+maps malformed to { policyInsight: null, unavailableReason: "malformed" }
+returns { policyInsight: null, unavailableReason } for malformed
+renders fail-closed unavailable copy for malformed
+renders distinct bounded copy for every unavailable reason
 ```
 
-**Commit boundary:** Commit the dependency lock and contract preflight together. Do not proceed to Task 2 unless this task is green.
+Keep the existing invalid-JSON test asserting `upstream-error` and the app-client malformed-block tests asserting thrown errors.
 
----
+- [ ] **Step 2: Run focused tests and confirm the new cases fail**
+
+Run:
+
+```bash
+pnpm --filter @clmm/adapters test -- src/outbound/regime-engine/CurrentPolicyInsightsAdapter.test.ts src/inbound/http/PolicyInsightsController.test.ts
+pnpm --filter @clmm/app test -- src/api/policyInsights.test.ts
+pnpm --filter @clmm/ui test -- src/components/PolicyInsightsSection.test.tsx
+```
+
+Expected: the new `malformed` expectations fail because the unions, mappings, reason allowlist, and UI copy do not yet contain that variant.
+
+- [ ] **Step 3: Extend the port and all implementations/consumers atomically**
+
+Make these exact surface changes in one step so the workspace typecheck remains green:
+
+```ts
+export type PolicyInsightsUnavailableReason =
+  | 'not-found'
+  | 'store-unavailable'
+  | 'config-error'
+  | 'malformed'
+  | 'upstream-error';
+
+export type PolicyInsightsReadResult =
+  | { kind: 'block'; block: PolicyInsightBlock }
+  | { kind: 'not-found' }
+  | { kind: 'store-unavailable' }
+  | { kind: 'config-error' }
+  | { kind: 'malformed' }
+  | { kind: 'upstream-error' };
+```
+
+Return `malformed` only from the adapter branch where parsed JSON fails `parsePolicyInsightBlock`. Add the matching exhaustive controller case, app-client allowlist entry, `PositionsListScreen` prop member, and `PolicyInsightsSection` unavailable-copy branch. Use stable copy with these meanings:
+
+```text
+not-found: No policy insight is available yet.
+store-unavailable: The policy insight store is temporarily unavailable.
+config-error: Policy analysis is not configured.
+malformed: The policy insight payload was malformed, so guidance was withheld.
+upstream-error: The policy insight service could not be reached.
+shared suffix: Position monitoring and deterministic stop-loss protection continue independently.
+```
+
+Do not expose parser diagnostics or rejected payload fields to the UI.
+
+- [ ] **Step 4: Run focused verification**
+
+Run:
+
+```bash
+pnpm --filter @clmm/adapters test -- src/outbound/regime-engine/CurrentPolicyInsightsAdapter.test.ts src/inbound/http/PolicyInsightsController.test.ts
+pnpm --filter @clmm/app test -- src/api/policyInsights.test.ts
+pnpm --filter @clmm/ui test -- src/components/PolicyInsightsSection.test.tsx
+pnpm --filter @clmm/application typecheck
+pnpm --filter @clmm/adapters typecheck
+pnpm --filter @clmm/app typecheck
+pnpm --filter @clmm/ui typecheck
+```
+
+Expected: all focused tests and package typechecks pass; invalid JSON is still upstream-error, schema-invalid decoded JSON is malformed, and no union consumer is non-exhaustive.
+
+- [ ] **Step 5: Commit the atomic boundary change**
+
+```bash
+git add packages/application/src/dto/policyInsights.ts packages/application/src/ports/index.ts packages/adapters/src/outbound/regime-engine/CurrentPolicyInsightsAdapter.ts packages/adapters/src/outbound/regime-engine/CurrentPolicyInsightsAdapter.test.ts packages/adapters/src/inbound/http/PolicyInsightsController.ts packages/adapters/src/inbound/http/PolicyInsightsController.test.ts apps/app/src/api/policyInsights.ts apps/app/src/api/policyInsights.test.ts packages/ui/src/components/PolicyInsightsSection.tsx packages/ui/src/components/PolicyInsightsSection.test.tsx packages/ui/src/screens/PositionsListScreen.tsx
+git commit -m "feat: distinguish malformed policy insights"
+```
 
 ## Repository Targets
 
 ### Expected Files
 
-- schemas/regime-engine/policy-insight.v1/schema.json
-- schemas/regime-engine/policy-insight.v1/schema.sha256
-- schemas/regime-engine/policy-insight.v1/fixtures/valid/current-pair.json
-- schemas/regime-engine/policy-insight.v1/fixtures/valid/current-position.json
-- schemas/regime-engine/policy-insight.v1/fixtures/valid/history.json
-- schemas/regime-engine/policy-insight.v1/fixtures/invalid/action-position-and-version.json
-- schemas/regime-engine/policy-insight.v1/fixtures/invalid/fields-and-enums.json
-- schemas/regime-engine/policy-insight.v1/fixtures/invalid/numbers-and-levels.json
-- schemas/regime-engine/policy-insight.v1/fixtures/invalid/ordering-and-duplicates.json
-- schemas/regime-engine/policy-insight.v1/fixtures/invalid/timestamps-and-freshness.json
-- schemas/regime-engine/policy-insight.v1/provenance.json
-- packages/application/package.json
-- pnpm-lock.yaml
-- packages/application/src/dto/policyInsightContract.test.ts
+- packages/application/src/dto/policyInsights.ts
+- packages/application/src/ports/index.ts
+- packages/adapters/src/outbound/regime-engine/CurrentPolicyInsightsAdapter.ts
+- packages/adapters/src/outbound/regime-engine/CurrentPolicyInsightsAdapter.test.ts
+- packages/adapters/src/inbound/http/PolicyInsightsController.ts
+- packages/adapters/src/inbound/http/PolicyInsightsController.test.ts
+- apps/app/src/api/policyInsights.ts
+- apps/app/src/api/policyInsights.test.ts
+- packages/ui/src/components/PolicyInsightsSection.tsx
+- packages/ui/src/components/PolicyInsightsSection.test.tsx
+- packages/ui/src/screens/PositionsListScreen.tsx
 
 ## Validation Commands
 
 ```bash
-pnpm install --frozen-lockfile
-pnpm --filter @clmm/application exec vitest run src/dto/policyInsightContract.test.ts
+pnpm --filter @clmm/adapters test -- src/outbound/regime-engine/CurrentPolicyInsightsAdapter.test.ts src/inbound/http/PolicyInsightsController.test.ts
+pnpm --filter @clmm/app test -- src/api/policyInsights.test.ts
+pnpm --filter @clmm/ui test -- src/components/PolicyInsightsSection.test.tsx
 pnpm --filter @clmm/application typecheck
-pnpm --filter @clmm/application build
+pnpm --filter @clmm/adapters typecheck
+pnpm --filter @clmm/app typecheck
+pnpm --filter @clmm/ui typecheck
 ```
 
 ## Behavioral Invariants
 
 You MUST implement the following behavioral invariants as named tests first (TDD):
 
-- **canonical fixture validates**: The vendored PolicyInsight fixture at schemas/regime-engine/policy-insight.v1/ validates successfully against the vendored schema in the same directory under strict Ajv settings. (Test: `accepts the vendored canonical PolicyInsight fixture with the vendored schema`)
-- **contract validation is non-mutating**: Strict schema validation does not coerce, default, remove, rename, or otherwise mutate the canonical fixture. (Test: `does not mutate the canonical PolicyInsight fixture during validation`)
+- **schema rejection is malformed**: A decoded 200 response rejected by parsePolicyInsightBlock returns malformed, emits contract-failure observability, and never exposes a block. (Test: `returns kind:"malformed" when a 200 payload violates the canonical schema`)
+- **transport failures remain upstream errors**: Invalid JSON, network failures, timeouts, and non-2xx responses remain upstream-error rather than being classified as malformed. (Test: `keeps invalid JSON distinct as kind:"upstream-error"`)
+- **controller preserves malformed**: The BFF maps malformed to a null policyInsight envelope with unavailableReason malformed. (Test: `maps malformed to { policyInsight: null, unavailableReason: "malformed" }`)
+- **client accepts typed malformed envelope**: The app client accepts a null malformed envelope while continuing to reject malformed top-level or embedded block data. (Test: `returns { policyInsight: null, unavailableReason } for malformed`)
+- **malformed fails closed in UI**: The UI renders stable malformed unavailable copy and never partially renders rejected policy fields. (Test: `renders fail-closed unavailable copy for malformed`)
+- **unavailable states stay distinct**: Not-found, store, config, malformed, and upstream outcomes have distinct bounded copy and all preserve independent deterministic monitoring. (Test: `renders distinct bounded copy for every unavailable reason`)

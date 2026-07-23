@@ -99,14 +99,15 @@ export class CurrentPolicyInsightsAdapter implements PolicyInsightsReadPort {
     try {
       const body: unknown = await response.json();
       if (typeof body !== 'object' || body === null || Array.isArray(body)) return null;
-      const err = (body as Record<string, unknown>)['error'];
+      const errRecord = (body as Record<string, unknown>)['error'];
       const out: { code?: string; message?: string } = {};
-      if (typeof err === 'object' && err !== null && !Array.isArray(err)) {
-        if (typeof (err as Record<string, unknown>)['code'] === 'string') {
-          out.code = (err as Record<string, unknown>)['code'] as string;
+      if (typeof errRecord === 'object' && errRecord !== null && !Array.isArray(errRecord)) {
+        const err = errRecord as Record<string, unknown>;
+        if (typeof err['code'] === 'string') {
+          out.code = err['code'];
         }
-        if (typeof (err as Record<string, unknown>)['message'] === 'string') {
-          out.message = (err as Record<string, unknown>)['message'] as string;
+        if (typeof err['message'] === 'string') {
+          out.message = err['message'];
         }
       }
       return out;
