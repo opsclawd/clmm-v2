@@ -1,8 +1,15 @@
 import type {
   PolicyInsightBlock,
+  PolicyInsightMarketRegime,
+  PolicyInsightFundamentalRegime,
+  PolicyInsightPosture,
+  PolicyInsightRangeBias,
+  PolicyInsightRebalanceSensitivity,
   PolicyInsightRecommendedAction,
   PolicyInsightRiskLevel,
   PolicyInsightDataQuality,
+  PolicyInsightSelectionStatus,
+  PolicyInsightWarningCode,
 } from '@clmm/application/public';
 
 export type PolicyInsightsSeverity = 'danger' | 'warning' | 'neutral';
@@ -10,6 +17,8 @@ export type PolicyInsightsSeverity = 'danger' | 'warning' | 'neutral';
 export type PolicyInsightsViewModel = {
   actionLabel: string;
   severity: PolicyInsightsSeverity;
+  marketRegimeLabel: string;
+  fundamentalRegimeLabel: string;
   postureLabel: string;
   rangeBiasLabel: string;
   rebalanceSensitivityLabel: string;
@@ -18,7 +27,16 @@ export type PolicyInsightsViewModel = {
   confidenceLabel: string;
   dataQualityLabel: string;
   freshnessLabel: string;
+  asOfLabel: string;
+  expiresLabel: string;
   isStale: boolean;
+  isDegraded: boolean;
+  isLowConfidence: boolean;
+  supportsLabel: string | null;
+  resistancesLabel: string | null;
+  levelsUnavailableLabel: string | null;
+  evidenceSummary: string;
+  warningLabels: string[];
   reasoning: string;
   subtitle: string;
 };
@@ -30,6 +48,41 @@ const ACTION_LABELS: Record<PolicyInsightRecommendedAction, string> = {
   EXIT_TO_USDC: 'Exit to USDC',
   EXIT_TO_SOL: 'Exit to SOL',
   STAND_DOWN: 'Stand down',
+};
+
+const MARKET_REGIME_LABELS: Record<PolicyInsightMarketRegime, string> = {
+  UP: 'Up market',
+  DOWN: 'Down market',
+  CHOP: 'Choppy market',
+};
+
+const FUNDAMENTAL_REGIME_LABELS: Record<PolicyInsightFundamentalRegime, string> = {
+  BULLISH: 'Bullish',
+  BEARISH: 'Bearish',
+  NEUTRAL: 'Neutral',
+  UNKNOWN: 'Unknown',
+};
+
+const POSTURE_LABELS: Record<PolicyInsightPosture, string> = {
+  AGGRESSIVE: 'Aggressive',
+  MODERATELY_AGGRESSIVE: 'Moderately aggressive',
+  NEUTRAL: 'Neutral',
+  DEFENSIVE: 'Defensive',
+  PAUSED: 'Paused',
+};
+
+const RANGE_BIAS_LABELS: Record<PolicyInsightRangeBias, string> = {
+  TIGHT: 'Tight',
+  MEDIUM: 'Medium',
+  WIDE: 'Wide',
+  PASSIVE: 'Passive',
+};
+
+const REBALANCE_SENSITIVITY_LABELS: Record<PolicyInsightRebalanceSensitivity, string> = {
+  LOW: 'Low',
+  NORMAL: 'Normal',
+  HIGH: 'High',
+  PAUSED: 'Paused',
 };
 
 const RISK_LABELS: Record<PolicyInsightRiskLevel, string> = {
@@ -44,9 +97,29 @@ const DATA_QUALITY_LABELS: Record<PolicyInsightDataQuality, string> = {
   STALE: 'Stale data',
 };
 
+const EVIDENCE_STATUS_LABELS: Record<PolicyInsightSelectionStatus, string> = {
+  FULL: 'Full evidence coverage',
+  PARTIAL: 'Partial evidence coverage',
+  DEGRADED: 'Limited evidence coverage',
+};
+
+const WARNING_CODE_LABELS: Record<PolicyInsightWarningCode, string> = {
+  MARKET_DATA_HARD_STALE: 'Market data hard stale',
+  EVIDENCE_STALE_INPUT: 'Evidence stale input',
+  EVIDENCE_MISSING_FAMILY: 'Evidence missing family',
+  EVIDENCE_REJECTED_FAMILY: 'Evidence rejected family',
+  EVIDENCE_CONFLICTED_FAMILY: 'Evidence conflicted family',
+  EVIDENCE_NO_SELECTED_RESEARCH: 'Evidence no selected research',
+  NO_ELIGIBLE_PRICE_LEVELS: 'No eligible price levels',
+};
+
+const LEXICAL_ZERO_VALUES = new Set(['0', '0.0', '0.00']);
+
 function formatPercentFromBps(bps: number): string {
-  const fraction = Math.max(0, Math.min(10000, bps)) / 10000;
-  return `${Math.round(fraction * 100)}%`;
+  const percent = bps / 100;
+  if (percent === 0) return '0%';
+  if (percent === Math.floor(percent)) return `${percent}%`;
+  return `${percent}%`;
 }
 
 function formatFreshness(ageSeconds: number): string {
@@ -61,37 +134,140 @@ function formatFreshness(ageSeconds: number): string {
   return `${hours}h ago`;
 }
 
-function deriveSeverity(block: PolicyInsightBlock): PolicyInsightsSeverity {
+function filterZeroLevels(levels: string[]): string[] {
+  return levels.filter((level) => !LEXICAL_ZERO_VALUES.has(level));
+}
+
+function formatLevelsLabel(levels: string[]): string | null {
+  const filtered = filterZeroLevels(levels);
+  if (filtered.length === 0) return null;
+  return `${filtered.join(', ')} USDC/SOL`;
+}
+
+function formatEvidenceSummary(
+  selectionStatus: PolicyInsightSelectionStatus,
+  bundleCount: number,
+  sourceCount: number,
+): string {
+  const label = EVIDENCE_STATUS_LABELS[selectionStatus];
+  if (selectionStatus === 'FULL' || (bundleCount === 0 && sourceCount === 0)) {
+    return label;
+  }
+  const bundleStr = `${bundleCount} bundle${bundleCount !== 1 ? 's' : ''}`;
+  const sourceStr = `${sourceCount} source${sourceCount !== 1 ? 's' : ''}`;
+  return `${label} (${bundleStr}, ${sourceStr})`;
+}
+
+function getWarningLabelsFromCodes(codes: PolicyInsightWarningCode[]): string[] {
+  const seen = new Set<PolicyInsightWarningCode>();
+  const labels: string[] = [];
+  for (const code of codes) {
+    if (!seen.has(code)) {
+      seen.add(code);
+      labels.push(WARNING_CODE_LABELS[code]);
+    }
+    if (labels.length >= 3) break;
+  }
+  return labels;
+}
+
+function deriveSeverity(
+  riskLevel: PolicyInsightRiskLevel,
+  recommendedAction: PolicyInsightRecommendedAction,
+  isStale: boolean,
+  isDegraded: boolean,
+  isLowConfidence: boolean,
+): PolicyInsightsSeverity {
   if (
-    block.riskLevel === 'CRITICAL' ||
-    block.recommendedAction === 'EXIT_TO_USDC' ||
-    block.recommendedAction === 'EXIT_TO_SOL'
+    riskLevel === 'CRITICAL' ||
+    recommendedAction === 'EXIT_TO_USDC' ||
+    recommendedAction === 'EXIT_TO_SOL'
   ) {
     return 'danger';
   }
-  if (block.riskLevel === 'ELEVATED' || block.recommendedAction === 'STAND_DOWN') {
+  if (
+    riskLevel === 'ELEVATED' ||
+    recommendedAction === 'STAND_DOWN' ||
+    isStale ||
+    isDegraded ||
+    isLowConfidence
+  ) {
     return 'warning';
   }
   return 'neutral';
 }
 
+function boundReasoning(reasoning: string): string {
+  if (reasoning.length <= 240) return reasoning;
+  return reasoning.slice(0, 239) + '…';
+}
+
 export function buildPolicyInsightsViewModel(
   block: PolicyInsightBlock,
-  _now: number,
+  now: number,
 ): PolicyInsightsViewModel {
+  const expiresAtMs = Date.parse(block.expiresAt);
+  const isExpired = expiresAtMs <= now;
+  const isStaleDueToFreshness = block.freshness.status === 'STALE';
+  const isStale = isStaleDueToFreshness || isExpired;
+
+  const isDegraded =
+    block.evidence.selectionStatus === 'PARTIAL' ||
+    block.evidence.selectionStatus === 'DEGRADED' ||
+    block.dataQuality !== 'COMPLETE';
+
+  const isLowConfidence = block.confidenceBps < 5000;
+
+  const severity = deriveSeverity(
+    block.riskLevel,
+    block.recommendedAction,
+    isStale,
+    isDegraded,
+    isLowConfidence,
+  );
+
+  const supports = formatLevelsLabel(block.levels.supportsUsdcPerSol);
+  const resistances = formatLevelsLabel(block.levels.resistancesUsdcPerSol);
+  const levelsUnavailableLabel =
+    supports === null && resistances === null ? 'No eligible support or resistance levels' : null;
+
+  const severityOverride =
+    severity === 'warning' &&
+    (block.riskLevel === 'CRITICAL' ||
+      block.recommendedAction === 'EXIT_TO_USDC' ||
+      block.recommendedAction === 'EXIT_TO_SOL')
+      ? 'danger'
+      : severity;
+
   return {
     actionLabel: ACTION_LABELS[block.recommendedAction],
-    severity: deriveSeverity(block),
-    postureLabel: `Posture: ${block.posture}`,
-    rangeBiasLabel: `Range bias: ${block.clmmPolicy.rangeBias}`,
-    rebalanceSensitivityLabel: `Rebalance sensitivity: ${block.clmmPolicy.rebalanceSensitivity}`,
+    severity: severityOverride,
+    marketRegimeLabel: MARKET_REGIME_LABELS[block.marketRegime],
+    fundamentalRegimeLabel: FUNDAMENTAL_REGIME_LABELS[block.fundamentalRegime],
+    postureLabel: POSTURE_LABELS[block.posture],
+    rangeBiasLabel: RANGE_BIAS_LABELS[block.clmmPolicy.rangeBias],
+    rebalanceSensitivityLabel: REBALANCE_SENSITIVITY_LABELS[block.clmmPolicy.rebalanceSensitivity],
     maxDeploymentLabel: formatPercentFromBps(block.clmmPolicy.maxCapitalDeploymentBps),
     riskLabel: RISK_LABELS[block.riskLevel],
     confidenceLabel: `${block.confidenceBps / 100}% confidence`,
     dataQualityLabel: DATA_QUALITY_LABELS[block.dataQuality],
     freshnessLabel: formatFreshness(block.freshness.ageSeconds),
-    isStale: block.freshness.status === 'STALE',
-    reasoning: block.reasoning,
-    subtitle: 'Advisory CLMM policy signal. Nothing has been applied.',
+    asOfLabel: block.asOf.replace(/\.\d{3}Z$/, 'Z'),
+    expiresLabel: block.expiresAt.replace(/\.\d{3}Z$/, 'Z'),
+    isStale,
+    isDegraded,
+    isLowConfidence,
+    supportsLabel: supports,
+    resistancesLabel: resistances,
+    levelsUnavailableLabel,
+    evidenceSummary: formatEvidenceSummary(
+      block.evidence.selectionStatus,
+      block.evidence.selectedBundleRefs.length,
+      block.evidence.selectedSourceRefs.length,
+    ),
+    warningLabels: getWarningLabelsFromCodes(block.warnings.map((w) => w.code)),
+    reasoning: boundReasoning(block.reasoning),
+    subtitle:
+      'Advisory policy context only. Nothing is signed or applied; deterministic stop-loss monitoring continues independently.',
   };
 }
