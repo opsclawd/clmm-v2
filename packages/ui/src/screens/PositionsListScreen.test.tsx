@@ -766,7 +766,11 @@ describe('PositionsListScreen', () => {
         policyInsightsUnavailableReason="not-found"
       />,
     );
-    expect(screen.getByText('No policy insight available yet.')).toBeTruthy();
+    expect(
+      screen.getByText(
+        'No policy insight is available yet. Position monitoring and deterministic stop-loss protection continue independently.',
+      ),
+    ).toBeTruthy();
   });
 
   it('does not render PolicyInsightsSection when not enabled', () => {
@@ -781,7 +785,11 @@ describe('PositionsListScreen', () => {
         policyInsightsUnavailableReason="not-found"
       />,
     );
-    expect(screen.queryByText('No policy insight available yet.')).toBeNull();
+    expect(
+      screen.queryByText(
+        'No policy insight is available yet. Position monitoring and deterministic stop-loss protection continue independently.',
+      ),
+    ).toBeNull();
   });
 
   it('renders PolicyInsights unavailable when in error with upstream-error', () => {
@@ -796,7 +804,11 @@ describe('PositionsListScreen', () => {
         policyInsightsUnavailableReason="upstream-error"
       />,
     );
-    expect(screen.getByText('Policy insights unavailable.')).toBeTruthy();
+    expect(
+      screen.getByText(
+        'The policy insight service could not be reached. Position monitoring and deterministic stop-loss protection continue independently.',
+      ),
+    ).toBeTruthy();
   });
 
   it('keeps loading distinct from a loaded card with unavailable prices', () => {
