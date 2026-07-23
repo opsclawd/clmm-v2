@@ -373,15 +373,18 @@ export class PlanStorageAdapter implements PlanRepository {
         })
         .where(eq(positionPlans.planId, params.planId));
 
-      await tx.insert(planResultOutbox).values({
-        resultId: params.canonicalResult.id,
-        planId: params.planId,
-        canonicalResultJson: params.canonicalResult.payload,
-        idempotencyKey: params.resultIdempotencyKey,
-        attemptCount: 0,
-        nextAttemptAt: now + 300000,
-        createdAt: now,
-      });
+      await tx
+        .insert(planResultOutbox)
+        .values({
+          resultId: params.canonicalResult.id,
+          planId: params.planId,
+          canonicalResultJson: params.canonicalResult.payload,
+          idempotencyKey: params.resultIdempotencyKey,
+          attemptCount: 0,
+          nextAttemptAt: now + 300000,
+          createdAt: now,
+        })
+        .onConflictDoNothing();
 
       return { kind: 'committed' };
     }) as Promise<TerminalOutcomeCommitResult>;
@@ -395,7 +398,7 @@ export class PlanStorageAdapter implements PlanRepository {
         .select()
         .from(planResultOutbox)
         .where(and(isNull(planResultOutbox.deliveredAt), lte(planResultOutbox.nextAttemptAt, now)))
-        .for('update')
+        .for('update', { skipLocked: true })
         .limit(1);
 
       if (rows.length === 0) {
