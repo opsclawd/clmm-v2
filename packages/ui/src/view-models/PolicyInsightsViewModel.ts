@@ -103,6 +103,22 @@ const EVIDENCE_STATUS_LABELS: Record<PolicyInsightSelectionStatus, string> = {
   DEGRADED: 'Limited evidence coverage',
 };
 
+type PolicyInsightReasonCode =
+  | 'ADVISORY_ONLY'
+  | 'DATA_HARD_STALE'
+  | 'DATA_INSUFFICIENT_SAMPLES'
+  | 'CLMM_BREACH_LOWER'
+  | 'CLMM_BREACH_UPPER'
+  | 'CHURN_STAND_DOWN_ACTIVE'
+  | 'CHURN_COOLDOWN_ACTIVE'
+  | 'MARKET_REGIME_UP'
+  | 'MARKET_REGIME_DOWN'
+  | 'MARKET_REGIME_CHOP'
+  | 'FEATURE_THRESHOLD_BREACHED'
+  | 'CONTEXTUAL_EVIDENCE_VOTE'
+  | 'RESEARCH_BRIEF_ANALYSIS'
+  | 'NO_ELIGIBLE_PRICE_LEVELS';
+
 const WARNING_CODE_LABELS: Record<PolicyInsightWarningCode, string> = {
   MARKET_DATA_HARD_STALE: 'Market data hard stale',
   EVIDENCE_STALE_INPUT: 'Evidence stale input',
@@ -113,12 +129,28 @@ const WARNING_CODE_LABELS: Record<PolicyInsightWarningCode, string> = {
   NO_ELIGIBLE_PRICE_LEVELS: 'No eligible price levels',
 };
 
+const REASON_CODE_LABELS: Record<PolicyInsightReasonCode, string> = {
+  ADVISORY_ONLY: 'Advisory only',
+  DATA_HARD_STALE: 'Data hard stale',
+  DATA_INSUFFICIENT_SAMPLES: 'Data insufficient samples',
+  CLMM_BREACH_LOWER: 'CLMM breach lower',
+  CLMM_BREACH_UPPER: 'CLMM breach upper',
+  CHURN_STAND_DOWN_ACTIVE: 'Churn stand-down active',
+  CHURN_COOLDOWN_ACTIVE: 'Churn cooldown active',
+  MARKET_REGIME_UP: 'Market regime up',
+  MARKET_REGIME_DOWN: 'Market regime down',
+  MARKET_REGIME_CHOP: 'Market regime chop',
+  FEATURE_THRESHOLD_BREACHED: 'Feature threshold breached',
+  CONTEXTUAL_EVIDENCE_VOTE: 'Contextual evidence vote',
+  RESEARCH_BRIEF_ANALYSIS: 'Research brief analysis',
+  NO_ELIGIBLE_PRICE_LEVELS: 'No eligible price levels',
+};
+
 const LEXICAL_ZERO_VALUES = new Set(['0', '0.0', '0.00']);
 
 function formatPercentFromBps(bps: number): string {
   const percent = bps / 100;
   if (percent === 0) return '0%';
-  if (percent === Math.floor(percent)) return `${percent}%`;
   return `${percent}%`;
 }
 
@@ -158,13 +190,23 @@ function formatEvidenceSummary(
   return `${label} (${bundleStr}, ${sourceStr})`;
 }
 
-function getWarningLabelsFromCodes(codes: PolicyInsightWarningCode[]): string[] {
-  const seen = new Set<PolicyInsightWarningCode>();
+function getWarningLabelsFromCodes(
+  codes: (PolicyInsightWarningCode | PolicyInsightReasonCode)[],
+): string[] {
+  const seen = new Set<PolicyInsightWarningCode | PolicyInsightReasonCode>();
   const labels: string[] = [];
   for (const code of codes) {
     if (!seen.has(code)) {
       seen.add(code);
-      labels.push(WARNING_CODE_LABELS[code]);
+      const warningLabel = WARNING_CODE_LABELS[code as PolicyInsightWarningCode];
+      if (warningLabel) {
+        labels.push(warningLabel);
+      } else {
+        const reasonLabel = REASON_CODE_LABELS[code as PolicyInsightReasonCode];
+        if (reasonLabel) {
+          labels.push(reasonLabel);
+        }
+      }
     }
     if (labels.length >= 3) break;
   }
@@ -231,17 +273,9 @@ export function buildPolicyInsightsViewModel(
   const levelsUnavailableLabel =
     supports === null && resistances === null ? 'No eligible support or resistance levels' : null;
 
-  const severityOverride =
-    severity === 'warning' &&
-    (block.riskLevel === 'CRITICAL' ||
-      block.recommendedAction === 'EXIT_TO_USDC' ||
-      block.recommendedAction === 'EXIT_TO_SOL')
-      ? 'danger'
-      : severity;
-
   return {
     actionLabel: ACTION_LABELS[block.recommendedAction],
-    severity: severityOverride,
+    severity,
     marketRegimeLabel: MARKET_REGIME_LABELS[block.marketRegime],
     fundamentalRegimeLabel: FUNDAMENTAL_REGIME_LABELS[block.fundamentalRegime],
     postureLabel: POSTURE_LABELS[block.posture],
@@ -265,7 +299,10 @@ export function buildPolicyInsightsViewModel(
       block.evidence.selectedBundleRefs.length,
       block.evidence.selectedSourceRefs.length,
     ),
-    warningLabels: getWarningLabelsFromCodes(block.warnings.map((w) => w.code)),
+    warningLabels: getWarningLabelsFromCodes([
+      ...block.warnings.map((w) => w.code),
+      ...block.reasonCodes,
+    ]),
     reasoning: boundReasoning(block.reasoning),
     subtitle:
       'Advisory policy context only. Nothing is signed or applied; deterministic stop-loss monitoring continues independently.',

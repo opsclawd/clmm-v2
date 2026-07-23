@@ -375,6 +375,18 @@ describe('buildPolicyInsightsViewModel', () => {
       ]);
       expect(vm.warningLabels.length).toBeLessThanOrEqual(3);
     });
+
+    it('includes mapped reason codes in warningLabels output', () => {
+      const vm = buildPolicyInsightsViewModel(
+        fixture({
+          warnings: [],
+          reasonCodes: ['MARKET_REGIME_UP', 'ADVISORY_ONLY'],
+        }),
+        NOW,
+      );
+      expect(vm.warningLabels).toContain('Market regime up');
+      expect(vm.warningLabels).toContain('Advisory only');
+    });
   });
 
   describe('reasoning bounds', () => {
