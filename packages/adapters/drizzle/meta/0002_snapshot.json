@@ -1,0 +1,303 @@
+{
+  "id": "a992517c-f33e-490b-94be-c065c443beb7",
+  "prevId": "39bf01f6-f33e-490b-94be-c065c443beb7",
+  "version": "7",
+  "dialect": "postgresql",
+  "tables": {
+    "public.position_plans": {
+      "name": "position_plans",
+      "schema": "",
+      "columns": {
+        "plan_id": {
+          "name": "plan_id",
+          "type": "text",
+          "primaryKey": true,
+          "notNull": true
+        },
+        "canonical_hash": {
+          "name": "canonical_hash",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "position_id": {
+          "name": "position_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "wallet_id": {
+          "name": "wallet_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "requested_at": {
+          "name": "requested_at",
+          "type": "bigint",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "responded_at": {
+          "name": "responded_at",
+          "type": "bigint",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "as_of_at": {
+          "name": "as_of_at",
+          "type": "bigint",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "expires_at": {
+          "name": "expires_at",
+          "type": "bigint",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "action_kind": {
+          "name": "action_kind",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "action_reasons": {
+          "name": "action_reasons",
+          "type": "jsonb",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "'[]'"
+        },
+        "snapshot_fingerprint": {
+          "name": "snapshot_fingerprint",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "lifecycle_kind": {
+          "name": "lifecycle_kind",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "decision_kind": {
+          "name": "decision_kind",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "attempt_id": {
+          "name": "attempt_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "canonical_result_json": {
+          "name": "canonical_result_json",
+          "type": "jsonb",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "result_idempotency_key": {
+          "name": "result_idempotency_key",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "delivery_attempts": {
+          "name": "delivery_attempts",
+          "type": "bigint",
+          "primaryKey": false,
+          "notNull": true,
+          "default": 0
+        },
+        "next_attempt_at": {
+          "name": "next_attempt_at",
+          "type": "bigint",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "last_error_class": {
+          "name": "last_error_class",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "delivered_at": {
+          "name": "delivered_at",
+          "type": "bigint",
+          "primaryKey": false,
+          "notNull": false
+        }
+      },
+      "indexes": {
+        "position_plans_position_id_idx": {
+          "name": "position_plans_position_id_idx",
+          "columns": [
+            {
+              "expression": "position_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "position_plans_delivery_due_idx": {
+          "name": "position_plans_delivery_due_idx",
+          "columns": [
+            {
+              "expression": "next_attempt_at",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {},
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {
+        "position_plans_replay_identity_idx": {
+          "name": "position_plans_replay_identity_idx",
+          "nullsNotDistinct": false,
+          "columns": ["plan_id", "canonical_hash"]
+        }
+      },
+      "policies": {},
+      "checkConstraints": {
+        "position_plans_action_kind_check": {
+          "name": "position_plans_action_kind_check",
+          "value": "\"position_plans\".\"action_kind\" IN ('HOLD', 'STAND_DOWN', 'REQUEST_EXIT_CLMM')"
+        },
+        "position_plans_lifecycle_kind_check": {
+          "name": "position_plans_lifecycle_kind_check",
+          "value": "\"position_plans\".\"lifecycle_kind\" IN ('requested', 'advisory-ready', 'exit-previewed', 'awaiting-signature', 'submitted', 'result-pending', 'reported', 'report-failed', 'conflict', 'superseded')"
+        },
+        "position_plans_decision_kind_check": {
+          "name": "position_plans_decision_kind_check",
+          "value": "\"position_plans\".\"decision_kind\" IS NULL OR \"position_plans\".\"decision_kind\" IN ('acknowledged', 'stand-down', 'expired', 'position-changed', 'rejected', 'executed', 'failed')"
+        },
+        "position_plans_delivery_attempts_min_check": {
+          "name": "position_plans_delivery_attempts_min_check",
+          "value": "\"position_plans\".\"delivery_attempts\" >= 0"
+        }
+      },
+      "isRLSEnabled": false
+    },
+    "public.plan_result_outbox": {
+      "name": "plan_result_outbox",
+      "schema": "",
+      "columns": {
+        "result_id": {
+          "name": "result_id",
+          "type": "text",
+          "primaryKey": true,
+          "notNull": true
+        },
+        "plan_id": {
+          "name": "plan_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "canonical_result_json": {
+          "name": "canonical_result_json",
+          "type": "jsonb",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "idempotency_key": {
+          "name": "idempotency_key",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "attempt_count": {
+          "name": "attempt_count",
+          "type": "bigint",
+          "primaryKey": false,
+          "notNull": true,
+          "default": 0
+        },
+        "next_attempt_at": {
+          "name": "next_attempt_at",
+          "type": "bigint",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "last_error_class": {
+          "name": "last_error_class",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "delivered_at": {
+          "name": "delivered_at",
+          "type": "bigint",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "bigint",
+          "primaryKey": false,
+          "notNull": true
+        }
+      },
+      "indexes": {
+        "plan_result_outbox_due_idx": {
+          "name": "plan_result_outbox_due_idx",
+          "columns": [
+            {
+              "expression": "next_attempt_at",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {},
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {
+        "plan_result_outbox_idempotency_key_idx": {
+          "name": "plan_result_outbox_idempotency_key_idx",
+          "nullsNotDistinct": false,
+          "columns": ["idempotency_key"]
+        }
+      },
+      "policies": {},
+      "checkConstraints": {
+        "plan_result_outbox_attempt_count_min_check": {
+          "name": "plan_result_outbox_attempt_count_min_check",
+          "value": "\"plan_result_outbox\".\"attempt_count\" >= 0"
+        }
+      },
+      "isRLSEnabled": false
+    }
+  },
+  "enums": {},
+  "schemas": {},
+  "sequences": {},
+  "roles": {},
+  "policies": {},
+  "views": {},
+  "_meta": {
+    "columns": {},
+    "schemas": {},
+    "tables": {}
+  }
+}

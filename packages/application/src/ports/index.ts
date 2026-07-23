@@ -24,6 +24,7 @@ import type {
   SrThesesBlock,
   PolicyInsightBlock,
 } from '../dto/index.js';
+import type { PositionPlan, PlanAction, RegimeResponse } from '@clmm/domain';
 
 // --- Position read ports ---
 
@@ -415,4 +416,107 @@ export type SignMessageOutcome =
 
 export interface WalletMessageSigningPort {
   signMessage(params: { walletId: string; message: string }): Promise<SignMessageOutcome>;
+}
+
+// --- Plan repository port ---
+
+export type PlanOutcome =
+  | { readonly kind: 'acknowledged' }
+  | { readonly kind: 'stand-down' }
+  | { readonly kind: 'expired' }
+  | { readonly kind: 'position-changed' }
+  | { readonly kind: 'rejected' }
+  | { readonly kind: 'executed' }
+  | { readonly kind: 'failed' };
+
+export type PlanRequestParams = {
+  readonly planId: import('@clmm/domain').PlanId;
+  readonly canonicalHash: import('@clmm/domain').CanonicalHash;
+  readonly positionId: PositionId;
+  readonly walletId: WalletId;
+  readonly requestedAt: ClockTimestamp;
+  readonly action: PlanAction;
+  readonly snapshotFingerprint?: string;
+};
+
+export type PlanRequestResult =
+  | { readonly kind: 'created' }
+  | { readonly kind: 'exact-replay' }
+  | { readonly kind: 'conflict' };
+
+export type PlanResponseParams = {
+  readonly planId: import('@clmm/domain').PlanId;
+  readonly regimeResponse: RegimeResponse;
+  readonly respondedAt: ClockTimestamp;
+  readonly asOfAt: ClockTimestamp;
+  readonly expiresAt: ClockTimestamp;
+};
+
+export type PlanDecisionParams = {
+  readonly planId: import('@clmm/domain').PlanId;
+  readonly decision: PlanOutcome;
+  readonly decidedAt: ClockTimestamp;
+};
+
+export type PlanExecutionLinkParams = {
+  readonly planId: import('@clmm/domain').PlanId;
+  readonly attemptId: string;
+  readonly linkedAt: ClockTimestamp;
+};
+
+export type CanonicalResult = {
+  readonly id: string;
+  readonly payload: Record<string, unknown>;
+};
+
+export type PlanTerminalOutcomeParams = {
+  readonly planId: import('@clmm/domain').PlanId;
+  readonly outcome: PlanOutcome;
+  readonly canonicalResult: CanonicalResult;
+  readonly resultIdempotencyKey: string;
+  readonly committedAt: ClockTimestamp;
+};
+
+export type TerminalOutcomeCommitResult =
+  | { readonly kind: 'committed' }
+  | { readonly kind: 'plan-not-found' };
+
+export type PlanResultClaim = {
+  readonly resultId: string;
+  readonly planId: import('@clmm/domain').PlanId;
+  readonly canonicalResult: CanonicalResult;
+  readonly idempotencyKey: string;
+  readonly attemptCount: number;
+};
+
+export type PlanRetryScheduleParams = {
+  readonly resultId: string;
+  readonly nextAttemptAt: ClockTimestamp;
+  readonly lastError?: string;
+};
+
+export type PlanDeliveryCompletionParams = {
+  readonly resultId: string;
+  readonly deliveredAt: ClockTimestamp;
+};
+
+export type PlanPermanentFailureParams = {
+  readonly planId: import('@clmm/domain').PlanId;
+  readonly reason: string;
+  readonly failedAt: ClockTimestamp;
+};
+
+export interface PlanRepository {
+  createRequest(params: PlanRequestParams): Promise<PlanRequestResult>;
+  acceptResponse(
+    params: PlanResponseParams,
+  ): Promise<{ readonly kind: 'accepted' } | { readonly kind: 'conflict-detected' }>;
+  getCurrentPlan(positionId: PositionId): Promise<PositionPlan | null>;
+  recordDecision(params: PlanDecisionParams): Promise<void>;
+  linkExecutionAttempt(params: PlanExecutionLinkParams): Promise<void>;
+  commitTerminalOutcome(params: PlanTerminalOutcomeParams): Promise<TerminalOutcomeCommitResult>;
+  claimDueResult(): Promise<PlanResultClaim | null>;
+  rescheduleRetry(params: PlanRetryScheduleParams): Promise<void>;
+  completeDelivery(params: PlanDeliveryCompletionParams): Promise<void>;
+  recordPermanentFailure(params: PlanPermanentFailureParams): Promise<void>;
 }

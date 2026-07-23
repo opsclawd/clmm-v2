@@ -20,3 +20,4 @@ export { FakeObservabilityPort } from './FakeObservabilityPort.js';
 export { FakeMonitoredWalletRepository } from './FakeMonitoredWalletRepository.js';
 export { FakeWalletChallengeRepository } from './FakeWalletChallengeRepository.js';
 export { FakePricePort } from './FakePricePort.js';
+export { FakePlanRepository } from './FakePlanRepository.js';

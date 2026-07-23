@@ -15,6 +15,13 @@
       "when": 1777737438515,
       "tag": "0001_fat_beyonder",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1776272593766,
+      "tag": "0002_position_plan_lifecycle",
+      "breakpoints": true
     }
   ]
 }
