@@ -12,7 +12,7 @@ class FakeObservabilityPort {
   logs: Array<{ level: string; message: string; context?: Record<string, unknown> }> = [];
 
   log(level: string, message: string, context?: Record<string, unknown>): void {
-    this.logs.push({ level, message, context });
+    this.logs.push(context !== undefined ? { level, message, context } : { level, message });
   }
 
   recordTiming(): void {}
@@ -71,7 +71,7 @@ describe('PlanResultSweepHandler', () => {
         regimePort,
         clock as ClockPort,
         observability as ObservabilityPort,
-        boss as PgBoss,
+        boss as unknown as PgBoss,
       );
 
       await handler.handle();
