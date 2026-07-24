@@ -204,7 +204,8 @@
           "name": "origin_kind",
           "type": "text",
           "primaryKey": false,
-          "notNull": true
+          "notNull": true,
+          "default": "'qualified-breach'"
         },
         "direction_kind": {
           "name": "direction_kind",
@@ -274,6 +275,10 @@
         "execution_previews_direction_kind_check": {
           "name": "execution_previews_direction_kind_check",
           "value": "(\"execution_previews\".\"origin_kind\" = 'qualified-breach' and \"execution_previews\".\"direction_kind\" in ('lower-bound-breach', 'upper-bound-breach')) or (\"execution_previews\".\"origin_kind\" = 'regime-plan' and \"execution_previews\".\"direction_kind\" is null)"
+        },
+        "execution_previews_regime_fields_check": {
+          "name": "execution_previews_regime_fields_check",
+          "value": "(\"execution_previews\".\"origin_kind\" = 'regime-plan' and \"execution_previews\".\"plan_id\" is not null and \"execution_previews\".\"canonical_hash\" is not null and \"execution_previews\".\"canonical_exit_intent\" is not null) or (\"execution_previews\".\"origin_kind\" = 'qualified-breach' and \"execution_previews\".\"plan_id\" is null and \"execution_previews\".\"canonical_hash\" is null and \"execution_previews\".\"canonical_exit_intent\" is null)"
         }
       },
       "isRLSEnabled": false
@@ -310,7 +315,8 @@
           "name": "origin_kind",
           "type": "text",
           "primaryKey": false,
-          "notNull": true
+          "notNull": true,
+          "default": "'qualified-breach'"
         },
         "direction_kind": {
           "name": "direction_kind",
@@ -382,6 +388,10 @@
         "execution_attempts_direction_kind_check": {
           "name": "execution_attempts_direction_kind_check",
           "value": "(\"execution_attempts\".\"origin_kind\" = 'qualified-breach' and \"execution_attempts\".\"direction_kind\" in ('lower-bound-breach', 'upper-bound-breach')) or (\"execution_attempts\".\"origin_kind\" = 'regime-plan' and \"execution_attempts\".\"direction_kind\" is null)"
+        },
+        "execution_attempts_regime_fields_check": {
+          "name": "execution_attempts_regime_fields_check",
+          "value": "(\"execution_attempts\".\"origin_kind\" = 'regime-plan' and \"execution_attempts\".\"plan_id\" is not null and \"execution_attempts\".\"canonical_hash\" is not null and \"execution_attempts\".\"canonical_exit_intent\" is not null) or (\"execution_attempts\".\"origin_kind\" = 'qualified-breach' and \"execution_attempts\".\"plan_id\" is null and \"execution_attempts\".\"canonical_hash\" is null and \"execution_attempts\".\"canonical_exit_intent\" is null)"
         }
       },
       "isRLSEnabled": false
@@ -510,7 +520,8 @@
           "name": "origin_kind",
           "type": "text",
           "primaryKey": false,
-          "notNull": true
+          "notNull": true,
+          "default": "'qualified-breach'"
         },
         "direction_kind": {
           "name": "direction_kind",
@@ -568,6 +579,10 @@
         "history_events_direction_kind_check": {
           "name": "history_events_direction_kind_check",
           "value": "(\"history_events\".\"origin_kind\" = 'qualified-breach' and \"history_events\".\"direction_kind\" in ('lower-bound-breach', 'upper-bound-breach')) or (\"history_events\".\"origin_kind\" = 'regime-plan' and \"history_events\".\"direction_kind\" is null)"
+        },
+        "history_events_regime_fields_check": {
+          "name": "history_events_regime_fields_check",
+          "value": "(\"history_events\".\"origin_kind\" = 'regime-plan' and \"history_events\".\"plan_id\" is not null and \"history_events\".\"canonical_hash\" is not null and \"history_events\".\"canonical_exit_intent\" is not null) or (\"history_events\".\"origin_kind\" = 'qualified-breach' and \"history_events\".\"plan_id\" is null and \"history_events\".\"canonical_hash\" is null and \"history_events\".\"canonical_exit_intent\" is null)"
         }
       },
       "isRLSEnabled": false

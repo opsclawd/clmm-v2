@@ -27,5 +27,9 @@ export const historyEvents = pgTable(
       'history_events_direction_kind_check',
       sql`(${table.originKind} = 'qualified-breach' and ${table.directionKind} in ('lower-bound-breach', 'upper-bound-breach')) or (${table.originKind} = 'regime-plan' and ${table.directionKind} is null)`,
     ),
+    check(
+      'history_events_regime_fields_check',
+      sql`(${table.originKind} = 'regime-plan' and ${table.planId} is not null and ${table.canonicalHash} is not null and ${table.canonicalExitIntent} is not null) or (${table.originKind} = 'qualified-breach' and ${table.planId} is null and ${table.canonicalHash} is null and ${table.canonicalExitIntent} is null)`,
+    ),
   ],
 );
