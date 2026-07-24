@@ -479,4 +479,61 @@ describe('PlanStorageAdapter', () => {
       expect(claim).toBeNull();
     });
   });
+
+  describe('links one execution attempt exactly once', () => {
+    it('links a plan to an execution attempt and rejects a second link', async () => {
+      const { db, plans } = makeFakeDb({
+        planRows: [makePlanRow({ planId: 'plan-1', lifecycleKind: 'result-pending' })],
+      });
+      const adapter = new PlanStorageAdapter(db);
+
+      await adapter.linkExecutionAttempt({
+        planId: 'plan-1' as PlanId,
+        attemptId: 'attempt-1',
+        linkedAt: makeClockTimestamp(2_000),
+      });
+
+      expect(plans[0]?.attemptId).toBe('attempt-1');
+
+      await expect(
+        adapter.linkExecutionAttempt({
+          planId: 'plan-1' as PlanId,
+          attemptId: 'attempt-2',
+          linkedAt: makeClockTimestamp(3_000),
+        }),
+      ).rejects.toThrow();
+    });
+  });
+
+  describe('reschedules retry without changing idempotency identity', () => {
+    it('updates nextAttemptAt and lastErrorClass while preserving idempotency key and payload', async () => {
+      const { db, outbox } = makeFakeDb({
+        outboxRows: [
+          {
+            resultId: 'result-1',
+            planId: 'plan-1',
+            canonicalResultJson: { ok: true },
+            idempotencyKey: 'idem-1',
+            attemptCount: 1,
+            nextAttemptAt: 1_000,
+            lastErrorClass: null,
+            deliveredAt: null,
+            createdAt: 0,
+          },
+        ],
+      });
+      const adapter = new PlanStorageAdapter(db);
+
+      await adapter.rescheduleRetry({
+        resultId: 'result-1',
+        nextAttemptAt: makeClockTimestamp(5_000),
+        lastError: 'NetworkError',
+      });
+
+      expect(outbox[0]?.idempotencyKey).toBe('idem-1');
+      expect(outbox[0]?.canonicalResultJson).toEqual({ ok: true });
+      expect(outbox[0]?.nextAttemptAt).toBe(5_000);
+      expect(outbox[0]?.lastErrorClass).toBe('NetworkError');
+    });
+  });
 });
