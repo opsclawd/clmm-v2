@@ -1,6 +1,6 @@
 import { describe, expect, it, vi, beforeEach } from 'vitest';
 import type { PlanRepository, RegimePlanPort, PlanResultClaim } from '../../ports/index.js';
-import type { ClockTimestamp } from '@clmm/domain';
+import type { ClockTimestamp, PlanId } from '@clmm/domain';
 import {
   syncPlanExecutionResults,
   type SyncPlanExecutionResultsDeps,
@@ -8,7 +8,7 @@ import {
 
 /* eslint-disable @typescript-eslint/unbound-method */
 
-const FIXTURE_PLAN_ID = 'plan-001';
+const FIXTURE_PLAN_ID = 'plan-001' as PlanId;
 const FIXTURE_RESULT_ID = 'result-001';
 const FIXTURE_IDEMPOTENCY_KEY = 'idem-key-001';
 
@@ -16,7 +16,7 @@ class FakeObservabilityPort {
   logs: Array<{ level: string; message: string; context?: Record<string, unknown> }> = [];
 
   log(level: string, message: string, context?: Record<string, unknown>): void {
-    this.logs.push({ level, message, context });
+    this.logs.push(context !== undefined ? { level, message, context } : { level, message });
   }
 
   recordTiming(): void {}
@@ -250,8 +250,8 @@ describe('SyncPlanExecutionResults', () => {
 
   describe('continues processing after one row fails', () => {
     it('processes multiple due results even if one fails permanently', async () => {
-      const claim1 = makeClaim({ resultId: 'result-1', planId: 'plan-001' });
-      const claim2 = makeClaim({ resultId: 'result-2', planId: 'plan-002' });
+      const claim1 = makeClaim({ resultId: 'result-1', planId: 'plan-001' as PlanId });
+      const claim2 = makeClaim({ resultId: 'result-2', planId: 'plan-002' as PlanId });
 
       vi.mocked(planRepo.claimDueResult)
         .mockResolvedValueOnce(claim1)
