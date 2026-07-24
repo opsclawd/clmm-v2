@@ -108,7 +108,7 @@ function PositionDetailRouteBody() {
       }
       onPlanAcknowledge={(planId: string) => acknowledgeMutation.mutate(planId)}
       onPlanPreview={(planId: string) => previewMutation.mutate(planId)}
-      onPlanApprove={({ planId, previewId }: { planId: string; previewId: string }) =>
+      onPlanApprove={(planId: string, previewId: string) =>
         approveMutation.mutate({ planId, previewId })
       }
     />
