@@ -75,8 +75,11 @@ export async function approvePlanExit(params: {
     );
   }
 
+  const attemptId = ids.generateId();
+
   const planAfterTransition = applyPlanLifecycleTransition(currentPlan, {
     kind: 'request-signature',
+    attemptId,
   });
 
   const executionOrigin: ExecutionOrigin = {
@@ -85,8 +88,6 @@ export async function approvePlanExit(params: {
     canonicalHash: currentPlan.canonicalHash,
     canonicalExitIntent: previewRecord.preview.plan.postExitPosture.kind,
   };
-
-  const attemptId = ids.generateId();
 
   const { serializedPayload } = await prepPort.prepareExecution({
     plan: previewRecord.preview.plan,
