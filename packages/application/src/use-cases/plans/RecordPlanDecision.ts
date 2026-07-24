@@ -12,6 +12,7 @@ import type {
   PlanLifecycleState,
   ExitTrigger,
   CanonicalHash,
+  PlanAction,
 } from '@clmm/domain';
 import { makeClockTimestamp } from '@clmm/domain';
 
@@ -83,6 +84,25 @@ function isPlanExpired(plan: { state: PlanLifecycleState }, now: number): boolea
   return false;
 }
 
+function isUnsupportedDecisionForAction(
+  action: PlanAction | undefined,
+  decision: PlanOutcome,
+): boolean {
+  if (!action) return false;
+  if (action.kind === 'REQUEST_EXIT_CLMM') {
+    return decision.kind === 'acknowledged' || decision.kind === 'stand-down';
+  }
+  return false;
+}
+
+function getAdvisoryAction(plan: { state: PlanLifecycleState }): PlanAction | undefined {
+  const state = plan.state;
+  if (state.kind === 'advisory-ready' || state.kind === 'exit-previewed') {
+    return state.advisoryAction;
+  }
+  return undefined;
+}
+
 export async function recordPlanDecision(params: {
   planId: PlanId;
   positionId: PositionId;
@@ -122,7 +142,13 @@ export async function recordPlanDecision(params: {
 
   const now = clock.now();
   const isExpired = isPlanExpired(existingPlan, now);
-  const effectiveDecision = isExpired ? { kind: 'expired' as const } : decision;
+  const advisoryAction = getAdvisoryAction(existingPlan);
+  const isUnsupported = isUnsupportedDecisionForAction(advisoryAction, decision);
+  const effectiveDecision = isExpired
+    ? { kind: 'expired' as const }
+    : isUnsupported
+      ? { kind: 'rejected' as const }
+      : decision;
 
   const existingDecision = getExistingDecisionFromPlan(existingPlan);
 
@@ -180,6 +206,14 @@ export async function recordPlanDecision(params: {
     positionId,
     decision: effectiveDecision,
     canonicalHash: existingPlan.canonicalHash,
+  });
+
+  await planRepository.commitTerminalOutcome({
+    planId,
+    outcome: effectiveDecision,
+    canonicalResult,
+    resultIdempotencyKey: canonicalResult.id,
+    committedAt: decidedAt,
   });
 
   observability.log('info', 'RecordPlanDecision: decision recorded', {

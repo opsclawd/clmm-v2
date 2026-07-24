@@ -135,7 +135,9 @@ class FakePlanRepository implements PlanRepository {
 
   async linkExecutionAttempt(): Promise<void> {}
 
-  async commitTerminalOutcome(): Promise<import('@clmm/application').TerminalOutcomeCommitResult> {
+  async commitTerminalOutcome(
+    _params: Parameters<PlanRepository['commitTerminalOutcome']>[0],
+  ): Promise<import('@clmm/application').TerminalOutcomeCommitResult> {
     return { kind: 'committed' };
   }
 
@@ -272,17 +274,16 @@ describe('RecordPlanDecision', () => {
       expect(savedOutcome).toEqual({ kind: 'acknowledged' });
     });
 
-    it('creates no preview, attempt, signature request, or submission', async () => {
+    it('enqueues canonical result without triggering on-chain submission', async () => {
       const plan = makeAdvisoryReadyPlan({ action: { kind: 'HOLD' } });
       planRepo.setPlan(plan);
 
-      let onChainWorkInvoked = false;
+      let commitTerminalOutcomeCalled = false;
       const originalCommitTerminalOutcome = planRepo.commitTerminalOutcome.bind(planRepo);
 
-      // Override to detect on-chain work
-      planRepo.commitTerminalOutcome = async () => {
-        onChainWorkInvoked = true;
-        return originalCommitTerminalOutcome();
+      planRepo.commitTerminalOutcome = async (params) => {
+        commitTerminalOutcomeCalled = true;
+        return originalCommitTerminalOutcome(params);
       };
 
       await recordPlanDecision({
@@ -296,7 +297,7 @@ describe('RecordPlanDecision', () => {
         observability,
       });
 
-      expect(onChainWorkInvoked).toBe(false);
+      expect(commitTerminalOutcomeCalled).toBe(true);
     });
   });
 
