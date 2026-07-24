@@ -40,6 +40,7 @@ export const positionPlans = pgTable(
     ),
     check('position_plans_delivery_attempts_min_check', sql`${table.deliveryAttempts} >= 0`),
     uniqueIndex('position_plans_replay_identity_idx').on(table.planId, table.canonicalHash),
+    uniqueIndex('position_plans_attempt_id_idx').on(table.attemptId),
     index('position_plans_position_id_idx').on(table.positionId),
     index('position_plans_delivery_due_idx').on(table.nextAttemptAt),
   ],

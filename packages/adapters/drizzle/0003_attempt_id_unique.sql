@@ -1,0 +1,1 @@
+CREATE UNIQUE INDEX "position_plans_attempt_id_idx" ON "position_plans" ("attempt_id");
