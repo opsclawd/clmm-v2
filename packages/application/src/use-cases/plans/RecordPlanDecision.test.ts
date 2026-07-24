@@ -19,8 +19,17 @@ import type {
   CanonicalHash,
   PlanAction,
   RegimeResponse,
+  BreachDirection,
 } from '@clmm/domain';
 import { makeWalletId, makePositionId, makeClockTimestamp, LOWER_BOUND_BREACH } from '@clmm/domain';
+
+interface MutablePositionPlan {
+  planId: PlanId;
+  canonicalHash: CanonicalHash;
+  positionId: PositionId;
+  createdAt: ClockTimestamp;
+  state: PlanLifecycleState;
+}
 
 const FIXTURE_WALLET_ID = makeWalletId('test-wallet-1');
 const FIXTURE_POSITION_ID = makePositionId('test-position-1');
@@ -95,7 +104,7 @@ function makeLowerTrigger(positionId: PositionId): ExitTrigger {
 }
 
 class FakePlanRepository implements PlanRepository {
-  private _plans = new Map<string, PositionPlan>();
+  private _plans = new Map<string, MutablePositionPlan>();
   private _decisions = new Map<string, PlanDecisionParams>();
   private _outcomes = new Map<string, PlanOutcome>();
 
@@ -143,7 +152,7 @@ class FakePlanRepository implements PlanRepository {
   async updateLifecycleState(): Promise<void> {}
 
   setPlan(plan: PositionPlan): void {
-    this._plans.set(plan.positionId, plan);
+    this._plans.set(plan.positionId, plan as MutablePositionPlan);
   }
 
   getDecision(planId: PlanId): PlanDecisionParams | undefined {
@@ -185,27 +194,48 @@ class FakeTriggerRepository implements TriggerRepository {
 }
 
 class FakeClock implements ClockPort {
-  private _now: number;
+  private _now: ClockTimestamp;
 
   constructor(now?: number) {
-    this._now = now ?? Date.now();
+    this._now = makeClockTimestamp(now ?? Date.now());
   }
 
-  now(): number {
+  now(): ClockTimestamp {
     return this._now;
   }
 
   setNow(now: number): void {
-    this._now = now;
+    this._now = makeClockTimestamp(now);
   }
 }
 
 class FakeObservability implements ObservabilityPort {
-  logs: Array<{ level: string; message: string; data?: Record<string, unknown> }> = [];
+  logs: Array<{ level: string; message: string; context?: Record<string, unknown> }> = [];
 
-  log(level: string, message: string, data?: Record<string, unknown>): void {
-    this.logs.push({ level, message, data });
+  log(level: 'info' | 'warn' | 'error', message: string, context?: Record<string, unknown>): void {
+    if (context !== undefined) {
+      this.logs.push({ level, message, context });
+    } else {
+      this.logs.push({ level, message });
+    }
   }
+
+  recordTiming(_event: string, _durationMs: number, _tags?: Record<string, string>): void {}
+
+  recordDetectionTiming(_record: {
+    positionId: string;
+    detectedAt: number;
+    observedAt: number;
+    durationMs: number;
+  }): void {}
+
+  recordDeliveryTiming(_record: {
+    triggerId: string;
+    dispatchedAt: number;
+    deliveredAt: number | null;
+    durationMs: number;
+    channel: 'push' | 'web-push' | 'in-app';
+  }): void {}
 }
 
 describe('RecordPlanDecision', () => {
@@ -298,7 +328,9 @@ describe('RecordPlanDecision', () => {
 
       expect(decisionPersisted).toBe(true);
       expect(result.kind).toBe('breach-supersedes');
-      expect(result.breachDirection).toEqual(LOWER_BOUND_BREACH);
+      expect((result as { breachDirection: BreachDirection }).breachDirection).toEqual(
+        LOWER_BOUND_BREACH,
+      );
     });
 
     it('returns breach-supersedes when qualified breach exists for stand-down', async () => {
@@ -320,7 +352,9 @@ describe('RecordPlanDecision', () => {
       });
 
       expect(result.kind).toBe('breach-supersedes');
-      expect(result.breachDirection).toEqual(LOWER_BOUND_BREACH);
+      expect((result as { breachDirection: BreachDirection }).breachDirection).toEqual(
+        LOWER_BOUND_BREACH,
+      );
     });
   });
 
@@ -382,7 +416,9 @@ describe('RecordPlanDecision', () => {
 
       expect(result1.kind).toBe('recorded');
       expect(result2.kind).toBe('recorded');
-      expect(result1.resultId).toBe(result2.resultId);
+      expect((result1 as { resultId: string }).resultId).toBe(
+        (result2 as { resultId: string }).resultId,
+      );
     });
   });
 
