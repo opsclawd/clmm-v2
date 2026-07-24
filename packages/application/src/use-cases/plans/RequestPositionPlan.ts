@@ -25,6 +25,7 @@ export type PositionPlanRequestResult =
       readonly status: 'ok';
       readonly conflict: false;
       readonly reason: 'exact-replay';
+      readonly plan: RegimePlanResponse;
       readonly fingerprint: string;
     }
   | { readonly status: 'ok'; readonly conflict: true; readonly reason: 'exact-replay' }
@@ -200,19 +201,6 @@ export async function requestPositionPlan(params: {
     ? Number(qualifiedTrigger.triggeredAt)
     : undefined;
 
-  if (qualifiedTrigger) {
-    observability.log('info', 'RequestPositionPlan: qualified trigger outranks advisory', {
-      positionId,
-      triggerId: qualifiedTrigger.triggerId,
-      breachDirection: qualifiedTrigger.breachDirection.kind,
-    });
-
-    return {
-      status: 'superseded',
-      breachDirection: qualifiedTrigger.breachDirection,
-    };
-  }
-
   const market = {
     symbol,
     source: 'clmm',
@@ -256,7 +244,13 @@ export async function requestPositionPlan(params: {
 
     if (createResult.kind === 'exact-replay') {
       observability.log('info', 'RequestPositionPlan: exact replay detected', { positionId });
-      return { status: 'ok', conflict: false, reason: 'exact-replay', fingerprint };
+      return {
+        status: 'ok',
+        conflict: false,
+        reason: 'exact-replay',
+        plan: existingPlan as unknown as RegimePlanResponse,
+        fingerprint,
+      };
     }
 
     if (createResult.kind === 'conflict') {
@@ -268,6 +262,18 @@ export async function requestPositionPlan(params: {
         status: 'conflict',
         priorPlanId: existingPlan?.planId ?? 'unknown',
         newFingerprint: fingerprint,
+      };
+    }
+
+    if (qualifiedTrigger) {
+      observability.log('info', 'RequestPositionPlan: qualified trigger outranks advisory', {
+        positionId,
+        triggerId: qualifiedTrigger.triggerId,
+        breachDirection: qualifiedTrigger.breachDirection.kind,
+      });
+      return {
+        status: 'superseded',
+        breachDirection: qualifiedTrigger.breachDirection,
       };
     }
 
@@ -298,6 +304,17 @@ export async function requestPositionPlan(params: {
   }
 
   if (transportResult.kind === 'conflict') {
+    if (qualifiedTrigger) {
+      observability.log('info', 'RequestPositionPlan: qualified trigger outranks conflict', {
+        positionId,
+        triggerId: qualifiedTrigger.triggerId,
+        breachDirection: qualifiedTrigger.breachDirection.kind,
+      });
+      return {
+        status: 'superseded',
+        breachDirection: qualifiedTrigger.breachDirection,
+      };
+    }
     observability.log('warn', 'RequestPositionPlan: regime returned conflict', {
       positionId,
       reason: transportResult.reason,
@@ -310,6 +327,17 @@ export async function requestPositionPlan(params: {
   }
 
   if (transportResult.kind === 'permanent') {
+    if (qualifiedTrigger) {
+      observability.log('info', 'RequestPositionPlan: qualified trigger outranks permanent error', {
+        positionId,
+        triggerId: qualifiedTrigger.triggerId,
+        breachDirection: qualifiedTrigger.breachDirection.kind,
+      });
+      return {
+        status: 'superseded',
+        breachDirection: qualifiedTrigger.breachDirection,
+      };
+    }
     observability.log('warn', 'RequestPositionPlan: regime returned permanent error', {
       positionId,
       reason: transportResult.reason,
@@ -321,6 +349,17 @@ export async function requestPositionPlan(params: {
   }
 
   if (transportResult.kind === 'retryable-degraded') {
+    if (qualifiedTrigger) {
+      observability.log('info', 'RequestPositionPlan: qualified trigger outranks timeout', {
+        positionId,
+        triggerId: qualifiedTrigger.triggerId,
+        breachDirection: qualifiedTrigger.breachDirection.kind,
+      });
+      return {
+        status: 'superseded',
+        breachDirection: qualifiedTrigger.breachDirection,
+      };
+    }
     observability.log('warn', 'RequestPositionPlan: regime timeout/unavailable', {
       positionId,
       reason: transportResult.reason,
