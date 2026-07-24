@@ -3,7 +3,7 @@ import { fetchJson } from './http';
 export type PlanAction =
   | { kind: 'HOLD' }
   | { kind: 'STAND_DOWN' }
-  | { kind: 'REQUEST_EXIT_CLMM'; exitIntent?: { posture: 'ExitToUSDC' | 'ExitToSOL' } };
+  | { kind: 'REQUEST_EXIT_CLMM'; exitIntent: { posture: 'ExitToUSDC' | 'ExitToSOL' } };
 
 export type PlanLifecycleState =
   | { kind: 'requested' }
@@ -44,12 +44,11 @@ function isPlanAction(value: unknown): value is PlanAction {
   if (value['kind'] === 'HOLD') return true;
   if (value['kind'] === 'STAND_DOWN') return true;
   if (value['kind'] === 'REQUEST_EXIT_CLMM') {
-    if (value['exitIntent'] !== undefined) {
-      const exitIntent = value['exitIntent'];
-      if (!isRecord(exitIntent)) return false;
-      if (exitIntent['posture'] !== 'ExitToUSDC' && exitIntent['posture'] !== 'ExitToSOL') {
-        return false;
-      }
+    if (value['exitIntent'] === undefined) return false;
+    const exitIntent = value['exitIntent'];
+    if (!isRecord(exitIntent)) return false;
+    if (exitIntent['posture'] !== 'ExitToUSDC' && exitIntent['posture'] !== 'ExitToSOL') {
+      return false;
     }
     return true;
   }

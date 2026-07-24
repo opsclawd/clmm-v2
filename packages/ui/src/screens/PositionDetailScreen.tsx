@@ -47,9 +47,9 @@ export function PositionDetailScreen({
   const vm = presentation.position;
   const breachDirection = position.breachDirection;
   const triggerId = position.triggerId;
-  const canViewPreview =
-    position.hasActionableTrigger && breachDirection != null && triggerId != null;
   const planVm = buildPositionPlanViewModel(plan ?? null, breachDirection);
+  const showBreachControls =
+    'showBreachControls' in planVm ? planVm.showBreachControls : breachDirection != null;
 
   return (
     <ScrollView style={{ flex: 1, backgroundColor: colors.background }}>
@@ -150,9 +150,9 @@ export function PositionDetailScreen({
           </View>
         ) : null}
 
-        {canViewPreview ? (
+        {showBreachControls && triggerId != null ? (
           <View style={{ marginTop: 16 }}>
-            <DirectionalPolicyCard direction={breachDirection} />
+            <DirectionalPolicyCard direction={breachDirection!} />
 
             <TouchableOpacity
               onPress={() => onViewPreview?.(triggerId)}

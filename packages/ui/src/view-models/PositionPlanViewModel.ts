@@ -1,7 +1,7 @@
 export type PlanAction =
   | { kind: 'HOLD' }
   | { kind: 'STAND_DOWN' }
-  | { kind: 'REQUEST_EXIT_CLMM'; exitIntent?: { posture: 'ExitToUSDC' | 'ExitToSOL' } };
+  | { kind: 'REQUEST_EXIT_CLMM'; exitIntent: { posture: 'ExitToUSDC' | 'ExitToSOL' } };
 
 export type PlanLifecycleState =
   | { kind: 'requested' }
@@ -110,12 +110,12 @@ function getAdvisoryPosture(
   action:
     | { kind: 'HOLD' }
     | { kind: 'STAND_DOWN' }
-    | { kind: 'REQUEST_EXIT_CLMM'; exitIntent?: { posture: 'ExitToUSDC' | 'ExitToSOL' } },
-): 'ExitToUSDC' | 'ExitToSOL' | undefined {
-  if (action.kind === 'REQUEST_EXIT_CLMM' && action.exitIntent) {
+    | { kind: 'REQUEST_EXIT_CLMM'; exitIntent: { posture: 'ExitToUSDC' | 'ExitToSOL' } },
+): 'ExitToUSDC' | 'ExitToSOL' {
+  if (action.kind === 'REQUEST_EXIT_CLMM') {
     return action.exitIntent.posture;
   }
-  return undefined;
+  return 'ExitToUSDC';
 }
 
 export function buildPositionPlanViewModel(
@@ -149,7 +149,7 @@ export function buildPositionPlanViewModel(
       }
 
       if (action.kind === 'REQUEST_EXIT_CLMM') {
-        const exitPosture = getAdvisoryPosture(action) ?? 'ExitToUSDC';
+        const exitPosture = getAdvisoryPosture(action);
         return {
           status: 'requesting-exit',
           exitPosture,
@@ -164,7 +164,7 @@ export function buildPositionPlanViewModel(
 
     case 'exit-previewed': {
       const action = plan.state.advisoryAction;
-      const exitPosture = getAdvisoryPosture(action) ?? 'ExitToUSDC';
+      const exitPosture = getAdvisoryPosture(action);
       return {
         status: 'preview-ready',
         previewId: plan.state.previewId,
@@ -177,7 +177,7 @@ export function buildPositionPlanViewModel(
 
     case 'awaiting-signature': {
       const action = plan.state.advisoryAction;
-      const exitPosture = getAdvisoryPosture(action) ?? 'ExitToUSDC';
+      const exitPosture = getAdvisoryPosture(action);
       return {
         status: 'awaiting-signature',
         exitPosture,
@@ -188,7 +188,7 @@ export function buildPositionPlanViewModel(
 
     case 'submitted': {
       const action = plan.state.advisoryAction;
-      const exitPosture = getAdvisoryPosture(action) ?? 'ExitToUSDC';
+      const exitPosture = getAdvisoryPosture(action);
       return {
         status: 'in-flight',
         attemptId: plan.state.attemptId ?? 'unknown',
