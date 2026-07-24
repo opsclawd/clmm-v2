@@ -323,9 +323,14 @@ export class FakePlanRepository implements PlanRepository {
       return;
     }
 
+    const storedOutcome =
+      plan.lifecycleStateJson && 'outcome' in plan.lifecycleStateJson
+        ? plan.lifecycleStateJson.outcome
+        : undefined;
+
     const state = {
       kind: 'reported',
-      outcome: { kind: 'executed' },
+      outcome: storedOutcome ?? { kind: 'executed' },
       executionOrigin: resolveExecutionOrigin(plan),
       reportedAt: params.deliveredAt,
     } as PlanLifecycleState;
@@ -367,9 +372,14 @@ export class FakePlanRepository implements PlanRepository {
       return;
     }
 
+    const storedOutcome =
+      plan.lifecycleStateJson && 'outcome' in plan.lifecycleStateJson
+        ? plan.lifecycleStateJson.outcome
+        : undefined;
+
     const state = {
       kind: 'report-failed',
-      outcome: { kind: 'failed' },
+      outcome: storedOutcome ?? { kind: 'failed' },
       executionOrigin: resolveExecutionOrigin(plan),
     } as PlanLifecycleState;
 
