@@ -34,7 +34,6 @@ function makePreviewReadyPlan(): PositionPlanViewModel {
     status: 'preview-ready',
     previewId: 'preview-123',
     exitPosture: 'ExitToUSDC',
-    regimeLabel: 'DOWN',
     canApprove: true,
     showBreachControls: true,
   };
@@ -198,7 +197,6 @@ describe('PositionPlanCard', () => {
       const plan: PositionPlanViewModel = {
         status: 'awaiting-signature',
         exitPosture: 'ExitToUSDC',
-        regimeLabel: 'DOWN',
         showBreachControls: true,
       };
       render(<PositionPlanCard plan={plan} />);
@@ -212,7 +210,6 @@ describe('PositionPlanCard', () => {
         status: 'in-flight',
         attemptId: 'attempt-456',
         exitPosture: 'ExitToSOL',
-        regimeLabel: 'DOWN',
         showBreachControls: true,
       };
       render(<PositionPlanCard plan={plan} />);

@@ -113,7 +113,7 @@ describe('PositionPlanViewModel', () => {
       if (vm.status !== 'requesting-exit') return;
       expect(vm.exitPosture).toBe('ExitToUSDC');
       expect(vm.canPreview).toBe(true);
-      expect(vm.showBreachControls).toBe(true);
+      expect(vm.showBreachControls).toBe(false);
     });
 
     it('transitions to preview-ready after preview is created', () => {
@@ -264,7 +264,7 @@ describe('PositionPlanViewModel', () => {
       expect(vm.status).toBe('unavailable');
     });
 
-    it('shows breach controls for in-flight states', () => {
+    it('hides breach controls for in-flight states when active plan control exists', () => {
       const plan: CurrentPlanDto = {
         planId: 'plan-1',
         canonicalHash: 'hash-1',
@@ -280,10 +280,10 @@ describe('PositionPlanViewModel', () => {
 
       expect(vm.status).toBe('in-flight');
       if (vm.status !== 'in-flight') return;
-      expect(vm.showBreachControls).toBe(true);
+      expect(vm.showBreachControls).toBe(false);
     });
 
-    it('shows breach controls for awaiting-signature state', () => {
+    it('hides breach controls for awaiting-signature state', () => {
       const plan: CurrentPlanDto = {
         planId: 'plan-1',
         canonicalHash: 'hash-1',
@@ -298,7 +298,7 @@ describe('PositionPlanViewModel', () => {
 
       expect(vm.status).toBe('awaiting-signature');
       if (vm.status !== 'awaiting-signature') return;
-      expect(vm.showBreachControls).toBe(true);
+      expect(vm.showBreachControls).toBe(false);
     });
   });
 

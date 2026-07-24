@@ -59,36 +59,30 @@ export type PositionPlanViewModel =
       status: 'preview-ready';
       previewId: string;
       exitPosture: 'ExitToUSDC' | 'ExitToSOL';
-      regimeLabel: string;
       canApprove: boolean;
       showBreachControls: boolean;
     }
   | {
       status: 'awaiting-signature';
       exitPosture: 'ExitToUSDC' | 'ExitToSOL';
-      regimeLabel: string;
       showBreachControls: boolean;
     }
   | {
       status: 'in-flight';
       attemptId: string;
       exitPosture: 'ExitToUSDC' | 'ExitToSOL';
-      regimeLabel: string;
       showBreachControls: boolean;
     }
   | {
       status: 'result-pending';
-      regimeLabel: string;
       showBreachControls: boolean;
     }
   | {
       status: 'completed';
-      regimeLabel: string;
       showBreachControls: boolean;
     }
   | {
       status: 'failed';
-      regimeLabel: string;
       showBreachControls: boolean;
     }
   | {
@@ -127,7 +121,7 @@ export function buildPositionPlanViewModel(
     return { status: 'unavailable' };
   }
 
-  const showBreachControls = breachDirection != null;
+  const hasBreach = breachDirection != null;
 
   switch (plan.state.kind) {
     case 'requested':
@@ -145,7 +139,7 @@ export function buildPositionPlanViewModel(
           regimeLabel,
           suitabilityLabel,
           canAcknowledge: true,
-          showBreachControls,
+          showBreachControls: hasBreach,
         };
       }
 
@@ -156,7 +150,7 @@ export function buildPositionPlanViewModel(
           exitPosture,
           regimeLabel,
           canPreview: true,
-          showBreachControls,
+          showBreachControls: false,
         };
       }
 
@@ -172,7 +166,7 @@ export function buildPositionPlanViewModel(
         return {
           status: 'stale',
           staleReason: 'Exit preview has gone stale. Request a new preview to continue.',
-          showBreachControls,
+          showBreachControls: hasBreach,
         };
       }
 
@@ -180,7 +174,7 @@ export function buildPositionPlanViewModel(
         return {
           status: 'stale',
           staleReason: 'Exit preview has expired. Request a new preview to continue.',
-          showBreachControls,
+          showBreachControls: hasBreach,
         };
       }
 
@@ -188,9 +182,8 @@ export function buildPositionPlanViewModel(
         status: 'preview-ready',
         previewId: plan.state.previewId,
         exitPosture,
-        regimeLabel: 'DOWN',
         canApprove: true,
-        showBreachControls,
+        showBreachControls: false,
       };
     }
 
@@ -200,8 +193,7 @@ export function buildPositionPlanViewModel(
       return {
         status: 'awaiting-signature',
         exitPosture,
-        regimeLabel: 'DOWN',
-        showBreachControls,
+        showBreachControls: false,
       };
     }
 
@@ -212,32 +204,31 @@ export function buildPositionPlanViewModel(
         status: 'in-flight',
         attemptId: plan.state.attemptId ?? 'unknown',
         exitPosture,
-        regimeLabel: 'DOWN',
-        showBreachControls,
+        showBreachControls: false,
       };
     }
 
     case 'result-pending':
-      return { status: 'result-pending', regimeLabel: 'DOWN', showBreachControls };
+      return { status: 'result-pending', showBreachControls: false };
 
     case 'reported':
-      return { status: 'completed', regimeLabel: 'DOWN', showBreachControls };
+      return { status: 'completed', showBreachControls: false };
 
     case 'report-failed':
-      return { status: 'failed', regimeLabel: 'DOWN', showBreachControls };
+      return { status: 'failed', showBreachControls: hasBreach };
 
     case 'conflict':
       return {
         status: 'conflict',
         conflictReason: 'A conflicting plan decision was detected',
-        showBreachControls,
+        showBreachControls: hasBreach,
       };
 
     case 'superseded':
       return {
         status: 'superseded',
         supersededReason: 'A newer plan has superseded this one',
-        showBreachControls,
+        showBreachControls: hasBreach,
       };
 
     default:
