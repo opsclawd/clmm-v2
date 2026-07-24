@@ -1,0 +1,11 @@
+{
+  "result": "fail",
+  "findings": [
+    {
+      "severity": "P1",
+      "summary": "completeDelivery and failDelivery hardcode the plan's outcome to { kind: \"executed\" } and { kind: \"failed\" } respectively, overwriting the actual terminal outcome (e.g., 'rejected', 'expired') determined during execution.",
+      "file": "packages/adapters/src/outbound/storage/PlanStorageAdapter.ts",
+      "suggested_fix": "Retrieve the original outcome from the plan's current state (e.g., `stored.lifecycleStateJson.outcome` or `stored.decisionKind`) and preserve it when constructing the `reported` and `report-failed` lifecycle states."
+    }
+  ]
+}

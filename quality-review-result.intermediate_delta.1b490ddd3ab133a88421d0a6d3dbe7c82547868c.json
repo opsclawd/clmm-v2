@@ -1,0 +1,17 @@
+{
+  "result": "fail",
+  "findings": [
+    {
+      "severity": "P1",
+      "summary": "completeDelivery and failDelivery do not check if deliveredAt is already set before updating, allowing a worker with an expired lease to overwrite a subsequent successful/failed delivery.",
+      "file": "packages/adapters/src/outbound/storage/PlanStorageAdapter.ts",
+      "suggested_fix": "In completeDelivery and failDelivery, select deliveredAt in the outbox query and return early if outboxRows[0]!.deliveredAt !== null."
+    },
+    {
+      "severity": "P3",
+      "summary": "The abandonDelivery method is no longer used since it was combined into failDelivery, but it remains in the port interface and adapters.",
+      "file": "packages/application/src/ports/index.ts",
+      "suggested_fix": "Remove abandonDelivery from the PlanRepository interface, PlanStorageAdapter, and FakePlanRepository to keep the port minimal."
+    }
+  ]
+}

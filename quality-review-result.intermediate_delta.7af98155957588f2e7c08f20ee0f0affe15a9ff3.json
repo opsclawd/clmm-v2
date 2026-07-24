@@ -1,0 +1,23 @@
+{
+  "result": "fail",
+  "findings": [
+    {
+      "severity": "P1",
+      "summary": "PlanController.test.ts is missing test coverage for the ConflictException error branch in recordDecision (when recordPlanDecision returns 'conflict-detected').",
+      "file": "packages/adapters/src/inbound/http/PlanController.test.ts",
+      "suggested_fix": "Add a test in the recordDecision describe block verifying that a ConflictException is thrown when the underlying recordPlanDecision call returns { kind: \"conflict-detected\" }."
+    },
+    {
+      "severity": "P1",
+      "summary": "PlanController.test.ts is missing test coverage for the NotFoundException error branch in recordDecision when the plan is not found.",
+      "file": "packages/adapters/src/inbound/http/PlanController.test.ts",
+      "suggested_fix": "Add a test in the recordDecision describe block verifying that a NotFoundException is thrown when the underlying recordPlanDecision call returns { kind: \"not-found\" }."
+    },
+    {
+      "severity": "P1",
+      "summary": "PlanController.test.ts is missing test coverage for the ConflictException error branch in approvePlan.",
+      "file": "packages/adapters/src/inbound/http/PlanController.test.ts",
+      "suggested_fix": "Add a test in the approvePlan describe block verifying that a ConflictException is thrown when approvePlanExit throws a PlanExitApprovalError that does not contain \"not found\" in its message."
+    }
+  ]
+}

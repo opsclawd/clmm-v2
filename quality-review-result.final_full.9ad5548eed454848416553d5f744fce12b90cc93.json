@@ -1,0 +1,17 @@
+{
+  "result": "fail",
+  "findings": [
+    {
+      "severity": "P0",
+      "summary": "PositionPlanViewModel re-derives and defaults the exit posture to \"ExitToUSDC\" when exitIntent is missing, violating the strict domain invariant against inferring directional mapping.",
+      "file": "packages/ui/src/view-models/PositionPlanViewModel.ts",
+      "suggested_fix": "Remove the `?? \"ExitToUSDC\"` fallbacks in `getAdvisoryPosture` and `buildPositionPlanViewModel`. Make `exitIntent` required for the `REQUEST_EXIT_CLMM` action in the API schema (`apps/app/src/api/plans.ts`) and view model, and treat missing `exitIntent` as a malformed or unavailable state."
+    },
+    {
+      "severity": "P2",
+      "summary": "PositionPlanViewModel defines a `showBreachControls` property for all states, but it is completely ignored by PositionDetailScreen, which uses unrelated `canViewPreview` logic instead, potentially rendering conflicting preview buttons.",
+      "file": "packages/ui/src/screens/PositionDetailScreen.tsx",
+      "suggested_fix": "Update PositionDetailScreen to use `planVm.showBreachControls` to determine visibility of the original breach controls, or remove the unused `showBreachControls` property from the view model."
+    }
+  ]
+}

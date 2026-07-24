@@ -1,0 +1,17 @@
+{
+  "result": "fail",
+  "findings": [
+    {
+      "severity": "P0",
+      "summary": "Permanent delivery failures and exhausted retries cause an infinite loop in syncPlanExecutionResults because the planResultOutbox row is never finalized or removed, causing claimDueResult to yield the same row repeatedly.",
+      "file": "packages/application/src/use-cases/plans/SyncPlanExecutionResults.ts",
+      "suggested_fix": "Add a method like abandonDelivery to PlanRepository to delete or mark the outbox row as failed, and call it when attemptCount >= MAX_RESULT_RETRIES or transportResult.kind === 'permanent'."
+    },
+    {
+      "severity": "P2",
+      "summary": "requestedAction is hardcoded to 'HOLD' when building the RegimeExecutionResult, which misreports the action to the regime engine for non-HOLD decisions like stand-down.",
+      "file": "packages/application/src/use-cases/plans/SyncPlanExecutionResults.ts",
+      "suggested_fix": "Extract requestedAction from the plan outcome or canonicalResult payload instead of hardcoding 'HOLD'."
+    }
+  ]
+}

@@ -1,0 +1,29 @@
+{
+  "result": "fail",
+  "findings": [
+    {
+      "severity": "P0",
+      "summary": "CreatePlanExitPreview manually derives swapInstruction from exitIntent, violating the release-blocker invariant that directional mapping must not be re-derived outside of DirectionalExitPolicyService.",
+      "file": "packages/application/src/use-cases/plans/CreatePlanExitPreview.ts",
+      "suggested_fix": "Add a function to DirectionalExitPolicyService to map ExitIntentPosture to a swap instruction and execution skeleton, and use it in CreatePlanExitPreview."
+    },
+    {
+      "severity": "P1",
+      "summary": "CreatePlanExitPreview fabricates a fake previewId (`${currentPlan.planId}-preview`) when reusing a fresh preview, which will cause downstream lookups to fail if the repository generated a different ID.",
+      "file": "packages/application/src/use-cases/plans/CreatePlanExitPreview.ts",
+      "suggested_fix": "Add `previewId` to the `exit-previewed` state in `PositionPlan.ts` so it can be stored and returned correctly when the preview is reused."
+    },
+    {
+      "severity": "P1",
+      "summary": "ApprovePlanExit performs database writes (saveAttempt, savePreparedPayload) before calling applyPlanLifecycleTransition. If the state transition is invalid, an error is thrown, leaving orphaned records in the database.",
+      "file": "packages/application/src/use-cases/plans/ApprovePlanExit.ts",
+      "suggested_fix": "Call applyPlanLifecycleTransition to validate the transition before performing any database writes."
+    },
+    {
+      "severity": "P2",
+      "summary": "ApprovePlanExit throws an error instead of being idempotent when the plan is already in an executable state (e.g. 'awaiting-signature'), violating the suggested fix from the previous review.",
+      "file": "packages/application/src/use-cases/plans/ApprovePlanExit.ts",
+      "suggested_fix": "Add `attemptId` to the `awaiting-signature` and `submitted` states in PositionPlan so it can be returned idempotently instead of throwing an error."
+    }
+  ]
+}

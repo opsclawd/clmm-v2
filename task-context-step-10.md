@@ -77,8 +77,8 @@ Expected: focused app/UI tests pass and deterministic exit controls retain visua
 ```bash
 pnpm --filter @clmm/app test -- src/api/plans.test.ts
 pnpm --filter @clmm/ui test -- src/view-models/PositionPlanViewModel.test.ts src/components/PositionPlanCard.test.tsx src/screens/PositionDetailScreen.test.tsx
-pnpm exec eslint apps/app/src/api/plans.ts apps/app/src/api/plans.test.ts packages/ui/src/view-models/PositionPlanViewModel.ts packages/ui/src/view-models/PositionPlanViewModel.test.ts packages/ui/src/components/PositionPlanCard.tsx packages/ui/src/components/PositionPlanCard.test.tsx packages/ui/src/screens/PositionDetailScreen.tsx packages/ui/src/screens/PositionDetailScreen.test.tsx packages/ui/src/index.ts apps/app/app/position/'[id].tsx
-git diff --check -- apps/app/src/api/plans.ts apps/app/src/api/plans.test.ts packages/ui/src/view-models/PositionPlanViewModel.ts packages/ui/src/view-models/PositionPlanViewModel.test.ts packages/ui/src/components/PositionPlanCard.tsx packages/ui/src/components/PositionPlanCard.test.tsx packages/ui/src/screens/PositionDetailScreen.tsx packages/ui/src/screens/PositionDetailScreen.test.tsx packages/ui/src/index.ts apps/app/app/position/'[id].tsx
+pnpm exec eslint apps/app/src/api/plans.ts apps/app/src/api/plans.test.ts packages/ui/src/view-models/PositionPlanViewModel.ts packages/ui/src/view-models/PositionPlanViewModel.test.ts packages/ui/src/components/PositionPlanCard.tsx packages/ui/src/components/PositionPlanCard.test.tsx packages/ui/src/screens/PositionDetailScreen.tsx packages/ui/src/screens/PositionDetailScreen.test.tsx packages/ui/src/index.ts 'apps/app/app/position/[id].tsx'
+git diff --check -- apps/app/src/api/plans.ts apps/app/src/api/plans.test.ts packages/ui/src/view-models/PositionPlanViewModel.ts packages/ui/src/view-models/PositionPlanViewModel.test.ts packages/ui/src/components/PositionPlanCard.tsx packages/ui/src/components/PositionPlanCard.test.tsx packages/ui/src/screens/PositionDetailScreen.tsx packages/ui/src/screens/PositionDetailScreen.test.tsx packages/ui/src/index.ts 'apps/app/app/position/[id].tsx'
 ```
 
 ## Behavioral Invariants

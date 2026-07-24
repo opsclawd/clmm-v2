@@ -1,0 +1,11 @@
+{
+  "result": "fail",
+  "findings": [
+    {
+      "severity": "P0",
+      "summary": "Plan exit intent is hardcoded to USDC, ignoring the contract's explicit exitIntent field, which violates the release-blocker invariant against implicit directional mapping.",
+      "file": "packages/application/src/use-cases/plans/CreatePlanExitPreview.ts",
+      "suggested_fix": "Extract exitIntent from the DTO, add it to the PlanAction domain model for REQUEST_EXIT_CLMM in PositionPlan.ts, and read it in CreatePlanExitPreview.ts instead of hardcoding 'exit-to-usdc'."
+    }
+  ]
+}

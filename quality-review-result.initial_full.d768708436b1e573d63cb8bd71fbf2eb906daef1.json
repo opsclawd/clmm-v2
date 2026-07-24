@@ -1,0 +1,17 @@
+{
+  "result": "fail",
+  "findings": [
+    {
+      "severity": "P1",
+      "summary": "CreatePlanExitPreview bypasses PlanLifecycleReducer and manually constructs state, allowing duplicate previews to be created for plans already in exit-previewed state. This violates the invariant 'execution replay cannot duplicate attempt' (produce at most one preview).",
+      "file": "packages/application/src/use-cases/plans/CreatePlanExitPreview.ts",
+      "suggested_fix": "Check if the plan is already 'exit-previewed' and return the existing preview if fresh, and use applyPlanLifecycleTransition instead of manual state construction to enforce domain transition rules."
+    },
+    {
+      "severity": "P1",
+      "summary": "ApprovePlanExit bypasses PlanLifecycleReducer and unconditionally creates a new ExecutionAttempt and PreparedPayload before attempting to link it. If the link fails due to an existing attempt, orphaned records are left in the database, violating the 'execution replay cannot duplicate attempt' invariant.",
+      "file": "packages/application/src/use-cases/plans/ApprovePlanExit.ts",
+      "suggested_fix": "Add an idempotency check to return the existing attempt if the plan is already in an executable state (e.g. 'awaiting-signature'), and use applyPlanLifecycleTransition to validate the transition."
+    }
+  ]
+}

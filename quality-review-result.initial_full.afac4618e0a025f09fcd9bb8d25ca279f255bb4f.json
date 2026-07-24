@@ -1,0 +1,17 @@
+{
+  "result": "fail",
+  "findings": [
+    {
+      "severity": "P1",
+      "summary": "The requestPlan endpoint in PlanController fails to map a 'conflict' result to an HTTP 409 response, instead returning it directly as a 2xx success payload. This violates the invariant that conflicts return 409.",
+      "file": "packages/adapters/src/inbound/http/PlanController.ts",
+      "suggested_fix": "Add a check: `if (result.status === \"conflict\") { throw new HttpException(result, HttpStatus.CONFLICT); }`"
+    },
+    {
+      "severity": "P2",
+      "summary": "The test block 'returns existing identity for replay' fails to actually test replay idempotency, instead duplicating conflict behavior testing by setting 'conflict' as the mock error.",
+      "file": "packages/adapters/src/inbound/http/PlanController.test.ts",
+      "suggested_fix": "Add a test inside the block that verifies making the exact same request twice correctly returns `status: \"ok\"` with the existing identity, rather than mocking a conflict error."
+    }
+  ]
+}
