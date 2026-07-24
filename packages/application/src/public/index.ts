@@ -180,3 +180,4 @@ export { getExecutionHistory } from '../use-cases/execution/GetExecutionHistory.
 export { getWalletExecutionHistory } from '../use-cases/execution/GetWalletExecutionHistory.js';
 export { resolveExecutionEntryContext } from '../use-cases/execution/ResolveExecutionEntryContext.js';
 export { dispatchActionableNotification } from '../use-cases/notifications/DispatchActionableNotification.js';
+export { requestPositionPlan } from '../use-cases/plans/RequestPositionPlan.js';

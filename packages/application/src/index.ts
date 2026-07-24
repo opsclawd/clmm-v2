@@ -33,3 +33,4 @@ export * from './use-cases/execution/ResumeExecutionAttempt.js';
 export * from './use-cases/insights/GetSolUsdcInsightPoolSnapshot.js';
 export * from './use-cases/insights/GetSolUsdcInsightPositions.js';
 export * from './use-cases/insights/GetSolUsdcInsightBundle.js';
+export * from './use-cases/plans/RequestPositionPlan.js';
