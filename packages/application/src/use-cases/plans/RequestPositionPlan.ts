@@ -7,13 +7,7 @@ import type {
   ObservabilityPort,
   IdGeneratorPort,
 } from '../../ports/index.js';
-import type {
-  WalletId,
-  PositionId,
-  ClockTimestamp,
-  BreachDirection,
-  ExitTrigger,
-} from '@clmm/domain';
+import type { WalletId, PositionId, ClockTimestamp, BreachDirection } from '@clmm/domain';
 import { makeClockTimestamp } from '@clmm/domain';
 import type { CanonicalHash } from '@clmm/domain';
 import type { RegimePlanRequest, RegimePlanResponse } from '@clmm/application';
@@ -79,23 +73,40 @@ function buildRegimePlanRequest(params: {
     poolAddress: string;
     timeframe: '15m' | '1h';
   };
-  trigger: ExitTrigger | null;
 }): RegimePlanRequest {
+  const positionPart: {
+    positionId: string;
+    walletId?: string;
+    observedAtUnixMs: number;
+    breachQualifiedAtUnixMs?: number;
+    lowerBoundPrice: number;
+    upperBoundPrice: number;
+    currentPrice: number;
+    rangeState: 'in-range' | 'below-range' | 'above-range';
+    breachQualified: boolean;
+  } = {
+    positionId: params.position.positionId as string,
+    observedAtUnixMs: params.position.observedAtUnixMs,
+    lowerBoundPrice: params.position.lowerBoundPrice,
+    upperBoundPrice: params.position.upperBoundPrice,
+    currentPrice: params.position.currentPrice,
+    rangeState: params.position.rangeState,
+    breachQualified: params.position.breachQualified,
+  };
+
+  if (params.position.walletId !== undefined) {
+    positionPart.walletId = params.position.walletId;
+  }
+
+  if (params.position.breachQualifiedAtUnixMs !== undefined) {
+    positionPart.breachQualifiedAtUnixMs = params.position.breachQualifiedAtUnixMs;
+  }
+
   return {
     schemaVersion: 'position-plan.v1',
     asOfUnixMs: Date.now(),
     market: params.market,
-    position: {
-      positionId: params.position.positionId,
-      walletId: params.position.walletId,
-      observedAtUnixMs: params.position.observedAtUnixMs,
-      breachQualifiedAtUnixMs: params.position.breachQualifiedAtUnixMs,
-      lowerBoundPrice: params.position.lowerBoundPrice,
-      upperBoundPrice: params.position.upperBoundPrice,
-      currentPrice: params.position.currentPrice,
-      rangeState: params.position.rangeState,
-      breachQualified: params.position.breachQualified,
-    },
+    position: positionPart,
   };
 }
 
@@ -184,6 +195,10 @@ export async function requestPositionPlan(params: {
     observedAt: position.lastObservedAt,
   });
 
+  const breachQualifiedAtUnixMs = qualifiedTrigger
+    ? Number(qualifiedTrigger.triggeredAt)
+    : undefined;
+
   if (qualifiedTrigger) {
     observability.log('info', 'RequestPositionPlan: qualified trigger outranks advisory', {
       positionId,
@@ -208,17 +223,16 @@ export async function requestPositionPlan(params: {
   const request = buildRegimePlanRequest({
     position: {
       positionId,
-      walletId,
+      ...(walletId !== undefined && { walletId: walletId as string }),
       lowerBoundPrice: position.bounds.lowerBound,
       upperBoundPrice: position.bounds.upperBound,
       currentPrice,
       rangeState: rangeStateKind,
       breachQualified: !!qualifiedTrigger,
-      observedAtUnixMs: position.lastObservedAt,
-      breachQualifiedAtUnixMs: qualifiedTrigger ? Number(qualifiedTrigger.triggeredAt) : undefined,
+      observedAtUnixMs: position.lastObservedAt as number,
+      ...(breachQualifiedAtUnixMs !== undefined && { breachQualifiedAtUnixMs }),
     },
     market,
-    trigger: qualifiedTrigger,
   });
 
   const transportResult = await regimePlanPort.requestPositionPlan(request);

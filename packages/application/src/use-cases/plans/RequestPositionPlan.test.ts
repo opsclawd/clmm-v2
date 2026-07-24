@@ -10,6 +10,7 @@ import type {
   IdGeneratorPort,
   PlanRequestTransportResult,
 } from '../../ports/index.js';
+import type { RegimePlanRequest } from '@clmm/application';
 import type {
   WalletId,
   PositionId,
@@ -38,13 +39,17 @@ const FIXTURE_WALLET_ID = makeWalletId('test-wallet-1');
 const FIXTURE_POSITION_ID = makePositionId('test-position-1');
 const FIXTURE_POOL_ID = 'test-pool-1' as PoolId;
 
-function makeInRangePosition(positionId: PositionId, walletId: WalletId): LiquidityPosition {
+function makeInRangePosition(
+  positionId: PositionId,
+  walletId: WalletId,
+  lastObservedAt?: ClockTimestamp,
+): LiquidityPosition {
   return {
     positionId,
     walletId,
     poolId: FIXTURE_POOL_ID,
     bounds: { lowerBound: 100, upperBound: 200 },
-    lastObservedAt: makeClockTimestamp(1_000_000),
+    lastObservedAt: lastObservedAt ?? makeClockTimestamp(1_000_000),
     rangeState: { kind: 'in-range', currentPrice: 150 },
     monitoringReadiness: { kind: 'active' },
   };
@@ -357,20 +362,17 @@ class FakeRegimePlanPort implements RegimePlanPort {
       reasons: [{ code: 'FAKE', severity: 'INFO' as const, message: 'test' }],
     },
   };
-  private _requests: { position: { positionId: string }; market: { symbol: string } }[] = [];
+  private _requests: RegimePlanRequest[] = [];
 
   setResponse(response: PlanRequestTransportResult): void {
     this._response = response;
   }
 
-  getRequests(): readonly { position: { positionId: string }; market: { symbol: string } }[] {
+  getRequests(): readonly RegimePlanRequest[] {
     return this._requests;
   }
 
-  async requestPositionPlan(request: {
-    position: { positionId: string };
-    market: { symbol: string };
-  }): Promise<PlanRequestTransportResult> {
+  async requestPositionPlan(request: RegimePlanRequest): Promise<PlanRequestTransportResult> {
     this._requests.push(request);
     return this._response;
   }
@@ -415,7 +417,7 @@ class FakeObservabilityPort implements ObservabilityPort {
   logs: { level: string; message: string; context?: Record<string, unknown> }[] = [];
 
   log(level: 'info' | 'warn' | 'error', message: string, context?: Record<string, unknown>): void {
-    this.logs.push({ level, message, context });
+    this.logs.push({ level, message, ...(context !== undefined ? { context } : {}) });
   }
 
   recordTiming(_event: string, _durationMs: number, _tags?: Record<string, string>): void {}
@@ -774,8 +776,11 @@ describe('RequestPositionPlan', () => {
 
       clock.advance(60_000);
 
-      const updatedPosition = makeInRangePosition(FIXTURE_POSITION_ID, FIXTURE_WALLET_ID);
-      updatedPosition.lastObservedAt = makeClockTimestamp(clock.now());
+      const updatedPosition = makeInRangePosition(
+        FIXTURE_POSITION_ID,
+        FIXTURE_WALLET_ID,
+        makeClockTimestamp(clock.now()),
+      );
       positionRead.setPosition(updatedPosition);
 
       const result = await requestPositionPlan({
