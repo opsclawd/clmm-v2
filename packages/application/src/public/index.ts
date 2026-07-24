@@ -181,3 +181,4 @@ export { getWalletExecutionHistory } from '../use-cases/execution/GetWalletExecu
 export { resolveExecutionEntryContext } from '../use-cases/execution/ResolveExecutionEntryContext.js';
 export { dispatchActionableNotification } from '../use-cases/notifications/DispatchActionableNotification.js';
 export { requestPositionPlan } from '../use-cases/plans/RequestPositionPlan.js';
+export { recordPlanDecision } from '../use-cases/plans/RecordPlanDecision.js';
