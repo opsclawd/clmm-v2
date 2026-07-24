@@ -1,9 +1,15 @@
 import { useLocalSearchParams, useRouter } from 'expo-router';
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { PositionDetailScreen } from '@clmm/ui';
 import { Text, View } from 'react-native';
 import { useStore } from 'zustand';
 import { fetchPositionDetail } from '../../src/api/positions';
+import {
+  fetchCurrentPlan,
+  recordPlanDecision,
+  requestPlanPreview,
+  approvePlanExit,
+} from '../../src/api/plans';
 import { navigateRoute } from '../../src/platform/webNavigation';
 import { walletSessionStore } from '../../src/state/walletSessionStore';
 import { RequireWallet } from '../../src/wallet-boot/RequireWallet';
@@ -22,6 +28,7 @@ function PositionDetailRouteBody() {
     triggerId?: string | string[];
   }>();
   const router = useRouter();
+  const queryClient = useQueryClient();
   const walletAddress = useStore(walletSessionStore, (state) => state.walletAddress);
   const positionId = typeof id === 'string' ? id : undefined;
   const alertTriggerId =
@@ -32,6 +39,41 @@ function PositionDetailRouteBody() {
     queryKey: ['position-detail', walletAddress, positionId],
     queryFn: () => fetchPositionDetail(walletAddress!, positionId!),
     enabled: walletAddress != null && hasValidPositionId,
+  });
+
+  const planQuery = useQuery({
+    queryKey: ['position-plan', walletAddress, positionId],
+    queryFn: () => fetchCurrentPlan(walletAddress!, positionId!),
+    enabled: walletAddress != null && hasValidPositionId,
+  });
+
+  const acknowledgeMutation = useMutation({
+    mutationFn: (planId: string) =>
+      recordPlanDecision(walletAddress!, positionId!, planId, 'acknowledged'),
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({
+        queryKey: ['position-plan', walletAddress, positionId],
+      });
+    },
+  });
+
+  const previewMutation = useMutation({
+    mutationFn: (planId: string) => requestPlanPreview(walletAddress!, positionId!, planId),
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({
+        queryKey: ['position-plan', walletAddress, positionId],
+      });
+    },
+  });
+
+  const approveMutation = useMutation({
+    mutationFn: ({ planId, previewId }: { planId: string; previewId: string }) =>
+      approvePlanExit(walletAddress!, positionId!, planId, previewId),
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({
+        queryKey: ['position-plan', walletAddress, positionId],
+      });
+    },
   });
 
   if (!hasValidPositionId) {
@@ -51,16 +93,23 @@ function PositionDetailRouteBody() {
   }
 
   const position = positionQuery.data;
+  const plan = planQuery.data;
 
   return (
     <PositionDetailScreen
       {...(position ? { position } : {})}
+      {...(plan !== undefined ? { plan } : {})}
       onViewPreview={(resolvedTriggerId: string) =>
         navigateRoute({
           router,
           path: `/preview/${alertTriggerId ?? resolvedTriggerId}`,
           method: 'push',
         })
+      }
+      onPlanAcknowledge={(planId: string) => acknowledgeMutation.mutate(planId)}
+      onPlanPreview={(planId: string) => previewMutation.mutate(planId)}
+      onPlanApprove={({ planId, previewId }: { planId: string; previewId: string }) =>
+        approveMutation.mutate({ planId, previewId })
       }
     />
   );
