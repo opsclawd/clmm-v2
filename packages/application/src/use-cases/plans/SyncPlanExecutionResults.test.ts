@@ -63,7 +63,6 @@ describe('SyncPlanExecutionResults', () => {
       completeDelivery: vi.fn(),
       recordPermanentFailure: vi.fn(),
       failDelivery: vi.fn(),
-      abandonDelivery: vi.fn(),
       getCurrentPlan: vi.fn(),
       getPlanActionKind: vi.fn().mockResolvedValue('HOLD'),
     } as unknown as PlanRepository;

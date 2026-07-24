@@ -393,13 +393,17 @@ export class PlanStorageAdapter implements PlanRepository {
   async completeDelivery(params: PlanDeliveryCompletionParams): Promise<void> {
     await this.db.transaction(async (tx) => {
       const outboxRows = await tx
-        .select({ planId: planResultOutbox.planId })
+        .select({ planId: planResultOutbox.planId, deliveredAt: planResultOutbox.deliveredAt })
         .from(planResultOutbox)
         .where(eq(planResultOutbox.resultId, params.resultId))
         .for('update')
         .limit(1);
 
       if (outboxRows.length === 0) {
+        return;
+      }
+
+      if (outboxRows[0]!.deliveredAt !== null) {
         return;
       }
 
@@ -474,13 +478,17 @@ export class PlanStorageAdapter implements PlanRepository {
   ): Promise<void> {
     await this.db.transaction(async (tx) => {
       const outboxRows = await tx
-        .select({ planId: planResultOutbox.planId })
+        .select({ planId: planResultOutbox.planId, deliveredAt: planResultOutbox.deliveredAt })
         .from(planResultOutbox)
         .where(eq(planResultOutbox.resultId, params.resultId))
         .for('update')
         .limit(1);
 
       if (outboxRows.length === 0) {
+        return;
+      }
+
+      if (outboxRows[0]!.deliveredAt !== null) {
         return;
       }
 
@@ -517,13 +525,6 @@ export class PlanStorageAdapter implements PlanRepository {
         })
         .where(eq(positionPlans.planId, planId));
     });
-  }
-
-  async abandonDelivery(params: PlanDeliveryCompletionParams): Promise<void> {
-    await this.db
-      .update(planResultOutbox)
-      .set({ deliveredAt: params.deliveredAt })
-      .where(eq(planResultOutbox.resultId, params.resultId));
   }
 
   async updateLifecycleState(params: PlanLifecycleStateUpdateParams): Promise<void> {

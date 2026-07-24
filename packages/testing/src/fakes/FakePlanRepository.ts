@@ -304,9 +304,15 @@ export class FakePlanRepository implements PlanRepository {
 
   async completeDelivery(params: PlanDeliveryCompletionParams): Promise<void> {
     const outbox = Array.from(this.outbox.values()).find((o) => o.resultId === params.resultId);
-    if (outbox) {
-      outbox.deliveredAt = params.deliveredAt;
+    if (!outbox) {
+      return;
     }
+
+    if (outbox.deliveredAt !== null) {
+      return;
+    }
+
+    outbox.deliveredAt = params.deliveredAt;
 
     const plan = Array.from(this.plans.values()).find(
       (p) =>
@@ -346,9 +352,15 @@ export class FakePlanRepository implements PlanRepository {
 
   async failDelivery(params: PlanFailDeliveryParams): Promise<void> {
     const outbox = Array.from(this.outbox.values()).find((o) => o.resultId === params.resultId);
-    if (outbox) {
-      outbox.deliveredAt = params.deliveredAt;
+    if (!outbox) {
+      return;
     }
+
+    if (outbox.deliveredAt !== null) {
+      return;
+    }
+
+    outbox.deliveredAt = params.deliveredAt;
 
     const plan = this.plans.get(params.planId);
     if (!plan) {
@@ -363,13 +375,6 @@ export class FakePlanRepository implements PlanRepository {
 
     Object.assign(plan, relationalPatchForState(state));
     plan.lastErrorClass = params.reason;
-  }
-
-  async abandonDelivery(params: PlanDeliveryCompletionParams): Promise<void> {
-    const outbox = Array.from(this.outbox.values()).find((o) => o.resultId === params.resultId);
-    if (outbox) {
-      outbox.deliveredAt = params.deliveredAt;
-    }
   }
 
   async updateLifecycleState(params: PlanLifecycleStateUpdateParams): Promise<void> {

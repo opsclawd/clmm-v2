@@ -153,8 +153,6 @@ class FakePlanRepository implements PlanRepository {
 
   async failDelivery(): Promise<void> {}
 
-  async abandonDelivery(): Promise<void> {}
-
   async getPlanActionKind(): Promise<string | null> {
     return 'HOLD';
   }

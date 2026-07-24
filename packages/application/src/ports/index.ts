@@ -563,6 +563,5 @@ export interface PlanRepository {
   completeDelivery(params: PlanDeliveryCompletionParams): Promise<void>;
   recordPermanentFailure(params: PlanPermanentFailureParams): Promise<void>;
   failDelivery(params: PlanFailDeliveryParams): Promise<void>;
-  abandonDelivery(params: PlanDeliveryCompletionParams): Promise<void>;
   updateLifecycleState(params: PlanLifecycleStateUpdateParams): Promise<void>;
 }
