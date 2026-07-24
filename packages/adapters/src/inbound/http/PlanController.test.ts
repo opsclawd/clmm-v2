@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach } from 'vitest';
-import { NotFoundException, HttpException, HttpStatus } from '@nestjs/common';
+import { NotFoundException, HttpException, HttpStatus, ConflictException } from '@nestjs/common';
 import { PlanController } from './PlanController.js';
 import {
   FakePlanRepository,
@@ -16,7 +16,7 @@ import {
   FakeClockPort,
 } from '@clmm/testing';
 import type { RegimePlanResponse, TriggerRepository } from '@clmm/application';
-import { makeWalletId } from '@clmm/domain';
+import { makeWalletId, makePositionId } from '@clmm/domain';
 import type { WalletId } from '@clmm/domain';
 
 const TEST_WALLET = FIXTURE_POSITION_IN_RANGE.walletId;
@@ -243,6 +243,159 @@ describe('PlanController', () => {
     it('returns null when no plan exists', async () => {
       const current = await controller.getCurrentPlan(TEST_WALLET, TEST_POSITION);
       expect(current).toBeNull();
+    });
+  });
+
+  describe('recordDecision', () => {
+    const TEST_PLAN_ID = 'test-plan-id' as import('@clmm/domain').PlanId;
+
+    async function seedAdvisoryReadyPlan(): Promise<void> {
+      await fakePlanRepo.createRequest({
+        planId: TEST_PLAN_ID,
+        canonicalHash: 'test-hash' as import('@clmm/domain').CanonicalHash,
+        positionId: TEST_POSITION,
+        walletId: TEST_WALLET,
+        requestedAt: fakeClock.now(),
+        action: { kind: 'REQUEST_EXIT_CLMM' },
+      });
+      await fakePlanRepo.updateLifecycleState({
+        planId: TEST_PLAN_ID,
+        lifecycleState: {
+          kind: 'advisory-ready',
+          advisoryAction: { kind: 'REQUEST_EXIT_CLMM' },
+          regimeResponse: { kind: 'regime-response', regime: 'DOWN', suitability: 'ALLOWED' },
+        },
+      });
+    }
+
+    it('throws NotFoundException when position does not exist', async () => {
+      await expect(
+        controller.recordDecision(TEST_WALLET, TEST_POSITION, TEST_PLAN_ID, {
+          decision: 'acknowledged',
+        }),
+      ).rejects.toBeInstanceOf(NotFoundException);
+    });
+
+    it('returns recorded decision successfully', async () => {
+      await seedAdvisoryReadyPlan();
+
+      const result = await controller.recordDecision(TEST_WALLET, TEST_POSITION, TEST_PLAN_ID, {
+        decision: 'acknowledged',
+      });
+
+      expect(result.kind).toBe('recorded');
+      expect(result).toHaveProperty('resultId');
+    });
+
+    it('throws ConflictException when conflict-detected is returned', async () => {
+      await seedAdvisoryReadyPlan();
+
+      await controller.recordDecision(TEST_WALLET, TEST_POSITION, TEST_PLAN_ID, {
+        decision: 'acknowledged',
+      });
+
+      await expect(
+        controller.recordDecision(TEST_WALLET, TEST_POSITION, TEST_PLAN_ID, {
+          decision: 'stand-down',
+        }),
+      ).rejects.toBeInstanceOf(ConflictException);
+    });
+
+    it('throws NotFoundException when plan does not exist', async () => {
+      await expect(
+        controller.recordDecision(
+          TEST_WALLET,
+          TEST_POSITION,
+          'nonexistent-plan' as import('@clmm/domain').PlanId,
+          {
+            decision: 'acknowledged',
+          },
+        ),
+      ).rejects.toBeInstanceOf(NotFoundException);
+    });
+  });
+
+  describe('approvePlan', () => {
+    const TEST_PLAN_ID = 'test-plan-id' as import('@clmm/domain').PlanId;
+
+    async function seedAdvisoryReadyPlan(): Promise<void> {
+      await fakePlanRepo.createRequest({
+        planId: TEST_PLAN_ID,
+        canonicalHash: 'test-hash' as import('@clmm/domain').CanonicalHash,
+        positionId: TEST_POSITION,
+        walletId: TEST_WALLET,
+        requestedAt: fakeClock.now(),
+        action: { kind: 'REQUEST_EXIT_CLMM' },
+      });
+      await fakePlanRepo.updateLifecycleState({
+        planId: TEST_PLAN_ID,
+        lifecycleState: {
+          kind: 'advisory-ready',
+          advisoryAction: { kind: 'REQUEST_EXIT_CLMM' },
+          regimeResponse: { kind: 'regime-response', regime: 'DOWN', suitability: 'ALLOWED' },
+        },
+      });
+    }
+
+    it('throws NotFoundException when position does not exist', async () => {
+      const nonExistentPosition = makePositionId('non-existent-position');
+      await expect(
+        controller.approvePlan(TEST_WALLET, nonExistentPosition, TEST_PLAN_ID, {
+          previewId: 'preview-1',
+        }),
+      ).rejects.toBeInstanceOf(NotFoundException);
+    });
+
+    it('throws NotFoundException when plan does not exist', async () => {
+      await seedAdvisoryReadyPlan();
+
+      await expect(
+        controller.approvePlan(
+          TEST_WALLET,
+          TEST_POSITION,
+          'wrong-plan-id' as import('@clmm/domain').PlanId,
+          { previewId: 'preview-1' },
+        ),
+      ).rejects.toBeInstanceOf(NotFoundException);
+    });
+
+    it('throws NotFoundException when preview does not exist', async () => {
+      await seedAdvisoryReadyPlan();
+      await controller.createPreview(TEST_WALLET, TEST_POSITION, TEST_PLAN_ID);
+
+      await expect(
+        controller.approvePlan(TEST_WALLET, TEST_POSITION, TEST_PLAN_ID, {
+          previewId: 'nonexistent-preview',
+        }),
+      ).rejects.toBeInstanceOf(NotFoundException);
+    });
+
+    it('returns approval result successfully', async () => {
+      await seedAdvisoryReadyPlan();
+
+      const preview = await controller.createPreview(TEST_WALLET, TEST_POSITION, TEST_PLAN_ID);
+      const result = await controller.approvePlan(TEST_WALLET, TEST_POSITION, TEST_PLAN_ID, {
+        previewId: preview.previewId,
+      });
+
+      expect(result).toHaveProperty('attemptId');
+      expect(result.lifecycleState.kind).toBe('awaiting-signature');
+      expect(result).toHaveProperty('executionOrigin');
+    });
+
+    it('throws ConflictException when plan is already linked to an attempt', async () => {
+      await seedAdvisoryReadyPlan();
+
+      const preview = await controller.createPreview(TEST_WALLET, TEST_POSITION, TEST_PLAN_ID);
+      await controller.approvePlan(TEST_WALLET, TEST_POSITION, TEST_PLAN_ID, {
+        previewId: preview.previewId,
+      });
+
+      await expect(
+        controller.approvePlan(TEST_WALLET, TEST_POSITION, TEST_PLAN_ID, {
+          previewId: preview.previewId,
+        }),
+      ).rejects.toBeInstanceOf(ConflictException);
     });
   });
 });
