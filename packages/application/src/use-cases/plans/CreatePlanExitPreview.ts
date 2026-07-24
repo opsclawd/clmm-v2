@@ -8,7 +8,11 @@ import type {
   IdGeneratorPort,
 } from '../../ports/index.js';
 import type { WalletId, PositionId, PlanId, ExecutionPreview, ExecutionOrigin } from '@clmm/domain';
-import { evaluatePreviewFreshness, applyPlanLifecycleTransition } from '@clmm/domain';
+import {
+  evaluatePreviewFreshness,
+  applyPlanLifecycleTransition,
+  mapExitIntentPostureToPolicy,
+} from '@clmm/domain';
 
 export class PlanNotEligibleForExitPreviewError extends Error {
   constructor(reason: string) {
@@ -87,7 +91,7 @@ export async function createPlanExitPreview(params: {
     if (freshness.kind === 'fresh') {
       const existingOrigin = state.executionOrigin;
       return {
-        previewId: `${currentPlan.planId}-preview`,
+        previewId: state.previewId,
         plan: existingPreview.plan,
         preview: existingPreview,
         executionOrigin: existingOrigin,
@@ -96,21 +100,12 @@ export async function createPlanExitPreview(params: {
   }
 
   const intent = advisoryAction.exitIntent ?? 'exit-to-usdc';
-  const postExitPosture = { kind: intent };
-  const swapInstruction = {
-    fromAsset: (intent === 'exit-to-sol' ? 'USDC' : 'SOL') as import('@clmm/domain').AssetSymbol,
-    toAsset: (intent === 'exit-to-sol' ? 'SOL' : 'USDC') as import('@clmm/domain').AssetSymbol,
-    policyReason: 'regime-plan-exit',
-  };
+  const policy = mapExitIntentPostureToPolicy(intent);
 
   const executionPlan: import('@clmm/domain').ExecutionPlan = {
-    steps: [
-      { kind: 'remove-liquidity' as const },
-      { kind: 'collect-fees' as const },
-      { kind: 'swap-assets' as const, instruction: swapInstruction },
-    ],
-    postExitPosture,
-    swapInstruction,
+    steps: policy.executionStepSkeleton,
+    postExitPosture: policy.postExitPosture,
+    swapInstruction: policy.swapInstruction,
   };
 
   const freshness = evaluatePreviewFreshness(now, now);
@@ -120,8 +115,18 @@ export async function createPlanExitPreview(params: {
     estimatedAt: now,
   };
 
+  const executionOrigin: ExecutionOrigin = {
+    kind: 'regime-plan',
+    planId: currentPlan.planId,
+    canonicalHash: currentPlan.canonicalHash,
+    canonicalExitIntent: policy.postExitPosture.kind,
+  };
+
+  const { previewId } = await executionRepo.savePreview(positionId, preview, executionOrigin);
+
   const planAfterTransition = applyPlanLifecycleTransition(currentPlan, {
     kind: 'preview',
+    previewId,
     preview,
   });
 
@@ -129,10 +134,6 @@ export async function createPlanExitPreview(params: {
   if (newState.kind !== 'exit-previewed') {
     throw new Error(`Invalid transition: expected exit-previewed, got ${newState.kind}`);
   }
-
-  const executionOrigin = newState.executionOrigin;
-
-  const { previewId } = await executionRepo.savePreview(positionId, preview, executionOrigin);
 
   await planRepo.updateLifecycleState({
     planId: currentPlan.planId,

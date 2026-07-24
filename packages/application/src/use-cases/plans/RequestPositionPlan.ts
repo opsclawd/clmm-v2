@@ -263,6 +263,7 @@ export async function requestPositionPlan(params: {
     const response = transportResult.response;
     const planId = idGenerator.generateId() as import('@clmm/domain').PlanId;
     const canonicalHash = fingerprint as CanonicalHash;
+    const advisoryActionFromResponse = extractAdvisoryAction(response);
 
     const createResult = await planRepository.createRequest({
       planId,
@@ -270,7 +271,7 @@ export async function requestPositionPlan(params: {
       positionId,
       walletId,
       requestedAt: makeClockTimestamp(now),
-      action: { kind: 'HOLD' },
+      action: advisoryActionFromResponse,
       snapshotFingerprint: fingerprint,
     });
 
@@ -297,6 +298,19 @@ export async function requestPositionPlan(params: {
       };
     }
 
+    await planRepository.acceptResponse({
+      planId,
+      regimeResponse: {
+        kind: 'regime-response',
+        regime: response.regime,
+        suitability: 'ALLOWED',
+      },
+      advisoryAction: advisoryActionFromResponse,
+      respondedAt: makeClockTimestamp(response.asOfUnixMs),
+      asOfAt: makeClockTimestamp(response.asOfUnixMs),
+      expiresAt: makeClockTimestamp(response.expiresAtUnixMs),
+    });
+
     if (qualifiedTrigger) {
       observability.log('info', 'RequestPositionPlan: qualified trigger outranks advisory', {
         positionId,
@@ -308,19 +322,6 @@ export async function requestPositionPlan(params: {
         breachDirection: qualifiedTrigger.breachDirection,
       };
     }
-
-    await planRepository.acceptResponse({
-      planId,
-      regimeResponse: {
-        kind: 'regime-response',
-        regime: response.regime,
-        suitability: 'ALLOWED',
-      },
-      advisoryAction: extractAdvisoryAction(response),
-      respondedAt: makeClockTimestamp(response.asOfUnixMs),
-      asOfAt: makeClockTimestamp(response.asOfUnixMs),
-      expiresAt: makeClockTimestamp(response.expiresAtUnixMs),
-    });
 
     observability.log('info', 'RequestPositionPlan: plan received', {
       positionId,

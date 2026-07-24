@@ -128,7 +128,7 @@ describe('createPlanExitPreview', () => {
     expect(result.plan.swapInstruction).toEqual({
       fromAsset: 'USDC',
       toAsset: 'SOL',
-      policyReason: 'regime-plan-exit',
+      policyReason: 'exit-to-sol posture: swap USDC to SOL',
     });
   });
 

@@ -286,6 +286,7 @@ describe('PlanLifecycleReducer', () => {
       expect(() =>
         applyPlanLifecycleTransition(reportedPlan, {
           kind: 'preview',
+          previewId: 'test-preview-id',
           preview: {
             plan: {
               steps: [],
@@ -314,6 +315,7 @@ describe('PlanLifecycleReducer', () => {
       expect(() =>
         applyPlanLifecycleTransition(conflictPlan, {
           kind: 'preview',
+          previewId: 'test-preview-id',
           preview: {
             plan: {
               steps: [],
@@ -343,6 +345,7 @@ describe('PlanLifecycleReducer', () => {
       expect(() =>
         applyPlanLifecycleTransition(failedPlan, {
           kind: 'preview',
+          previewId: 'test-preview-id',
           preview: {
             plan: {
               steps: [],
@@ -387,6 +390,7 @@ describe('PlanLifecycleReducer', () => {
       });
       const result = applyPlanLifecycleTransition(plan, {
         kind: 'preview',
+        previewId: 'test-preview-id',
         preview: {
           plan: {
             steps: [],
@@ -417,6 +421,7 @@ describe('PlanLifecycleReducer', () => {
       });
       const result = applyPlanLifecycleTransition(plan, {
         kind: 'preview',
+        previewId: 'test-preview-id',
         preview: {
           plan: {
             steps: [],
@@ -443,6 +448,7 @@ describe('PlanLifecycleReducer', () => {
       });
       const previewedPlan = applyPlanLifecycleTransition(plan, {
         kind: 'preview',
+        previewId: 'test-preview-id',
         preview: {
           plan: {
             steps: [],
@@ -467,6 +473,7 @@ describe('PlanLifecycleReducer', () => {
       });
       const previewedPlan = applyPlanLifecycleTransition(plan, {
         kind: 'preview',
+        previewId: 'test-preview-id',
         preview: {
           plan: {
             steps: [],
@@ -494,6 +501,7 @@ describe('PlanLifecycleReducer', () => {
       });
       const previewedPlan = applyPlanLifecycleTransition(plan, {
         kind: 'preview',
+        previewId: 'test-preview-id',
         preview: {
           plan: {
             steps: [],

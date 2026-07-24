@@ -43,6 +43,7 @@ export type PlanLifecycleState =
     }
   | {
       readonly kind: 'exit-previewed';
+      readonly previewId: string;
       readonly advisoryAction: PlanAction;
       readonly preview: {
         readonly plan: ExecutionPlan;
@@ -53,11 +54,13 @@ export type PlanLifecycleState =
     }
   | {
       readonly kind: 'awaiting-signature';
+      readonly attemptId?: string;
       readonly advisoryAction: PlanAction;
       readonly executionOrigin: ExecutionOrigin;
     }
   | {
       readonly kind: 'submitted';
+      readonly attemptId?: string;
       readonly advisoryAction: PlanAction;
       readonly executionOrigin: ExecutionOrigin;
     }
@@ -98,13 +101,14 @@ export type PlanLifecycleEvent =
   | { readonly kind: 'acknowledge' }
   | {
       readonly kind: 'preview';
+      readonly previewId: string;
       readonly preview: {
         readonly plan: ExecutionPlan;
         readonly freshness: PreviewFreshness;
         readonly estimatedAt: number;
       };
     }
-  | { readonly kind: 'request-signature' }
+  | { readonly kind: 'request-signature'; readonly attemptId?: string }
   | { readonly kind: 'submit' }
   | { readonly kind: 'confirm' }
   | { readonly kind: 'expire' }

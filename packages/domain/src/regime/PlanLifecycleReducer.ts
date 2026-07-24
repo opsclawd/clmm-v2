@@ -150,6 +150,7 @@ export function applyPlanLifecycleTransition(
         ...plan,
         state: {
           kind: 'exit-previewed',
+          previewId: event.previewId,
           advisoryAction: currentState.advisoryAction,
           preview: event.preview,
           executionOrigin,
@@ -178,13 +179,22 @@ export function applyPlanLifecycleTransition(
               canonicalHash: plan.canonicalHash,
               canonicalExitIntent: 'exit-to-usdc',
             };
+      const newState: PlanLifecycleState = {
+        kind: 'awaiting-signature',
+        advisoryAction,
+        executionOrigin,
+      };
+      const attemptId =
+        event.attemptId ??
+        (currentState.kind === 'awaiting-signature' || currentState.kind === 'submitted'
+          ? currentState.attemptId
+          : undefined);
+      if (attemptId !== undefined) {
+        (newState as { attemptId: string }).attemptId = attemptId;
+      }
       return {
         ...plan,
-        state: {
-          kind: 'awaiting-signature',
-          advisoryAction,
-          executionOrigin,
-        },
+        state: newState,
       };
     }
 
@@ -192,13 +202,17 @@ export function applyPlanLifecycleTransition(
       if (currentState.kind !== 'awaiting-signature') {
         throw new Error(`Invalid transition: ${currentState.kind} + ${event.kind}`);
       }
+      const newState: PlanLifecycleState = {
+        kind: 'submitted',
+        advisoryAction: currentState.advisoryAction,
+        executionOrigin: currentState.executionOrigin,
+      };
+      if (currentState.attemptId !== undefined) {
+        (newState as { attemptId: string }).attemptId = currentState.attemptId;
+      }
       return {
         ...plan,
-        state: {
-          kind: 'submitted',
-          advisoryAction: currentState.advisoryAction,
-          executionOrigin: currentState.executionOrigin,
-        },
+        state: newState,
       };
     }
 

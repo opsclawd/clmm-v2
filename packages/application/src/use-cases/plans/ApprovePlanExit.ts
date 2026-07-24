@@ -75,6 +75,10 @@ export async function approvePlanExit(params: {
     );
   }
 
+  const planAfterTransition = applyPlanLifecycleTransition(currentPlan, {
+    kind: 'request-signature',
+  });
+
   const executionOrigin: ExecutionOrigin = {
     kind: 'regime-plan',
     planId: currentPlan.planId,
@@ -113,10 +117,6 @@ export async function approvePlanExit(params: {
     planId: currentPlan.planId,
     attemptId,
     linkedAt: now,
-  });
-
-  const planAfterTransition = applyPlanLifecycleTransition(currentPlan, {
-    kind: 'request-signature',
   });
 
   await planRepo.updateLifecycleState({
