@@ -6,6 +6,7 @@ import { TriggerQualificationJobHandler } from './TriggerQualificationJobHandler
 import { ReconciliationJobHandler } from './ReconciliationJobHandler.js';
 import { NotificationDispatchJobHandler } from './NotificationDispatchJobHandler.js';
 import { SubmittedAttemptSweepHandler } from './SubmittedAttemptSweepHandler.js';
+import { PlanResultSweepHandler } from './PlanResultSweepHandler.js';
 import { createPgBossProvider } from './PgBossProvider.js';
 import { PG_BOSS, PG_BOSS_INSTANCE } from './tokens.js';
 import { WorkerLifecycle } from './WorkerLifecycle.js';
@@ -35,6 +36,7 @@ const boss = createPgBossProvider(dbUrl);
     ReconciliationJobHandler,
     NotificationDispatchJobHandler,
     SubmittedAttemptSweepHandler,
+    PlanResultSweepHandler,
     WorkerLifecycle,
   ],
 })
