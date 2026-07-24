@@ -225,6 +225,20 @@ export class PlanStorageAdapter implements PlanRepository {
     };
   }
 
+  async getPlanActionKind(planId: PlanId): Promise<string | null> {
+    const rows = await this.db
+      .select({ actionKind: positionPlans.actionKind })
+      .from(positionPlans)
+      .where(eq(positionPlans.planId, planId))
+      .limit(1);
+
+    if (rows.length === 0) {
+      return null;
+    }
+
+    return rows[0]!.actionKind;
+  }
+
   async recordDecision(params: PlanDecisionParams): Promise<void> {
     await this.db.transaction(async (tx) => {
       const rows = await tx
@@ -452,6 +466,13 @@ export class PlanStorageAdapter implements PlanRepository {
         })
         .where(eq(positionPlans.planId, params.planId));
     });
+  }
+
+  async abandonDelivery(params: PlanDeliveryCompletionParams): Promise<void> {
+    await this.db
+      .update(planResultOutbox)
+      .set({ deliveredAt: params.deliveredAt })
+      .where(eq(planResultOutbox.resultId, params.resultId));
   }
 
   async updateLifecycleState(params: PlanLifecycleStateUpdateParams): Promise<void> {

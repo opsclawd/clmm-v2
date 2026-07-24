@@ -70,19 +70,22 @@ function mapDecisionKindToReasonCode(decisionKind: string | undefined): string {
 async function deliverResult(
   claim: PlanResultClaim,
   regimePort: RegimePlanPort,
+  planRepository: PlanRepository,
   clock: ClockPort,
 ): Promise<PlanExecutionResultTransportResult> {
   const payload = claim.canonicalResult.payload;
   const planHash = (payload['canonicalHash'] as string) ?? '';
   const positionId = (payload['positionId'] as string) ?? '';
   const decisionKind = (payload['decisionKind'] as string | undefined) ?? 'executed';
+  const storedActionKind = await planRepository.getPlanActionKind(claim.planId);
+  const requestedAction = storedActionKind ?? 'HOLD';
 
   const regimeResult: RegimeExecutionResult = {
     schemaVersion: 'execution-result.v1',
     planId: claim.planId as string,
     planHash,
     positionId,
-    requestedAction: 'HOLD',
+    requestedAction: requestedAction as RegimeExecutionResult['requestedAction'],
     status: mapDecisionKindToStatus(decisionKind),
     reasonCode: mapDecisionKindToReasonCode(decisionKind),
     completedAtUnixMs: clock.now() as number,
@@ -92,9 +95,7 @@ async function deliverResult(
   return regimePort.reportExecutionResult(regimeResult);
 }
 
-export async function syncPlanExecutionResults(
-  deps: SyncPlanExecutionResultsDeps,
-): Promise<{
+export async function syncPlanExecutionResults(deps: SyncPlanExecutionResultsDeps): Promise<{
   processed: number;
   delivered: number;
   retried: number;
@@ -119,7 +120,7 @@ export async function syncPlanExecutionResults(
     processed++;
 
     try {
-      const transportResult = await deliverResult(claim, regimePlanPort, clock);
+      const transportResult = await deliverResult(claim, regimePlanPort, planRepository, clock);
 
       if (transportResult.kind === 'ok') {
         await planRepository.completeDelivery({
@@ -138,6 +139,10 @@ export async function syncPlanExecutionResults(
           reason: `permanent:${transportResult.reason}`,
           failedAt: clock.now(),
         });
+        await planRepository.abandonDelivery({
+          resultId: claim.resultId,
+          deliveredAt: clock.now(),
+        });
         permanentlyRejected++;
         observability.log('warn', 'Plan result permanently rejected', {
           resultId: claim.resultId,
@@ -150,6 +155,10 @@ export async function syncPlanExecutionResults(
             planId: claim.planId,
             reason: 'exhausted',
             failedAt: clock.now(),
+          });
+          await planRepository.abandonDelivery({
+            resultId: claim.resultId,
+            deliveredAt: clock.now(),
           });
           exhausted++;
           observability.log('warn', 'Plan result retry exhausted', {
@@ -185,6 +194,10 @@ export async function syncPlanExecutionResults(
           planId: claim.planId,
           reason: 'exhausted',
           failedAt: clock.now(),
+        });
+        await planRepository.abandonDelivery({
+          resultId: claim.resultId,
+          deliveredAt: clock.now(),
         });
         exhausted++;
       } else {

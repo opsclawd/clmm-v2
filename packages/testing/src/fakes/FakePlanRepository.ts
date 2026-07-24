@@ -195,6 +195,11 @@ export class FakePlanRepository implements PlanRepository {
     };
   }
 
+  async getPlanActionKind(planId: PlanId): Promise<string | null> {
+    const plan = this.plans.get(planId);
+    return plan?.actionKind ?? null;
+  }
+
   async recordDecision(params: PlanDecisionParams): Promise<void> {
     const plan = this.plans.get(params.planId);
     if (!plan) {
@@ -336,6 +341,13 @@ export class FakePlanRepository implements PlanRepository {
 
     Object.assign(plan, relationalPatchForState(state));
     plan.lastErrorClass = params.reason;
+  }
+
+  async abandonDelivery(params: PlanDeliveryCompletionParams): Promise<void> {
+    const outbox = Array.from(this.outbox.values()).find((o) => o.resultId === params.resultId);
+    if (outbox) {
+      outbox.deliveredAt = params.deliveredAt;
+    }
   }
 
   async updateLifecycleState(params: PlanLifecycleStateUpdateParams): Promise<void> {

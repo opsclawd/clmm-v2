@@ -62,7 +62,9 @@ describe('SyncPlanExecutionResults', () => {
       rescheduleRetry: vi.fn(),
       completeDelivery: vi.fn(),
       recordPermanentFailure: vi.fn(),
+      abandonDelivery: vi.fn(),
       getCurrentPlan: vi.fn(),
+      getPlanActionKind: vi.fn().mockResolvedValue('HOLD'),
     } as unknown as PlanRepository;
 
     regimePort = {

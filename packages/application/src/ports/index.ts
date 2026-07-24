@@ -1,5 +1,6 @@
 import type {
   PositionId,
+  PlanId,
   WalletId,
   PoolId,
   BreachDirection,
@@ -545,6 +546,7 @@ export interface PlanRepository {
     params: PlanResponseParams,
   ): Promise<{ readonly kind: 'accepted' } | { readonly kind: 'conflict-detected' }>;
   getCurrentPlan(positionId: PositionId): Promise<PositionPlan | null>;
+  getPlanActionKind(planId: PlanId): Promise<string | null>;
   recordDecision(params: PlanDecisionParams): Promise<void>;
   linkExecutionAttempt(params: PlanExecutionLinkParams): Promise<void>;
   commitTerminalOutcome(params: PlanTerminalOutcomeParams): Promise<TerminalOutcomeCommitResult>;
@@ -552,5 +554,6 @@ export interface PlanRepository {
   rescheduleRetry(params: PlanRetryScheduleParams): Promise<void>;
   completeDelivery(params: PlanDeliveryCompletionParams): Promise<void>;
   recordPermanentFailure(params: PlanPermanentFailureParams): Promise<void>;
+  abandonDelivery(params: PlanDeliveryCompletionParams): Promise<void>;
   updateLifecycleState(params: PlanLifecycleStateUpdateParams): Promise<void>;
 }
