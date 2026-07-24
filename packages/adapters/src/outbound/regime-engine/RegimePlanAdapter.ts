@@ -62,7 +62,6 @@ export class RegimePlanAdapter implements RegimePlanPort {
         signal: controller.signal,
       });
 
-      clearTimeout(timer);
       const durationMs = Date.now() - startMs;
 
       if (response.status === 200) {
@@ -71,7 +70,7 @@ export class RegimePlanAdapter implements RegimePlanPort {
           body = await response.json();
         } catch {
           this.observability.log('warn', 'RegimePlan response was not valid JSON', {
-            planId: request.position?.positionId,
+            positionId: request.position?.positionId,
             durationMs,
           });
           return { kind: 'permanent', reason: 'malformed-body' };
@@ -80,7 +79,7 @@ export class RegimePlanAdapter implements RegimePlanPort {
         const validated = parseRegimePlanResponse(body);
         if (!validated) {
           this.observability.log('warn', 'RegimePlan response failed schema validation', {
-            planId: request.position?.positionId,
+            positionId: request.position?.positionId,
             durationMs,
           });
           return { kind: 'permanent', reason: 'schema-invalid' };
@@ -98,7 +97,7 @@ export class RegimePlanAdapter implements RegimePlanPort {
       if (response.status === 409) {
         const envelope = await this.readErrorEnvelope(response);
         this.observability.log('info', 'RegimePlan conflict', {
-          planId: request.position?.positionId,
+          positionId: request.position?.positionId,
           statusClass: 'conflict',
           durationMs,
           reason: envelope?.message ?? 'unknown',
@@ -109,7 +108,7 @@ export class RegimePlanAdapter implements RegimePlanPort {
       if (response.status === 401 || response.status === 403) {
         const envelope = await this.readErrorEnvelope(response);
         this.observability.log('error', 'RegimePlan auth failure', {
-          planId: request.position?.positionId,
+          positionId: request.position?.positionId,
           statusClass: 'permanent',
           durationMs,
           reason: envelope?.message ?? 'unauthorized',
@@ -120,7 +119,7 @@ export class RegimePlanAdapter implements RegimePlanPort {
       if (response.status === 400) {
         const envelope = await this.readErrorEnvelope(response);
         this.observability.log('warn', 'RegimePlan validation error', {
-          planId: request.position?.positionId,
+          positionId: request.position?.positionId,
           statusClass: 'permanent',
           durationMs,
           reason: envelope?.message ?? 'validation-error',
@@ -130,7 +129,7 @@ export class RegimePlanAdapter implements RegimePlanPort {
 
       if (response.status >= 500) {
         this.observability.log('warn', 'RegimePlan server error', {
-          planId: request.position?.positionId,
+          positionId: request.position?.positionId,
           statusClass: 'retryable-degraded',
           durationMs,
           status: response.status,
@@ -139,19 +138,18 @@ export class RegimePlanAdapter implements RegimePlanPort {
       }
 
       this.observability.log('warn', 'RegimePlan unexpected status', {
-        planId: request.position?.positionId,
+        positionId: request.position?.positionId,
         statusClass: 'retryable-degraded',
         durationMs,
         status: response.status,
       });
       return { kind: 'retryable-degraded', reason: `unexpected-status-${response.status}` };
     } catch (error: unknown) {
-      clearTimeout(timer);
       const durationMs = Date.now() - startMs;
 
       if (isAbortError(error)) {
         this.observability.log('warn', 'RegimePlan request timeout', {
-          planId: request.position?.positionId,
+          positionId: request.position?.positionId,
           statusClass: 'retryable-degraded',
           durationMs,
           reason: 'timeout',
@@ -161,12 +159,14 @@ export class RegimePlanAdapter implements RegimePlanPort {
 
       const message = error instanceof Error ? error.message : String(error);
       this.observability.log('warn', 'RegimePlan network error', {
-        planId: request.position?.positionId,
+        positionId: request.position?.positionId,
         statusClass: 'retryable-degraded',
         durationMs,
         reason: message,
       });
       return { kind: 'retryable-degraded', reason: 'network-error' };
+    } finally {
+      clearTimeout(timer);
     }
   }
 
@@ -208,7 +208,6 @@ export class RegimePlanAdapter implements RegimePlanPort {
         signal: controller.signal,
       });
 
-      clearTimeout(timer);
       const durationMs = Date.now() - startMs;
 
       if (response.status === 200 || response.status === 201 || response.status === 202) {
@@ -270,7 +269,6 @@ export class RegimePlanAdapter implements RegimePlanPort {
       });
       return { kind: 'retryable-degraded', reason: `unexpected-status-${response.status}` };
     } catch (error: unknown) {
-      clearTimeout(timer);
       const durationMs = Date.now() - startMs;
 
       if (isAbortError(error)) {
@@ -295,6 +293,8 @@ export class RegimePlanAdapter implements RegimePlanPort {
         reason: message,
       });
       return { kind: 'retryable-degraded', reason: 'network-error' };
+    } finally {
+      clearTimeout(timer);
     }
   }
 
