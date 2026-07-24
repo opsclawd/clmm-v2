@@ -73,6 +73,7 @@ function buildRegimePlanRequest(params: {
     poolAddress: string;
     timeframe: '15m' | '1h';
   };
+  asOfUnixMs: number;
 }): RegimePlanRequest {
   const positionPart: {
     positionId: string;
@@ -104,7 +105,7 @@ function buildRegimePlanRequest(params: {
 
   return {
     schemaVersion: 'position-plan.v1',
-    asOfUnixMs: Date.now(),
+    asOfUnixMs: params.asOfUnixMs,
     market: params.market,
     position: positionPart,
   };
@@ -233,6 +234,7 @@ export async function requestPositionPlan(params: {
       ...(breachQualifiedAtUnixMs !== undefined && { breachQualifiedAtUnixMs }),
     },
     market,
+    asOfUnixMs: now,
   });
 
   const transportResult = await regimePlanPort.requestPositionPlan(request);
@@ -247,7 +249,7 @@ export async function requestPositionPlan(params: {
       canonicalHash,
       positionId,
       walletId,
-      requestedAt: makeClockTimestamp(Date.now()),
+      requestedAt: makeClockTimestamp(now),
       action: { kind: 'HOLD' },
       snapshotFingerprint: fingerprint,
     });
