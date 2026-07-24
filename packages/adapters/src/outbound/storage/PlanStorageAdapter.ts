@@ -47,6 +47,7 @@ type StoredPlan = {
   nextAttemptAt: number | null;
   lastErrorClass: string | null;
   deliveredAt: number | null;
+  executionOriginJson: Record<string, unknown> | null;
 };
 
 function actionKindToString(action: PlanAction): string {
@@ -75,46 +76,117 @@ function buildPlanLifecycleState(row: StoredPlan): PlanLifecycleState {
         },
       };
     case 'exit-previewed':
+    case 'awaiting-signature':
+    case 'submitted':
+    case 'result-pending':
+    case 'reported': {
+      const executionOrigin = row.executionOriginJson as
+        | {
+            kind: 'regime-plan';
+            planId: string;
+            canonicalHash: string;
+            canonicalExitIntent: string;
+          }
+        | { kind: 'qualified-breach'; breachDirection: { kind: string } }
+        | null;
+      if (!executionOrigin) {
+        throw new Error(
+          `Missing executionOrigin for plan ${row.planId} in state ${row.lifecycleKind}`,
+        );
+      }
+      if (executionOrigin.kind === 'regime-plan') {
+        const regimePlanOrigin = executionOrigin;
+        return buildRegimePlanState(row, regimePlanOrigin);
+      } else {
+        const breachOrigin = executionOrigin;
+        return buildBreachOriginState(row, breachOrigin);
+      }
+    }
+    case 'report-failed': {
+      return {
+        kind: 'report-failed',
+        outcome: { kind: 'failed' },
+        executionOrigin: null,
+      };
+    }
+    case 'conflict':
+      return {
+        kind: 'conflict',
+        priorPlanId: row.planId as PlanId,
+        canonicalHash: row.canonicalHash as CanonicalHash,
+        conflictingHash: row.canonicalHash as CanonicalHash,
+      };
+    case 'superseded': {
+      const executionOrigin = row.executionOriginJson as {
+        kind: 'qualified-breach';
+        breachDirection: { kind: string };
+      } | null;
+      if (!executionOrigin || executionOrigin.kind !== 'qualified-breach') {
+        throw new Error(`Missing or invalid breachOrigin for superseded plan ${row.planId}`);
+      }
+      return {
+        kind: 'superseded',
+        priorPlan: {
+          planId: row.planId as PlanId,
+          canonicalHash: row.canonicalHash as CanonicalHash,
+          state: { kind: 'requested' },
+        },
+        breachOrigin: {
+          kind: 'qualified-breach',
+          breachDirection: executionOrigin.breachDirection as
+            | { kind: 'lower-bound-breach' }
+            | { kind: 'upper-bound-breach' },
+        },
+      };
+    }
+    default:
+      return { kind: 'requested' };
+  }
+}
+
+function buildRegimePlanState(
+  row: StoredPlan,
+  origin: {
+    kind: 'regime-plan';
+    planId: string;
+    canonicalHash: string;
+    canonicalExitIntent: string;
+  },
+): PlanLifecycleState {
+  const base = {
+    kind: 'regime-plan' as const,
+    planId: origin.planId as PlanId,
+    canonicalHash: origin.canonicalHash as CanonicalHash,
+    canonicalExitIntent: origin.canonicalExitIntent as 'exit-to-usdc' | 'exit-to-sol',
+  };
+
+  switch (row.lifecycleKind as PlanLifecycleState['kind']) {
+    case 'exit-previewed':
       return {
         kind: 'exit-previewed',
         advisoryAction: stringToAction(row.actionKind),
         preview: {
           plan: {
             steps: [],
-            postExitPosture: { kind: 'exit-to-usdc' },
+            postExitPosture: { kind: origin.canonicalExitIntent as 'exit-to-usdc' | 'exit-to-sol' },
             swapInstruction: { fromAsset: 'SOL', toAsset: 'USDC', policyReason: '' },
           },
           freshness: { kind: 'stale' },
           estimatedAt: row.asOfAt ?? row.requestedAt,
         },
-        executionOrigin: {
-          kind: 'regime-plan',
-          planId: row.planId as PlanId,
-          canonicalHash: row.canonicalHash as CanonicalHash,
-          canonicalExitIntent: 'exit-to-usdc',
-        },
+        executionOrigin: base,
       };
     case 'awaiting-signature':
       return {
         kind: 'awaiting-signature',
         advisoryAction: stringToAction(row.actionKind),
-        executionOrigin: {
-          kind: 'regime-plan',
-          planId: row.planId as PlanId,
-          canonicalHash: row.canonicalHash as CanonicalHash,
-          canonicalExitIntent: 'exit-to-usdc',
-        },
+        executionOrigin: base,
       };
     case 'submitted':
       return {
         kind: 'submitted',
         advisoryAction: stringToAction(row.actionKind),
-        executionOrigin: {
-          kind: 'regime-plan',
-          planId: row.planId as PlanId,
-          canonicalHash: row.canonicalHash as CanonicalHash,
-          canonicalExitIntent: 'exit-to-usdc',
-        },
+        executionOrigin: base,
       };
     case 'result-pending': {
       const outcomeKind = row.decisionKind ?? 'acknowledged';
@@ -134,57 +206,53 @@ function buildPlanLifecycleState(row: StoredPlan): PlanLifecycleState {
       return {
         kind: 'result-pending',
         outcome,
-        executionOrigin: row.attemptId
-          ? {
-              kind: 'regime-plan',
-              planId: row.planId as PlanId,
-              canonicalHash: row.canonicalHash as CanonicalHash,
-              canonicalExitIntent: 'exit-to-usdc',
-            }
-          : null,
+        executionOrigin: row.attemptId ? base : null,
       };
     }
-    case 'reported': {
+    case 'reported':
       return {
         kind: 'reported',
         outcome: { kind: 'executed' },
-        executionOrigin: row.attemptId
-          ? {
-              kind: 'regime-plan',
-              planId: row.planId as PlanId,
-              canonicalHash: row.canonicalHash as CanonicalHash,
-              canonicalExitIntent: 'exit-to-usdc',
-            }
-          : null,
+        executionOrigin: row.attemptId ? base : null,
         reportedAt: (row.deliveredAt ?? row.requestedAt) as ClockTimestamp,
       };
-    }
-    case 'report-failed': {
+    default:
+      throw new Error(`Unexpected lifecycle kind ${row.lifecycleKind} for regime-plan origin`);
+  }
+}
+
+function buildBreachOriginState(
+  row: StoredPlan,
+  origin: { kind: 'qualified-breach'; breachDirection: { kind: string } },
+): PlanLifecycleState {
+  switch (row.lifecycleKind as PlanLifecycleState['kind']) {
+    case 'exit-previewed':
       return {
-        kind: 'report-failed',
-        outcome: { kind: 'failed' },
-        executionOrigin: null,
-      };
-    }
-    case 'conflict':
-      return {
-        kind: 'conflict',
-        priorPlanId: row.planId as PlanId,
-        canonicalHash: row.canonicalHash as CanonicalHash,
-        conflictingHash: row.canonicalHash as CanonicalHash,
-      };
-    case 'superseded':
-      return {
-        kind: 'superseded',
-        priorPlan: {
-          planId: row.planId as PlanId,
-          canonicalHash: row.canonicalHash as CanonicalHash,
-          state: { kind: 'requested' },
+        kind: 'exit-previewed',
+        advisoryAction: stringToAction(row.actionKind),
+        preview: {
+          plan: {
+            steps: [],
+            postExitPosture: {
+              kind:
+                origin.breachDirection.kind === 'lower-bound-breach'
+                  ? 'exit-to-usdc'
+                  : ('exit-to-sol' as 'exit-to-usdc' | 'exit-to-sol'),
+            },
+            swapInstruction: { fromAsset: 'SOL', toAsset: 'USDC', policyReason: '' },
+          },
+          freshness: { kind: 'stale' },
+          estimatedAt: row.asOfAt ?? row.requestedAt,
         },
-        breachOrigin: { kind: 'qualified-breach', breachDirection: { kind: 'lower-bound-breach' } },
+        executionOrigin: {
+          kind: 'qualified-breach',
+          breachDirection: origin.breachDirection as
+            | { kind: 'lower-bound-breach' }
+            | { kind: 'upper-bound-breach' },
+        },
       };
     default:
-      return { kind: 'requested' };
+      throw new Error(`Unexpected lifecycle kind ${row.lifecycleKind} for breach-origin`);
   }
 }
 
@@ -259,6 +327,7 @@ export class PlanStorageAdapter implements PlanRepository {
           actionKind: 'HOLD',
           actionReasons: [params.regimeResponse.regime, params.regimeResponse.suitability],
           lifecycleKind: 'advisory-ready',
+          executionOriginJson: params.executionOriginJson ?? null,
         })
         .where(eq(positionPlans.planId, params.planId));
 
@@ -299,6 +368,7 @@ export class PlanStorageAdapter implements PlanRepository {
       nextAttemptAt: row.nextAttemptAt ? Number(row.nextAttemptAt) : null,
       lastErrorClass: row.lastErrorClass ?? null,
       deliveredAt: row.deliveredAt ? Number(row.deliveredAt) : null,
+      executionOriginJson: (row.executionOriginJson as Record<string, unknown>) ?? null,
     };
 
     return {

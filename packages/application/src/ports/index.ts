@@ -450,6 +450,7 @@ export type PlanResponseParams = {
   readonly respondedAt: ClockTimestamp;
   readonly asOfAt: ClockTimestamp;
   readonly expiresAt: ClockTimestamp;
+  readonly executionOriginJson?: Record<string, unknown>;
 };
 
 export type PlanDecisionParams = {

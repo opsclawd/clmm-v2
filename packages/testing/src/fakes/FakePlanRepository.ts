@@ -45,6 +45,7 @@ type StoredPlan = {
   nextAttemptAt: ClockTimestamp | null;
   lastErrorClass: string | null;
   deliveredAt: ClockTimestamp | null;
+  executionOriginJson: Record<string, unknown> | null;
 };
 
 type StoredOutbox = {
@@ -99,6 +100,7 @@ export class FakePlanRepository implements PlanRepository {
       nextAttemptAt: null,
       lastErrorClass: null,
       deliveredAt: null,
+      executionOriginJson: null,
     };
 
     this.plans.set(params.planId, plan);
@@ -119,6 +121,7 @@ export class FakePlanRepository implements PlanRepository {
     plan.actionKind = 'HOLD';
     plan.actionReasons = [params.regimeResponse.regime, params.regimeResponse.suitability];
     plan.lifecycleKind = 'advisory-ready';
+    plan.executionOriginJson = params.executionOriginJson ?? null;
 
     return { kind: 'accepted' };
   }
@@ -266,46 +269,116 @@ export class FakePlanRepository implements PlanRepository {
           },
         };
       case 'exit-previewed':
+      case 'awaiting-signature':
+      case 'submitted':
+      case 'result-pending':
+      case 'reported': {
+        const executionOrigin = plan.executionOriginJson as
+          | {
+              kind: 'regime-plan';
+              planId: string;
+              canonicalHash: string;
+              canonicalExitIntent: string;
+            }
+          | { kind: 'qualified-breach'; breachDirection: { kind: string } }
+          | null;
+        if (!executionOrigin) {
+          throw new Error(
+            `Missing executionOrigin for plan ${plan.planId} in state ${plan.lifecycleKind}`,
+          );
+        }
+        if (executionOrigin.kind === 'regime-plan') {
+          return this.buildRegimePlanState(plan, executionOrigin);
+        } else {
+          return this.buildBreachOriginState(plan, executionOrigin);
+        }
+      }
+      case 'report-failed':
+        return {
+          kind: 'report-failed',
+          outcome: { kind: 'failed' },
+          executionOrigin: null,
+        };
+      case 'conflict':
+        return {
+          kind: 'conflict',
+          priorPlanId: plan.planId,
+          canonicalHash: plan.canonicalHash,
+          conflictingHash: plan.canonicalHash,
+        };
+      case 'superseded': {
+        const executionOrigin = plan.executionOriginJson as {
+          kind: 'qualified-breach';
+          breachDirection: { kind: string };
+        } | null;
+        if (!executionOrigin || executionOrigin.kind !== 'qualified-breach') {
+          throw new Error(`Missing or invalid breachOrigin for superseded plan ${plan.planId}`);
+        }
+        return {
+          kind: 'superseded',
+          priorPlan: {
+            planId: plan.planId,
+            canonicalHash: plan.canonicalHash,
+            state: { kind: 'requested' },
+          },
+          breachOrigin: {
+            kind: 'qualified-breach',
+            breachDirection: executionOrigin.breachDirection as
+              | { kind: 'lower-bound-breach' }
+              | { kind: 'upper-bound-breach' },
+          },
+        };
+      }
+      default:
+        return { kind: 'requested' };
+    }
+  }
+
+  private buildRegimePlanState(
+    plan: StoredPlan,
+    origin: {
+      kind: 'regime-plan';
+      planId: string;
+      canonicalHash: string;
+      canonicalExitIntent: string;
+    },
+  ): PlanLifecycleState {
+    const base = {
+      kind: 'regime-plan' as const,
+      planId: origin.planId as PlanId,
+      canonicalHash: origin.canonicalHash as CanonicalHash,
+      canonicalExitIntent: origin.canonicalExitIntent as 'exit-to-usdc' | 'exit-to-sol',
+    };
+
+    switch (plan.lifecycleKind) {
+      case 'exit-previewed':
         return {
           kind: 'exit-previewed',
           advisoryAction: { kind: plan.actionKind } as PlanAction,
           preview: {
             plan: {
               steps: [],
-              postExitPosture: { kind: 'exit-to-usdc' },
+              postExitPosture: {
+                kind: origin.canonicalExitIntent as 'exit-to-usdc' | 'exit-to-sol',
+              },
               swapInstruction: { fromAsset: 'SOL', toAsset: 'USDC', policyReason: '' },
             },
             freshness: { kind: 'stale' },
             estimatedAt: plan.asOfAt ?? plan.requestedAt,
           },
-          executionOrigin: {
-            kind: 'regime-plan',
-            planId: plan.planId,
-            canonicalHash: plan.canonicalHash,
-            canonicalExitIntent: 'exit-to-usdc',
-          },
+          executionOrigin: base,
         };
       case 'awaiting-signature':
         return {
           kind: 'awaiting-signature',
           advisoryAction: { kind: plan.actionKind } as PlanAction,
-          executionOrigin: {
-            kind: 'regime-plan',
-            planId: plan.planId,
-            canonicalHash: plan.canonicalHash,
-            canonicalExitIntent: 'exit-to-usdc',
-          },
+          executionOrigin: base,
         };
       case 'submitted':
         return {
           kind: 'submitted',
           advisoryAction: { kind: plan.actionKind } as PlanAction,
-          executionOrigin: {
-            kind: 'regime-plan',
-            planId: plan.planId,
-            canonicalHash: plan.canonicalHash,
-            canonicalExitIntent: 'exit-to-usdc',
-          },
+          executionOrigin: base,
         };
       case 'result-pending': {
         const outcomeKind = plan.decisionKind ?? 'acknowledged';
@@ -325,58 +398,53 @@ export class FakePlanRepository implements PlanRepository {
         return {
           kind: 'result-pending',
           outcome,
-          executionOrigin: plan.attemptId
-            ? {
-                kind: 'regime-plan',
-                planId: plan.planId,
-                canonicalHash: plan.canonicalHash,
-                canonicalExitIntent: 'exit-to-usdc',
-              }
-            : null,
+          executionOrigin: plan.attemptId ? base : null,
         };
       }
       case 'reported':
         return {
           kind: 'reported',
           outcome: { kind: 'executed' },
-          executionOrigin: plan.attemptId
-            ? {
-                kind: 'regime-plan',
-                planId: plan.planId,
-                canonicalHash: plan.canonicalHash,
-                canonicalExitIntent: 'exit-to-usdc',
-              }
-            : null,
+          executionOrigin: plan.attemptId ? base : null,
           reportedAt: plan.deliveredAt ?? plan.requestedAt,
         };
-      case 'report-failed':
+      default:
+        throw new Error(`Unexpected lifecycle kind ${plan.lifecycleKind} for regime-plan origin`);
+    }
+  }
+
+  private buildBreachOriginState(
+    plan: StoredPlan,
+    origin: { kind: 'qualified-breach'; breachDirection: { kind: string } },
+  ): PlanLifecycleState {
+    switch (plan.lifecycleKind) {
+      case 'exit-previewed':
         return {
-          kind: 'report-failed',
-          outcome: { kind: 'failed' },
-          executionOrigin: null,
-        };
-      case 'conflict':
-        return {
-          kind: 'conflict',
-          priorPlanId: plan.planId,
-          canonicalHash: plan.canonicalHash,
-          conflictingHash: plan.canonicalHash,
-        };
-      case 'superseded':
-        return {
-          kind: 'superseded',
-          priorPlan: {
-            planId: plan.planId,
-            canonicalHash: plan.canonicalHash,
-            state: { kind: 'requested' },
+          kind: 'exit-previewed',
+          advisoryAction: { kind: plan.actionKind } as PlanAction,
+          preview: {
+            plan: {
+              steps: [],
+              postExitPosture: {
+                kind:
+                  origin.breachDirection.kind === 'lower-bound-breach'
+                    ? 'exit-to-usdc'
+                    : ('exit-to-sol' as 'exit-to-usdc' | 'exit-to-sol'),
+              },
+              swapInstruction: { fromAsset: 'SOL', toAsset: 'USDC', policyReason: '' },
+            },
+            freshness: { kind: 'stale' },
+            estimatedAt: plan.asOfAt ?? plan.requestedAt,
           },
-          breachOrigin: {
+          executionOrigin: {
             kind: 'qualified-breach',
-            breachDirection: { kind: 'lower-bound-breach' },
+            breachDirection: origin.breachDirection as
+              | { kind: 'lower-bound-breach' }
+              | { kind: 'upper-bound-breach' },
           },
         };
       default:
-        return { kind: 'requested' };
+        throw new Error(`Unexpected lifecycle kind ${plan.lifecycleKind} for breach-origin`);
     }
   }
 }

@@ -24,6 +24,7 @@ export const positionPlans = pgTable(
     nextAttemptAt: bigint('next_attempt_at', { mode: 'number' }),
     lastErrorClass: text('last_error_class'),
     deliveredAt: bigint('delivered_at', { mode: 'number' }),
+    executionOriginJson: jsonb('execution_origin_json'),
   },
   (table) => [
     check(
@@ -39,6 +40,10 @@ export const positionPlans = pgTable(
       sql`${table.decisionKind} is null or ${table.decisionKind} in ('acknowledged', 'stand-down', 'expired', 'position-changed', 'rejected', 'executed', 'failed')`,
     ),
     check('position_plans_delivery_attempts_min_check', sql`${table.deliveryAttempts} >= 0`),
+    check(
+      'position_plans_delivery_consistency',
+      sql`${table.lifecycleKind} != 'reported' OR ${table.deliveredAt} IS NOT NULL`,
+    ),
     uniqueIndex('position_plans_replay_identity_idx').on(table.planId, table.canonicalHash),
     uniqueIndex('position_plans_attempt_id_idx').on(table.attemptId),
     index('position_plans_position_id_idx').on(table.positionId),
