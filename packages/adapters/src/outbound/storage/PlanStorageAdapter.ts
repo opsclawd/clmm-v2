@@ -20,7 +20,6 @@ import type {
   PositionPlan,
   PlanLifecycleState,
   PlanAction,
-  RegimeResponse,
   PlanId,
   CanonicalHash,
   PositionId,
@@ -33,21 +32,9 @@ type StoredPlan = {
   positionId: string;
   walletId: string;
   requestedAt: number;
-  respondedAt: number | null;
-  asOfAt: number | null;
-  expiresAt: number | null;
-  actionKind: string;
-  actionReasons: string[];
-  snapshotFingerprint: string | null;
-  lifecycleKind: string;
-  decisionKind: string | null;
   attemptId: string | null;
-  canonicalResultJson: Record<string, unknown> | null;
+  decisionKind: string | null;
   resultIdempotencyKey: string | null;
-  deliveryAttempts: number;
-  nextAttemptAt: number | null;
-  lastErrorClass: string | null;
-  deliveredAt: number | null;
   executionOriginJson: Record<string, unknown> | null;
   lifecycleStateJson: Record<string, unknown> | null;
 };
@@ -56,206 +43,72 @@ function actionKindToString(action: PlanAction): string {
   return action.kind;
 }
 
-function stringToAction(kind: string): PlanAction {
-  if (kind === 'HOLD' || kind === 'STAND_DOWN' || kind === 'REQUEST_EXIT_CLMM') {
-    return { kind } as PlanAction;
-  }
-  throw new Error(`Unknown action kind: ${kind}`);
-}
-
-function buildPlanLifecycleState(row: StoredPlan): PlanLifecycleState {
-  switch (row.lifecycleKind as PlanLifecycleState['kind']) {
-    case 'requested':
-      return { kind: 'requested' };
-    case 'advisory-ready':
-      return {
-        kind: 'advisory-ready',
-        advisoryAction: stringToAction(row.actionKind),
-        regimeResponse: {
-          kind: 'regime-response',
-          regime: (row.actionReasons[0] as RegimeResponse['regime']) ?? 'UP',
-          suitability: (row.actionReasons[1] as RegimeResponse['suitability']) ?? 'UNKNOWN',
-        },
-      };
-    case 'exit-previewed':
-    case 'awaiting-signature':
-    case 'submitted':
-    case 'result-pending':
-    case 'reported': {
-      const executionOrigin = row.executionOriginJson as
-        | {
-            kind: 'regime-plan';
-            planId: string;
-            canonicalHash: string;
-            canonicalExitIntent: string;
-          }
-        | { kind: 'qualified-breach'; breachDirection: { kind: string } }
-        | null;
-      if (!executionOrigin) {
-        throw new Error(
-          `Missing executionOrigin for plan ${row.planId} in state ${row.lifecycleKind}`,
-        );
-      }
-      if (executionOrigin.kind === 'regime-plan') {
-        const regimePlanOrigin = executionOrigin;
-        return buildRegimePlanState(row, regimePlanOrigin);
-      } else {
-        const breachOrigin = executionOrigin;
-        return buildBreachOriginState(row, breachOrigin);
-      }
-    }
-    case 'report-failed': {
-      return {
-        kind: 'report-failed',
-        outcome: { kind: 'failed' },
-        executionOrigin: null,
-      };
-    }
-    case 'conflict':
-      return {
-        kind: 'conflict',
-        priorPlanId: row.planId as PlanId,
-        canonicalHash: row.canonicalHash as CanonicalHash,
-        conflictingHash: row.canonicalHash as CanonicalHash,
-      };
-    case 'superseded': {
-      const executionOrigin = row.executionOriginJson as {
-        kind: 'qualified-breach';
-        breachDirection: { kind: string };
-      } | null;
-      if (!executionOrigin || executionOrigin.kind !== 'qualified-breach') {
-        throw new Error(`Missing or invalid breachOrigin for superseded plan ${row.planId}`);
-      }
-      return {
-        kind: 'superseded',
-        priorPlan: {
-          planId: row.planId as PlanId,
-          canonicalHash: row.canonicalHash as CanonicalHash,
-          state: { kind: 'requested' },
-        },
-        breachOrigin: {
-          kind: 'qualified-breach',
-          breachDirection: executionOrigin.breachDirection as
-            | { kind: 'lower-bound-breach' }
-            | { kind: 'upper-bound-breach' },
-        },
-      };
-    }
-    default:
-      return { kind: 'requested' };
-  }
-}
-
-function buildRegimePlanState(
-  row: StoredPlan,
-  origin: {
-    kind: 'regime-plan';
-    planId: string;
-    canonicalHash: string;
-    canonicalExitIntent: string;
-  },
-): PlanLifecycleState {
-  const base = {
-    kind: 'regime-plan' as const,
-    planId: origin.planId as PlanId,
-    canonicalHash: origin.canonicalHash as CanonicalHash,
-    canonicalExitIntent: origin.canonicalExitIntent as 'exit-to-usdc' | 'exit-to-sol',
+function rowToStoredPlan(row: {
+  planId: string;
+  canonicalHash: string;
+  positionId: string;
+  walletId: string;
+  requestedAt: number | string;
+  attemptId: string | null;
+  decisionKind: string | null;
+  resultIdempotencyKey: string | null;
+  executionOriginJson: unknown;
+  lifecycleStateJson: unknown;
+}): StoredPlan {
+  return {
+    planId: row.planId,
+    canonicalHash: row.canonicalHash,
+    positionId: row.positionId,
+    walletId: row.walletId,
+    requestedAt: Number(row.requestedAt),
+    attemptId: row.attemptId ?? null,
+    decisionKind: row.decisionKind ?? null,
+    resultIdempotencyKey: row.resultIdempotencyKey ?? null,
+    executionOriginJson: (row.executionOriginJson as Record<string, unknown>) ?? null,
+    lifecycleStateJson: (row.lifecycleStateJson as Record<string, unknown>) ?? null,
   };
-
-  switch (row.lifecycleKind as PlanLifecycleState['kind']) {
-    case 'exit-previewed':
-      return {
-        kind: 'exit-previewed',
-        advisoryAction: stringToAction(row.actionKind),
-        preview: {
-          plan: {
-            steps: [],
-            postExitPosture: { kind: origin.canonicalExitIntent as 'exit-to-usdc' | 'exit-to-sol' },
-            swapInstruction: { fromAsset: 'SOL', toAsset: 'USDC', policyReason: '' },
-          },
-          freshness: { kind: 'stale' },
-          estimatedAt: row.asOfAt ?? row.requestedAt,
-        },
-        executionOrigin: base,
-      };
-    case 'awaiting-signature':
-      return {
-        kind: 'awaiting-signature',
-        advisoryAction: stringToAction(row.actionKind),
-        executionOrigin: base,
-      };
-    case 'submitted':
-      return {
-        kind: 'submitted',
-        advisoryAction: stringToAction(row.actionKind),
-        executionOrigin: base,
-      };
-    case 'result-pending': {
-      const outcomeKind = row.decisionKind ?? 'acknowledged';
-      const outcome =
-        outcomeKind === 'executed'
-          ? { kind: 'executed' as const }
-          : outcomeKind === 'failed'
-            ? { kind: 'failed' as const }
-            : {
-                kind: outcomeKind as
-                  | 'acknowledged'
-                  | 'stand-down'
-                  | 'expired'
-                  | 'position-changed'
-                  | 'rejected',
-              };
-      return {
-        kind: 'result-pending',
-        outcome,
-        executionOrigin: row.attemptId ? base : null,
-      };
-    }
-    case 'reported':
-      return {
-        kind: 'reported',
-        outcome: { kind: 'executed' },
-        executionOrigin: row.attemptId ? base : null,
-        reportedAt: (row.deliveredAt ?? row.requestedAt) as ClockTimestamp,
-      };
-    default:
-      throw new Error(`Unexpected lifecycle kind ${row.lifecycleKind} for regime-plan origin`);
-  }
 }
 
-function buildBreachOriginState(
-  row: StoredPlan,
-  origin: { kind: 'qualified-breach'; breachDirection: { kind: string } },
-): PlanLifecycleState {
-  switch (row.lifecycleKind as PlanLifecycleState['kind']) {
-    case 'exit-previewed':
-      return {
-        kind: 'exit-previewed',
-        advisoryAction: stringToAction(row.actionKind),
-        preview: {
-          plan: {
-            steps: [],
-            postExitPosture: {
-              kind:
-                origin.breachDirection.kind === 'lower-bound-breach'
-                  ? 'exit-to-usdc'
-                  : ('exit-to-sol' as 'exit-to-usdc' | 'exit-to-sol'),
-            },
-            swapInstruction: { fromAsset: 'SOL', toAsset: 'USDC', policyReason: '' },
-          },
-          freshness: { kind: 'stale' },
-          estimatedAt: row.asOfAt ?? row.requestedAt,
-        },
-        executionOrigin: {
-          kind: 'qualified-breach',
-          breachDirection: origin.breachDirection as
-            | { kind: 'lower-bound-breach' }
-            | { kind: 'upper-bound-breach' },
-        },
-      };
-    default:
-      throw new Error(`Unexpected lifecycle kind ${row.lifecycleKind} for breach-origin`);
+/**
+ * `lifecycleStateJson` is the single source of truth for a plan's state; the
+ * relational columns (`lifecycle_kind`, `decision_kind`, `execution_origin_json`)
+ * are a queryable mirror derived from it, never an independent representation.
+ * Every write path funnels through this so the mirror can never drift from
+ * the JSON the way it did when transitions patched relational columns alone.
+ */
+function relationalPatchForState(state: PlanLifecycleState): {
+  lifecycleKind: string;
+  decisionKind: string | null;
+  executionOriginJson: Record<string, unknown> | null;
+  lifecycleStateJson: Record<string, unknown>;
+} {
+  const executionOrigin = 'executionOrigin' in state ? (state.executionOrigin ?? null) : null;
+  const decisionKind = 'outcome' in state ? state.outcome.kind : null;
+  return {
+    lifecycleKind: state.kind,
+    decisionKind,
+    executionOriginJson: (executionOrigin as unknown as Record<string, unknown>) ?? null,
+    lifecycleStateJson: state as unknown as Record<string, unknown>,
+  };
+}
+
+/**
+ * Recovers the `ExecutionOrigin` for a plan that is not itself carrying a
+ * fully-formed `PlanLifecycleState` yet (e.g. a row whose only prior write
+ * was `acceptResponse`). Never fabricates fields: it either reads the origin
+ * already embedded in `lifecycleStateJson`, or reads the raw origin the
+ * caller stored via `executionOriginJson`, gated on an attempt having been
+ * linked — matching the domain reducer's own gating for result-pending /
+ * reported states.
+ */
+function resolveExecutionOrigin(row: StoredPlan): unknown {
+  if (row.lifecycleStateJson && 'executionOrigin' in row.lifecycleStateJson) {
+    return (row.lifecycleStateJson as { executionOrigin: unknown }).executionOrigin ?? null;
   }
+  if (row.attemptId && row.executionOriginJson) {
+    return row.executionOriginJson;
+  }
+  return null;
 }
 
 export class PlanStorageAdapter implements PlanRepository {
@@ -285,6 +138,8 @@ export class PlanStorageAdapter implements PlanRepository {
       return { kind: 'conflict' };
     }
 
+    const state: PlanLifecycleState = { kind: 'requested' };
+
     await this.db.insert(positionPlans).values({
       planId: params.planId,
       canonicalHash: params.canonicalHash,
@@ -293,8 +148,8 @@ export class PlanStorageAdapter implements PlanRepository {
       requestedAt: params.requestedAt,
       actionKind: actionKindToString(params.action),
       actionReasons: [],
-      lifecycleKind: 'requested',
       deliveryAttempts: 0,
+      ...relationalPatchForState(state),
     });
 
     return { kind: 'created' };
@@ -320,15 +175,21 @@ export class PlanStorageAdapter implements PlanRepository {
         return { kind: 'conflict-detected' };
       }
 
+      const advisoryAction: PlanAction = { kind: 'HOLD' };
+      const state: PlanLifecycleState = {
+        kind: 'advisory-ready',
+        advisoryAction,
+        regimeResponse: params.regimeResponse,
+      };
+
       await tx
         .update(positionPlans)
         .set({
           respondedAt: params.respondedAt,
           asOfAt: params.asOfAt,
           expiresAt: params.expiresAt,
-          actionKind: 'HOLD',
           actionReasons: [params.regimeResponse.regime, params.regimeResponse.suitability],
-          lifecycleKind: 'advisory-ready',
+          ...relationalPatchForState(state),
           executionOriginJson: params.executionOriginJson ?? null,
         })
         .where(eq(positionPlans.planId, params.planId));
@@ -349,51 +210,46 @@ export class PlanStorageAdapter implements PlanRepository {
     }
 
     const row = rows[0]!;
-    const storedPlan: StoredPlan = {
-      planId: row.planId,
-      canonicalHash: row.canonicalHash,
-      positionId: row.positionId,
-      walletId: row.walletId,
-      requestedAt: Number(row.requestedAt),
-      respondedAt: row.respondedAt ? Number(row.respondedAt) : null,
-      asOfAt: row.asOfAt ? Number(row.asOfAt) : null,
-      expiresAt: row.expiresAt ? Number(row.expiresAt) : null,
-      actionKind: row.actionKind,
-      actionReasons: Array.isArray(row.actionReasons) ? (row.actionReasons as string[]) : [],
-      snapshotFingerprint: row.snapshotFingerprint ?? null,
-      lifecycleKind: row.lifecycleKind,
-      decisionKind: row.decisionKind ?? null,
-      attemptId: row.attemptId ?? null,
-      canonicalResultJson: row.canonicalResultJson as Record<string, unknown> | null,
-      resultIdempotencyKey: row.resultIdempotencyKey ?? null,
-      deliveryAttempts: Number(row.deliveryAttempts),
-      nextAttemptAt: row.nextAttemptAt ? Number(row.nextAttemptAt) : null,
-      lastErrorClass: row.lastErrorClass ?? null,
-      deliveredAt: row.deliveredAt ? Number(row.deliveredAt) : null,
-      executionOriginJson: (row.executionOriginJson as Record<string, unknown>) ?? null,
-      lifecycleStateJson: (row.lifecycleStateJson as Record<string, unknown>) ?? null,
-    };
+    const storedPlan = rowToStoredPlan(row);
+
+    if (storedPlan.lifecycleStateJson === null) {
+      throw new Error(`Plan ${storedPlan.planId} has no lifecycle state recorded`);
+    }
 
     return {
       planId: storedPlan.planId as PlanId,
       canonicalHash: storedPlan.canonicalHash as CanonicalHash,
       positionId: storedPlan.positionId as PositionId,
       createdAt: storedPlan.requestedAt as ClockTimestamp,
-      state:
-        storedPlan.lifecycleStateJson !== null
-          ? (storedPlan.lifecycleStateJson as PlanLifecycleState)
-          : buildPlanLifecycleState(storedPlan),
+      state: storedPlan.lifecycleStateJson as unknown as PlanLifecycleState,
     };
   }
 
   async recordDecision(params: PlanDecisionParams): Promise<void> {
-    await this.db
-      .update(positionPlans)
-      .set({
-        decisionKind: params.decision.kind,
-        lifecycleKind: 'result-pending',
-      })
-      .where(eq(positionPlans.planId, params.planId));
+    await this.db.transaction(async (tx) => {
+      const rows = await tx
+        .select()
+        .from(positionPlans)
+        .where(eq(positionPlans.planId, params.planId))
+        .for('update');
+
+      const [row] = rows;
+      if (!row) {
+        return;
+      }
+
+      const stored = rowToStoredPlan(row);
+      const state = {
+        kind: 'result-pending',
+        outcome: params.decision,
+        executionOrigin: resolveExecutionOrigin(stored),
+      } as PlanLifecycleState;
+
+      await tx
+        .update(positionPlans)
+        .set(relationalPatchForState(state))
+        .where(eq(positionPlans.planId, params.planId));
+    });
   }
 
   async linkExecutionAttempt(params: PlanExecutionLinkParams): Promise<void> {
@@ -425,20 +281,31 @@ export class PlanStorageAdapter implements PlanRepository {
         .where(eq(positionPlans.planId, params.planId))
         .for('update');
 
-      const [plan] = rows;
-      if (!plan) {
+      const [row] = rows;
+      if (!row) {
         return { kind: 'plan-not-found' };
       }
 
-      const lifecycleKind = 'result-pending';
+      const stored = rowToStoredPlan(row);
+
+      // A terminal outcome has already been committed for this plan: treat
+      // the call as an idempotent no-op rather than clobbering the existing
+      // outcome (and possibly leaving a second, unrelated outbox entry).
+      if (stored.resultIdempotencyKey !== null) {
+        return { kind: 'committed' };
+      }
 
       const now = params.committedAt;
+      const state = {
+        kind: 'result-pending',
+        outcome: params.outcome,
+        executionOrigin: resolveExecutionOrigin(stored),
+      } as PlanLifecycleState;
 
       await tx
         .update(positionPlans)
         .set({
-          decisionKind: params.outcome.kind,
-          lifecycleKind,
+          ...relationalPatchForState(state),
           canonicalResultJson: params.canonicalResult.payload,
           resultIdempotencyKey: params.resultIdempotencyKey,
         })
@@ -528,10 +395,29 @@ export class PlanStorageAdapter implements PlanRepository {
         .set({ deliveredAt: params.deliveredAt })
         .where(eq(planResultOutbox.resultId, params.resultId));
 
+      const planRows = await tx
+        .select()
+        .from(positionPlans)
+        .where(eq(positionPlans.planId, planId))
+        .for('update');
+
+      const [planRow] = planRows;
+      if (!planRow) {
+        return;
+      }
+
+      const stored = rowToStoredPlan(planRow);
+      const state = {
+        kind: 'reported',
+        outcome: { kind: 'executed' },
+        executionOrigin: resolveExecutionOrigin(stored),
+        reportedAt: params.deliveredAt,
+      } as PlanLifecycleState;
+
       await tx
         .update(positionPlans)
         .set({
-          lifecycleKind: 'reported',
+          ...relationalPatchForState(state),
           deliveredAt: params.deliveredAt,
         })
         .where(eq(positionPlans.planId, planId));
@@ -539,21 +425,39 @@ export class PlanStorageAdapter implements PlanRepository {
   }
 
   async recordPermanentFailure(params: PlanPermanentFailureParams): Promise<void> {
-    await this.db
-      .update(positionPlans)
-      .set({
-        lifecycleKind: 'report-failed',
-        lastErrorClass: params.reason,
-      })
-      .where(eq(positionPlans.planId, params.planId));
+    await this.db.transaction(async (tx) => {
+      const rows = await tx
+        .select()
+        .from(positionPlans)
+        .where(eq(positionPlans.planId, params.planId))
+        .for('update');
+
+      const [row] = rows;
+      if (!row) {
+        return;
+      }
+
+      const stored = rowToStoredPlan(row);
+      const state = {
+        kind: 'report-failed',
+        outcome: { kind: 'failed' },
+        executionOrigin: resolveExecutionOrigin(stored),
+      } as PlanLifecycleState;
+
+      await tx
+        .update(positionPlans)
+        .set({
+          ...relationalPatchForState(state),
+          lastErrorClass: params.reason,
+        })
+        .where(eq(positionPlans.planId, params.planId));
+    });
   }
 
   async updateLifecycleState(params: PlanLifecycleStateUpdateParams): Promise<void> {
     await this.db
       .update(positionPlans)
-      .set({
-        lifecycleStateJson: params.lifecycleState as unknown as Record<string, unknown>,
-      })
+      .set(relationalPatchForState(params.lifecycleState))
       .where(eq(positionPlans.planId, params.planId));
   }
 }
