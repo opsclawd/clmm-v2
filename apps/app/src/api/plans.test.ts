@@ -120,6 +120,61 @@ describe('fetchCurrentPlan', () => {
     expect((error as Error).message).toBe('Could not load current plan for this position');
   });
 
+  it('accepts an exit-previewed plan carrying preview freshness', async () => {
+    env.EXPO_PUBLIC_BFF_BASE_URL = 'https://bff.example.test';
+
+    const plan = {
+      planId: 'plan-1',
+      canonicalHash: 'hash-1',
+      positionId: 'Position1111111111111111111111111111111111',
+      state: {
+        kind: 'exit-previewed',
+        previewId: 'preview-123',
+        advisoryAction: { kind: 'REQUEST_EXIT_CLMM', exitIntent: { posture: 'ExitToUSDC' } },
+        preview: { freshness: { kind: 'stale' } },
+      },
+    };
+
+    globalThis.fetch = vi.fn().mockResolvedValue({
+      ok: true,
+      json: () => Promise.resolve(plan),
+    }) as typeof fetch;
+
+    const result = await fetchCurrentPlan(
+      'Wallet1111111111111111111111111111111111',
+      'Position1111111111111111111111111111111111',
+    );
+
+    expect(result).toEqual(plan);
+  });
+
+  it('rejects an exit-previewed plan missing preview freshness', async () => {
+    env.EXPO_PUBLIC_BFF_BASE_URL = 'https://bff.example.test';
+
+    globalThis.fetch = vi.fn().mockResolvedValue({
+      ok: true,
+      json: () =>
+        Promise.resolve({
+          planId: 'plan-1',
+          canonicalHash: 'hash-1',
+          positionId: 'pos-1',
+          state: {
+            kind: 'exit-previewed',
+            previewId: 'preview-123',
+            advisoryAction: { kind: 'REQUEST_EXIT_CLMM', exitIntent: { posture: 'ExitToUSDC' } },
+          },
+        }),
+    }) as typeof fetch;
+
+    const error = await fetchCurrentPlan(
+      'Wallet1111111111111111111111111111111111',
+      'Position1111111111111111111111111111111111',
+    ).catch((e: unknown) => e);
+
+    expect(error).toBeInstanceOf(Error);
+    expect((error as Error).message).toBe('Could not load current plan for this position');
+  });
+
   it('rejects non-object response', async () => {
     env.EXPO_PUBLIC_BFF_BASE_URL = 'https://bff.example.test';
 

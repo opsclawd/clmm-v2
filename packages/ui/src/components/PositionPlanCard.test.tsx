@@ -220,5 +220,48 @@ describe('PositionPlanCard', () => {
       expect(screen.getByText('Transaction Submitted')).toBeTruthy();
       expect(screen.getByText(/Attempt ID: attempt-456/)).toBeTruthy();
     });
+
+    it('disables the acknowledge button while an action is pending', () => {
+      const onAcknowledge = vi.fn();
+      render(
+        <PositionPlanCard
+          plan={makeAdvisoryPlan('HOLD')}
+          onAcknowledge={onAcknowledge}
+          isActionPending
+        />,
+      );
+
+      const button = screen.getByText('Acknowledge').closest('[aria-disabled]');
+      expect(button?.getAttribute('aria-disabled')).toBe('true');
+
+      fireEvent.click(screen.getByText('Acknowledge'));
+      expect(onAcknowledge).not.toHaveBeenCalled();
+    });
+
+    it('disables the preview button while an action is pending', () => {
+      const onPreview = vi.fn();
+      render(
+        <PositionPlanCard plan={makeRequestingExitPlan()} onPreview={onPreview} isActionPending />,
+      );
+
+      const button = screen.getByText('Preview Exit').closest('[aria-disabled]');
+      expect(button?.getAttribute('aria-disabled')).toBe('true');
+
+      fireEvent.click(screen.getByText('Preview Exit'));
+      expect(onPreview).not.toHaveBeenCalled();
+    });
+
+    it('disables the approve button while an action is pending', () => {
+      const onApprove = vi.fn();
+      render(
+        <PositionPlanCard plan={makePreviewReadyPlan()} onApprove={onApprove} isActionPending />,
+      );
+
+      const button = screen.getByText('Approve & Sign').closest('[aria-disabled]');
+      expect(button?.getAttribute('aria-disabled')).toBe('true');
+
+      fireEvent.click(screen.getByText('Approve & Sign'));
+      expect(onApprove).not.toHaveBeenCalled();
+    });
   });
 });

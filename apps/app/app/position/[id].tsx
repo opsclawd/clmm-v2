@@ -94,11 +94,14 @@ function PositionDetailRouteBody() {
 
   const position = positionQuery.data;
   const plan = planQuery.data;
+  const isPlanActionPending =
+    acknowledgeMutation.isPending || previewMutation.isPending || approveMutation.isPending;
 
   return (
     <PositionDetailScreen
       {...(position ? { position } : {})}
       {...(plan !== undefined ? { plan } : {})}
+      isPlanActionPending={isPlanActionPending}
       onViewPreview={(resolvedTriggerId: string) =>
         navigateRoute({
           router,
@@ -106,11 +109,21 @@ function PositionDetailRouteBody() {
           method: 'push',
         })
       }
-      onPlanAcknowledge={(planId: string) => acknowledgeMutation.mutate(planId)}
-      onPlanPreview={(planId: string) => previewMutation.mutate(planId)}
-      onPlanApprove={(planId: string, previewId: string) =>
-        approveMutation.mutate({ planId, previewId })
-      }
+      onPlanAcknowledge={(planId: string) => {
+        if (!isPlanActionPending) {
+          acknowledgeMutation.mutate(planId);
+        }
+      }}
+      onPlanPreview={(planId: string) => {
+        if (!isPlanActionPending) {
+          previewMutation.mutate(planId);
+        }
+      }}
+      onPlanApprove={(planId: string, previewId: string) => {
+        if (!isPlanActionPending) {
+          approveMutation.mutate({ planId, previewId });
+        }
+      }}
     />
   );
 }

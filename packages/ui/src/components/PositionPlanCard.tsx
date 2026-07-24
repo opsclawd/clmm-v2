@@ -8,6 +8,7 @@ type Props = {
   onAcknowledge?: () => void;
   onPreview?: () => void;
   onApprove?: () => void;
+  isActionPending?: boolean;
 };
 
 export function PositionPlanCard({
@@ -15,6 +16,7 @@ export function PositionPlanCard({
   onAcknowledge,
   onPreview,
   onApprove,
+  isActionPending = false,
 }: Props): JSX.Element {
   if (plan.status === 'unavailable') {
     return (
@@ -74,12 +76,14 @@ export function PositionPlanCard({
         {plan.canAcknowledge && onAcknowledge && (
           <TouchableOpacity
             onPress={onAcknowledge}
+            disabled={isActionPending}
             style={{
               marginTop: 12,
               padding: 12,
               backgroundColor: colors.surfaceElevated,
               borderRadius: 8,
               alignItems: 'center',
+              opacity: isActionPending ? 0.5 : 1,
             }}
           >
             <Text
@@ -131,12 +135,14 @@ export function PositionPlanCard({
         {plan.canPreview && onPreview && (
           <TouchableOpacity
             onPress={onPreview}
+            disabled={isActionPending}
             style={{
               marginTop: 12,
               padding: 12,
               backgroundColor: colors.primary,
               borderRadius: 8,
               alignItems: 'center',
+              opacity: isActionPending ? 0.5 : 1,
             }}
           >
             <Text
@@ -188,12 +194,14 @@ export function PositionPlanCard({
         {plan.canApprove && onApprove && (
           <TouchableOpacity
             onPress={onApprove}
+            disabled={isActionPending}
             style={{
               marginTop: 12,
               padding: 12,
               backgroundColor: colors.primary,
               borderRadius: 8,
               alignItems: 'center',
+              opacity: isActionPending ? 0.5 : 1,
             }}
           >
             <Text

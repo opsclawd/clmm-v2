@@ -17,6 +17,7 @@ export type PlanLifecycleState =
       kind: 'exit-previewed';
       previewId: string;
       advisoryAction: PlanAction;
+      preview: { freshness: { kind: 'fresh' | 'stale' | 'expired' } };
     }
   | { kind: 'awaiting-signature'; attemptId?: string; advisoryAction: PlanAction }
   | { kind: 'submitted'; attemptId?: string; advisoryAction: PlanAction }
@@ -165,6 +166,24 @@ export function buildPositionPlanViewModel(
     case 'exit-previewed': {
       const action = plan.state.advisoryAction;
       const exitPosture = getAdvisoryPosture(action);
+      const freshnessKind = plan.state.preview.freshness.kind;
+
+      if (freshnessKind === 'stale') {
+        return {
+          status: 'stale',
+          staleReason: 'Exit preview has gone stale. Request a new preview to continue.',
+          showBreachControls,
+        };
+      }
+
+      if (freshnessKind === 'expired') {
+        return {
+          status: 'stale',
+          staleReason: 'Exit preview has expired. Request a new preview to continue.',
+          showBreachControls,
+        };
+      }
+
       return {
         status: 'preview-ready',
         previewId: plan.state.previewId,

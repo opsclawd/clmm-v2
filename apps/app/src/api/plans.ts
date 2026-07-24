@@ -19,6 +19,7 @@ export type PlanLifecycleState =
       kind: 'exit-previewed';
       previewId: string;
       advisoryAction: PlanAction;
+      preview: { freshness: { kind: 'fresh' | 'stale' | 'expired' } };
     }
   | { kind: 'awaiting-signature'; attemptId?: string; advisoryAction: PlanAction }
   | { kind: 'submitted'; attemptId?: string; advisoryAction: PlanAction }
@@ -85,7 +86,16 @@ function isPlanLifecycleState(value: unknown): value is PlanLifecycleState {
 
   if (kind === 'exit-previewed') {
     const advisoryAction = value['advisoryAction'];
-    return typeof value['previewId'] === 'string' && isPlanAction(advisoryAction);
+    const preview = value['preview'];
+    if (!isRecord(preview)) return false;
+    const freshness = preview['freshness'];
+    if (!isRecord(freshness)) return false;
+    const freshnessKind = freshness['kind'];
+    return (
+      typeof value['previewId'] === 'string' &&
+      isPlanAction(advisoryAction) &&
+      (freshnessKind === 'fresh' || freshnessKind === 'stale' || freshnessKind === 'expired')
+    );
   }
 
   if (kind === 'awaiting-signature' || kind === 'submitted') {

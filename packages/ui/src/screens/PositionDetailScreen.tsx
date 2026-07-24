@@ -16,6 +16,7 @@ type Props = {
   onPlanAcknowledge?: (planId: string) => void;
   onPlanPreview?: (planId: string) => void;
   onPlanApprove?: (planId: string, previewId: string) => void;
+  isPlanActionPending?: boolean;
 };
 
 export function PositionDetailScreen({
@@ -25,6 +26,7 @@ export function PositionDetailScreen({
   onPlanAcknowledge,
   onPlanPreview,
   onPlanApprove,
+  isPlanActionPending = false,
 }: Props): JSX.Element {
   if (!position) {
     return (
@@ -179,10 +181,19 @@ export function PositionDetailScreen({
 
         <PositionPlanCard
           plan={planVm}
-          onAcknowledge={() => plan && onPlanAcknowledge?.(plan.planId)}
-          onPreview={() => plan && onPlanPreview?.(plan.planId)}
+          isActionPending={isPlanActionPending}
+          onAcknowledge={() => {
+            if (plan && !isPlanActionPending) {
+              onPlanAcknowledge?.(plan.planId);
+            }
+          }}
+          onPreview={() => {
+            if (plan && !isPlanActionPending) {
+              onPlanPreview?.(plan.planId);
+            }
+          }}
           onApprove={() => {
-            if (plan && planVm.status === 'preview-ready') {
+            if (plan && planVm.status === 'preview-ready' && !isPlanActionPending) {
               onPlanApprove?.(plan.planId, planVm.previewId);
             }
           }}

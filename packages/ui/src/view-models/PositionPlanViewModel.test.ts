@@ -125,6 +125,7 @@ describe('PositionPlanViewModel', () => {
           kind: 'exit-previewed',
           previewId: 'preview-123',
           advisoryAction: { kind: 'REQUEST_EXIT_CLMM', exitIntent: { posture: 'ExitToSOL' } },
+          preview: { freshness: { kind: 'fresh' } },
         },
       };
 
@@ -145,6 +146,7 @@ describe('PositionPlanViewModel', () => {
           kind: 'exit-previewed',
           previewId: 'preview-123',
           advisoryAction: { kind: 'REQUEST_EXIT_CLMM', exitIntent: { posture: 'ExitToUSDC' } },
+          preview: { freshness: { kind: 'fresh' } },
         },
       };
 
@@ -214,6 +216,44 @@ describe('PositionPlanViewModel', () => {
 
       expect(vm.status).toBe('unavailable');
     });
+
+    it('marks a stale preview as non-executable instead of preview-ready', () => {
+      const plan: CurrentPlanDto = {
+        planId: 'plan-1',
+        canonicalHash: 'hash-1',
+        positionId: 'Position1111111111111111111111111111111111',
+        state: {
+          kind: 'exit-previewed',
+          previewId: 'preview-1',
+          advisoryAction: { kind: 'REQUEST_EXIT_CLMM', exitIntent: { posture: 'ExitToUSDC' } },
+          preview: { freshness: { kind: 'stale' } },
+        },
+      };
+
+      const vm = buildPositionPlanViewModel(plan, makeBreachDirectionLower());
+
+      expect(vm.status).toBe('stale');
+      expect(vm.status).not.toBe('preview-ready');
+    });
+
+    it('marks an expired preview as non-executable instead of preview-ready', () => {
+      const plan: CurrentPlanDto = {
+        planId: 'plan-1',
+        canonicalHash: 'hash-1',
+        positionId: 'Position1111111111111111111111111111111111',
+        state: {
+          kind: 'exit-previewed',
+          previewId: 'preview-1',
+          advisoryAction: { kind: 'REQUEST_EXIT_CLMM', exitIntent: { posture: 'ExitToUSDC' } },
+          preview: { freshness: { kind: 'expired' } },
+        },
+      };
+
+      const vm = buildPositionPlanViewModel(plan, makeBreachDirectionLower());
+
+      expect(vm.status).toBe('stale');
+      expect(vm.status).not.toBe('preview-ready');
+    });
   });
 
   describe('keeps position and breach controls during plan outage', () => {
@@ -272,6 +312,7 @@ describe('PositionPlanViewModel', () => {
           kind: 'exit-previewed',
           previewId: 'preview-1',
           advisoryAction: { kind: 'REQUEST_EXIT_CLMM', exitIntent: { posture: 'ExitToUSDC' } },
+          preview: { freshness: { kind: 'fresh' } },
         },
       };
 

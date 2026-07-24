@@ -92,6 +92,7 @@ function makePreviewReadyPlan(): CurrentPlanDto {
       kind: 'exit-previewed',
       previewId: 'preview-123',
       advisoryAction: { kind: 'REQUEST_EXIT_CLMM', exitIntent: { posture: 'ExitToUSDC' } },
+      preview: { freshness: { kind: 'fresh' } },
     },
   };
 }
