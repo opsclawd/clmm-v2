@@ -1,0 +1,23 @@
+{
+  "result": "fail",
+  "findings": [
+    {
+      "severity": "P0",
+      "summary": "packages/domain/src/regime/PositionPlan.ts was not created as required.",
+      "file": "packages/domain/src/regime/PositionPlan.ts",
+      "suggested_fix": "Create PositionPlan.ts and move PositionPlan, PlanLifecycleState, PlanAction, and related types out of PlanLifecycleReducer.ts."
+    },
+    {
+      "severity": "P0",
+      "summary": "ExecutionOrigin was incorrectly placed in PlanLifecycleReducer.ts instead of packages/domain/src/execution/index.ts.",
+      "file": "packages/domain/src/execution/index.ts",
+      "suggested_fix": "Export ExecutionOrigin from packages/domain/src/execution/index.ts."
+    },
+    {
+      "severity": "P1",
+      "summary": "The required PlanAction symbol was not implemented; an AdvisoryAction union was implemented instead.",
+      "file": "packages/domain/src/regime/PlanLifecycleReducer.ts",
+      "suggested_fix": "Rename AdvisoryAction to PlanAction to match the expected domain action union signature."
+    }
+  ]
+}

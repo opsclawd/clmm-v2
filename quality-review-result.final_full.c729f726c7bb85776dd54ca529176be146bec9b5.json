@@ -1,0 +1,11 @@
+{
+  "result": "pass",
+  "findings": [
+    {
+      "severity": "P3",
+      "summary": "RegimePlanAction type definition could use a discriminated union for tighter compile-time safety on exitIntent.",
+      "file": "packages/application/src/dto/regimePlan.ts",
+      "suggested_fix": "export type RegimePlanAction = { type: 'HOLD' | 'STAND_DOWN'; reasonCode: string; exitIntent?: never } | { type: 'REQUEST_EXIT_CLMM'; reasonCode: string; exitIntent: RegimePlanExitIntent };"
+    }
+  ]
+}

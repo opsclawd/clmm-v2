@@ -1,0 +1,29 @@
+{
+  "result": "fail",
+  "findings": [
+    {
+      "severity": "P2",
+      "summary": "Zero level filtering uses a fixed Set instead of the required lexical predicate regex, missing arbitrary precision zeros like '0.000'.",
+      "file": "packages/ui/src/view-models/PolicyInsightsViewModel.ts",
+      "suggested_fix": "Replace `const LEXICAL_ZERO_VALUES = new Set(['0', '0.0', '0.00']);` and `filterZeroLevels` with a regex predicate such as `/^0(?:\\.0+)?$/.test(level)` as specified in the plan."
+    },
+    {
+      "severity": "P2",
+      "summary": "Evidence summary does not append bundle and source counts when selection status is 'FULL'.",
+      "file": "packages/ui/src/view-models/PolicyInsightsViewModel.ts",
+      "suggested_fix": "Remove `selectionStatus === 'FULL' ||` from the condition in `formatEvidenceSummary` so that counts are appended for full evidence as well, per the requirement."
+    },
+    {
+      "severity": "P2",
+      "summary": "PolicyInsightReasonCode is redefined locally instead of being imported from @clmm/application/public.",
+      "file": "packages/ui/src/view-models/PolicyInsightsViewModel.ts",
+      "suggested_fix": "Remove the local `type PolicyInsightReasonCode` definition and add it to the import statement from `@clmm/application/public`."
+    },
+    {
+      "severity": "P3",
+      "summary": "confidenceLabel calculates percentages inline instead of using the formatPercentFromBps helper.",
+      "file": "packages/ui/src/view-models/PolicyInsightsViewModel.ts",
+      "suggested_fix": "Update `confidenceLabel` to use `formatPercentFromBps(block.confidenceBps) + ' confidence'`."
+    }
+  ]
+}

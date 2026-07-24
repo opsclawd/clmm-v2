@@ -1,0 +1,17 @@
+{
+  "result": "fail",
+  "findings": [
+    {
+      "severity": "P1",
+      "summary": "Concurrent polling of the outbox in claimDueResult will block because .for('update') lacks skipLocked: true.",
+      "file": "packages/adapters/src/outbound/storage/PlanStorageAdapter.ts",
+      "suggested_fix": "Change `.for('update')` to `.for('update', { skipLocked: true })` to allow concurrent consumers to safely claim different due results."
+    },
+    {
+      "severity": "P2",
+      "summary": "Retrying commitTerminalOutcome with the same result will cause a primary key or unique constraint violation.",
+      "file": "packages/adapters/src/outbound/storage/PlanStorageAdapter.ts",
+      "suggested_fix": "Add `.onConflictDoNothing()` or equivalent upsert logic to the `tx.insert(planResultOutbox)` statement to make the commit idempotent."
+    }
+  ]
+}
