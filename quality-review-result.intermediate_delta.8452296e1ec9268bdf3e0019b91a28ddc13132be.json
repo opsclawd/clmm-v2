@@ -1,0 +1,17 @@
+{
+  "result": "fail",
+  "findings": [
+    {
+      "severity": "P2",
+      "summary": "The request timeout is cleared immediately after the fetch promise resolves with headers, leaving the subsequent response.json() body reads unprotected from hanging if the stream stalls.",
+      "file": "packages/adapters/src/outbound/regime-engine/RegimePlanAdapter.ts",
+      "suggested_fix": "Move `clearTimeout(timer)` into a `finally` block that encompasses both the `fetch` call and all `await response.json()` calls, ensuring the timeout protects the entire network transaction."
+    },
+    {
+      "severity": "P3",
+      "summary": "Telemetry logs for request failures mistakenly use the `planId` key to store `request.position?.positionId`, which misaligns with success logs and pollutes observability data.",
+      "file": "packages/adapters/src/outbound/regime-engine/RegimePlanAdapter.ts",
+      "suggested_fix": "Rename the `planId` key to `positionId` in all error and warning logs within `requestPositionPlan` where it maps to `request.position?.positionId`."
+    }
+  ]
+}

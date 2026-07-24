@@ -10,10 +10,12 @@ export type RegimeResponse = {
   readonly suitability: 'ALLOWED' | 'CAUTION' | 'BLOCKED' | 'UNKNOWN';
 };
 
+export type ExitIntentPosture = 'exit-to-usdc' | 'exit-to-sol';
+
 export type PlanAction =
   | { readonly kind: 'HOLD' }
   | { readonly kind: 'STAND_DOWN' }
-  | { readonly kind: 'REQUEST_EXIT_CLMM' };
+  | { readonly kind: 'REQUEST_EXIT_CLMM'; readonly exitIntent?: ExitIntentPosture };
 
 export type NonExecutedOutcome =
   | { readonly kind: 'acknowledged' }
@@ -24,15 +26,8 @@ export type NonExecutedOutcome =
 
 export type ExecutedOutcome = { readonly kind: 'executed' } | { readonly kind: 'failed' };
 
-export type ExecutionPlan = {
-  readonly steps: readonly { readonly kind: string }[];
-  readonly postExitPosture: { readonly kind: 'exit-to-usdc' | 'exit-to-sol' };
-  readonly swapInstruction: {
-    readonly fromAsset: string;
-    readonly toAsset: string;
-    readonly policyReason: string;
-  };
-};
+import type { ExecutionPlan } from '../execution/index.js';
+export type { ExecutionPlan };
 
 export type PreviewFreshness =
   | { readonly kind: 'fresh'; readonly expiresAt: number }

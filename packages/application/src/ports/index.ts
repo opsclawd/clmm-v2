@@ -473,6 +473,7 @@ export type PlanRequestResult =
 export type PlanResponseParams = {
   readonly planId: import('@clmm/domain').PlanId;
   readonly regimeResponse: RegimeResponse;
+  readonly advisoryAction: PlanAction;
   readonly respondedAt: ClockTimestamp;
   readonly asOfAt: ClockTimestamp;
   readonly expiresAt: ClockTimestamp;

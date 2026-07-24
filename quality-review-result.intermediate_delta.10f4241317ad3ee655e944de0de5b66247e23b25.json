@@ -1,0 +1,17 @@
+{
+  "result": "fail",
+  "findings": [
+    {
+      "severity": "P1",
+      "summary": "When a qualified trigger is present alongside a successful plan response, the use case returns early with a `superseded` status, leaving the plan permanently dangling in a `requested` state because it bypasses `planRepository.acceptResponse`.",
+      "file": "packages/application/src/use-cases/plans/RequestPositionPlan.ts",
+      "suggested_fix": "Move the `if (qualifiedTrigger)` check after `await planRepository.acceptResponse(...)` so the plan transition completes before returning the superseded status."
+    },
+    {
+      "severity": "P1",
+      "summary": "The plan action is hardcoded to `HOLD` in `createRequest` and `suitability` is hardcoded to `ALLOWED` in `acceptResponse`, completely ignoring the actual actions and constraints provided in the authoritative Regime plan response.",
+      "file": "packages/application/src/use-cases/plans/RequestPositionPlan.ts",
+      "suggested_fix": "Map the `actions` and `constraints` from the `RegimePlanResponse` to the appropriate domain `PlanAction` and `suitability` enum values instead of hardcoding them."
+    }
+  ]
+}

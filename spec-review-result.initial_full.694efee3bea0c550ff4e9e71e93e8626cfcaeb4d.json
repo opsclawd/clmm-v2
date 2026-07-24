@@ -1,0 +1,11 @@
+{
+  "result": "fail",
+  "findings": [
+    {
+      "severity": "P1",
+      "summary": "The `position_plans` schema is missing a unique constraint on `attempt_id` to enforce the required one-to-one attempt linkage at the database level.",
+      "file": "packages/adapters/src/outbound/storage/schema/position-plans.ts",
+      "suggested_fix": "Add `uniqueIndex('position_plans_attempt_id_idx').on(table.attemptId)` to the positionPlans schema definition and generate a new migration to apply it."
+    }
+  ]
+}

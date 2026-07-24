@@ -159,7 +159,7 @@ export class FakePlanRepository implements PlanRepository {
       return { kind: 'conflict-detected' };
     }
 
-    const advisoryAction: PlanAction = { kind: 'HOLD' };
+    const advisoryAction: PlanAction = params.advisoryAction;
     const state: PlanLifecycleState = {
       kind: 'advisory-ready',
       advisoryAction,

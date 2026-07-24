@@ -1,0 +1,11 @@
+{
+  "result": "fail",
+  "findings": [
+    {
+      "severity": "P2",
+      "summary": "The validation logic overriding unsupported decisions to a 'rejected' outcome is missing unit test coverage.",
+      "file": "packages/application/src/use-cases/plans/RecordPlanDecision.test.ts",
+      "suggested_fix": "Add test cases to verify that when a plan action is 'REQUEST_EXIT_CLMM' and the decision is 'acknowledged' or 'stand-down', the outcome is correctly overridden to 'rejected'."
+    }
+  ]
+}

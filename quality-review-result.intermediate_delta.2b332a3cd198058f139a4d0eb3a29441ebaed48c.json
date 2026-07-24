@@ -1,0 +1,10 @@
+{
+  "result": "fail",
+  "findings": [
+    {
+      "severity": "P0",
+      "summary": "Implementation is entirely missing. No code was created or modified for Task 4 (e.g. RegimePlanAdapter.ts and FakeRegimePlanPort.ts are absent).",
+      "suggested_fix": "Implement the requirements as specified in the task context."
+    }
+  ]
+}

@@ -1,0 +1,23 @@
+{
+  "result": "fail",
+  "findings": [
+    {
+      "severity": "P0",
+      "summary": "State transitions like recordDecision, commitTerminalOutcome, and completeDelivery update relational columns (lifecycleKind, decisionKind) but fail to update or clear lifecycleStateJson, causing getCurrentPlan to return stale JSON state.",
+      "file": "packages/adapters/src/outbound/storage/PlanStorageAdapter.ts",
+      "suggested_fix": "Ensure all methods that mutate lifecycle state also update or clear lifecycleStateJson, or completely migrate all state transitions to use updateLifecycleState and remove the dual-state relational columns."
+    },
+    {
+      "severity": "P1",
+      "summary": "FakePlanRepository shares the same state synchronization defect as PlanStorageAdapter, where lifecycleStateJson becomes stale because transition methods do not update it.",
+      "file": "packages/testing/src/fakes/FakePlanRepository.ts",
+      "suggested_fix": "Synchronize lifecycleStateJson with manual property updates in FakePlanRepository's state transition methods."
+    },
+    {
+      "severity": "P2",
+      "summary": "commitTerminalOutcome lacks state guards and will blindly overwrite terminal outcomes in positionPlans while potentially failing to insert into the outbox if called multiple times.",
+      "file": "packages/adapters/src/outbound/storage/PlanStorageAdapter.ts",
+      "suggested_fix": "Add a check in commitTerminalOutcome to ensure the plan is in an expected pre-terminal state before updating and inserting into the outbox."
+    }
+  ]
+}

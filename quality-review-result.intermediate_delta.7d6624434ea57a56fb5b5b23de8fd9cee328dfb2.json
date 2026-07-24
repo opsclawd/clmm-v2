@@ -1,0 +1,17 @@
+{
+  "result": "fail",
+  "findings": [
+    {
+      "severity": "P0",
+      "summary": "Early return for qualifiedTrigger bypasses the Regime request entirely, violating the requirement to include the trigger in the upstream request and rendering the breachQualified fields dead code.",
+      "file": "packages/application/src/use-cases/plans/RequestPositionPlan.ts",
+      "suggested_fix": "Remove the early return for `qualifiedTrigger` that occurs before building the request. Allow `regimePlanPort.requestPositionPlan` to execute so the upstream receives `breachQualified: true`, then evaluate the `superseded` outrank logic after the Regime request completes or fails."
+    },
+    {
+      "severity": "P1",
+      "summary": "The exact-replay return object lacks the existing plan, which violates the acceptance criteria stating 'An exact response replay returns the existing plan'.",
+      "file": "packages/application/src/use-cases/plans/RequestPositionPlan.ts",
+      "suggested_fix": "Update the `PositionPlanRequestResult` type's exact-replay branch to include a `plan` field, and return `existingPlan` when `createResult.kind === 'exact-replay'`."
+    }
+  ]
+}

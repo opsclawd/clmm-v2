@@ -11,6 +11,7 @@ export type {
   RegimeResponse,
   PlanId,
   CanonicalHash,
+  ExitIntentPosture,
 } from './PositionPlan.js';
 
 export {

@@ -7,7 +7,11 @@ import type {
   IdGeneratorPort,
 } from '../../ports/index.js';
 import type { WalletId, PositionId, PlanId, ExecutionOrigin } from '@clmm/domain';
-import { makeClockTimestamp, evaluatePreviewFreshness } from '@clmm/domain';
+import {
+  makeClockTimestamp,
+  evaluatePreviewFreshness,
+  applyPlanLifecycleTransition,
+} from '@clmm/domain';
 
 const PREPARED_PAYLOAD_VERSION = 'v1';
 
@@ -65,6 +69,12 @@ export async function approvePlanExit(params: {
     throw new PlanExitApprovalError(`Preview ${previewId} is ${liveFreshness.kind}`);
   }
 
+  if (currentPlan.state.kind === 'awaiting-signature' || currentPlan.state.kind === 'submitted') {
+    throw new PlanExitApprovalError(
+      `Plan ${planId} is already linked to attempt (state: ${currentPlan.state.kind})`,
+    );
+  }
+
   const executionOrigin: ExecutionOrigin = {
     kind: 'regime-plan',
     planId: currentPlan.planId,
@@ -105,13 +115,13 @@ export async function approvePlanExit(params: {
     linkedAt: now,
   });
 
+  const planAfterTransition = applyPlanLifecycleTransition(currentPlan, {
+    kind: 'request-signature',
+  });
+
   await planRepo.updateLifecycleState({
     planId: currentPlan.planId,
-    lifecycleState: {
-      kind: 'awaiting-signature',
-      advisoryAction: { kind: 'REQUEST_EXIT_CLMM' },
-      executionOrigin,
-    },
+    lifecycleState: planAfterTransition.state,
   });
 
   await historyRepo.recordWalletPositionOwnership(walletId, positionId, now);

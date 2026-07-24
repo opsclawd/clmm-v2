@@ -7,12 +7,44 @@ import type {
   ObservabilityPort,
   IdGeneratorPort,
 } from '../../ports/index.js';
-import type { WalletId, PositionId, ClockTimestamp, BreachDirection } from '@clmm/domain';
+import type {
+  WalletId,
+  PositionId,
+  ClockTimestamp,
+  BreachDirection,
+  PlanAction,
+} from '@clmm/domain';
 import { makeClockTimestamp } from '@clmm/domain';
 import type { CanonicalHash } from '@clmm/domain';
-import type { RegimePlanRequest, RegimePlanResponse } from '@clmm/application';
+import type {
+  RegimePlanRequest,
+  RegimePlanResponse,
+  RegimePlanExitPosture,
+} from '@clmm/application';
 
 const STALENESS_THRESHOLD_MS = 5 * 60 * 1000;
+
+function mapRegimeExitPostureToDomain(
+  posture: RegimePlanExitPosture,
+): 'exit-to-usdc' | 'exit-to-sol' {
+  return posture === 'ExitToSOL' ? 'exit-to-sol' : 'exit-to-usdc';
+}
+
+function extractAdvisoryAction(response: RegimePlanResponse): PlanAction {
+  const requestedAction = response.actions.find(
+    (a) => a.type === 'REQUEST_EXIT_CLMM' || a.type === 'HOLD' || a.type === 'STAND_DOWN',
+  );
+  if (!requestedAction) {
+    return { kind: 'HOLD' };
+  }
+  if (requestedAction.type === 'REQUEST_EXIT_CLMM') {
+    const exitIntent = requestedAction.exitIntent?.posture
+      ? mapRegimeExitPostureToDomain(requestedAction.exitIntent.posture)
+      : undefined;
+    return { kind: 'REQUEST_EXIT_CLMM', ...(exitIntent && { exitIntent }) };
+  }
+  return { kind: requestedAction.type };
+}
 
 export type PositionPlanRequestResult =
   | {
@@ -284,6 +316,7 @@ export async function requestPositionPlan(params: {
         regime: response.regime,
         suitability: 'ALLOWED',
       },
+      advisoryAction: extractAdvisoryAction(response),
       respondedAt: makeClockTimestamp(response.asOfUnixMs),
       asOfAt: makeClockTimestamp(response.asOfUnixMs),
       expiresAt: makeClockTimestamp(response.expiresAtUnixMs),

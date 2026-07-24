@@ -8,7 +8,7 @@ import type {
   IdGeneratorPort,
 } from '../../ports/index.js';
 import type { WalletId, PositionId, PlanId, ExecutionPreview, ExecutionOrigin } from '@clmm/domain';
-import { evaluatePreviewFreshness } from '@clmm/domain';
+import { evaluatePreviewFreshness, applyPlanLifecycleTransition } from '@clmm/domain';
 
 export class PlanNotEligibleForExitPreviewError extends Error {
   constructor(reason: string) {
@@ -81,18 +81,29 @@ export async function createPlanExitPreview(params: {
     throw new PositionMateriallyChangedError(positionId);
   }
 
-  // The regime engine's REQUEST_EXIT_CLMM advisory action does not carry a
-  // directional payload — canonical exit direction defaults to USDC, matching
-  // PlanLifecycleReducer's own fallback when transitioning without a preview.
-  const intent: 'exit-to-usdc' | 'exit-to-sol' = 'exit-to-usdc';
+  if (state.kind === 'exit-previewed') {
+    const existingPreview = state.preview;
+    const freshness = evaluatePreviewFreshness(existingPreview.estimatedAt, now);
+    if (freshness.kind === 'fresh') {
+      const existingOrigin = state.executionOrigin;
+      return {
+        previewId: `${currentPlan.planId}-preview`,
+        plan: existingPreview.plan,
+        preview: existingPreview,
+        executionOrigin: existingOrigin,
+      };
+    }
+  }
+
+  const intent = advisoryAction.exitIntent ?? 'exit-to-usdc';
   const postExitPosture = { kind: intent };
   const swapInstruction = {
-    fromAsset: 'SOL' as const,
-    toAsset: 'USDC' as const,
+    fromAsset: (intent === 'exit-to-sol' ? 'USDC' : 'SOL') as import('@clmm/domain').AssetSymbol,
+    toAsset: (intent === 'exit-to-sol' ? 'SOL' : 'USDC') as import('@clmm/domain').AssetSymbol,
     policyReason: 'regime-plan-exit',
   };
 
-  const executionPlan = {
+  const executionPlan: import('@clmm/domain').ExecutionPlan = {
     steps: [
       { kind: 'remove-liquidity' as const },
       { kind: 'collect-fees' as const },
@@ -109,23 +120,23 @@ export async function createPlanExitPreview(params: {
     estimatedAt: now,
   };
 
-  const executionOrigin: ExecutionOrigin = {
-    kind: 'regime-plan',
-    planId: currentPlan.planId,
-    canonicalHash: currentPlan.canonicalHash,
-    canonicalExitIntent: intent,
-  };
+  const planAfterTransition = applyPlanLifecycleTransition(currentPlan, {
+    kind: 'preview',
+    preview,
+  });
+
+  const newState = planAfterTransition.state;
+  if (newState.kind !== 'exit-previewed') {
+    throw new Error(`Invalid transition: expected exit-previewed, got ${newState.kind}`);
+  }
+
+  const executionOrigin = newState.executionOrigin;
 
   const { previewId } = await executionRepo.savePreview(positionId, preview, executionOrigin);
 
   await planRepo.updateLifecycleState({
     planId: currentPlan.planId,
-    lifecycleState: {
-      kind: 'exit-previewed',
-      advisoryAction,
-      preview,
-      executionOrigin,
-    },
+    lifecycleState: newState,
   });
 
   await historyRepo.appendEvent({

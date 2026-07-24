@@ -87,6 +87,51 @@ describe('createPlanExitPreview', () => {
     expect(stored?.origin).not.toHaveProperty('breachDirection');
   });
 
+  it('honors explicit exitIntent from advisoryAction without hardcoding exit-to-usdc', async () => {
+    await planRepo.createRequest({
+      planId: PLAN_ID,
+      canonicalHash: CANONICAL_HASH,
+      positionId: FIXTURE_POSITION_ID,
+      walletId: FIXTURE_WALLET_ID,
+      requestedAt: clock.now(),
+      action: { kind: 'REQUEST_EXIT_CLMM', exitIntent: 'exit-to-sol' },
+    });
+    await planRepo.updateLifecycleState({
+      planId: PLAN_ID,
+      lifecycleState: {
+        kind: 'advisory-ready',
+        advisoryAction: { kind: 'REQUEST_EXIT_CLMM', exitIntent: 'exit-to-sol' },
+        regimeResponse: { kind: 'regime-response', regime: 'DOWN', suitability: 'ALLOWED' },
+      },
+    });
+
+    const result = await createPlanExitPreview({
+      planId: PLAN_ID,
+      positionId: FIXTURE_POSITION_ID,
+      walletId: FIXTURE_WALLET_ID,
+      planRepo,
+      positionRepo,
+      executionRepo,
+      prepPort,
+      historyRepo,
+      clock,
+      ids,
+    });
+
+    expect(result.executionOrigin).toEqual({
+      kind: 'regime-plan',
+      planId: PLAN_ID,
+      canonicalHash: CANONICAL_HASH,
+      canonicalExitIntent: 'exit-to-sol',
+    });
+    expect(result.plan.postExitPosture).toEqual({ kind: 'exit-to-sol' });
+    expect(result.plan.swapInstruction).toEqual({
+      fromAsset: 'USDC',
+      toAsset: 'SOL',
+      policyReason: 'regime-plan-exit',
+    });
+  });
+
   it('records a preview-created history event carrying the regime-plan origin', async () => {
     await seedAdvisoryReadyPlan();
 
