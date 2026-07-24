@@ -335,6 +335,13 @@ class FakePlanRepository implements PlanRepository {
     reason: string;
     failedAt: ClockTimestamp;
   }): Promise<void> {}
+  async failDelivery(_params: {
+    planId: PlanId;
+    resultId: string;
+    reason: string;
+    failedAt: ClockTimestamp;
+    deliveredAt: ClockTimestamp;
+  }): Promise<void> {}
   async abandonDelivery(_params: {
     resultId: string;
     deliveredAt: ClockTimestamp;

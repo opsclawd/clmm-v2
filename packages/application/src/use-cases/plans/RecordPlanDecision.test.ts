@@ -151,6 +151,8 @@ class FakePlanRepository implements PlanRepository {
 
   async recordPermanentFailure(): Promise<void> {}
 
+  async failDelivery(): Promise<void> {}
+
   async abandonDelivery(): Promise<void> {}
 
   async getPlanActionKind(): Promise<string | null> {

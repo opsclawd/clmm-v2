@@ -535,6 +535,14 @@ export type PlanPermanentFailureParams = {
   readonly failedAt: ClockTimestamp;
 };
 
+export type PlanFailDeliveryParams = {
+  readonly planId: import('@clmm/domain').PlanId;
+  readonly resultId: string;
+  readonly reason: string;
+  readonly failedAt: ClockTimestamp;
+  readonly deliveredAt: ClockTimestamp;
+};
+
 export type PlanLifecycleStateUpdateParams = {
   readonly planId: import('@clmm/domain').PlanId;
   readonly lifecycleState: PlanLifecycleState;
@@ -554,6 +562,7 @@ export interface PlanRepository {
   rescheduleRetry(params: PlanRetryScheduleParams): Promise<void>;
   completeDelivery(params: PlanDeliveryCompletionParams): Promise<void>;
   recordPermanentFailure(params: PlanPermanentFailureParams): Promise<void>;
+  failDelivery(params: PlanFailDeliveryParams): Promise<void>;
   abandonDelivery(params: PlanDeliveryCompletionParams): Promise<void>;
   updateLifecycleState(params: PlanLifecycleStateUpdateParams): Promise<void>;
 }

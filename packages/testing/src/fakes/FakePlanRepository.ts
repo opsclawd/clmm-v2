@@ -11,6 +11,7 @@ import type {
   PlanRetryScheduleParams,
   PlanDeliveryCompletionParams,
   PlanPermanentFailureParams,
+  PlanFailDeliveryParams,
   PlanLifecycleStateUpdateParams,
   CanonicalResult,
 } from '@clmm/application';
@@ -328,6 +329,27 @@ export class FakePlanRepository implements PlanRepository {
   }
 
   async recordPermanentFailure(params: PlanPermanentFailureParams): Promise<void> {
+    const plan = this.plans.get(params.planId);
+    if (!plan) {
+      return;
+    }
+
+    const state = {
+      kind: 'report-failed',
+      outcome: { kind: 'failed' },
+      executionOrigin: resolveExecutionOrigin(plan),
+    } as PlanLifecycleState;
+
+    Object.assign(plan, relationalPatchForState(state));
+    plan.lastErrorClass = params.reason;
+  }
+
+  async failDelivery(params: PlanFailDeliveryParams): Promise<void> {
+    const outbox = Array.from(this.outbox.values()).find((o) => o.resultId === params.resultId);
+    if (outbox) {
+      outbox.deliveredAt = params.deliveredAt;
+    }
+
     const plan = this.plans.get(params.planId);
     if (!plan) {
       return;

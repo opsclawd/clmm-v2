@@ -363,6 +363,7 @@ export class PlanStorageAdapter implements PlanRepository {
         .update(planResultOutbox)
         .set({
           attemptCount: Number(row.attemptCount) + 1,
+          nextAttemptAt: now + 300000,
         })
         .where(eq(planResultOutbox.resultId, row.resultId));
 
@@ -465,6 +466,56 @@ export class PlanStorageAdapter implements PlanRepository {
           lastErrorClass: params.reason,
         })
         .where(eq(positionPlans.planId, params.planId));
+    });
+  }
+
+  async failDelivery(
+    params: PlanPermanentFailureParams & PlanDeliveryCompletionParams,
+  ): Promise<void> {
+    await this.db.transaction(async (tx) => {
+      const outboxRows = await tx
+        .select({ planId: planResultOutbox.planId })
+        .from(planResultOutbox)
+        .where(eq(planResultOutbox.resultId, params.resultId))
+        .for('update')
+        .limit(1);
+
+      if (outboxRows.length === 0) {
+        return;
+      }
+
+      const { planId } = outboxRows[0]!;
+
+      await tx
+        .update(planResultOutbox)
+        .set({ deliveredAt: params.deliveredAt })
+        .where(eq(planResultOutbox.resultId, params.resultId));
+
+      const planRows = await tx
+        .select()
+        .from(positionPlans)
+        .where(eq(positionPlans.planId, planId))
+        .for('update');
+
+      const [planRow] = planRows;
+      if (!planRow) {
+        return;
+      }
+
+      const stored = rowToStoredPlan(planRow);
+      const state = {
+        kind: 'report-failed',
+        outcome: { kind: 'failed' },
+        executionOrigin: resolveExecutionOrigin(stored),
+      } as PlanLifecycleState;
+
+      await tx
+        .update(positionPlans)
+        .set({
+          ...relationalPatchForState(state),
+          lastErrorClass: params.reason,
+        })
+        .where(eq(positionPlans.planId, planId));
     });
   }
 

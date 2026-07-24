@@ -62,6 +62,7 @@ describe('SyncPlanExecutionResults', () => {
       rescheduleRetry: vi.fn(),
       completeDelivery: vi.fn(),
       recordPermanentFailure: vi.fn(),
+      failDelivery: vi.fn(),
       abandonDelivery: vi.fn(),
       getCurrentPlan: vi.fn(),
       getPlanActionKind: vi.fn().mockResolvedValue('HOLD'),
@@ -163,7 +164,7 @@ describe('SyncPlanExecutionResults', () => {
       await syncPlanExecutionResults(deps);
 
       // eslint-disable-next-line @typescript-eslint/unbound-method
-      expect(planRepo.recordPermanentFailure).toHaveBeenCalledTimes(1);
+      expect(planRepo.failDelivery).toHaveBeenCalledTimes(1);
       // eslint-disable-next-line @typescript-eslint/unbound-method
       expect(planRepo.completeDelivery).not.toHaveBeenCalled();
     });
@@ -201,7 +202,7 @@ describe('SyncPlanExecutionResults', () => {
       await syncPlanExecutionResults(deps);
 
       // eslint-disable-next-line @typescript-eslint/unbound-method
-      expect(planRepo.recordPermanentFailure).toHaveBeenCalledTimes(1);
+      expect(planRepo.failDelivery).toHaveBeenCalledTimes(1);
       // eslint-disable-next-line @typescript-eslint/unbound-method
       expect(planRepo.rescheduleRetry).not.toHaveBeenCalled();
     });
@@ -217,7 +218,7 @@ describe('SyncPlanExecutionResults', () => {
       await syncPlanExecutionResults(deps);
 
       // eslint-disable-next-line @typescript-eslint/unbound-method
-      expect(planRepo.recordPermanentFailure).toHaveBeenCalledTimes(1);
+      expect(planRepo.failDelivery).toHaveBeenCalledTimes(1);
     });
 
     it('marks report-failed for conflict responses', async () => {
@@ -231,7 +232,7 @@ describe('SyncPlanExecutionResults', () => {
       await syncPlanExecutionResults(deps);
 
       // eslint-disable-next-line @typescript-eslint/unbound-method
-      expect(planRepo.recordPermanentFailure).toHaveBeenCalledTimes(1);
+      expect(planRepo.failDelivery).toHaveBeenCalledTimes(1);
     });
   });
 
@@ -267,7 +268,7 @@ describe('SyncPlanExecutionResults', () => {
       await syncPlanExecutionResults(deps);
 
       // eslint-disable-next-line @typescript-eslint/unbound-method
-      expect(planRepo.recordPermanentFailure).toHaveBeenCalledTimes(1);
+      expect(planRepo.failDelivery).toHaveBeenCalledTimes(1);
       // eslint-disable-next-line @typescript-eslint/unbound-method
       expect(planRepo.completeDelivery).toHaveBeenCalledTimes(1);
     });

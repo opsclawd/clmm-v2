@@ -134,13 +134,11 @@ export async function syncPlanExecutionResults(deps: SyncPlanExecutionResultsDep
           attemptCount: claim.attemptCount,
         });
       } else if (transportResult.kind === 'permanent') {
-        await planRepository.recordPermanentFailure({
+        await planRepository.failDelivery({
           planId: claim.planId,
+          resultId: claim.resultId,
           reason: `permanent:${transportResult.reason}`,
           failedAt: clock.now(),
-        });
-        await planRepository.abandonDelivery({
-          resultId: claim.resultId,
           deliveredAt: clock.now(),
         });
         permanentlyRejected++;
@@ -151,13 +149,11 @@ export async function syncPlanExecutionResults(deps: SyncPlanExecutionResultsDep
         });
       } else {
         if (claim.attemptCount >= MAX_RESULT_RETRIES) {
-          await planRepository.recordPermanentFailure({
+          await planRepository.failDelivery({
             planId: claim.planId,
+            resultId: claim.resultId,
             reason: 'exhausted',
             failedAt: clock.now(),
-          });
-          await planRepository.abandonDelivery({
-            resultId: claim.resultId,
             deliveredAt: clock.now(),
           });
           exhausted++;
@@ -190,13 +186,11 @@ export async function syncPlanExecutionResults(deps: SyncPlanExecutionResultsDep
       });
 
       if (claim.attemptCount >= MAX_RESULT_RETRIES) {
-        await planRepository.recordPermanentFailure({
+        await planRepository.failDelivery({
           planId: claim.planId,
+          resultId: claim.resultId,
           reason: 'exhausted',
           failedAt: clock.now(),
-        });
-        await planRepository.abandonDelivery({
-          resultId: claim.resultId,
           deliveredAt: clock.now(),
         });
         exhausted++;
