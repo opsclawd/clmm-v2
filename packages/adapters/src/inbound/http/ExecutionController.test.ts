@@ -144,7 +144,7 @@ describe('ExecutionController', () => {
         ...FIXTURE_FRESH_PREVIEW,
         plan: buildExecutionPlan(direction),
       },
-      direction,
+      { kind: 'qualified-breach', breachDirection: direction },
     );
   }
 
@@ -183,7 +183,7 @@ describe('ExecutionController', () => {
     expect(result.approval).toEqual({
       attemptId: result.approval.attemptId,
       lifecycleState: { kind: 'awaiting-signature' },
-      breachDirection: LOWER_BOUND_BREACH,
+      origin: { kind: 'qualified-breach', breachDirection: LOWER_BOUND_BREACH },
     });
     const storedAttempt = await executionRepo.getAttempt(result.approval.attemptId);
     expect(storedAttempt?.previewId).toBe(previewId);
@@ -232,7 +232,7 @@ describe('ExecutionController', () => {
     await saveAttempt({
       attemptId: 'attempt-signing-payload',
       positionId: FIXTURE_POSITION_ID,
-      breachDirection: LOWER_BOUND_BREACH,
+      origin: { kind: 'qualified-breach', breachDirection: LOWER_BOUND_BREACH },
       lifecycleState: { kind: 'awaiting-signature' },
       completedSteps: [],
       transactionReferences: [],
@@ -263,7 +263,7 @@ describe('ExecutionController', () => {
     await saveAttempt({
       attemptId: 'attempt-not-signable',
       positionId: FIXTURE_POSITION_ID,
-      breachDirection: LOWER_BOUND_BREACH,
+      origin: { kind: 'qualified-breach', breachDirection: LOWER_BOUND_BREACH },
       lifecycleState: { kind: 'submitted' },
       completedSteps: [],
       transactionReferences: [],
@@ -271,7 +271,7 @@ describe('ExecutionController', () => {
     await saveAttempt({
       attemptId: 'attempt-missing-payload',
       positionId: FIXTURE_POSITION_ID,
-      breachDirection: LOWER_BOUND_BREACH,
+      origin: { kind: 'qualified-breach', breachDirection: LOWER_BOUND_BREACH },
       lifecycleState: { kind: 'awaiting-signature' },
       completedSteps: [],
       transactionReferences: [],
@@ -279,7 +279,7 @@ describe('ExecutionController', () => {
     await saveAttempt({
       attemptId: 'attempt-expired-payload',
       positionId: FIXTURE_POSITION_ID,
-      breachDirection: LOWER_BOUND_BREACH,
+      origin: { kind: 'qualified-breach', breachDirection: LOWER_BOUND_BREACH },
       lifecycleState: { kind: 'awaiting-signature' },
       completedSteps: [],
       transactionReferences: [],
@@ -314,7 +314,7 @@ describe('ExecutionController', () => {
       eventId: 'evt-wallet-history',
       positionId: FIXTURE_POSITION_ID,
       eventType: 'submitted',
-      breachDirection: LOWER_BOUND_BREACH,
+      origin: { kind: 'qualified-breach', breachDirection: LOWER_BOUND_BREACH },
       occurredAt: makeClockTimestamp(1_000_000),
       lifecycleState: { kind: 'submitted' },
       transactionReference: { signature: 'sig-wallet-history', stepKind: 'swap-assets' },
@@ -328,7 +328,7 @@ describe('ExecutionController', () => {
           eventId: 'evt-wallet-history',
           positionId: FIXTURE_POSITION_ID,
           eventType: 'submitted',
-          breachDirection: LOWER_BOUND_BREACH,
+          origin: { kind: 'qualified-breach', breachDirection: LOWER_BOUND_BREACH },
           occurredAt: makeClockTimestamp(1_000_000),
           transactionReference: { signature: 'sig-wallet-history', stepKind: 'swap-assets' },
           note: 'off-chain operational history — not an on-chain receipt or attestation',
@@ -341,7 +341,7 @@ describe('ExecutionController', () => {
     await saveAttempt({
       attemptId: 'attempt-decline',
       positionId: FIXTURE_POSITION_ID,
-      breachDirection: LOWER_BOUND_BREACH,
+      origin: { kind: 'qualified-breach', breachDirection: LOWER_BOUND_BREACH },
       lifecycleState: { kind: 'awaiting-signature' },
       completedSteps: [],
       transactionReferences: [],
@@ -360,7 +360,7 @@ describe('ExecutionController', () => {
     await saveAttempt({
       attemptId: 'attempt-decline-terminal',
       positionId: FIXTURE_POSITION_ID,
-      breachDirection: LOWER_BOUND_BREACH,
+      origin: { kind: 'qualified-breach', breachDirection: LOWER_BOUND_BREACH },
       lifecycleState: { kind: 'submitted' },
       completedSteps: [],
       transactionReferences: [],
@@ -378,7 +378,7 @@ describe('ExecutionController', () => {
     await saveAttempt({
       attemptId: 'attempt-interrupt',
       positionId: FIXTURE_POSITION_ID,
-      breachDirection: LOWER_BOUND_BREACH,
+      origin: { kind: 'qualified-breach', breachDirection: LOWER_BOUND_BREACH },
       lifecycleState: { kind: 'awaiting-signature' },
       completedSteps: [],
       transactionReferences: [],
@@ -397,7 +397,7 @@ describe('ExecutionController', () => {
     await saveAttempt({
       attemptId: 'attempt-interrupt-terminal',
       positionId: FIXTURE_POSITION_ID,
-      breachDirection: LOWER_BOUND_BREACH,
+      origin: { kind: 'qualified-breach', breachDirection: LOWER_BOUND_BREACH },
       lifecycleState: { kind: 'submitted' },
       completedSteps: [],
       transactionReferences: [],
@@ -415,7 +415,7 @@ describe('ExecutionController', () => {
     await saveAttempt({
       attemptId: 'attempt-upper',
       positionId: FIXTURE_POSITION_ID,
-      breachDirection: LOWER_BOUND_BREACH,
+      origin: { kind: 'qualified-breach', breachDirection: LOWER_BOUND_BREACH },
       lifecycleState: { kind: 'submitted' },
       completedSteps: [],
       transactionReferences: [],
@@ -424,14 +424,17 @@ describe('ExecutionController', () => {
       eventId: 'evt-upper',
       positionId: FIXTURE_POSITION_ID,
       eventType: 'submitted',
-      breachDirection: UPPER_BOUND_BREACH,
+      origin: { kind: 'qualified-breach', breachDirection: UPPER_BOUND_BREACH },
       occurredAt: makeClockTimestamp(1_000_000),
       lifecycleState: { kind: 'submitted' },
     });
 
     const result = await controller.getExecution('attempt-upper');
 
-    expect(result.execution.breachDirection).toEqual(LOWER_BOUND_BREACH);
+    expect(result.execution.origin).toEqual({
+      kind: 'qualified-breach',
+      breachDirection: LOWER_BOUND_BREACH,
+    });
     expect(result.execution.postExitPosture).toEqual({ kind: 'exit-to-usdc' });
   });
 
@@ -439,7 +442,7 @@ describe('ExecutionController', () => {
     await saveAttempt({
       attemptId: 'attempt-no-direction',
       positionId: FIXTURE_POSITION_ID,
-      breachDirection: UPPER_BOUND_BREACH,
+      origin: { kind: 'qualified-breach', breachDirection: UPPER_BOUND_BREACH },
       lifecycleState: { kind: 'submitted' },
       completedSteps: [],
       transactionReferences: [],
@@ -447,7 +450,10 @@ describe('ExecutionController', () => {
 
     const result = await controller.getExecution('attempt-no-direction');
 
-    expect(result.execution.breachDirection).toEqual(UPPER_BOUND_BREACH);
+    expect(result.execution.origin).toEqual({
+      kind: 'qualified-breach',
+      breachDirection: UPPER_BOUND_BREACH,
+    });
     expect(result.execution.postExitPosture).toEqual({ kind: 'exit-to-sol' });
   });
 
@@ -455,7 +461,7 @@ describe('ExecutionController', () => {
     await saveAttempt({
       attemptId: 'attempt-submit',
       positionId: FIXTURE_POSITION_ID,
-      breachDirection: UPPER_BOUND_BREACH,
+      origin: { kind: 'qualified-breach', breachDirection: UPPER_BOUND_BREACH },
       lifecycleState: { kind: 'awaiting-signature' },
       completedSteps: [],
       transactionReferences: [],
@@ -486,19 +492,25 @@ describe('ExecutionController', () => {
     expect(storedAttempt?.transactionReferences).toEqual([
       { signature: 'sig-submit-1', stepKind: 'swap-assets' },
     ]);
-    expect(storedAttempt?.breachDirection).toEqual(UPPER_BOUND_BREACH);
+    expect(storedAttempt?.origin).toEqual({
+      kind: 'qualified-breach',
+      breachDirection: UPPER_BOUND_BREACH,
+    });
 
     const submittedEvent = historyRepo.events.find(
       (event: HistoryEvent) => event.eventType === 'submitted',
     );
-    expect(submittedEvent?.breachDirection).toEqual(UPPER_BOUND_BREACH);
+    expect(submittedEvent?.origin).toEqual({
+      kind: 'qualified-breach',
+      breachDirection: UPPER_BOUND_BREACH,
+    });
   });
 
   it('rejects submit when caller direction conflicts with the attempt-persisted direction', async () => {
     await saveAttempt({
       attemptId: 'attempt-mismatch',
       positionId: FIXTURE_POSITION_ID,
-      breachDirection: UPPER_BOUND_BREACH,
+      origin: { kind: 'qualified-breach', breachDirection: UPPER_BOUND_BREACH },
       lifecycleState: { kind: 'awaiting-signature' },
       completedSteps: [],
       transactionReferences: [],
@@ -525,7 +537,7 @@ describe('ExecutionController', () => {
     await saveAttempt({
       attemptId: 'attempt-missing-abandon-direction',
       positionId: FIXTURE_POSITION_ID,
-      breachDirection: LOWER_BOUND_BREACH,
+      origin: { kind: 'qualified-breach', breachDirection: LOWER_BOUND_BREACH },
       lifecycleState: { kind: 'awaiting-signature' },
       completedSteps: [],
       transactionReferences: [],
@@ -534,14 +546,17 @@ describe('ExecutionController', () => {
     const result = await controller.abandonExecution('attempt-missing-abandon-direction', {});
 
     expect(result.abandoned).toBe(true);
-    expect(historyRepo.events.at(-1)?.breachDirection).toEqual(LOWER_BOUND_BREACH);
+    expect(historyRepo.events.at(-1)?.origin).toEqual({
+      kind: 'qualified-breach',
+      breachDirection: LOWER_BOUND_BREACH,
+    });
   });
 
   it('rejects submit when payloadVersion does not match the stored prepared payload', async () => {
     await saveAttempt({
       attemptId: 'attempt-version-mismatch',
       positionId: FIXTURE_POSITION_ID,
-      breachDirection: LOWER_BOUND_BREACH,
+      origin: { kind: 'qualified-breach', breachDirection: LOWER_BOUND_BREACH },
       lifecycleState: { kind: 'awaiting-signature' },
       completedSteps: [],
       transactionReferences: [],
@@ -568,7 +583,7 @@ describe('ExecutionController', () => {
     await saveAttempt({
       attemptId: 'attempt-missing-prepared-payload',
       positionId: FIXTURE_POSITION_ID,
-      breachDirection: LOWER_BOUND_BREACH,
+      origin: { kind: 'qualified-breach', breachDirection: LOWER_BOUND_BREACH },
       lifecycleState: { kind: 'awaiting-signature' },
       completedSteps: [],
       transactionReferences: [],
@@ -587,7 +602,7 @@ describe('ExecutionController', () => {
     await saveAttempt({
       attemptId: 'attempt-missing-version',
       positionId: FIXTURE_POSITION_ID,
-      breachDirection: LOWER_BOUND_BREACH,
+      origin: { kind: 'qualified-breach', breachDirection: LOWER_BOUND_BREACH },
       lifecycleState: { kind: 'awaiting-signature' },
       completedSteps: [],
       transactionReferences: [],
@@ -613,7 +628,7 @@ describe('ExecutionController', () => {
     await saveAttempt({
       attemptId: 'attempt-legacy-submit',
       positionId: FIXTURE_POSITION_ID,
-      breachDirection: LOWER_BOUND_BREACH,
+      origin: { kind: 'qualified-breach', breachDirection: LOWER_BOUND_BREACH },
       lifecycleState: { kind: 'awaiting-signature' },
       completedSteps: [],
       transactionReferences: [],
@@ -633,7 +648,7 @@ describe('ExecutionController', () => {
     await saveAttempt({
       attemptId: 'attempt-expired-payload',
       positionId: FIXTURE_POSITION_ID,
-      breachDirection: LOWER_BOUND_BREACH,
+      origin: { kind: 'qualified-breach', breachDirection: LOWER_BOUND_BREACH },
       lifecycleState: { kind: 'awaiting-signature' },
       completedSteps: [],
       transactionReferences: [],
@@ -661,7 +676,7 @@ describe('ExecutionController', () => {
     await saveAttempt({
       attemptId: 'attempt-matching-version',
       positionId: FIXTURE_POSITION_ID,
-      breachDirection: LOWER_BOUND_BREACH,
+      origin: { kind: 'qualified-breach', breachDirection: LOWER_BOUND_BREACH },
       lifecycleState: { kind: 'awaiting-signature' },
       completedSteps: [],
       transactionReferences: [],
@@ -689,7 +704,7 @@ describe('ExecutionController', () => {
     await saveAttempt({
       attemptId: 'attempt-abandon-history',
       positionId: FIXTURE_POSITION_ID,
-      breachDirection: LOWER_BOUND_BREACH,
+      origin: { kind: 'qualified-breach', breachDirection: LOWER_BOUND_BREACH },
       lifecycleState: { kind: 'awaiting-signature' },
       completedSteps: [],
       transactionReferences: [],
@@ -698,7 +713,7 @@ describe('ExecutionController', () => {
       eventId: 'evt-abandon-history',
       positionId: FIXTURE_POSITION_ID,
       eventType: 'signature-requested',
-      breachDirection: UPPER_BOUND_BREACH,
+      origin: { kind: 'qualified-breach', breachDirection: UPPER_BOUND_BREACH },
       occurredAt: makeClockTimestamp(1_000_001),
       lifecycleState: { kind: 'awaiting-signature' },
     });
@@ -706,14 +721,17 @@ describe('ExecutionController', () => {
     const result = await controller.abandonExecution('attempt-abandon-history', {});
 
     expect(result.abandoned).toBe(true);
-    expect(historyRepo.events.at(-1)?.breachDirection).toEqual(LOWER_BOUND_BREACH);
+    expect(historyRepo.events.at(-1)?.origin).toEqual({
+      kind: 'qualified-breach',
+      breachDirection: LOWER_BOUND_BREACH,
+    });
   });
 
   it('rejects abandon when caller direction conflicts with the attempt-persisted direction', async () => {
     await saveAttempt({
       attemptId: 'attempt-abandon-mismatch',
       positionId: FIXTURE_POSITION_ID,
-      breachDirection: UPPER_BOUND_BREACH,
+      origin: { kind: 'qualified-breach', breachDirection: UPPER_BOUND_BREACH },
       lifecycleState: { kind: 'awaiting-signature' },
       completedSteps: [],
       transactionReferences: [],
@@ -730,7 +748,7 @@ describe('ExecutionController', () => {
     await saveAttempt({
       attemptId: 'attempt-bad-payload',
       positionId: FIXTURE_POSITION_ID,
-      breachDirection: LOWER_BOUND_BREACH,
+      origin: { kind: 'qualified-breach', breachDirection: LOWER_BOUND_BREACH },
       lifecycleState: { kind: 'awaiting-signature' },
       completedSteps: [],
       transactionReferences: [],
@@ -757,7 +775,7 @@ describe('ExecutionController', () => {
     await saveAttempt({
       attemptId: 'attempt-invalid-body',
       positionId: FIXTURE_POSITION_ID,
-      breachDirection: LOWER_BOUND_BREACH,
+      origin: { kind: 'qualified-breach', breachDirection: LOWER_BOUND_BREACH },
       lifecycleState: { kind: 'awaiting-signature' },
       completedSteps: [],
       transactionReferences: [],
@@ -779,7 +797,7 @@ describe('ExecutionController', () => {
       await saveAttempt({
         attemptId,
         positionId: FIXTURE_POSITION_ID,
-        breachDirection: direction,
+        origin: { kind: 'qualified-breach', breachDirection: direction },
         lifecycleState: { kind: 'awaiting-signature' },
         completedSteps: [],
         transactionReferences: [],

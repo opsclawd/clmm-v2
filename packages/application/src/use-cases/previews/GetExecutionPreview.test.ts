@@ -27,13 +27,16 @@ describe('GetExecutionPreview', () => {
     previewId = result.previewId;
   });
 
-  it('returns the preview with positionId and breachDirection when it exists', async () => {
+  it('returns the preview with positionId and origin when it exists', async () => {
     const result = await getExecutionPreview({ previewId, executionRepo });
     expect(result.kind).toBe('found');
     if (result.kind === 'found') {
       expect(result.previewId).toBe(previewId);
       expect(result.positionId).toBe(FIXTURE_POSITION_ID);
-      expect(result.breachDirection.kind).toBe('lower-bound-breach');
+      expect(result.origin.kind).toBe('qualified-breach');
+      if (result.origin.kind === 'qualified-breach') {
+        expect(result.origin.breachDirection.kind).toBe('lower-bound-breach');
+      }
       expect(result.preview.plan).toBeDefined();
     }
   });

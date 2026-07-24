@@ -45,7 +45,7 @@ describe('SubmittedAttemptSweepHandler', () => {
     await executionRepo.saveAttempt({
       attemptId: 'attempt-1',
       positionId: FIXTURE_POSITION_ID,
-      breachDirection: LOWER_BOUND_BREACH,
+      origin: { kind: 'qualified-breach', breachDirection: LOWER_BOUND_BREACH },
       lifecycleState: { kind: 'submitted' },
       completedSteps: [],
       transactionReferences: [],
@@ -88,7 +88,7 @@ describe('SubmittedAttemptSweepHandler', () => {
     await executionRepo.saveAttempt({
       attemptId: 'attempt-1',
       positionId: FIXTURE_POSITION_ID,
-      breachDirection: LOWER_BOUND_BREACH,
+      origin: { kind: 'qualified-breach', breachDirection: LOWER_BOUND_BREACH },
       lifecycleState: { kind: 'submitted' },
       completedSteps: [],
       transactionReferences: [],
@@ -96,7 +96,7 @@ describe('SubmittedAttemptSweepHandler', () => {
     await executionRepo.saveAttempt({
       attemptId: 'attempt-2',
       positionId: FIXTURE_POSITION_ID,
-      breachDirection: LOWER_BOUND_BREACH,
+      origin: { kind: 'qualified-breach', breachDirection: LOWER_BOUND_BREACH },
       lifecycleState: { kind: 'submitted' },
       completedSteps: [],
       transactionReferences: [],

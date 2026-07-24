@@ -26,7 +26,7 @@ describe('RecordExecutionAbandonment', () => {
     await executionRepo.saveAttempt({
       attemptId: 'attempt-abandon-1',
       positionId: FIXTURE_POSITION_ID,
-      breachDirection: LOWER_BOUND_BREACH,
+      origin: { kind: 'qualified-breach', breachDirection: LOWER_BOUND_BREACH },
       lifecycleState: { kind: 'awaiting-signature' },
       completedSteps: [],
       transactionReferences: [],
@@ -37,7 +37,7 @@ describe('RecordExecutionAbandonment', () => {
     const result = await recordExecutionAbandonment({
       attemptId: 'attempt-abandon-1',
       positionId: FIXTURE_POSITION_ID,
-      breachDirection: LOWER_BOUND_BREACH,
+      origin: { kind: 'qualified-breach', breachDirection: LOWER_BOUND_BREACH },
       executionRepo,
       historyRepo,
       clock,
@@ -52,7 +52,7 @@ describe('RecordExecutionAbandonment', () => {
     await recordExecutionAbandonment({
       attemptId: 'attempt-abandon-1',
       positionId: FIXTURE_POSITION_ID,
-      breachDirection: LOWER_BOUND_BREACH,
+      origin: { kind: 'qualified-breach', breachDirection: LOWER_BOUND_BREACH },
       executionRepo,
       historyRepo,
       clock,
@@ -67,7 +67,7 @@ describe('RecordExecutionAbandonment', () => {
       eventId: 'evt-existing',
       positionId: FIXTURE_POSITION_ID,
       eventType: 'submitted',
-      breachDirection: UPPER_BOUND_BREACH,
+      origin: { kind: 'qualified-breach', breachDirection: UPPER_BOUND_BREACH },
       occurredAt: makeClockTimestamp(1_000_000),
       lifecycleState: { kind: 'submitted' },
     });
@@ -75,21 +75,24 @@ describe('RecordExecutionAbandonment', () => {
     await recordExecutionAbandonment({
       attemptId: 'attempt-abandon-1',
       positionId: FIXTURE_POSITION_ID,
-      breachDirection: LOWER_BOUND_BREACH,
+      origin: { kind: 'qualified-breach', breachDirection: LOWER_BOUND_BREACH },
       executionRepo,
       historyRepo,
       clock,
       ids,
     });
 
-    expect(historyRepo.events[1]?.breachDirection).toBe(LOWER_BOUND_BREACH);
+    expect(historyRepo.events[1]?.origin).toEqual({
+      kind: 'qualified-breach',
+      breachDirection: LOWER_BOUND_BREACH,
+    });
   });
 
   it('uses the stored attempt positionId for the history event after validating the caller input', async () => {
     await recordExecutionAbandonment({
       attemptId: 'attempt-abandon-1',
       positionId: FIXTURE_POSITION_ID,
-      breachDirection: LOWER_BOUND_BREACH,
+      origin: { kind: 'qualified-breach', breachDirection: LOWER_BOUND_BREACH },
       executionRepo,
       historyRepo,
       clock,
@@ -102,7 +105,7 @@ describe('RecordExecutionAbandonment', () => {
     const result = await recordExecutionAbandonment({
       attemptId: 'no-such',
       positionId: FIXTURE_POSITION_ID,
-      breachDirection: LOWER_BOUND_BREACH,
+      origin: { kind: 'qualified-breach', breachDirection: LOWER_BOUND_BREACH },
       executionRepo,
       historyRepo,
       clock,
@@ -118,7 +121,7 @@ describe('RecordExecutionAbandonment', () => {
       const result = await recordExecutionAbandonment({
         attemptId: 'attempt-abandon-1',
         positionId: FIXTURE_POSITION_ID,
-        breachDirection: LOWER_BOUND_BREACH,
+        origin: { kind: 'qualified-breach', breachDirection: LOWER_BOUND_BREACH },
         executionRepo,
         historyRepo,
         clock,
@@ -137,7 +140,7 @@ describe('RecordExecutionAbandonment', () => {
       recordExecutionAbandonment({
         attemptId: 'attempt-abandon-1',
         positionId: makePositionId('other-position'),
-        breachDirection: LOWER_BOUND_BREACH,
+        origin: { kind: 'qualified-breach', breachDirection: LOWER_BOUND_BREACH },
         executionRepo,
         historyRepo,
         clock,
@@ -147,17 +150,17 @@ describe('RecordExecutionAbandonment', () => {
     expect(historyRepo.events).toHaveLength(0);
   });
 
-  it('fails fast when caller breachDirection mismatches the stored attempt direction', async () => {
+  it('fails fast when caller origin mismatches the stored attempt origin', async () => {
     await expect(
       recordExecutionAbandonment({
         attemptId: 'attempt-abandon-1',
         positionId: FIXTURE_POSITION_ID,
-        breachDirection: UPPER_BOUND_BREACH,
+        origin: { kind: 'qualified-breach', breachDirection: UPPER_BOUND_BREACH },
         executionRepo,
         historyRepo,
         clock,
         ids,
       }),
-    ).rejects.toThrow('breachDirection mismatch');
+    ).rejects.toThrow('origin mismatch');
   });
 });

@@ -1,5 +1,9 @@
-import type { PositionId, BreachDirection, ClockTimestamp } from '../shared/index.js';
-import type { ExecutionLifecycleState, TransactionReference } from '../execution/index.js';
+import type { PositionId, ClockTimestamp } from '../shared/index.js';
+import type {
+  ExecutionLifecycleState,
+  TransactionReference,
+  ExecutionOrigin,
+} from '../execution/index.js';
 
 export type HistoryEventType =
   | 'trigger-created'
@@ -20,7 +24,7 @@ export type HistoryEvent = {
   readonly eventId: string;
   readonly positionId: PositionId;
   readonly eventType: HistoryEventType;
-  readonly breachDirection: BreachDirection;
+  readonly origin: ExecutionOrigin;
   readonly occurredAt: ClockTimestamp;
   readonly lifecycleState?: ExecutionLifecycleState;
   readonly transactionReference?: TransactionReference;
@@ -34,7 +38,7 @@ export type HistoryTimeline = {
 
 export type ExecutionOutcomeSummary = {
   readonly positionId: PositionId;
-  readonly breachDirection: BreachDirection;
+  readonly origin: ExecutionOrigin;
   readonly finalState: ExecutionLifecycleState;
   readonly transactionReferences: readonly TransactionReference[];
   readonly completedAt: ClockTimestamp;

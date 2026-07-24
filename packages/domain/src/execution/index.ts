@@ -56,12 +56,6 @@ export type ExecutionPreview = {
   readonly estimatedAt: number;
 };
 
-export type ExecutionAttempt = {
-  readonly lifecycleState: ExecutionLifecycleState;
-  readonly completedSteps: ReadonlyArray<ExecutionStep['kind']>;
-  readonly transactionReferences: readonly TransactionReference[];
-};
-
 export type ExecutionOrigin =
   | {
       readonly kind: 'qualified-breach';
@@ -73,3 +67,10 @@ export type ExecutionOrigin =
       readonly canonicalHash: CanonicalHash;
       readonly canonicalExitIntent: 'exit-to-usdc' | 'exit-to-sol';
     };
+
+export type ExecutionAttempt = {
+  readonly origin: ExecutionOrigin;
+  readonly lifecycleState: ExecutionLifecycleState;
+  readonly completedSteps: ReadonlyArray<ExecutionStep['kind']>;
+  readonly transactionReferences: readonly TransactionReference[];
+};

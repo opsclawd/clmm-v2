@@ -13,6 +13,7 @@ import type {
   ExecutionPreview,
   ExecutionAttempt,
   ExecutionLifecycleState,
+  ExecutionOrigin,
   TransactionReference,
   SwapInstruction,
   ExecutionStep,
@@ -153,7 +154,6 @@ export interface TriggerRepository {
 export type StoredExecutionAttempt = ExecutionAttempt & {
   attemptId: string;
   positionId: PositionId;
-  breachDirection: BreachDirection;
   episodeId?: BreachEpisodeId;
   previewId?: string;
 };
@@ -162,12 +162,12 @@ export interface ExecutionRepository {
   savePreview(
     positionId: PositionId,
     preview: ExecutionPreview,
-    breachDirection: BreachDirection,
+    origin: ExecutionOrigin,
   ): Promise<{ previewId: string }>;
   getPreview(previewId: string): Promise<{
     preview: ExecutionPreview;
     positionId: PositionId;
-    breachDirection: BreachDirection;
+    origin: ExecutionOrigin;
   } | null>;
   saveAttempt(attempt: StoredExecutionAttempt): Promise<void>;
   getAttempt(attemptId: string): Promise<StoredExecutionAttempt | null>;

@@ -176,7 +176,7 @@ describe('BreachScanJobHandler', () => {
     await executionRepo.saveAttempt({
       attemptId: 'attempt-recover-1',
       positionId: FIXTURE_POSITION_ID,
-      breachDirection: LOWER_BOUND_BREACH,
+      origin: { kind: 'qualified-breach', breachDirection: LOWER_BOUND_BREACH },
       episodeId,
       lifecycleState: { kind: 'awaiting-signature' },
       completedSteps: [],
@@ -207,7 +207,7 @@ describe('BreachScanJobHandler', () => {
     await executionRepo.saveAttempt({
       attemptId: 'attempt-reversal-1',
       positionId: FIXTURE_POSITION_ID,
-      breachDirection: LOWER_BOUND_BREACH,
+      origin: { kind: 'qualified-breach', breachDirection: LOWER_BOUND_BREACH },
       episodeId,
       lifecycleState: { kind: 'awaiting-signature' },
       completedSteps: [],
@@ -240,7 +240,7 @@ describe('BreachScanJobHandler', () => {
     await executionRepo.saveAttempt({
       attemptId: 'attempt-integrity-1',
       positionId: FIXTURE_POSITION_ID,
-      breachDirection: LOWER_BOUND_BREACH,
+      origin: { kind: 'qualified-breach', breachDirection: LOWER_BOUND_BREACH },
       episodeId,
       lifecycleState: { kind: 'awaiting-signature' },
       completedSteps: [],
@@ -249,7 +249,7 @@ describe('BreachScanJobHandler', () => {
     await executionRepo.saveAttempt({
       attemptId: 'attempt-integrity-2',
       positionId: FIXTURE_POSITION_ID,
-      breachDirection: LOWER_BOUND_BREACH,
+      origin: { kind: 'qualified-breach', breachDirection: LOWER_BOUND_BREACH },
       episodeId,
       lifecycleState: { kind: 'awaiting-signature' },
       completedSteps: [],
@@ -288,7 +288,7 @@ describe('BreachScanJobHandler', () => {
     await executionRepo.saveAttempt({
       attemptId: 'attempt-mismatched-position',
       positionId: mismatchedPositionId,
-      breachDirection: LOWER_BOUND_BREACH,
+      origin: { kind: 'qualified-breach', breachDirection: LOWER_BOUND_BREACH },
       episodeId,
       lifecycleState: { kind: 'awaiting-signature' },
       completedSteps: [],

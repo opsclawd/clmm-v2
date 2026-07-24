@@ -10,7 +10,7 @@ describe('ResumeExecutionAttempt', () => {
     const attempt: StoredExecutionAttempt = {
       attemptId: 'attempt-1',
       positionId: FIXTURE_POSITION_ID,
-      breachDirection: LOWER_BOUND_BREACH,
+      origin: { kind: 'qualified-breach', breachDirection: LOWER_BOUND_BREACH },
       lifecycleState: { kind: 'awaiting-signature' },
       completedSteps: [],
       transactionReferences: [],
@@ -26,7 +26,10 @@ describe('ResumeExecutionAttempt', () => {
     if (result.kind === 'resumable') {
       expect(result.attemptId).toBe('attempt-1');
       expect(result.positionId).toBe(FIXTURE_POSITION_ID);
-      expect(result.breachDirection).toEqual(LOWER_BOUND_BREACH);
+      expect(result.origin).toEqual({
+        kind: 'qualified-breach',
+        breachDirection: LOWER_BOUND_BREACH,
+      });
     }
   });
 
@@ -45,7 +48,7 @@ describe('ResumeExecutionAttempt', () => {
     const attempt: StoredExecutionAttempt = {
       attemptId: 'attempt-1',
       positionId: FIXTURE_POSITION_ID,
-      breachDirection: LOWER_BOUND_BREACH,
+      origin: { kind: 'qualified-breach', breachDirection: LOWER_BOUND_BREACH },
       lifecycleState: { kind: 'confirmed' },
       completedSteps: ['remove-liquidity', 'collect-fees', 'swap-assets'],
       transactionReferences: [],
@@ -68,7 +71,7 @@ describe('ResumeExecutionAttempt', () => {
     const attempt: StoredExecutionAttempt = {
       attemptId: 'attempt-1',
       positionId: FIXTURE_POSITION_ID,
-      breachDirection: LOWER_BOUND_BREACH,
+      origin: { kind: 'qualified-breach', breachDirection: LOWER_BOUND_BREACH },
       lifecycleState: { kind: 'submitted' },
       completedSteps: [],
       transactionReferences: [{ signature: 'sig-1', stepKind: 'remove-liquidity' }],

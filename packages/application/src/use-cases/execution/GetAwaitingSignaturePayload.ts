@@ -57,7 +57,7 @@ export async function getAwaitingSignaturePayload(
       eventId: input.ids.generateId(),
       positionId: attempt.positionId,
       eventType: 'preview-expired',
-      breachDirection: attempt.breachDirection,
+      origin: attempt.origin,
       occurredAt: input.clock.now(),
       lifecycleState: { kind: 'expired' },
     });

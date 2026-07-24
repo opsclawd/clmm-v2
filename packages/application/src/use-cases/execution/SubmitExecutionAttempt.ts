@@ -40,7 +40,7 @@ export async function submitExecutionAttempt(params: {
       eventId: ids.generateId(),
       positionId: attempt.positionId,
       eventType: 'preview-expired',
-      breachDirection: attempt.breachDirection,
+      origin: attempt.origin,
       occurredAt: now,
       lifecycleState: { kind: 'expired' },
     });
@@ -70,7 +70,7 @@ export async function submitExecutionAttempt(params: {
       eventId: ids.generateId(),
       positionId: attempt.positionId,
       eventType: 'submitted',
-      breachDirection: attempt.breachDirection,
+      origin: attempt.origin,
       occurredAt: clock.now(),
       lifecycleState: { kind: 'submitted' },
       transactionReference: firstReference,

@@ -246,8 +246,8 @@ function SigningRouteBody() {
       {...(displayedExecution != null
         ? {
             lifecycleState: displayedExecution.lifecycleState,
-            ...(displayedExecution.breachDirection != null
-              ? { breachDirection: displayedExecution.breachDirection }
+            ...(displayedExecution.origin.kind === 'qualified-breach'
+              ? { breachDirection: displayedExecution.origin.breachDirection }
               : {}),
             ...(displayedExecution.retryEligible != null
               ? { retryEligible: displayedExecution.retryEligible }

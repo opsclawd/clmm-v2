@@ -67,7 +67,7 @@ describe('OffChainHistoryStorageAdapter', () => {
         eventId: 'evt-1',
         positionId: FIXTURE_POSITION_ID,
         eventType: 'submitted',
-        breachDirection: LOWER_BOUND_BREACH,
+        origin: { kind: 'qualified-breach', breachDirection: LOWER_BOUND_BREACH },
         occurredAt: 1000,
         lifecycleState: { kind: 'submitted' },
         transactionReference: { signature: 'sig-1', stepKind: 'remove-liquidity' },
@@ -76,7 +76,7 @@ describe('OffChainHistoryStorageAdapter', () => {
         eventId: 'evt-2',
         positionId: secondPositionId,
         eventType: 'failed',
-        breachDirection: UPPER_BOUND_BREACH,
+        origin: { kind: 'qualified-breach', breachDirection: UPPER_BOUND_BREACH },
         occurredAt: 2000,
       },
     ]);
@@ -140,6 +140,6 @@ describe('OffChainHistoryStorageAdapter', () => {
     expect(src).toContain('positionId');
     // A real implementation will reference terminal event types
     expect(src).toContain('confirmed');
-    expect(src).toContain('breachDirection');
+    expect(src).toContain('origin');
   });
 });

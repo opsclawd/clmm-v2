@@ -10,7 +10,10 @@ function makeEvent(
     eventId: overrides.eventId,
     positionId: overrides.positionId ?? makePositionId('pos-1'),
     eventType: overrides.eventType ?? 'trigger-created',
-    breachDirection: overrides.breachDirection ?? { kind: 'lower-bound-breach' },
+    origin: overrides.origin ?? {
+      kind: 'qualified-breach',
+      breachDirection: { kind: 'lower-bound-breach' },
+    },
     occurredAt: makeClockTimestamp(overrides.occurredAt),
     note: 'off-chain operational history — not an on-chain receipt or attestation',
   };

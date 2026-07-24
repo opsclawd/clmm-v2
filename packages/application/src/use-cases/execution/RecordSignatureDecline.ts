@@ -33,7 +33,7 @@ export async function recordSignatureDecline(params: {
     eventId: ids.generateId(),
     positionId: attempt.positionId,
     eventType: 'signature-declined',
-    breachDirection: attempt.breachDirection,
+    origin: attempt.origin,
     occurredAt: clock.now(),
     lifecycleState: { kind: 'abandoned' },
   });

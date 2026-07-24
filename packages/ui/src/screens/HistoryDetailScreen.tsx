@@ -10,8 +10,14 @@ type Props = {
   events?: HistoryEventDto[];
 };
 
-function breachDirectionLabel(direction: { kind: string }): string {
-  return direction.kind === 'lower-bound-breach'
+function originLabel(event: HistoryEventDto): string {
+  const origin = event.origin;
+  if (origin.kind === 'regime-plan') {
+    return origin.canonicalExitIntent === 'exit-to-sol'
+      ? 'Regime Plan Exit — Exit to SOL'
+      : 'Regime Plan Exit — Exit to USDC';
+  }
+  return origin.breachDirection.kind === 'lower-bound-breach'
     ? 'Lower Bound Breach — Exit to USDC'
     : 'Upper Bound Breach — Exit to SOL';
 }
@@ -62,7 +68,7 @@ export function HistoryDetailScreen({ positionId, events }: Props): JSX.Element 
               fontWeight: typography.fontWeight.semibold,
             }}
           >
-            {breachDirectionLabel(eventItems[0].breachDirection)}
+            {originLabel(eventItems[0])}
           </Text>
         </View>
       ) : null}

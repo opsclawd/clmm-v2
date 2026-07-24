@@ -23,7 +23,7 @@ describe('SubmitExecutionAttempt', () => {
     const attempt: StoredExecutionAttempt = {
       attemptId: 'attempt-1',
       positionId: FIXTURE_POSITION_ID,
-      breachDirection: LOWER_BOUND_BREACH,
+      origin: { kind: 'qualified-breach', breachDirection: LOWER_BOUND_BREACH },
       lifecycleState: { kind: 'awaiting-signature' },
       completedSteps: [],
       transactionReferences: [],
@@ -74,7 +74,7 @@ describe('SubmitExecutionAttempt', () => {
     const attempt: StoredExecutionAttempt = {
       attemptId: 'attempt-1',
       positionId: FIXTURE_POSITION_ID,
-      breachDirection: LOWER_BOUND_BREACH,
+      origin: { kind: 'qualified-breach', breachDirection: LOWER_BOUND_BREACH },
       lifecycleState: { kind: 'awaiting-signature' },
       completedSteps: [],
       transactionReferences: [],
@@ -124,7 +124,7 @@ describe('SubmitExecutionAttempt', () => {
     const attempt: StoredExecutionAttempt = {
       attemptId: 'attempt-at-boundary',
       positionId: FIXTURE_POSITION_ID,
-      breachDirection: LOWER_BOUND_BREACH,
+      origin: { kind: 'qualified-breach', breachDirection: LOWER_BOUND_BREACH },
       lifecycleState: { kind: 'awaiting-signature' },
       completedSteps: [],
       transactionReferences: [],
@@ -166,7 +166,7 @@ describe('SubmitExecutionAttempt', () => {
     await executionRepo.saveAttempt({
       attemptId: 'attempt-1',
       positionId: FIXTURE_POSITION_ID,
-      breachDirection: LOWER_BOUND_BREACH,
+      origin: { kind: 'qualified-breach', breachDirection: LOWER_BOUND_BREACH },
       lifecycleState: { kind: 'awaiting-signature' },
       completedSteps: [],
       transactionReferences: [],
@@ -220,7 +220,7 @@ describe('SubmitExecutionAttempt', () => {
     const attempt: StoredExecutionAttempt = {
       attemptId: 'attempt-1',
       positionId: FIXTURE_POSITION_ID,
-      breachDirection: LOWER_BOUND_BREACH,
+      origin: { kind: 'qualified-breach', breachDirection: LOWER_BOUND_BREACH },
       lifecycleState: { kind: 'submitted' },
       completedSteps: [],
       transactionReferences: [],
@@ -266,13 +266,13 @@ describe('SubmitExecutionAttempt', () => {
         freshness: { kind: 'fresh', expiresAt: Date.now() + 60_000 },
         estimatedAt: Date.now(),
       },
-      LOWER_BOUND_BREACH,
+      { kind: 'qualified-breach', breachDirection: LOWER_BOUND_BREACH },
     );
 
     const attempt: StoredExecutionAttempt = {
       attemptId: 'attempt-with-preview',
       positionId: FIXTURE_POSITION_ID,
-      breachDirection: LOWER_BOUND_BREACH,
+      origin: { kind: 'qualified-breach', breachDirection: LOWER_BOUND_BREACH },
       lifecycleState: { kind: 'awaiting-signature' },
       completedSteps: [],
       transactionReferences: [],
@@ -308,7 +308,7 @@ describe('SubmitExecutionAttempt', () => {
     const attempt: StoredExecutionAttempt = {
       attemptId: 'attempt-no-preview',
       positionId: FIXTURE_POSITION_ID,
-      breachDirection: LOWER_BOUND_BREACH,
+      origin: { kind: 'qualified-breach', breachDirection: LOWER_BOUND_BREACH },
       lifecycleState: { kind: 'awaiting-signature' },
       completedSteps: [],
       transactionReferences: [],

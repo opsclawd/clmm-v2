@@ -62,7 +62,7 @@ describe('RequestWalletSignature', () => {
     expect(result).toEqual({
       attemptId: 'fake-1',
       lifecycleState: { kind: 'awaiting-signature' },
-      breachDirection: LOWER_BOUND_BREACH,
+      origin: { kind: 'qualified-breach', breachDirection: LOWER_BOUND_BREACH },
     });
     expect(result).not.toHaveProperty('kind');
     expect(result).not.toHaveProperty('signedPayload');
@@ -71,7 +71,7 @@ describe('RequestWalletSignature', () => {
       attemptId: result.attemptId,
       previewId,
       positionId: FIXTURE_POSITION_ID,
-      breachDirection: LOWER_BOUND_BREACH,
+      origin: { kind: 'qualified-breach', breachDirection: LOWER_BOUND_BREACH },
       episodeId: FIXTURE_BREACH_EPISODE_ID,
       lifecycleState: { kind: 'awaiting-signature' },
       completedSteps: [],
@@ -90,7 +90,7 @@ describe('RequestWalletSignature', () => {
         eventId: 'fake-3',
         positionId: FIXTURE_POSITION_ID,
         eventType: 'signature-requested',
-        breachDirection: LOWER_BOUND_BREACH,
+        origin: { kind: 'qualified-breach', breachDirection: LOWER_BOUND_BREACH },
         occurredAt: 1_000_000,
         lifecycleState: { kind: 'awaiting-signature' },
       },

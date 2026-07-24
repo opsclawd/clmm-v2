@@ -35,7 +35,7 @@ export async function recordSignatureInterruption(
     eventId: input.ids.generateId(),
     positionId: attempt.positionId,
     eventType: 'signature-interrupted',
-    breachDirection: attempt.breachDirection,
+    origin: attempt.origin,
     occurredAt: input.clock.now(),
     lifecycleState: { kind: 'awaiting-signature' },
   });

@@ -15,8 +15,23 @@ export type PreviewViewModel = {
   steps: Array<{ label: string; sublabel?: string }>;
 };
 
+function resolvePolicyText(dto: ExecutionPreviewDto) {
+  if (dto.origin.kind === 'qualified-breach') {
+    return renderDirectionalPolicyText(dto.origin.breachDirection);
+  }
+
+  const swapLabel = dto.postExitPosture.kind === 'exit-to-sol' ? 'USDC → SOL' : 'SOL → USDC';
+  const postureLabel = dto.postExitPosture.kind === 'exit-to-sol' ? 'Exit to SOL' : 'Exit to USDC';
+  return {
+    swapLabel,
+    postureLabel,
+    directionLabel: 'Regime plan exit',
+    policyReason: 'Regime-advised plan exit.',
+  };
+}
+
 export function buildPreviewViewModel(dto: ExecutionPreviewDto): PreviewViewModel {
-  const policy = renderDirectionalPolicyText(dto.breachDirection);
+  const policy = resolvePolicyText(dto);
   const isFresh = dto.freshness.kind === 'fresh';
   const isStale = dto.freshness.kind === 'stale';
   const isExpired = dto.freshness.kind === 'expired';

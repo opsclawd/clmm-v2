@@ -2,57 +2,46 @@ import type {
   ExecutionRepository,
   ExecutionPreparationPort,
   ExecutionHistoryRepository,
+  PlanRepository,
   ClockPort,
   IdGeneratorPort,
 } from '../../ports/index.js';
+import type { WalletId, PositionId, PlanId, ExecutionOrigin } from '@clmm/domain';
 import { makeClockTimestamp, evaluatePreviewFreshness } from '@clmm/domain';
-import type { WalletId, ExecutionOrigin, BreachEpisodeId } from '@clmm/domain';
 
 const PREPARED_PAYLOAD_VERSION = 'v1';
 
-export class PreviewNotFoundError extends Error {
-  constructor(previewId: string) {
-    super(`Preview not found: ${previewId}`);
-    this.name = 'PreviewNotFoundError';
-  }
-}
-
-export class PreviewApprovalNotAllowedError extends Error {
+export class PlanExitApprovalError extends Error {
   constructor(reason: string) {
-    super(`Preview approval not allowed: ${reason}`);
-    this.name = 'PreviewApprovalNotAllowedError';
+    super(`Plan exit approval failed: ${reason}`);
+    this.name = 'PlanExitApprovalError';
   }
 }
 
-export class MissingEpisodeIdForTriggerDerivedApprovalError extends Error {
-  constructor() {
-    super('episodeId is required for trigger-derived approval');
-    this.name = 'MissingEpisodeIdForTriggerDerivedApprovalError';
-  }
-}
-
-export type RequestWalletSignatureResult = {
+export type ApprovePlanExitResult = {
   readonly attemptId: string;
   readonly lifecycleState: { readonly kind: 'awaiting-signature' };
-  readonly origin: ExecutionOrigin;
+  readonly executionOrigin: ExecutionOrigin;
 };
 
-export async function requestWalletSignature(params: {
+export async function approvePlanExit(params: {
   readonly previewId: string;
-  readonly episodeId?: BreachEpisodeId;
-  readonly isTriggerDerivedApproval?: boolean;
+  readonly planId: PlanId;
+  readonly positionId: PositionId;
   readonly walletId: WalletId;
+  readonly planRepo: PlanRepository;
   readonly executionRepo: ExecutionRepository;
   readonly prepPort: ExecutionPreparationPort;
   readonly historyRepo: ExecutionHistoryRepository;
   readonly clock: ClockPort;
   readonly ids: IdGeneratorPort;
-}): Promise<RequestWalletSignatureResult> {
+}): Promise<ApprovePlanExitResult> {
   const {
     previewId,
-    episodeId,
-    isTriggerDerivedApproval,
+    planId,
+    positionId,
     walletId,
+    planRepo,
     executionRepo,
     prepPort,
     historyRepo,
@@ -60,34 +49,42 @@ export async function requestWalletSignature(params: {
     ids,
   } = params;
 
-  if (isTriggerDerivedApproval && !episodeId) {
-    throw new MissingEpisodeIdForTriggerDerivedApprovalError();
+  const currentPlan = await planRepo.getCurrentPlan(positionId);
+  if (!currentPlan || currentPlan.planId !== planId) {
+    throw new PlanExitApprovalError(`Plan ${planId} not found or not current`);
   }
 
   const previewRecord = await executionRepo.getPreview(previewId);
   if (!previewRecord) {
-    throw new PreviewNotFoundError(previewId);
+    throw new PlanExitApprovalError(`Preview ${previewId} not found`);
   }
 
   const now = clock.now();
   const liveFreshness = evaluatePreviewFreshness(previewRecord.preview.estimatedAt, now);
   if (liveFreshness.kind !== 'fresh') {
-    throw new PreviewApprovalNotAllowedError(`preview ${previewId} is ${liveFreshness.kind}`);
+    throw new PlanExitApprovalError(`Preview ${previewId} is ${liveFreshness.kind}`);
   }
 
+  const executionOrigin: ExecutionOrigin = {
+    kind: 'regime-plan',
+    planId: currentPlan.planId,
+    canonicalHash: currentPlan.canonicalHash,
+    canonicalExitIntent: previewRecord.preview.plan.postExitPosture.kind,
+  };
+
   const attemptId = ids.generateId();
+
   const { serializedPayload } = await prepPort.prepareExecution({
     plan: previewRecord.preview.plan,
     walletId,
-    positionId: previewRecord.positionId,
+    positionId,
   });
 
   await executionRepo.saveAttempt({
     attemptId,
     previewId,
-    positionId: previewRecord.positionId,
-    origin: previewRecord.origin,
-    ...(episodeId ? { episodeId } : {}),
+    positionId,
+    origin: executionOrigin,
     lifecycleState: { kind: 'awaiting-signature' },
     completedSteps: [],
     transactionReferences: [],
@@ -102,13 +99,28 @@ export async function requestWalletSignature(params: {
     createdAt: now,
   });
 
-  await historyRepo.recordWalletPositionOwnership(walletId, previewRecord.positionId, now);
+  await planRepo.linkExecutionAttempt({
+    planId: currentPlan.planId,
+    attemptId,
+    linkedAt: now,
+  });
+
+  await planRepo.updateLifecycleState({
+    planId: currentPlan.planId,
+    lifecycleState: {
+      kind: 'awaiting-signature',
+      advisoryAction: { kind: 'REQUEST_EXIT_CLMM' },
+      executionOrigin,
+    },
+  });
+
+  await historyRepo.recordWalletPositionOwnership(walletId, positionId, now);
 
   await historyRepo.appendEvent({
     eventId: ids.generateId(),
-    positionId: previewRecord.positionId,
+    positionId,
     eventType: 'signature-requested',
-    origin: previewRecord.origin,
+    origin: executionOrigin,
     occurredAt: now,
     lifecycleState: { kind: 'awaiting-signature' },
   });
@@ -116,6 +128,6 @@ export async function requestWalletSignature(params: {
   return {
     attemptId,
     lifecycleState: { kind: 'awaiting-signature' },
-    origin: previewRecord.origin,
+    executionOrigin,
   };
 }

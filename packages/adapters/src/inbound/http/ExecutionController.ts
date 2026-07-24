@@ -40,6 +40,7 @@ import type {
   PositionId,
   BreachDirection,
   ExecutionAttempt,
+  ExecutionOrigin,
   ExecutionStep,
   HistoryEvent,
   ExecutionLifecycleState,
@@ -62,19 +63,25 @@ import {
   OBSERVABILITY_PORT,
 } from './tokens.js';
 
+function resolvePostExitPosture(origin: ExecutionOrigin) {
+  if (origin.kind === 'qualified-breach') {
+    return applyDirectionalExitPolicy(origin.breachDirection).postExitPosture;
+  }
+  return { kind: origin.canonicalExitIntent };
+}
+
 function toAttemptDto(
   attemptId: string,
   positionId: PositionId,
-  breachDirection: BreachDirection,
+  origin: ExecutionOrigin,
   attempt: ExecutionAttempt,
 ): ExecutionAttemptDto {
   const retry = evaluateRetryEligibility(attempt);
-  const policy = applyDirectionalExitPolicy(breachDirection);
   return {
     attemptId,
     positionId,
-    breachDirection,
-    postExitPosture: policy.postExitPosture,
+    origin,
+    postExitPosture: resolvePostExitPosture(origin),
     lifecycleState: attempt.lifecycleState,
     completedStepKinds: [...attempt.completedSteps],
     transactionReferences: [...attempt.transactionReferences],
@@ -88,7 +95,7 @@ function toHistoryEventDto(event: HistoryEvent): HistoryEventDto {
     eventId: event.eventId,
     positionId: event.positionId,
     eventType: event.eventType,
-    breachDirection: event.breachDirection,
+    origin: event.origin,
     occurredAt: event.occurredAt,
     ...(event.transactionReference ? { transactionReference: event.transactionReference } : {}),
     note: 'off-chain operational history — not an on-chain receipt or attestation',
@@ -142,22 +149,27 @@ export class ExecutionController {
     private readonly observability: ObservabilityPort,
   ) {}
 
-  private resolveAttemptDirection(
+  private resolveAttemptOrigin(
     attempt: StoredExecutionAttempt,
     requestDirectionKind?: 'lower-bound-breach' | 'upper-bound-breach',
-  ): BreachDirection {
+  ): ExecutionOrigin {
     const requestDirection = parseDirectionKind(requestDirectionKind);
-    if (requestDirection && requestDirection.kind !== attempt.breachDirection.kind) {
-      throw new ConflictException(
-        `breachDirection conflicts with authoritative attempt direction for attempt ${attempt.attemptId}`,
-      );
+    if (requestDirection) {
+      if (
+        attempt.origin.kind !== 'qualified-breach' ||
+        requestDirection.kind !== attempt.origin.breachDirection.kind
+      ) {
+        throw new ConflictException(
+          `breachDirection conflicts with authoritative attempt direction for attempt ${attempt.attemptId}`,
+        );
+      }
     }
-    return attempt.breachDirection;
+    return attempt.origin;
   }
 
   private async appendLifecycleEvent(params: {
     positionId: PositionId;
-    breachDirection: BreachDirection;
+    origin: ExecutionOrigin;
     lifecycleState: ExecutionLifecycleState;
     eventType: 'submitted' | 'confirmed' | 'partial-completion' | 'failed';
     transactionReference?: TransactionReference;
@@ -166,7 +178,7 @@ export class ExecutionController {
       eventId: this.ids.generateId(),
       positionId: params.positionId,
       eventType: params.eventType,
-      breachDirection: params.breachDirection,
+      origin: params.origin,
       occurredAt: this.clock.now(),
       lifecycleState: params.lifecycleState,
       ...(params.transactionReference ? { transactionReference: params.transactionReference } : {}),
@@ -298,12 +310,7 @@ export class ExecutionController {
       throw new NotFoundException(`Attempt not found: ${attemptId}`);
     }
     return {
-      execution: toAttemptDto(
-        attempt.attemptId,
-        attempt.positionId,
-        attempt.breachDirection,
-        attempt,
-      ),
+      execution: toAttemptDto(attempt.attemptId, attempt.positionId, attempt.origin, attempt),
     };
   }
 
@@ -337,7 +344,7 @@ export class ExecutionController {
       throw new BadRequestException('submit body must include signedPayload as a string');
     }
 
-    const breachDirection = this.resolveAttemptDirection(attempt, body.breachDirection);
+    const origin = this.resolveAttemptOrigin(attempt, body.breachDirection);
     const signedPayload = decodeSignedPayload(body.signedPayload);
     const preparedPayload = await this.executionRepo.getPreparedPayload(attemptId);
     if (preparedPayload) {
@@ -380,7 +387,7 @@ export class ExecutionController {
 
     await this.appendLifecycleEvent({
       positionId: attempt.positionId,
-      breachDirection,
+      origin,
       eventType: 'submitted',
       lifecycleState: { kind: 'submitted' },
       ...(references[0] ? { transactionReference: references[0] } : {}),
@@ -421,7 +428,7 @@ export class ExecutionController {
 
     await this.appendLifecycleEvent({
       positionId: attempt.positionId,
-      breachDirection,
+      origin,
       eventType,
       lifecycleState: reconciliation.finalState,
     });
@@ -443,14 +450,19 @@ export class ExecutionController {
         transactionReferences: references,
       };
       try {
-        const policy = applyDirectionalExitPolicy(attempt.breachDirection);
-        const event = buildClmmExecutionEvent(
-          savedAttempt,
-          reconciliation.finalState.kind,
-          this.clock,
-          policy.swapInstruction.toAsset,
-        );
-        this.regimeEngineEventPort.notifyExecutionEvent(event).catch(() => {});
+        // The regime-engine execution-result schema only models qualified-breach
+        // outcomes today; plan-exit attempts are reported back to the regime
+        // engine through the plan-decision flow instead.
+        if (attempt.origin.kind === 'qualified-breach') {
+          const policy = applyDirectionalExitPolicy(attempt.origin.breachDirection);
+          const event = buildClmmExecutionEvent(
+            savedAttempt,
+            reconciliation.finalState.kind,
+            this.clock,
+            policy.swapInstruction.toAsset,
+          );
+          this.regimeEngineEventPort.notifyExecutionEvent(event).catch(() => {});
+        }
       } catch {
         // intentional: regime-engine event build/fire must never block the HTTP response
       }
@@ -472,12 +484,12 @@ export class ExecutionController {
     const attempt = await this.executionRepo.getAttempt(attemptId);
     if (!attempt) throw new NotFoundException(`Attempt not found: ${attemptId}`);
 
-    const breachDirection = this.resolveAttemptDirection(attempt, body?.breachDirection);
+    const origin = this.resolveAttemptOrigin(attempt, body?.breachDirection);
 
     const result = await recordExecutionAbandonment({
       attemptId,
       positionId: attempt.positionId,
-      breachDirection,
+      origin,
       executionRepo: this.executionRepo,
       historyRepo: this.historyRepo,
       clock: this.clock,

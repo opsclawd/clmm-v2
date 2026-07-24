@@ -27,7 +27,7 @@ describe('ReconcileExecutionAttempt', () => {
     await executionRepo.saveAttempt({
       attemptId: 'attempt-1',
       positionId: FIXTURE_POSITION_ID,
-      breachDirection: LOWER_BOUND_BREACH,
+      origin: { kind: 'qualified-breach', breachDirection: LOWER_BOUND_BREACH },
       lifecycleState: { kind: 'submitted' },
       completedSteps: [],
       transactionReferences: [{ signature: 'sig-1', stepKind: 'remove-liquidity' }],
@@ -39,7 +39,7 @@ describe('ReconcileExecutionAttempt', () => {
     const result = await reconcileExecutionAttempt({
       attemptId: 'attempt-1',
       positionId: FIXTURE_POSITION_ID,
-      breachDirection: LOWER_BOUND_BREACH,
+      origin: { kind: 'qualified-breach', breachDirection: LOWER_BOUND_BREACH },
       executionRepo,
       submissionPort,
       historyRepo,
@@ -54,7 +54,7 @@ describe('ReconcileExecutionAttempt', () => {
     const result = await reconcileExecutionAttempt({
       attemptId: 'attempt-1',
       positionId: FIXTURE_POSITION_ID,
-      breachDirection: LOWER_BOUND_BREACH,
+      origin: { kind: 'qualified-breach', breachDirection: LOWER_BOUND_BREACH },
       executionRepo,
       submissionPort,
       historyRepo,
@@ -71,7 +71,7 @@ describe('ReconcileExecutionAttempt', () => {
     await executionRepo.saveAttempt({
       attemptId: 'attempt-mixed',
       positionId: FIXTURE_POSITION_ID,
-      breachDirection: LOWER_BOUND_BREACH,
+      origin: { kind: 'qualified-breach', breachDirection: LOWER_BOUND_BREACH },
       lifecycleState: { kind: 'submitted' },
       completedSteps: [],
       transactionReferences: [
@@ -86,7 +86,7 @@ describe('ReconcileExecutionAttempt', () => {
     const result = await reconcileExecutionAttempt({
       attemptId: 'attempt-mixed',
       positionId: FIXTURE_POSITION_ID,
-      breachDirection: LOWER_BOUND_BREACH,
+      origin: { kind: 'qualified-breach', breachDirection: LOWER_BOUND_BREACH },
       executionRepo,
       submissionPort,
       historyRepo,
@@ -105,7 +105,7 @@ describe('ReconcileExecutionAttempt', () => {
     await reconcileExecutionAttempt({
       attemptId: 'attempt-1',
       positionId: FIXTURE_POSITION_ID,
-      breachDirection: LOWER_BOUND_BREACH,
+      origin: { kind: 'qualified-breach', breachDirection: LOWER_BOUND_BREACH },
       executionRepo,
       submissionPort,
       historyRepo,
@@ -113,7 +113,10 @@ describe('ReconcileExecutionAttempt', () => {
       ids,
     });
     const confirmedEvent = historyRepo.events.find((e) => e.eventType === 'confirmed');
-    expect(confirmedEvent?.breachDirection.kind).toBe('lower-bound-breach');
+    expect(confirmedEvent?.origin.kind).toBe('qualified-breach');
+    if (confirmedEvent?.origin.kind === 'qualified-breach') {
+      expect(confirmedEvent.origin.breachDirection.kind).toBe('lower-bound-breach');
+    }
   });
 
   it('returns stored confirmed state without calling the submission port again', async () => {
@@ -122,7 +125,7 @@ describe('ReconcileExecutionAttempt', () => {
     await executionRepo.saveAttempt({
       attemptId: 'attempt-confirmed',
       positionId: FIXTURE_POSITION_ID,
-      breachDirection: LOWER_BOUND_BREACH,
+      origin: { kind: 'qualified-breach', breachDirection: LOWER_BOUND_BREACH },
       lifecycleState: { kind: 'confirmed' },
       completedSteps: ['remove-liquidity', 'collect-fees', 'swap-assets'],
       transactionReferences: [{ signature: 'sig-confirmed', stepKind: 'swap-assets' }],
@@ -131,7 +134,7 @@ describe('ReconcileExecutionAttempt', () => {
     const result = await reconcileExecutionAttempt({
       attemptId: 'attempt-confirmed',
       positionId: FIXTURE_POSITION_ID,
-      breachDirection: LOWER_BOUND_BREACH,
+      origin: { kind: 'qualified-breach', breachDirection: LOWER_BOUND_BREACH },
       executionRepo,
       submissionPort,
       historyRepo,
@@ -149,7 +152,7 @@ describe('ReconcileExecutionAttempt', () => {
     await executionRepo.saveAttempt({
       attemptId: 'attempt-partial',
       positionId: FIXTURE_POSITION_ID,
-      breachDirection: LOWER_BOUND_BREACH,
+      origin: { kind: 'qualified-breach', breachDirection: LOWER_BOUND_BREACH },
       lifecycleState: { kind: 'partial' },
       completedSteps: ['remove-liquidity'],
       transactionReferences: [{ signature: 'sig-partial', stepKind: 'remove-liquidity' }],
@@ -158,7 +161,7 @@ describe('ReconcileExecutionAttempt', () => {
     const result = await reconcileExecutionAttempt({
       attemptId: 'attempt-partial',
       positionId: FIXTURE_POSITION_ID,
-      breachDirection: LOWER_BOUND_BREACH,
+      origin: { kind: 'qualified-breach', breachDirection: LOWER_BOUND_BREACH },
       executionRepo,
       submissionPort,
       historyRepo,
@@ -179,7 +182,7 @@ describe('ReconcileExecutionAttempt', () => {
     const result = await reconcileExecutionAttempt({
       attemptId: 'attempt-1',
       positionId: FIXTURE_POSITION_ID,
-      breachDirection: LOWER_BOUND_BREACH,
+      origin: { kind: 'qualified-breach', breachDirection: LOWER_BOUND_BREACH },
       executionRepo,
       submissionPort,
       historyRepo,
@@ -195,7 +198,7 @@ describe('ReconcileExecutionAttempt', () => {
     const result = await reconcileExecutionAttempt({
       attemptId: 'attempt-1',
       positionId: FIXTURE_POSITION_ID,
-      breachDirection: LOWER_BOUND_BREACH,
+      origin: { kind: 'qualified-breach', breachDirection: LOWER_BOUND_BREACH },
       executionRepo,
       submissionPort,
       historyRepo,
@@ -212,7 +215,7 @@ describe('ReconcileExecutionAttempt', () => {
     const firstResult = await reconcileExecutionAttempt({
       attemptId: 'attempt-1',
       positionId: FIXTURE_POSITION_ID,
-      breachDirection: LOWER_BOUND_BREACH,
+      origin: { kind: 'qualified-breach', breachDirection: LOWER_BOUND_BREACH },
       executionRepo,
       submissionPort,
       historyRepo,
@@ -229,7 +232,7 @@ describe('ReconcileExecutionAttempt', () => {
     const secondResult = await reconcileExecutionAttempt({
       attemptId: 'attempt-1',
       positionId: FIXTURE_POSITION_ID,
-      breachDirection: LOWER_BOUND_BREACH,
+      origin: { kind: 'qualified-breach', breachDirection: LOWER_BOUND_BREACH },
       executionRepo,
       submissionPort,
       historyRepo,

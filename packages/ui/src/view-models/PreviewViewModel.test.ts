@@ -12,7 +12,7 @@ function makePreviewDto(direction = LOWER_BOUND_BREACH): ExecutionPreviewDto {
   return {
     previewId: 'preview-1',
     positionId: makePositionId('pos-1'),
-    breachDirection: direction,
+    origin: { kind: 'qualified-breach', breachDirection: direction },
     postExitPosture:
       direction.kind === 'lower-bound-breach' ? { kind: 'exit-to-usdc' } : { kind: 'exit-to-sol' },
     steps: [
