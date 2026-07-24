@@ -14,6 +14,7 @@ import type {
   PlanRetryScheduleParams,
   PlanDeliveryCompletionParams,
   PlanPermanentFailureParams,
+  PlanLifecycleStateUpdateParams,
 } from '@clmm/application';
 import type {
   PositionPlan,
@@ -48,6 +49,7 @@ type StoredPlan = {
   lastErrorClass: string | null;
   deliveredAt: number | null;
   executionOriginJson: Record<string, unknown> | null;
+  lifecycleStateJson: Record<string, unknown> | null;
 };
 
 function actionKindToString(action: PlanAction): string {
@@ -369,6 +371,7 @@ export class PlanStorageAdapter implements PlanRepository {
       lastErrorClass: row.lastErrorClass ?? null,
       deliveredAt: row.deliveredAt ? Number(row.deliveredAt) : null,
       executionOriginJson: (row.executionOriginJson as Record<string, unknown>) ?? null,
+      lifecycleStateJson: (row.lifecycleStateJson as Record<string, unknown>) ?? null,
     };
 
     return {
@@ -376,7 +379,10 @@ export class PlanStorageAdapter implements PlanRepository {
       canonicalHash: storedPlan.canonicalHash as CanonicalHash,
       positionId: storedPlan.positionId as PositionId,
       createdAt: storedPlan.requestedAt as ClockTimestamp,
-      state: buildPlanLifecycleState(storedPlan),
+      state:
+        storedPlan.lifecycleStateJson !== null
+          ? (storedPlan.lifecycleStateJson as PlanLifecycleState)
+          : buildPlanLifecycleState(storedPlan),
     };
   }
 
@@ -538,6 +544,15 @@ export class PlanStorageAdapter implements PlanRepository {
       .set({
         lifecycleKind: 'report-failed',
         lastErrorClass: params.reason,
+      })
+      .where(eq(positionPlans.planId, params.planId));
+  }
+
+  async updateLifecycleState(params: PlanLifecycleStateUpdateParams): Promise<void> {
+    await this.db
+      .update(positionPlans)
+      .set({
+        lifecycleStateJson: params.lifecycleState as unknown as Record<string, unknown>,
       })
       .where(eq(positionPlans.planId, params.planId));
   }

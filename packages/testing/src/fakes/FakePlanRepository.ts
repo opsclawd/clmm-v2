@@ -11,6 +11,7 @@ import type {
   PlanRetryScheduleParams,
   PlanDeliveryCompletionParams,
   PlanPermanentFailureParams,
+  PlanLifecycleStateUpdateParams,
   CanonicalResult,
 } from '@clmm/application';
 import type {
@@ -46,6 +47,7 @@ type StoredPlan = {
   lastErrorClass: string | null;
   deliveredAt: ClockTimestamp | null;
   executionOriginJson: Record<string, unknown> | null;
+  lifecycleStateJson: PlanLifecycleState | null;
 };
 
 type StoredOutbox = {
@@ -101,6 +103,7 @@ export class FakePlanRepository implements PlanRepository {
       lastErrorClass: null,
       deliveredAt: null,
       executionOriginJson: null,
+      lifecycleStateJson: null,
     };
 
     this.plans.set(params.planId, plan);
@@ -242,8 +245,16 @@ export class FakePlanRepository implements PlanRepository {
     }
   }
 
+  async updateLifecycleState(params: PlanLifecycleStateUpdateParams): Promise<void> {
+    const plan = this.plans.get(params.planId);
+    if (plan) {
+      plan.lifecycleStateJson = params.lifecycleState;
+    }
+  }
+
   private buildPositionPlan(plan: StoredPlan): PositionPlan {
-    const state = this.buildLifecycleState(plan);
+    const state =
+      plan.lifecycleStateJson !== null ? plan.lifecycleStateJson : this.buildLifecycleState(plan);
     return {
       planId: plan.planId,
       canonicalHash: plan.canonicalHash,

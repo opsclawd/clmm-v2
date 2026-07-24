@@ -24,7 +24,7 @@ import type {
   SrThesesBlock,
   PolicyInsightBlock,
 } from '../dto/index.js';
-import type { PositionPlan, PlanAction, RegimeResponse } from '@clmm/domain';
+import type { PositionPlan, PlanAction, RegimeResponse, PlanLifecycleState } from '@clmm/domain';
 
 // --- Position read ports ---
 
@@ -507,6 +507,11 @@ export type PlanPermanentFailureParams = {
   readonly failedAt: ClockTimestamp;
 };
 
+export type PlanLifecycleStateUpdateParams = {
+  readonly planId: import('@clmm/domain').PlanId;
+  readonly lifecycleState: PlanLifecycleState;
+};
+
 export interface PlanRepository {
   createRequest(params: PlanRequestParams): Promise<PlanRequestResult>;
   acceptResponse(
@@ -520,4 +525,5 @@ export interface PlanRepository {
   rescheduleRetry(params: PlanRetryScheduleParams): Promise<void>;
   completeDelivery(params: PlanDeliveryCompletionParams): Promise<void>;
   recordPermanentFailure(params: PlanPermanentFailureParams): Promise<void>;
+  updateLifecycleState(params: PlanLifecycleStateUpdateParams): Promise<void>;
 }

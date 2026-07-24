@@ -25,6 +25,7 @@ export const positionPlans = pgTable(
     lastErrorClass: text('last_error_class'),
     deliveredAt: bigint('delivered_at', { mode: 'number' }),
     executionOriginJson: jsonb('execution_origin_json'),
+    lifecycleStateJson: jsonb('lifecycle_state_json'),
   },
   (table) => [
     check(
