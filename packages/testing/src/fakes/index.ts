@@ -21,3 +21,4 @@ export { FakeMonitoredWalletRepository } from './FakeMonitoredWalletRepository.j
 export { FakeWalletChallengeRepository } from './FakeWalletChallengeRepository.js';
 export { FakePricePort } from './FakePricePort.js';
 export { FakePlanRepository } from './FakePlanRepository.js';
+export { FakeRegimePlanPort } from './FakeRegimePlanPort.js';

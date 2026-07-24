@@ -23,6 +23,9 @@ import type {
   RegimeBlock,
   SrThesesBlock,
   PolicyInsightBlock,
+  RegimePlanRequest,
+  RegimePlanResponse,
+  RegimeExecutionResult,
 } from '../dto/index.js';
 import type { PositionPlan, PlanAction, RegimeResponse, PlanLifecycleState } from '@clmm/domain';
 
@@ -333,6 +336,29 @@ export type PolicyInsightsReadResult =
 
 export interface PolicyInsightsReadPort {
   fetchCurrent(): Promise<PolicyInsightsReadResult>;
+}
+
+// --- Regime plan transport port (application-owned; RegimePlanAdapter implements) ---
+//
+// Result types are discriminated unions so callers can classify failures without
+// parsing adapter logs or HTTP details. Permanent failures (auth, validation,
+// conflict) are never retried; retryable failures (timeout, 5xx, network) return
+// typed degraded results so the persisted outbox owns retries.
+
+export type PlanRequestTransportResult =
+  | { readonly kind: 'ok'; readonly response: RegimePlanResponse }
+  | { readonly kind: 'conflict'; readonly reason: string }
+  | { readonly kind: 'permanent'; readonly reason: string }
+  | { readonly kind: 'retryable-degraded'; readonly reason: string };
+
+export type PlanExecutionResultTransportResult =
+  | { readonly kind: 'ok' }
+  | { readonly kind: 'permanent'; readonly reason: string }
+  | { readonly kind: 'retryable-degraded'; readonly reason: string };
+
+export interface RegimePlanPort {
+  requestPositionPlan(request: RegimePlanRequest): Promise<PlanRequestTransportResult>;
+  reportExecutionResult(result: RegimeExecutionResult): Promise<PlanExecutionResultTransportResult>;
 }
 
 // --- Wallet ownership challenge port ---
