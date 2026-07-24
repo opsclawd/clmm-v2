@@ -1,0 +1,26 @@
+{
+  "schemaVersion": "position-plan.v1",
+  "planId": "plan_invalid_01",
+  "planHash": "a1b2c3d4e5f60123456789abcdef0123456789abcdef0123456789abcdef0123",
+  "asOfUnixMs": 1700000000000,
+  "expiresAtUnixMs": 1700003600000,
+  "scope": {
+    "kind": "position",
+    "positionId": "pos_sol_usdc_01",
+    "poolAddress": "Czfq3xZZDmsdGdUyrNLtRhGc47cXcZtLG4crryfu44zE",
+    "symbol": "SOL/USDC"
+  },
+  "regime": "UP",
+  "actions": [
+    {
+      "type": "REQUEST_ENTER_CLMM",
+      "reasonCode": "ENTRY_OPPORTUNITY"
+    }
+  ],
+  "constraints": {
+    "cooldownUntilUnixMs": 0,
+    "standDownUntilUnixMs": 0,
+    "notes": []
+  },
+  "reasons": []
+}

@@ -6,7 +6,7 @@ import type {
   IdGeneratorPort,
 } from '../../ports/index.js';
 import { makeClockTimestamp, evaluatePreviewFreshness } from '@clmm/domain';
-import type { WalletId, BreachDirection, BreachEpisodeId } from '@clmm/domain';
+import type { WalletId, ExecutionOrigin, BreachEpisodeId } from '@clmm/domain';
 
 const PREPARED_PAYLOAD_VERSION = 'v1';
 
@@ -34,7 +34,7 @@ export class MissingEpisodeIdForTriggerDerivedApprovalError extends Error {
 export type RequestWalletSignatureResult = {
   readonly attemptId: string;
   readonly lifecycleState: { readonly kind: 'awaiting-signature' };
-  readonly breachDirection: BreachDirection;
+  readonly origin: ExecutionOrigin;
 };
 
 export async function requestWalletSignature(params: {
@@ -86,7 +86,7 @@ export async function requestWalletSignature(params: {
     attemptId,
     previewId,
     positionId: previewRecord.positionId,
-    breachDirection: previewRecord.breachDirection,
+    origin: previewRecord.origin,
     ...(episodeId ? { episodeId } : {}),
     lifecycleState: { kind: 'awaiting-signature' },
     completedSteps: [],
@@ -108,7 +108,7 @@ export async function requestWalletSignature(params: {
     eventId: ids.generateId(),
     positionId: previewRecord.positionId,
     eventType: 'signature-requested',
-    breachDirection: previewRecord.breachDirection,
+    origin: previewRecord.origin,
     occurredAt: now,
     lifecycleState: { kind: 'awaiting-signature' },
   });
@@ -116,6 +116,6 @@ export async function requestWalletSignature(params: {
   return {
     attemptId,
     lifecycleState: { kind: 'awaiting-signature' },
-    breachDirection: previewRecord.breachDirection,
+    origin: previewRecord.origin,
   };
 }

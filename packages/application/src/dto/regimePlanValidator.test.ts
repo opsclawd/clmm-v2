@@ -1,0 +1,80 @@
+import { describe, expect, it } from 'vitest';
+import { parseRegimePlanResponse, parseRegimeExecutionResult } from './regimePlanValidator.js';
+import holdFixture from '../../../../schemas/regime-engine/position-plan.v1/fixtures/valid/hold.json' with { type: 'json' };
+import requestExitFixture from '../../../../schemas/regime-engine/position-plan.v1/fixtures/valid/request-exit.json' with { type: 'json' };
+import successFixture from '../../../../schemas/regime-engine/execution-result.v1/fixtures/valid/success.json' with { type: 'json' };
+
+function deepClone<T>(obj: T): T {
+  return JSON.parse(JSON.stringify(obj)) as T;
+}
+
+type MutableFixture = Record<string, unknown>;
+
+describe('regimePlanValidator', () => {
+  it('rejects unsupported plan actions and schema versions', () => {
+    const invalidAction = deepClone(holdFixture) as MutableFixture;
+    const actions = invalidAction['actions'] as Array<Record<string, unknown>>;
+    actions[0]!['type'] = 'REQUEST_ENTER_CLMM';
+    expect(parseRegimePlanResponse(invalidAction)).toBeNull();
+
+    const invalidVersion = deepClone(holdFixture) as MutableFixture;
+    invalidVersion['schemaVersion'] = 'position-plan.v999';
+    expect(parseRegimePlanResponse(invalidVersion)).toBeNull();
+
+    const invalidExecStatus = deepClone(successFixture) as MutableFixture;
+    invalidExecStatus['status'] = 'UNKNOWN_STATUS';
+    expect(parseRegimeExecutionResult(invalidExecStatus)).toBeNull();
+
+    const invalidExecVersion = deepClone(successFixture) as MutableFixture;
+    invalidExecVersion['schemaVersion'] = 'execution-result.v999';
+    expect(parseRegimeExecutionResult(invalidExecVersion)).toBeNull();
+  });
+
+  it('rejects a request-exit plan without canonical exit intent', () => {
+    const noExitIntent = deepClone(requestExitFixture) as MutableFixture;
+    const actions1 = noExitIntent['actions'] as Array<Record<string, unknown>>;
+    delete actions1[0]!['exitIntent'];
+    expect(parseRegimePlanResponse(noExitIntent)).toBeNull();
+
+    const invalidExitIntent = deepClone(requestExitFixture) as MutableFixture;
+    const actions2 = invalidExitIntent['actions'] as Array<Record<string, unknown>>;
+    actions2[0]!['exitIntent'] = { posture: 'InvalidPosture' };
+    expect(parseRegimePlanResponse(invalidExitIntent)).toBeNull();
+  });
+
+  it('does not admit inline candles regime state or portfolio allocations', () => {
+    const withCandles = deepClone(holdFixture) as MutableFixture;
+    withCandles['candles'] = [{ open: 100, close: 105 }];
+    expect(parseRegimePlanResponse(withCandles)).toBeNull();
+
+    const withRegimeState = deepClone(holdFixture) as MutableFixture;
+    withRegimeState['regimeState'] = { current: 'UP', barsInRegime: 5 };
+    expect(parseRegimePlanResponse(withRegimeState)).toBeNull();
+
+    const withPortfolioAllocations = deepClone(holdFixture) as MutableFixture;
+    withPortfolioAllocations['portfolioAllocations'] = { solBps: 5000, usdcBps: 5000 };
+    expect(parseRegimePlanResponse(withPortfolioAllocations)).toBeNull();
+  });
+
+  it('parses valid plan response fixtures cleanly', () => {
+    expect(parseRegimePlanResponse(holdFixture)).not.toBeNull();
+    expect(parseRegimePlanResponse(requestExitFixture)).not.toBeNull();
+  });
+
+  it('parses valid execution result fixtures cleanly', () => {
+    expect(parseRegimeExecutionResult(successFixture)).not.toBeNull();
+  });
+
+  it('rejects invalid expiry ordering where expiresAtUnixMs < asOfUnixMs', () => {
+    const invalidExpiry = deepClone(holdFixture) as MutableFixture;
+    invalidExpiry['asOfUnixMs'] = 1700000000000;
+    invalidExpiry['expiresAtUnixMs'] = 1690000000000;
+    expect(parseRegimePlanResponse(invalidExpiry)).toBeNull();
+  });
+
+  it('rejects invalid hashes', () => {
+    const invalidHash = deepClone(holdFixture) as MutableFixture;
+    invalidHash['planHash'] = 'not-a-valid-sha256-hash';
+    expect(parseRegimePlanResponse(invalidHash)).toBeNull();
+  });
+});

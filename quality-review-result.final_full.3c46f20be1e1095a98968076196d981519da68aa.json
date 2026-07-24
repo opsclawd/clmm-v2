@@ -1,0 +1,11 @@
+{
+  "result": "fail",
+  "findings": [
+    {
+      "severity": "P1",
+      "summary": "The implementation uses `Date.now()` instead of the injected `ClockPort` to generate timestamps, violating time determinism and breaking time-based testability.",
+      "file": "packages/application/src/use-cases/plans/RequestPositionPlan.ts",
+      "suggested_fix": "Pass the current timestamp from `clock.now()` to `buildRegimePlanRequest` for `asOfUnixMs` (line 107), and use `clock.now()` instead of `Date.now()` when calling `makeClockTimestamp` for `requestedAt` (line 250)."
+    }
+  ]
+}

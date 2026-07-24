@@ -31,9 +31,57 @@ import type {
   ExecutionLifecycleState,
   ClockTimestamp,
   BreachDirection,
+  ExecutionOrigin,
+  PlanId,
+  CanonicalHash,
 } from '@clmm/domain';
 import { LOWER_BOUND_BREACH, UPPER_BOUND_BREACH, makeClockTimestamp } from '@clmm/domain';
 import { BREACH_SCAN_INTERVAL_MS } from '../../inbound/jobs/breach-scan-schedule.js';
+
+type OriginRow = {
+  originKind: string;
+  directionKind: string | null;
+  planId: string | null;
+  canonicalHash: string | null;
+  canonicalExitIntent: string | null;
+};
+
+function originToRow(origin: ExecutionOrigin): OriginRow {
+  if (origin.kind === 'regime-plan') {
+    return {
+      originKind: 'regime-plan',
+      directionKind: null,
+      planId: origin.planId,
+      canonicalHash: origin.canonicalHash,
+      canonicalExitIntent: origin.canonicalExitIntent,
+    };
+  }
+  return {
+    originKind: 'qualified-breach',
+    directionKind: origin.breachDirection.kind,
+    planId: null,
+    canonicalHash: null,
+    canonicalExitIntent: null,
+  };
+}
+
+function originFromRow(row: OriginRow): ExecutionOrigin {
+  if (row.originKind === 'regime-plan') {
+    if (!row.planId || !row.canonicalHash || !row.canonicalExitIntent) {
+      throw new Error('originFromRow: incomplete regime-plan origin row');
+    }
+    if (row.canonicalExitIntent !== 'exit-to-usdc' && row.canonicalExitIntent !== 'exit-to-sol') {
+      throw new Error(`originFromRow: unknown canonicalExitIntent ${row.canonicalExitIntent}`);
+    }
+    return {
+      kind: 'regime-plan',
+      planId: row.planId as PlanId,
+      canonicalHash: row.canonicalHash as CanonicalHash,
+      canonicalExitIntent: row.canonicalExitIntent,
+    };
+  }
+  return { kind: 'qualified-breach', breachDirection: directionFromKind(row.directionKind ?? '') };
+}
 
 function directionFromKind(kind: string) {
   if (kind === 'lower-bound-breach') return LOWER_BOUND_BREACH;
@@ -383,13 +431,13 @@ export class OperationalStorageAdapter
   async savePreview(
     positionId: PositionId,
     preview: ExecutionPreview,
-    breachDirection: BreachDirection,
+    origin: ExecutionOrigin,
   ): Promise<{ previewId: string }> {
     const previewId = this.ids.generateId();
     await this.db.insert(executionPreviews).values({
       previewId,
       positionId,
-      directionKind: breachDirection.kind,
+      ...originToRow(origin),
       planJson: preview.plan as unknown as Record<string, unknown>,
       freshnessKind: preview.freshness.kind,
       freshnessExpiresAt: preview.freshness.kind === 'fresh' ? preview.freshness.expiresAt : null,
@@ -402,7 +450,7 @@ export class OperationalStorageAdapter
   async getPreview(previewId: string): Promise<{
     preview: ExecutionPreview;
     positionId: PositionId;
-    breachDirection: BreachDirection;
+    origin: ExecutionOrigin;
   } | null> {
     const rows = await this.db
       .select()
@@ -423,14 +471,14 @@ export class OperationalStorageAdapter
     return {
       preview,
       positionId: row.positionId as PositionId,
-      breachDirection: directionFromKind(row.directionKind),
+      origin: originFromRow(row),
     };
   }
 
   async saveAttempt(attempt: StoredExecutionAttempt): Promise<void> {
     const now = Date.now();
     const updateSet = {
-      directionKind: attempt.breachDirection.kind,
+      ...originToRow(attempt.origin),
       lifecycleStateKind: attempt.lifecycleState.kind,
       completedStepsJson: attempt.completedSteps as unknown as string[],
       transactionRefsJson: attempt.transactionReferences as unknown as Record<string, unknown>[],
@@ -451,7 +499,7 @@ export class OperationalStorageAdapter
         previewId: attempt.previewId ?? null,
         episodeId: attempt.episodeId ?? null,
         positionId: attempt.positionId,
-        directionKind: attempt.breachDirection.kind,
+        ...originToRow(attempt.origin),
         lifecycleStateKind: attempt.lifecycleState.kind,
         completedStepsJson: attempt.completedSteps as unknown as string[],
         transactionRefsJson: attempt.transactionReferences as unknown as Record<string, unknown>[],
@@ -474,7 +522,7 @@ export class OperationalStorageAdapter
     return {
       attemptId: row.attemptId,
       positionId: row.positionId as PositionId,
-      breachDirection: directionFromKind(row.directionKind),
+      origin: originFromRow(row),
       lifecycleState: { kind: row.lifecycleStateKind } as ExecutionLifecycleState,
       ...(row.episodeId ? { episodeId: row.episodeId as BreachEpisodeId } : {}),
       ...(row.previewId ? { previewId: row.previewId } : {}),
@@ -501,7 +549,7 @@ export class OperationalStorageAdapter
     return rows.map((row) => ({
       attemptId: row.attemptId,
       positionId: row.positionId as PositionId,
-      breachDirection: directionFromKind(row.directionKind),
+      origin: originFromRow(row),
       lifecycleState: { kind: row.lifecycleStateKind } as ExecutionLifecycleState,
       ...(row.episodeId ? { episodeId: row.episodeId as BreachEpisodeId } : {}),
       ...(row.previewId ? { previewId: row.previewId } : {}),
@@ -520,7 +568,7 @@ export class OperationalStorageAdapter
     return rows.map((row) => ({
       attemptId: row.attemptId,
       positionId: row.positionId as PositionId,
-      breachDirection: directionFromKind(row.directionKind),
+      origin: originFromRow(row),
       lifecycleState: { kind: row.lifecycleStateKind } as ExecutionLifecycleState,
       ...(row.episodeId ? { episodeId: row.episodeId as BreachEpisodeId } : {}),
       ...(row.previewId ? { previewId: row.previewId } : {}),

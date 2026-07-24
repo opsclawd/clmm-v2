@@ -1,0 +1,11 @@
+{
+  "result": "fail",
+  "findings": [
+    {
+      "severity": "P0",
+      "summary": "The canonical result payload is constructed but silently discarded without being passed to planRepository.commitTerminalOutcome(), failing the core task requirement to enqueue canonical results.",
+      "file": "packages/application/src/use-cases/plans/RecordPlanDecision.ts",
+      "suggested_fix": "Call planRepository.commitTerminalOutcome() with the built canonicalResult to properly persist and enqueue it, and update the test that incorrectly asserts commitTerminalOutcome should not be invoked."
+    }
+  ]
+}

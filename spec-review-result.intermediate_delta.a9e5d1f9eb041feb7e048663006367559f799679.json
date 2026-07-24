@@ -1,0 +1,23 @@
+{
+  "result": "fail",
+  "findings": [
+    {
+      "severity": "P0",
+      "summary": "Task 7 implementation is entirely missing; the plan exit files (e.g. CreatePlanExitPreview.ts, ApprovePlanExit.ts) were not created.",
+      "file": "packages/application/src/use-cases/plans/CreatePlanExitPreview.ts",
+      "suggested_fix": "Implement Task 7 according to the plan, including creating CreatePlanExitPreview.ts and ApprovePlanExit.ts."
+    },
+    {
+      "severity": "P0",
+      "summary": "The required `origin: ExecutionOrigin` field was not added to `ExecutionAttempt`.",
+      "file": "packages/domain/src/execution/index.ts",
+      "suggested_fix": "Add `readonly origin: ExecutionOrigin;` to the `ExecutionAttempt` type."
+    },
+    {
+      "severity": "P0",
+      "summary": "`HistoryEvent` and `ExecutionOutcomeSummary` still use `breachDirection` instead of being replaced by `origin: ExecutionOrigin`.",
+      "file": "packages/domain/src/history/index.ts",
+      "suggested_fix": "Replace `readonly breachDirection: BreachDirection;` with `readonly origin: ExecutionOrigin;` in both `HistoryEvent` and `ExecutionOutcomeSummary`."
+    }
+  ]
+}

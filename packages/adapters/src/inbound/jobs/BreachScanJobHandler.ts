@@ -116,7 +116,7 @@ export class BreachScanJobHandler {
             await recordExecutionAbandonment({
               attemptId: attempt.attemptId,
               positionId: attempt.positionId,
-              breachDirection: attempt.breachDirection,
+              origin: attempt.origin,
               executionRepo: this.executionRepo,
               historyRepo: this.historyRepo,
               clock: this.clock,

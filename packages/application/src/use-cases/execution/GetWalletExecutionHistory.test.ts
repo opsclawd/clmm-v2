@@ -19,7 +19,7 @@ describe('GetWalletExecutionHistory', () => {
       eventId: 'evt-wallet-1',
       positionId: FIXTURE_POSITION_ID,
       eventType: 'submitted',
-      breachDirection: LOWER_BOUND_BREACH,
+      origin: { kind: 'qualified-breach', breachDirection: LOWER_BOUND_BREACH },
       occurredAt: clock.now(),
       lifecycleState: { kind: 'submitted' },
     });
@@ -51,7 +51,7 @@ describe('GetWalletExecutionHistory', () => {
       eventId: 'evt-closed-pos',
       positionId: closedPositionId,
       eventType: 'confirmed',
-      breachDirection: LOWER_BOUND_BREACH,
+      origin: { kind: 'qualified-breach', breachDirection: LOWER_BOUND_BREACH },
       occurredAt: clock.now(),
       lifecycleState: { kind: 'confirmed' },
     });
@@ -75,7 +75,7 @@ describe('GetWalletExecutionHistory', () => {
       eventId: 'evt-wallet-other',
       positionId: otherPositionId,
       eventType: 'failed',
-      breachDirection: LOWER_BOUND_BREACH,
+      origin: { kind: 'qualified-breach', breachDirection: LOWER_BOUND_BREACH },
       occurredAt: clock.now(),
       lifecycleState: { kind: 'failed' },
     });

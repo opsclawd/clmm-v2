@@ -141,7 +141,7 @@ describe('Partial-Completion Resume Smoke Scenario', () => {
     const reconcileResult = await reconcileExecutionAttempt({
       attemptId: approvalOutcome.attemptId,
       positionId: obs.positionId,
-      breachDirection: obs.direction,
+      origin: { kind: 'qualified-breach', breachDirection: obs.direction },
       executionRepo: fakes.executionRepo,
       submissionPort: fakes.submissionPort,
       historyRepo: fakes.historyRepo,
@@ -176,7 +176,7 @@ describe('Partial-Completion Resume Smoke Scenario', () => {
     const reconcileResult = await reconcileExecutionAttempt({
       attemptId: approvalOutcome.attemptId,
       positionId: obs.positionId,
-      breachDirection: obs.direction,
+      origin: { kind: 'qualified-breach', breachDirection: obs.direction },
       executionRepo: fakes.executionRepo,
       submissionPort: fakes.submissionPort,
       historyRepo: fakes.historyRepo,

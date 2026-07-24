@@ -1,0 +1,17 @@
+{
+  "result": "fail",
+  "findings": [
+    {
+      "severity": "P1",
+      "summary": "In ApprovePlanExit, applyPlanLifecycleTransition is called for request-signature without passing the generated attemptId, resulting in the attemptId being missing from the persisted awaiting-signature state.",
+      "file": "packages/application/src/use-cases/plans/ApprovePlanExit.ts",
+      "suggested_fix": "Generate the attemptId before calling applyPlanLifecycleTransition and pass it in the event payload: `applyPlanLifecycleTransition(currentPlan, { kind: 'request-signature', attemptId })`."
+    },
+    {
+      "severity": "P2",
+      "summary": "PlanLifecycleReducer hardcodes 'exit-to-usdc' as the canonicalExitIntent fallback when transitioning to request-signature from a state without an executionOrigin, ignoring the explicit exitIntent that might be present in the advisoryAction.",
+      "file": "packages/domain/src/regime/PlanLifecycleReducer.ts",
+      "suggested_fix": "Extract the exit intent from `currentState.advisoryAction` (if it is a REQUEST_EXIT_CLMM action) and use it as the fallback intent instead of unconditionally hardcoding 'exit-to-usdc'."
+    }
+  ]
+}

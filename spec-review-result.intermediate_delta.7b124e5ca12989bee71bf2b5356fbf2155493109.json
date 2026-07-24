@@ -1,0 +1,29 @@
+{
+  "result": "fail",
+  "findings": [
+    {
+      "severity": "P1",
+      "summary": "On an exact replay of a fresh preview, CreatePlanExitPreview fabricates a `previewId` (`${currentPlan.planId}-preview`) instead of returning the actual repository-assigned ID. This will cause subsequent approval steps to fail when looking up the preview by ID.",
+      "file": "packages/application/src/use-cases/plans/CreatePlanExitPreview.ts",
+      "suggested_fix": "Add `previewId: string` to the `exit-previewed` state in `PlanLifecycleState`, populate it when transitioning the state after `savePreview`, and return it during exact replays."
+    },
+    {
+      "severity": "P1",
+      "summary": "The `qualifiedTrigger` early return is still placed before `await planRepository.acceptResponse(...)`, which leaves the plan permanently dangling in the `requested` state and ignores the previous review finding.",
+      "file": "packages/application/src/use-cases/plans/RequestPositionPlan.ts",
+      "suggested_fix": "Move the `if (qualifiedTrigger)` check to after the `await planRepository.acceptResponse(...)` call so the plan's state transition completes before returning the superseded status."
+    },
+    {
+      "severity": "P1",
+      "summary": "The plan action is still hardcoded to `{ kind: 'HOLD' }` in `createRequest` and suitability is still hardcoded to `'ALLOWED'` in `acceptResponse`, ignoring the previous review finding to use the actual Regime response values.",
+      "file": "packages/application/src/use-cases/plans/RequestPositionPlan.ts",
+      "suggested_fix": "Extract the initial action dynamically for `createRequest` and map the `suitability` from `RegimePlanResponse` instead of hardcoding `'ALLOWED'` in `acceptResponse`."
+    },
+    {
+      "severity": "P2",
+      "summary": "The request timeout is cleared immediately after fetch resolves with headers, leaving `response.json()` reads unprotected from hanging streams. The previous review finding was ignored.",
+      "file": "packages/adapters/src/outbound/regime-engine/RegimePlanAdapter.ts",
+      "suggested_fix": "Move `clearTimeout(timer)` into a `finally` block that encompasses both the `fetch` call and all `await response.json()` calls."
+    }
+  ]
+}

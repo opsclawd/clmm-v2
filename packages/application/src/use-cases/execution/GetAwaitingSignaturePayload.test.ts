@@ -15,7 +15,7 @@ describe('GetAwaitingSignaturePayload', () => {
     await executionRepo.saveAttempt({
       attemptId: 'attempt-1',
       positionId: FIXTURE_POSITION_ID,
-      breachDirection: LOWER_BOUND_BREACH,
+      origin: { kind: 'qualified-breach', breachDirection: LOWER_BOUND_BREACH },
       lifecycleState: { kind: 'awaiting-signature' },
       completedSteps: [],
       transactionReferences: [],
@@ -64,7 +64,7 @@ describe('GetAwaitingSignaturePayload', () => {
     await executionRepo.saveAttempt({
       attemptId: 'attempt-submitted',
       positionId: FIXTURE_POSITION_ID,
-      breachDirection: LOWER_BOUND_BREACH,
+      origin: { kind: 'qualified-breach', breachDirection: LOWER_BOUND_BREACH },
       lifecycleState: { kind: 'submitted' },
       completedSteps: [],
       transactionReferences: [],
@@ -97,7 +97,7 @@ describe('GetAwaitingSignaturePayload', () => {
     await executionRepo.saveAttempt({
       attemptId: 'attempt-missing-payload',
       positionId: FIXTURE_POSITION_ID,
-      breachDirection: LOWER_BOUND_BREACH,
+      origin: { kind: 'qualified-breach', breachDirection: LOWER_BOUND_BREACH },
       lifecycleState: { kind: 'awaiting-signature' },
       completedSteps: [],
       transactionReferences: [],
@@ -126,7 +126,7 @@ describe('GetAwaitingSignaturePayload', () => {
     await executionRepo.saveAttempt({
       attemptId: 'attempt-expired',
       positionId: FIXTURE_POSITION_ID,
-      breachDirection: LOWER_BOUND_BREACH,
+      origin: { kind: 'qualified-breach', breachDirection: LOWER_BOUND_BREACH },
       lifecycleState: { kind: 'awaiting-signature' },
       completedSteps: [],
       transactionReferences: [],
@@ -172,7 +172,7 @@ describe('GetAwaitingSignaturePayload', () => {
     await executionRepo.saveAttempt({
       attemptId: 'attempt-at-boundary',
       positionId: FIXTURE_POSITION_ID,
-      breachDirection: LOWER_BOUND_BREACH,
+      origin: { kind: 'qualified-breach', breachDirection: LOWER_BOUND_BREACH },
       lifecycleState: { kind: 'awaiting-signature' },
       completedSteps: [],
       transactionReferences: [],

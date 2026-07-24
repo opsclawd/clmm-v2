@@ -6,28 +6,58 @@ import type {
   HistoryEvent,
   HistoryTimeline,
   ExecutionOutcomeSummary,
+  ExecutionOrigin,
   PositionId,
   WalletId,
+  PlanId,
+  CanonicalHash,
 } from '@clmm/domain';
 import { LOWER_BOUND_BREACH, UPPER_BOUND_BREACH, makeClockTimestamp } from '@clmm/domain';
 
 type HistoryEventRow = typeof historyEvents.$inferSelect;
 
-function mapHistoryEventRow(row: HistoryEventRow): HistoryEvent {
+function mapOriginFromRow(row: {
+  originKind: string;
+  directionKind: string | null;
+  planId: string | null;
+  canonicalHash: string | null;
+  canonicalExitIntent: string | null;
+}): ExecutionOrigin {
+  if (row.originKind === 'regime-plan') {
+    if (!row.planId || !row.canonicalHash || !row.canonicalExitIntent) {
+      throw new Error('mapOriginFromRow: incomplete regime-plan origin row');
+    }
+    if (row.canonicalExitIntent !== 'exit-to-usdc' && row.canonicalExitIntent !== 'exit-to-sol') {
+      throw new Error(`mapOriginFromRow: unknown canonicalExitIntent ${row.canonicalExitIntent}`);
+    }
+    return {
+      kind: 'regime-plan',
+      planId: row.planId as PlanId,
+      canonicalHash: row.canonicalHash as CanonicalHash,
+      canonicalExitIntent: row.canonicalExitIntent,
+    };
+  }
+
   const breachDirection =
     row.directionKind === 'lower-bound-breach'
       ? LOWER_BOUND_BREACH
       : row.directionKind === 'upper-bound-breach'
         ? UPPER_BOUND_BREACH
         : (() => {
-            throw new Error(`mapHistoryEventRow: unknown directionKind ${row.directionKind}`);
+            throw new Error(`mapOriginFromRow: unknown directionKind ${row.directionKind}`);
           })();
+
+  return { kind: 'qualified-breach', breachDirection };
+}
+
+function mapHistoryEventRow(row: HistoryEventRow): HistoryEvent {
+  const origin = mapOriginFromRow(row);
 
   const baseEvent = {
     eventId: row.eventId,
     positionId: row.positionId as PositionId,
     eventType: row.eventType as HistoryEvent['eventType'],
-    breachDirection,
+    origin,
     occurredAt: makeClockTimestamp(row.occurredAt),
   };
 
@@ -47,13 +77,18 @@ export class OffChainHistoryStorageAdapter implements ExecutionHistoryRepository
   constructor(private readonly db: Db) {}
 
   async appendEvent(event: HistoryEvent): Promise<void> {
+    const origin = event.origin;
     await this.db
       .insert(historyEvents)
       .values({
         eventId: event.eventId,
         positionId: event.positionId,
         eventType: event.eventType,
-        directionKind: event.breachDirection.kind,
+        originKind: origin.kind,
+        directionKind: origin.kind === 'qualified-breach' ? origin.breachDirection.kind : null,
+        planId: origin.kind === 'regime-plan' ? origin.planId : null,
+        canonicalHash: origin.kind === 'regime-plan' ? origin.canonicalHash : null,
+        canonicalExitIntent: origin.kind === 'regime-plan' ? origin.canonicalExitIntent : null,
         occurredAt: event.occurredAt,
         lifecycleStateKind: event.lifecycleState?.kind ?? null,
         transactionRefJson: event.transactionReference
@@ -129,16 +164,7 @@ export class OffChainHistoryStorageAdapter implements ExecutionHistoryRepository
 
     if (!terminalRow) return null;
 
-    const breachDirection =
-      terminalRow.directionKind === 'lower-bound-breach'
-        ? LOWER_BOUND_BREACH
-        : terminalRow.directionKind === 'upper-bound-breach'
-          ? UPPER_BOUND_BREACH
-          : (() => {
-              throw new Error(
-                `getOutcomeSummary: unknown directionKind ${terminalRow.directionKind}`,
-              );
-            })();
+    const origin = mapOriginFromRow(terminalRow);
 
     const lifecycleStateKind = terminalRow.lifecycleStateKind;
     if (!lifecycleStateKind) return null;
@@ -149,7 +175,7 @@ export class OffChainHistoryStorageAdapter implements ExecutionHistoryRepository
 
     return {
       positionId,
-      breachDirection,
+      origin,
       finalState: { kind: lifecycleStateKind } as ExecutionOutcomeSummary['finalState'],
       transactionReferences: txRefs as ExecutionOutcomeSummary['transactionReferences'],
       completedAt: makeClockTimestamp(terminalRow.occurredAt),

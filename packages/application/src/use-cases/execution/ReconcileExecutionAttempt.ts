@@ -5,7 +5,7 @@ import type {
   ClockPort,
   IdGeneratorPort,
 } from '../../ports/index.js';
-import type { PositionId, BreachDirection } from '@clmm/domain';
+import type { PositionId, ExecutionOrigin } from '@clmm/domain';
 
 export type ReconcileResult =
   | { kind: 'confirmed' }
@@ -16,23 +16,15 @@ export type ReconcileResult =
 export async function reconcileExecutionAttempt(params: {
   attemptId: string;
   positionId: PositionId;
-  breachDirection: BreachDirection;
+  origin: ExecutionOrigin;
   executionRepo: ExecutionRepository;
   submissionPort: ExecutionSubmissionPort;
   historyRepo: ExecutionHistoryRepository;
   clock: ClockPort;
   ids: IdGeneratorPort;
 }): Promise<ReconcileResult> {
-  const {
-    attemptId,
-    positionId,
-    breachDirection,
-    executionRepo,
-    submissionPort,
-    historyRepo,
-    clock,
-    ids,
-  } = params;
+  const { attemptId, positionId, origin, executionRepo, submissionPort, historyRepo, clock, ids } =
+    params;
 
   const attempt = await executionRepo.getAttempt(attemptId);
   if (!attempt) throw new Error(`Attempt not found: ${attemptId}`);
@@ -70,7 +62,7 @@ export async function reconcileExecutionAttempt(params: {
     eventId: ids.generateId(),
     positionId,
     eventType,
-    breachDirection,
+    origin,
     occurredAt: clock.now(),
     lifecycleState: finalState,
   });

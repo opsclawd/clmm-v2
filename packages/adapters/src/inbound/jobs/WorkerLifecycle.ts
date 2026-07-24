@@ -5,6 +5,7 @@ import { NotificationDispatchJobHandler } from './NotificationDispatchJobHandler
 import { ReconciliationJobHandler } from './ReconciliationJobHandler.js';
 import { TriggerQualificationJobHandler } from './TriggerQualificationJobHandler.js';
 import { SubmittedAttemptSweepHandler } from './SubmittedAttemptSweepHandler.js';
+import { PlanResultSweepHandler } from './PlanResultSweepHandler.js';
 import { BREACH_SCAN_CRON } from './breach-scan-schedule.js';
 import { PG_BOSS_INSTANCE } from './tokens.js';
 
@@ -23,6 +24,8 @@ export class WorkerLifecycle implements OnModuleInit, OnModuleDestroy {
     private readonly notificationDispatchHandler: NotificationDispatchJobHandler,
     @Inject(SubmittedAttemptSweepHandler)
     private readonly submittedAttemptSweepHandler: SubmittedAttemptSweepHandler,
+    @Inject(PlanResultSweepHandler)
+    private readonly planResultSweepHandler: PlanResultSweepHandler,
   ) {}
 
   async onModuleInit(): Promise<void> {
@@ -34,6 +37,7 @@ export class WorkerLifecycle implements OnModuleInit, OnModuleDestroy {
       ReconciliationJobHandler.JOB_NAME,
       NotificationDispatchJobHandler.JOB_NAME,
       SubmittedAttemptSweepHandler.JOB_NAME,
+      PlanResultSweepHandler.JOB_NAME,
     ] as const;
 
     for (const queueName of queueNames) {
@@ -86,6 +90,10 @@ export class WorkerLifecycle implements OnModuleInit, OnModuleDestroy {
       await this.submittedAttemptSweepHandler.handle();
     });
 
+    await this.boss.work(PlanResultSweepHandler.JOB_NAME, async () => {
+      await this.planResultSweepHandler.handle();
+    });
+
     await this.boss.schedule(
       BreachScanJobHandler.JOB_NAME,
       BREACH_SCAN_CRON,
@@ -98,6 +106,15 @@ export class WorkerLifecycle implements OnModuleInit, OnModuleDestroy {
     await this.boss.schedule(
       SubmittedAttemptSweepHandler.JOB_NAME,
       '*/2 * * * *',
+      {},
+      {
+        tz: 'UTC',
+      },
+    );
+
+    await this.boss.schedule(
+      PlanResultSweepHandler.JOB_NAME,
+      '*/5 * * * *',
       {},
       {
         tz: 'UTC',

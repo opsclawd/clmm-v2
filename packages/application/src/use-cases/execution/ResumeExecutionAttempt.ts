@@ -1,18 +1,18 @@
 import type { ExecutionRepository } from '../../ports/index.js';
-import type { PositionId, BreachDirection } from '@clmm/domain';
+import type { PositionId, ExecutionOrigin } from '@clmm/domain';
 
 export type ResumeExecutionAttemptResult =
   | {
       kind: 'resumable';
       attemptId: string;
       positionId: PositionId;
-      breachDirection: BreachDirection;
+      origin: ExecutionOrigin;
     }
   | {
       kind: 'submitted-pending';
       attemptId: string;
       positionId: PositionId;
-      breachDirection: BreachDirection;
+      origin: ExecutionOrigin;
     }
   | { kind: 'not-found' }
   | { kind: 'not-resumable'; currentState: string };
@@ -39,7 +39,7 @@ export async function resumeExecutionAttempt(params: {
       kind: 'submitted-pending',
       attemptId: attempt.attemptId,
       positionId: attempt.positionId,
-      breachDirection: attempt.breachDirection,
+      origin: attempt.origin,
     };
   }
 
@@ -48,7 +48,7 @@ export async function resumeExecutionAttempt(params: {
       kind: 'resumable',
       attemptId: attempt.attemptId,
       positionId: attempt.positionId,
-      breachDirection: attempt.breachDirection,
+      origin: attempt.origin,
     };
   }
 

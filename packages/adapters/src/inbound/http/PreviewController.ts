@@ -16,7 +16,7 @@ import type {
   ExitTriggerId,
   ExecutionPreview,
   PositionId,
-  BreachDirection,
+  ExecutionOrigin,
   BreachEpisodeId,
 } from '@clmm/domain';
 import {
@@ -30,7 +30,7 @@ import {
 function toPreviewDto(
   previewId: string,
   positionId: PositionId,
-  breachDirection: BreachDirection,
+  origin: ExecutionOrigin,
   preview: ExecutionPreview,
   episodeId?: BreachEpisodeId,
 ): ExecutionPreviewDto {
@@ -39,7 +39,7 @@ function toPreviewDto(
     previewId,
     positionId,
     ...(episodeId ? { episodeId } : {}),
-    breachDirection,
+    origin,
     postExitPosture: plan.postExitPosture,
     steps: plan.steps.map((step) => {
       if (step.kind === 'swap-assets') {
@@ -79,7 +79,7 @@ export class PreviewController {
       throw new NotFoundException(`Preview not found: ${previewId}`);
     }
     return {
-      preview: toPreviewDto(previewId, result.positionId, result.breachDirection, result.preview),
+      preview: toPreviewDto(previewId, result.positionId, result.origin, result.preview),
     };
   }
 
@@ -103,7 +103,7 @@ export class PreviewController {
       preview: toPreviewDto(
         result.previewId,
         trigger.positionId,
-        trigger.breachDirection,
+        { kind: 'qualified-breach', breachDirection: trigger.breachDirection },
         result.preview,
         trigger.episodeId,
       ),
@@ -129,7 +129,7 @@ export class PreviewController {
       preview: toPreviewDto(
         result.previewId,
         trigger.positionId,
-        trigger.breachDirection,
+        { kind: 'qualified-breach', breachDirection: trigger.breachDirection },
         result.preview,
         trigger.episodeId,
       ),

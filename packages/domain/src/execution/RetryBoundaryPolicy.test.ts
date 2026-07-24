@@ -1,8 +1,10 @@
 import { describe, it, expect } from 'vitest';
 import { evaluateRetryEligibility } from './RetryBoundaryPolicy.js';
 import type { ExecutionAttempt } from './index.js';
+import { LOWER_BOUND_BREACH } from '../shared/index.js';
 
 const baseAttempt: ExecutionAttempt = {
+  origin: { kind: 'qualified-breach', breachDirection: LOWER_BOUND_BREACH },
   lifecycleState: { kind: 'failed' },
   completedSteps: [],
   transactionReferences: [],

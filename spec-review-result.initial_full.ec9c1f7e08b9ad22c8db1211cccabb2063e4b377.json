@@ -1,0 +1,17 @@
+{
+  "result": "fail",
+  "findings": [
+    {
+      "severity": "P0",
+      "summary": "The canonical result payload is built but never enqueued in the outbox; planRepository.commitTerminalOutcome() is not called.",
+      "file": "packages/application/src/use-cases/plans/RecordPlanDecision.ts",
+      "suggested_fix": "Call planRepository.commitTerminalOutcome() with the built canonicalResult. Update the test that incorrectly equates commitTerminalOutcome with on-chain work."
+    },
+    {
+      "severity": "P1",
+      "summary": "Unsupported decision/action combinations are not handled or transformed into a canonical skipped/expired outcome.",
+      "file": "packages/application/src/use-cases/plans/RecordPlanDecision.ts",
+      "suggested_fix": "Add logic to validate the requested decision against the plan's action, and override the decision to an appropriate skipped/expired outcome if unsupported."
+    }
+  ]
+}

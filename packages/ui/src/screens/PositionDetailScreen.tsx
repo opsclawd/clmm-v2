@@ -5,13 +5,29 @@ import { typography } from '../design-system/index.js';
 import { presentPositionDetail } from '../presenters/PositionDetailPresenter.js';
 import { RangeStatusBadge } from '../components/RangeStatusBadge.js';
 import { DirectionalPolicyCard } from '../components/DirectionalPolicyCard.js';
+import { PositionPlanCard } from '../components/PositionPlanCard.js';
+import { buildPositionPlanViewModel } from '../view-models/PositionPlanViewModel.js';
+import type { CurrentPlanDto } from '../view-models/PositionPlanViewModel.js';
 
 type Props = {
   position?: PositionDetailDto;
+  plan?: CurrentPlanDto;
   onViewPreview?: (triggerId: string) => void;
+  onPlanAcknowledge?: (planId: string) => void;
+  onPlanPreview?: (planId: string) => void;
+  onPlanApprove?: (planId: string, previewId: string) => void;
+  isPlanActionPending?: boolean;
 };
 
-export function PositionDetailScreen({ position, onViewPreview }: Props): JSX.Element {
+export function PositionDetailScreen({
+  position,
+  plan,
+  onViewPreview,
+  onPlanAcknowledge,
+  onPlanPreview,
+  onPlanApprove,
+  isPlanActionPending = false,
+}: Props): JSX.Element {
   if (!position) {
     return (
       <View style={{ flex: 1, backgroundColor: colors.background, padding: 16 }}>
@@ -33,8 +49,9 @@ export function PositionDetailScreen({ position, onViewPreview }: Props): JSX.El
   const vm = presentation.position;
   const breachDirection = position.breachDirection;
   const triggerId = position.triggerId;
-  const canViewPreview =
-    position.hasActionableTrigger && breachDirection != null && triggerId != null;
+  const planVm = buildPositionPlanViewModel(plan ?? null, breachDirection);
+  const showBreachControls =
+    'showBreachControls' in planVm ? planVm.showBreachControls : breachDirection != null;
 
   return (
     <ScrollView style={{ flex: 1, backgroundColor: colors.background }}>
@@ -135,9 +152,9 @@ export function PositionDetailScreen({ position, onViewPreview }: Props): JSX.El
           </View>
         ) : null}
 
-        {canViewPreview ? (
+        {showBreachControls && triggerId != null ? (
           <View style={{ marginTop: 16 }}>
-            <DirectionalPolicyCard direction={breachDirection} />
+            <DirectionalPolicyCard direction={breachDirection!} />
 
             <TouchableOpacity
               onPress={() => onViewPreview?.(triggerId)}
@@ -161,6 +178,26 @@ export function PositionDetailScreen({ position, onViewPreview }: Props): JSX.El
             </TouchableOpacity>
           </View>
         ) : null}
+
+        <PositionPlanCard
+          plan={planVm}
+          isActionPending={isPlanActionPending}
+          onAcknowledge={() => {
+            if (plan && !isPlanActionPending) {
+              onPlanAcknowledge?.(plan.planId);
+            }
+          }}
+          onPreview={() => {
+            if (plan && !isPlanActionPending) {
+              onPlanPreview?.(plan.planId);
+            }
+          }}
+          onApprove={() => {
+            if (plan && planVm.status === 'preview-ready' && !isPlanActionPending) {
+              onPlanApprove?.(plan.planId, planVm.previewId);
+            }
+          }}
+        />
 
         <View
           style={{

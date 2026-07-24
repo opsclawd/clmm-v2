@@ -35,6 +35,7 @@ export { getMonitoringDisplay } from './components/PositionCardUtils.js';
 export type { MonitoringDisplay, MonitoringTone } from './components/PositionCardUtils.js';
 export { RegimeSection } from './components/RegimeSection.js';
 export { PolicyInsightsSection } from './components/PolicyInsightsSection.js';
+export { PositionPlanCard } from './components/PositionPlanCard.js';
 
 // Wallet connection utils
 export {
@@ -71,6 +72,13 @@ export type {
   FinancialMetricViewModel,
 } from './view-models/PositionListViewModel.js';
 export { buildPositionDetailViewModel } from './view-models/PositionDetailViewModel.js';
+export { buildPositionPlanViewModel } from './view-models/PositionPlanViewModel.js';
+export type {
+  PositionPlanViewModel,
+  CurrentPlanDto,
+  PlanLifecycleState,
+  PlanAction,
+} from './view-models/PositionPlanViewModel.js';
 export { buildHistoryViewModel } from './view-models/HistoryViewModel.js';
 export { buildWalletConnectViewModel } from './view-models/WalletConnectionViewModel.js';
 export { buildWalletSettingsViewModel } from './view-models/WalletConnectionViewModel.js';

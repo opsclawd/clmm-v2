@@ -1,0 +1,11 @@
+{
+  "result": "fail",
+  "findings": [
+    {
+      "severity": "P0",
+      "summary": "Implementation is entirely missing. The expected files RegimePlanAdapter.ts, RegimePlanAdapter.test.ts, and FakeRegimePlanPort.ts were not created, and RegimePlanPort was not added to application ports index.",
+      "file": "packages/application/src/ports/index.ts",
+      "suggested_fix": "Implement the task requirements as described in the plan and task context: add RegimePlanPort, and implement RegimePlanAdapter and FakeRegimePlanPort with the required transport validations and tests."
+    }
+  ]
+}

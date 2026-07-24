@@ -33,7 +33,9 @@ function ExecutionRouteBody() {
       {...(executionQuery.data != null
         ? {
             lifecycleState: executionQuery.data.lifecycleState,
-            breachDirection: executionQuery.data.breachDirection,
+            ...(executionQuery.data.origin.kind === 'qualified-breach'
+              ? { breachDirection: executionQuery.data.origin.breachDirection }
+              : {}),
             retryEligible: executionQuery.data.retryEligible,
             ...(executionQuery.data.transactionReferences[0]?.signature != null
               ? { transactionSignature: executionQuery.data.transactionReferences[0].signature }

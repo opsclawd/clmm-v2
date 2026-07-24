@@ -45,7 +45,10 @@ export async function createExecutionPreview(params: {
     estimatedAt,
   };
 
-  const { previewId } = await executionRepo.savePreview(positionId, preview, breachDirection);
+  const { previewId } = await executionRepo.savePreview(positionId, preview, {
+    kind: 'qualified-breach',
+    breachDirection,
+  });
 
   return { previewId, plan: enrichedPlan, preview };
 }

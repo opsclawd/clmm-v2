@@ -1,6 +1,6 @@
 # Task Context: Task 2
 
-Title: Build the complete display-ready PolicyInsight view model
+Title: Model the plan lifecycle and explicit execution origin
 
 ## Workspace & Scope Constraints
 
@@ -10,142 +10,79 @@ Your working directory is a dedicated git worktree with the repository's complet
 
 .ai-orchestrator.local.json, if one exists, lives only in the main checkout and is intentionally not copied into your worktree — it is operator-machine-specific and not part of your task. Do not search for it or read it outside this directory. Reason about configuration using only .ai-orchestrator.json in your own working directory; treat it as the effective config for your task.
 
-Working Directory: /home/gary/.openclaw/workspace/clmm-superpowers-v2/.ai-worktrees/issue-93
+Working Directory: /home/gary/.openclaw/workspace/clmm-superpowers-v2/.ai-worktrees/issue-62
 Repository: opsclawd/clmm-v2
-Branch: ai/issue-93
-Start Commit: ea439d93e9d2ece2778fd487e370173c295002c9
+Branch: ai/issue-62
+Start Commit: a992517c4f418e93c2a98914c26582bf40b2515b
 
 ## Task Requirements
 
 **Files:**
 
-- Modify: `packages/ui/src/view-models/PolicyInsightsViewModel.ts`
-- Modify: `packages/ui/src/view-models/PolicyInsightsViewModel.test.ts`
+- Create: `packages/domain/src/regime/PositionPlan.ts`
+- Create: `packages/domain/src/regime/PlanLifecycleReducer.ts`
+- Create: `packages/domain/src/regime/PlanLifecycleReducer.test.ts`
+- Modify: `packages/domain/src/regime/index.ts`
+- Modify: `packages/domain/src/execution/index.ts`
+- Modify: `packages/domain/src/history/index.ts`
+- Modify: `packages/domain/src/exit-policy/DirectionalExitPolicyService.ts`
+- Modify: `packages/domain/src/exit-policy/DirectionalExitPolicyService.test.ts`
 
 **Behavioral invariants:**
 
-- Basis points format exactly without floating-point rounding: `0 -> 0%`, `1 -> 0.01%`, `3750 -> 37.5%`, and `10000 -> 100%`.
-- Market, fundamental, posture, range-bias, and sensitivity enums map to stable title/sentence-case labels in the view model; the component never interprets raw enums.
-- Canonical level strings retain their supplied precision and order, while lexical zero values (`0`, `0.0`, `0.00`) are removed. A side with valid values gets one comma-separated `USDC/SOL` label; when both sides are empty, one `No eligible support or resistance levels` label is supplied.
-- Evidence copy maps `FULL`, `PARTIAL`, and `DEGRADED` to `Full`, `Partial`, and `Limited evidence coverage`, appending pluralized aggregate bundle/source counts only; raw IDs never enter the view model.
-- `isDegraded` is true for `PARTIAL`/`DEGRADED` evidence or non-`COMPLETE` data quality. `isLowConfidence` is true below 5000 bps.
-- `isStale` is true when canonical freshness is `STALE` or `expiresAt <= now`; as-of and expiry labels are always display-ready UTC strings.
-- Stable warning copy is keyed by warning/reason code, upstream free-form warning messages are ignored, duplicates are removed, and at most three items are returned in canonical order.
-- Reasoning is unchanged through 240 characters and becomes the first 239 characters plus `…` when longer.
-- Critical risk and exit recommendations remain `danger`; otherwise stale, degraded, low-confidence, elevated-risk, or stand-down insights are `warning`; only fresh/full/complete/high-confidence normal insights are `neutral`.
+- `requested + valid response -> advisory-ready`; exact replay preserves the existing record; same plan ID with a different canonical hash transitions to `conflict` and cannot execute.
+- `advisory-ready(HOLD|STAND_DOWN) + acknowledge -> result-pending` with no execution origin or attempt.
+- `advisory-ready(REQUEST_EXIT_CLMM) + preview -> exit-previewed`; approval may then move through `awaiting-signature`, `submitted`, and `result-pending`.
+- `advisory-ready|exit-previewed|awaiting-signature + qualified breach -> superseded`; the breach remains independently actionable.
+- An expired/stale/position-changed plan can move only to `result-pending` with the canonical non-executed outcome.
+- `result-pending + delivery success -> reported`; retry scheduling leaves it `result-pending`; permanent rejection moves to `report-failed` without re-execution.
+- Terminal/reported/conflict plans reject transitions that would create another preview or attempt.
+- `ExecutionOrigin` is either `qualified-breach` with a real `BreachDirection` or `regime-plan` with plan ID/hash and canonical exit intent; neither variant can be constructed with the other variant's fields.
+- Lower and upper breach behavior remains exactly the release-blocker mapping in `DirectionalExitPolicyService`; no plan-intent mapping is added elsewhere.
 
-- [ ] **Step 1: Write the failing view-model tests**
+**Acceptance criteria:**
 
-Add exact tests named:
+- [ ] Write named tests `transitions a valid requested plan to advisory-ready`, `keeps exact response replay idempotent`, `fails closed on same plan id with different content`, `acknowledges hold without creating execution`, `supersedes advisory work when a breach qualifies`, `prevents execution after expiry or material position change`, `keeps retryable result delivery pending`, `rejects duplicate execution from a terminal plan`, and `keeps breach and regime-plan execution origins disjoint`.
+- [ ] Add an exhaustive pure reducer that returns typed transition results and throws on impossible runtime discriminants.
+- [ ] Introduce `ExecutionOrigin` alongside the existing execution/history types without changing their required members yet; Task 7 performs the atomic signature migration with every consumer and storage implementation.
+- [ ] Add regression tests named `lower breach still exits to USDC` and `upper breach still exits to SOL`.
 
-```text
-formats basis points exactly without rounding away precision
-maps market and fundamental regimes to display-ready labels
-preserves canonical decimal levels while filtering zero placeholders
-marks both empty level arrays unavailable instead of rendering zero
-summarizes evidence coverage and aggregate counts without raw identifiers
-marks partial degraded and low-confidence insights as visually weaker
-marks an expired insight stale even when freshness.status is FRESH
-maps deduplicates and bounds warning and reason-code copy
-bounds long reasoning for display
-keeps critical and exit actions at danger precedence
-```
-
-Use `current-pair.json` for fresh/full/empty-level coverage, `current-position.json` for multiple levels/partial evidence/exit action, and `history.json` item 2 for degraded/stale coverage. Clone before overrides so imported fixtures remain immutable.
-
-- [ ] **Step 2: Run the focused view-model test and confirm it fails**
-
-Run:
+**Verification:**
 
 ```bash
-pnpm --filter @clmm/ui test -- src/view-models/PolicyInsightsViewModel.test.ts
+pnpm --filter @clmm/domain test -- src/regime/PlanLifecycleReducer.test.ts src/exit-policy/DirectionalExitPolicyService.test.ts
+pnpm exec eslint packages/domain/src/regime/PositionPlan.ts packages/domain/src/regime/PlanLifecycleReducer.ts packages/domain/src/regime/PlanLifecycleReducer.test.ts packages/domain/src/regime/index.ts packages/domain/src/execution/index.ts packages/domain/src/history/index.ts packages/domain/src/exit-policy/DirectionalExitPolicyService.ts packages/domain/src/exit-policy/DirectionalExitPolicyService.test.ts
+git diff --check -- packages/domain/src/regime/PositionPlan.ts packages/domain/src/regime/PlanLifecycleReducer.ts packages/domain/src/regime/PlanLifecycleReducer.test.ts packages/domain/src/regime/index.ts packages/domain/src/execution/index.ts packages/domain/src/history/index.ts packages/domain/src/exit-policy/DirectionalExitPolicyService.ts packages/domain/src/exit-policy/DirectionalExitPolicyService.test.ts
 ```
 
-Expected: failures identify missing fields, the current rounded `3750 -> 38%` behavior, missing expiry handling, and absent evidence/warning/level formatting.
-
-- [ ] **Step 3: Add display-ready fields and pure formatting helpers**
-
-Extend the exported `PolicyInsightsViewModel` with this required shape:
-
-```ts
-type PolicyInsightsViewModel = {
-  actionLabel: string;
-  severity: PolicyInsightsSeverity;
-  marketRegimeLabel: string;
-  fundamentalRegimeLabel: string;
-  postureLabel: string;
-  rangeBiasLabel: string;
-  rebalanceSensitivityLabel: string;
-  maxDeploymentLabel: string;
-  riskLabel: string;
-  confidenceLabel: string;
-  dataQualityLabel: string;
-  freshnessLabel: string;
-  asOfLabel: string;
-  expiresLabel: string;
-  isStale: boolean;
-  isDegraded: boolean;
-  isLowConfidence: boolean;
-  supportsLabel: string | null;
-  resistancesLabel: string | null;
-  levelsUnavailableLabel: string | null;
-  evidenceSummary: string;
-  warningLabels: string[];
-  reasoning: string;
-  subtitle: string;
-};
-```
-
-Implement small pure helpers for exact basis-point formatting, enum labels, UTC timestamp labels, lexical-zero level filtering, evidence-count pluralization, stable code mapping/deduplication, and bounded text. Use this advisory subtitle:
-
-```text
-Advisory policy context only. Nothing is signed or applied; deterministic stop-loss monitoring continues independently.
-```
-
-Do not return evidence reference objects or free-form warning messages.
-
-- [ ] **Step 4: Run focused verification**
-
-Run:
-
-```bash
-pnpm --filter @clmm/ui test -- src/view-models/PolicyInsightsViewModel.test.ts
-pnpm --filter @clmm/ui typecheck
-```
-
-Expected: all view-model tests pass with exact basis-point values, canonical fixture coverage, bounded copy, no fake zero levels, and no raw evidence identifiers.
-
-- [ ] **Step 5: Commit the view-model delta**
-
-```bash
-git add packages/ui/src/view-models/PolicyInsightsViewModel.ts packages/ui/src/view-models/PolicyInsightsViewModel.test.ts
-git commit -m "feat: format canonical policy insight context"
-```
+Expected: all lifecycle and directional-policy tests pass, including the unchanged lower/upper mapping.
 
 ## Repository Targets
 
 ### Expected Files
 
-- packages/ui/src/view-models/PolicyInsightsViewModel.ts
-- packages/ui/src/view-models/PolicyInsightsViewModel.test.ts
+- packages/domain/src/regime/PositionPlan.ts
+- packages/domain/src/regime/PlanLifecycleReducer.ts
+- packages/domain/src/regime/PlanLifecycleReducer.test.ts
+- packages/domain/src/regime/index.ts
+- packages/domain/src/execution/index.ts
+- packages/domain/src/history/index.ts
+- packages/domain/src/exit-policy/DirectionalExitPolicyService.ts
+- packages/domain/src/exit-policy/DirectionalExitPolicyService.test.ts
 
 ## Validation Commands
 
 ```bash
-pnpm --filter @clmm/ui test -- src/view-models/PolicyInsightsViewModel.test.ts
-pnpm --filter @clmm/ui typecheck
+pnpm --filter @clmm/domain test -- src/regime/PlanLifecycleReducer.test.ts src/exit-policy/DirectionalExitPolicyService.test.ts
+pnpm exec eslint packages/domain/src/regime/PositionPlan.ts packages/domain/src/regime/PlanLifecycleReducer.ts packages/domain/src/regime/PlanLifecycleReducer.test.ts packages/domain/src/regime/index.ts packages/domain/src/execution/index.ts packages/domain/src/history/index.ts packages/domain/src/exit-policy/DirectionalExitPolicyService.ts packages/domain/src/exit-policy/DirectionalExitPolicyService.test.ts
+git diff --check -- packages/domain/src/regime/PositionPlan.ts packages/domain/src/regime/PlanLifecycleReducer.ts packages/domain/src/regime/PlanLifecycleReducer.test.ts packages/domain/src/regime/index.ts packages/domain/src/execution/index.ts packages/domain/src/history/index.ts packages/domain/src/exit-policy/DirectionalExitPolicyService.ts packages/domain/src/exit-policy/DirectionalExitPolicyService.test.ts
 ```
 
 ## Behavioral Invariants
 
 You MUST implement the following behavioral invariants as named tests first (TDD):
 
-- **basis points retain exact precision**: Basis points render exact hundredths of a percent without floating-point rounding. (Test: `formats basis points exactly without rounding away precision`)
-- **canonical enums become display labels**: Market, fundamental, posture, range-bias, and sensitivity enums are mapped centrally to stable human-readable labels. (Test: `maps market and fundamental regimes to display-ready labels`)
-- **zero levels are missing not prices**: Lexical zero level strings are filtered, valid decimal strings preserve precision and order, and both empty sides produce one unavailable label. (Test: `preserves canonical decimal levels while filtering zero placeholders`)
-- **evidence is summarized without internals**: Evidence status and aggregate counts are shown without bundle hashes, reference IDs, locators, or selection-policy details. (Test: `summarizes evidence coverage and aggregate counts without raw identifiers`)
-- **weak evidence and low confidence are explicit**: Partial or degraded evidence, incomplete data, and confidence below 5000 bps produce explicit weak-state flags. (Test: `marks partial degraded and low-confidence insights as visually weaker`)
-- **expiry is stale**: An insight whose expiresAt is at or before now is stale even if the read-time freshness enum says FRESH. (Test: `marks an expired insight stale even when freshness.status is FRESH`)
-- **warning copy is stable and bounded**: Warning and reason codes map to stable copy, deduplicate in canonical order, ignore free-form messages, and return no more than three items. (Test: `maps deduplicates and bounds warning and reason-code copy`)
-- **reasoning is bounded**: Reasoning longer than 240 characters is truncated to 239 characters plus an ellipsis. (Test: `bounds long reasoning for display`)
-- **danger has precedence**: Critical risk and both exit recommendations remain danger even when stale, degraded, or low confidence. (Test: `keeps critical and exit actions at danger precedence`)
+- **exact response replay is idempotent**: The same plan ID and canonical hash preserve the existing plan and cannot create another execution. (Test: `keeps exact response replay idempotent`)
+- **conflicting replay fails closed**: The same plan ID with different content transitions to conflict and remains unexecuted. (Test: `fails closed on same plan id with different content`)
+- **breach supersedes advisory plan**: A qualified breach moves advisory work to superseded while leaving the breach independently actionable. (Test: `supersedes advisory work when a breach qualifies`)
+- **execution origins are truthful**: Qualified breaches require a real direction and Regime plans require plan identity and canonical exit intent. (Test: `keeps breach and regime-plan execution origins disjoint`)

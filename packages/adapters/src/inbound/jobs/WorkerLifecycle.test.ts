@@ -6,6 +6,7 @@ import { NotificationDispatchJobHandler } from './NotificationDispatchJobHandler
 import { ReconciliationJobHandler } from './ReconciliationJobHandler.js';
 import { TriggerQualificationJobHandler } from './TriggerQualificationJobHandler.js';
 import { SubmittedAttemptSweepHandler } from './SubmittedAttemptSweepHandler.js';
+import { PlanResultSweepHandler } from './PlanResultSweepHandler.js';
 import { WorkerLifecycle } from './WorkerLifecycle.js';
 import { PG_BOSS_INSTANCE } from './tokens.js';
 
@@ -25,6 +26,7 @@ describe('WorkerLifecycle', () => {
       { index: 3, param: ReconciliationJobHandler },
       { index: 4, param: NotificationDispatchJobHandler },
       { index: 5, param: SubmittedAttemptSweepHandler },
+      { index: 6, param: PlanResultSweepHandler },
     ]);
   });
 
@@ -56,6 +58,9 @@ describe('WorkerLifecycle', () => {
     const submittedAttemptSweepHandler = {
       handle: vi.fn().mockResolvedValue(undefined),
     } as unknown as SubmittedAttemptSweepHandler;
+    const planResultSweepHandler = {
+      handle: vi.fn().mockResolvedValue(undefined),
+    } as unknown as PlanResultSweepHandler;
 
     const lifecycle = new WorkerLifecycle(
       boss,
@@ -64,6 +69,7 @@ describe('WorkerLifecycle', () => {
       reconciliationHandler,
       notificationDispatchHandler,
       submittedAttemptSweepHandler,
+      planResultSweepHandler,
     );
 
     await lifecycle.onModuleInit();

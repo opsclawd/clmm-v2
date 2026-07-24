@@ -65,7 +65,7 @@ export class ReconciliationJobHandler {
       const result = await reconcileExecutionAttempt({
         attemptId: data.attemptId,
         positionId: attempt.positionId,
-        breachDirection: attempt.breachDirection,
+        origin: attempt.origin,
         executionRepo: this.executionRepo,
         submissionPort: this.submissionPort,
         historyRepo: this.historyRepo,
@@ -93,12 +93,13 @@ export class ReconciliationJobHandler {
                 attemptId: data.attemptId,
               },
             );
-          } else {
+          } else if (updatedAttempt.origin.kind === 'qualified-breach') {
             const event = buildClmmExecutionEvent(
               updatedAttempt,
               result.kind,
               this.clock,
-              applyDirectionalExitPolicy(updatedAttempt.breachDirection).swapInstruction.toAsset,
+              applyDirectionalExitPolicy(updatedAttempt.origin.breachDirection).swapInstruction
+                .toAsset,
             );
             await this.regimeEngineEventPort.notifyExecutionEvent(event);
           }

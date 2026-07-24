@@ -1,180 +1,218 @@
-# feat: complete the PolicyInsight UI delta for the canonical v1 contract
+# feat: integrate the current position-scoped Regime plan and execution-result loop
 
 ## Summary
 
-Complete the **remaining UI delta** needed to render the canonical Regime Engine `PolicyInsight v1` after #92 centralizes contract parsing and DTO mapping.
+Integrate clmm-v2 with Regime Engine's **current position-scoped** plan → user decision/execution → execution-result audit loop.
 
-The positions experience already renders much of the decision-relevant policy content. This issue must inspect and extend the existing components rather than build a second PolicyInsight surface or replace working presentation unnecessarily.
+The previous issue body described an obsolete broad portfolio-allocation contract with inline candles and autonomous enter/rebalance actions. That design is superseded.
 
-## Correct dependency boundary
+## Correct boundary
 
 ```text
-Regime #63 -> canonical PolicyInsight v1 schema and fixtures
-Regime #61 -> synthesized canonical insights
-clmm #92   -> one validated adapter/DTO/parser boundary
-clmm #93   -> concise user-facing delta only
+Regime Engine -> advisory position-scoped plan and audit ledger
+clmm-v2       -> live position truth, breach qualification, execution safety, UX, signing, and actual result
 ```
 
-UI code must consume the internal validated view model from #92. It must not fetch Regime directly or maintain another handwritten runtime parser.
+Regime Engine never signs or submits transactions. clmm-v2 never delegates deterministic stop-loss safety or live execution authority to Regime availability.
 
-## Required pre-implementation audit
+## Canonical contract pinning
 
-Before modifying components, document which canonical fields and states are already rendered correctly and which are missing.
+Before this issue is enqueued, update this body with the merged/live Regime Engine contract artifacts:
 
-At minimum inspect existing support for:
+```text
+Regime Engine contract commit: <merged SHA>
+Plan request schema/OpenAPI path: <path>
+Plan response schema/OpenAPI path: <path>
+Execution-result schema/OpenAPI path: <path>
+Schema/API version: <version>
+Contract artifact SHA-256: <hash if applicable>
+Authentication/private-network semantics: <documented behavior>
+```
 
-- recommended action;
-- freshness/stale status;
-- posture;
-- range bias;
-- rebalance sensitivity;
-- maximum capital deployment;
-- risk;
-- confidence;
-- data quality;
-- reasoning;
-- unavailable/degraded handling.
+Do not reimplement the request or response from examples in this issue. Generate or centralize client validation from the pinned machine-readable contract.
 
-Only implement the gap against `PolicyInsight v1`.
+## Superseded behavior — remove from scope
 
-## Required UI delta
+Do not implement:
 
-Add or correct presentation for canonical fields that are not already handled:
+- inline OHLCV candles in the plan request;
+- client-authored regime state;
+- broad portfolio target allocations such as `solBps`/`usdcBps`;
+- `REQUEST_ENTER_CLMM`;
+- `REQUEST_REBALANCE`;
+- autonomous position opening;
+- execution of multiple portfolio actions from one plan;
+- the old five-action table from the previous body.
 
-- market regime;
-- fundamental regime;
-- canonical `supportsUsdcPerSol` and `resistancesUsdcPerSol` arrays;
-- evidence-selection status (`FULL`, `DEGRADED`, `NONE`, or exact canonical enum);
-- selected evidence/bundle summary appropriate for a user, without dumping raw IDs or every metric;
-- machine-readable warning/reason-code mapping where needed for stable copy;
-- canonical basis-point formatting for confidence and maximum capital deployment;
-- strict malformed-contract state supplied by #92.
+Regime Engine owns canonical stored candles and current regime state. The MVP plan contract is position-scoped.
 
-Do not render empty level arrays as zero-price levels. Omit or mark levels unavailable when no valid level evidence exists.
+## Supported plan actions
 
-## Required presentation states
+Consume only the action types in the current MVP contract:
 
-Implement or verify explicit states:
+```text
+HOLD
+STAND_DOWN
+REQUEST_EXIT_CLMM
+```
 
-### Loading
+Unknown actions or schema versions must fail closed and remain unexecuted.
 
-The canonical request is in progress. Do not show stale placeholder values as current.
+`REQUEST_EXIT_CLMM` is a request for the existing close/collect/swap preview-and-sign flow. It is not permission to bypass user approval or execution-safety checks.
 
-### Ready/fresh
+## Plan request
 
-Show concise decision context and the insight `asOf` time/freshness.
+Request a plan for one current position using the exact pinned Regime schema.
 
-### Stale
+The request must be built from authoritative clmm-v2 application/domain state and should include only fields supported by the live contract, such as:
 
-The last valid insight may be shown only with visibly weaker stale treatment and expiry/as-of context. It must not look current.
+- position and pool identity;
+- observation/as-of timestamp;
+- current range state and boundary/tick context;
+- position freshness;
+- deterministic qualified-trigger state when the contract supports it;
+- current liquidity, fee/reward, or inventory context only when authoritative and contractually required;
+- current stand-down/cooldown or execution-attempt state when owned by clmm-v2.
 
-### Degraded
+No source API/RPC calls should be duplicated solely to satisfy fields Regime already owns.
 
-Show the valid insight with explicit partial/low-coverage evidence context and warnings.
+## Freshness and availability
 
-### Unavailable/not found
+- Reject or stand down on stale local position state according to the current plan contract.
+- Timeouts, `5xx`, malformed responses, unknown versions, and Regime unavailability must degrade the advisory plan feature explicitly.
+- Regime failure must **not** disable clmm-v2 monitoring, breach debounce/qualification, notifications, preview creation, or deterministic stop-loss execution.
+- Do not substitute a cached plan as current unless the contract defines valid expiry and the UI marks it stale/cached.
 
-Show that policy analysis is unavailable while making clear that position monitoring and deterministic stop-loss protection continue independently.
+## Plan persistence and idempotency
 
-### Invalid/malformed upstream
+Persist enough local state to audit and resume the lifecycle:
 
-Fail closed. Do not partially render fields from a payload rejected by #92. Show a stable unavailable/error state and emit observability for the contract failure.
+- plan ID;
+- plan hash/canonical response hash;
+- schema version;
+- position identity;
+- requested/received/as-of/expiry timestamps;
+- action and reason codes;
+- local decision state;
+- linked execution attempt/result identity.
 
-### Upstream/store error
+Exact plan replays must be idempotent. Same plan identity with different content must fail as a conflict and remain unexecuted.
 
-Render a bounded retry/error state without fabricating policy guidance.
+## User decision and execution behavior
 
-## Product rules
+### `HOLD`
 
-- Keep the UI concise and decision-focused.
-- Do not dump raw evidence bundles, internal IDs, or all feature values.
-- Do not present contextual evidence as deterministic certainty.
-- Make stale, degraded, and low-confidence output visibly weaker than fresh/high-quality output.
-- Preserve the distinction between advisory PolicyInsight and the deterministic execution/approval flow.
-- An `EXIT_TO_*` recommendation is not a signed or automatically executable instruction.
+- display/record the advisory result;
+- perform no on-chain action;
+- post the canonical acknowledgement/result required by the execution-result contract.
 
-## View-model behavior
+### `STAND_DOWN`
 
-Prefer one existing/extended `PolicyInsightViewModel` that provides display-ready values and stable states.
+- display the stand-down state and reason;
+- do not open or rebalance positions;
+- do not suppress an already-qualified deterministic breach exit;
+- post the canonical acknowledgement/result.
 
-The view model should centralize:
+### `REQUEST_EXIT_CLMM`
 
-- basis-point formatting;
-- price-level decimal-string formatting;
-- freshness/status mapping;
-- concise evidence coverage labels;
-- reason/warning copy selection;
-- maximum reasoning-item limits;
-- unavailable versus true-zero distinctions.
+- route into the existing execution preview → approval → wallet signing → submit → reconcile flow;
+- preserve all clmm-v2 checks for current position state, balances, route availability, slippage cap, price impact, fee/priority-fee buffers, transaction freshness, retry limit, and user signature;
+- allow the user to decline/skip according to the canonical result-status contract;
+- never submit automatically in Phase 1.
 
-Components should not reinterpret raw contract enums independently.
+If the position has already closed or changed materially since plan creation, fail/skip safely and report the actual reason rather than executing a stale request.
 
-## Contract fixtures and tests
+## Execution-result reporting
 
-Tests must consume the canonical fixtures pinned through #92 or view-model fixtures derived directly from them.
+Post the exact canonical execution result for each accepted plan lifecycle according to the pinned Regime contract.
 
-Cover at minimum:
+At minimum preserve:
 
-- fresh full-evidence insight;
-- fresh deterministic-only/degraded insight;
-- stale insight;
-- no evidence/`NONE` selection;
-- empty support/resistance arrays;
-- multiple support/resistance levels;
-- `EXIT_TO_USDC` and `EXIT_TO_SOL` advisory actions;
-- unavailable/not found;
-- store/upstream error;
-- malformed payload rejected by #92;
-- out-of-range/invalid basis points rejected before UI;
-- long reasoning/warning lists bounded for display.
+- plan ID and plan hash;
+- position identity;
+- requested action;
+- actual result status;
+- reason/note codes;
+- execution attempt/transaction signature where applicable;
+- realized costs/amounts only when authoritative;
+- resulting position/posture state;
+- completion timestamp;
+- idempotency identity.
+
+Retry unknown network outcomes with the same idempotency identity and bounded backoff. Do not retry permanent validation/auth/conflict failures indefinitely.
+
+If the app crashes or is closed after accepting a plan but before reporting a terminal result, persist enough state to reconcile/report it on the next launch without double execution.
+
+## Authentication and network boundary
+
+Plan and execution-result routes must use the exact authenticated/private-network semantics documented by the live Regime contract.
+
+Do not create an unauthenticated public write surface. If the live route lacks required internal authentication and is not provably private-only, treat that as a prerequisite Regime issue rather than weakening the client.
+
+## Relationship to deterministic breach execution
+
+The following precedence is mandatory:
+
+```text
+qualified clmm-v2 breach + clmm execution safety
+> Regime position plan
+> pair-level PolicyInsight
+```
+
+Examples:
+
+- a qualified lower breach may continue toward the existing exit-to-USDC flow even if Regime is unavailable;
+- a `HOLD` plan cannot cancel an already-qualified deterministic breach;
+- `STAND_DOWN` prevents discretionary/new activity but cannot trap funds inside an already-breached position;
+- a plan may request exit before a breach, but clmm-v2 still requires user approval and all execution checks.
 
 ## Scope
 
 In scope:
 
-- audit of existing PolicyInsight presentation;
-- minimal view-model additions;
-- targeted existing screen/component updates;
-- loading/fresh/stale/degraded/unavailable/invalid/error states;
-- accessibility and concise copy affected by the delta;
-- fixture-driven unit/component tests.
+- pinned contract client/types/validation;
+- position-scoped plan request adapter and application use case;
+- plan persistence/idempotency/conflict handling;
+- UX integration for `HOLD`, `STAND_DOWN`, and `REQUEST_EXIT_CLMM`;
+- linking `REQUEST_EXIT_CLMM` into the existing preview/sign/submit/reconcile flow;
+- execution-result reporting and crash/retry reconciliation;
+- timeout, degraded-state, observability, tests, and docs.
 
 Out of scope:
 
-- another PolicyInsight parser or Regime HTTP adapter;
-- changing the canonical wire contract;
-- new synthesis rules;
-- raw evidence collector work;
-- raw analytics dashboards;
-- execution preview/sign/submit changes;
-- a broad redesign of the positions screen.
+- inline candle delivery;
+- portfolio allocation targets;
+- enter/rebalance actions;
+- autonomous signing/submission;
+- changing Regime synthesis rules;
+- PolicyInsight display (#92/#93);
+- redesigning the separate breach-event telemetry endpoint unless required by the pinned plan-result contract.
 
 ## Guardrails
 
-- Reuse the validated boundary from #92.
-- Do not duplicate existing PolicyInsight components or fields.
-- Missing is not zero.
-- Invalid contract payloads fail closed.
-- Policy guidance cannot obscure or disable deterministic stop-loss behavior.
+- clmm-v2 remains execution authority.
+- Regime availability never gates deterministic stop-loss protection.
+- Only current MVP actions are accepted.
+- Unknown action/schema fails closed.
+- No duplicate execution on retries or app restart.
+- Every reported monetary/cost field must be authoritative or explicitly unavailable.
 
 ## Acceptance criteria
 
-- [ ] A pre-implementation audit identifies existing coverage and the exact UI delta.
-- [ ] Existing PolicyInsight components are extended rather than duplicated or replaced without need.
-- [ ] Market/fundamental regime, canonical level arrays, and evidence-selection context render when available.
-- [ ] Basis-point and decimal-string values are formatted centrally and correctly.
-- [ ] Loading, fresh, stale, degraded, unavailable, malformed, not-found, store-error, and upstream-error states are distinct and tested.
-- [ ] Empty/missing levels never render as fake zero values.
-- [ ] Invalid payloads rejected by #92 are never partially displayed.
-- [ ] Contextual evidence is visually and textually qualified.
-- [ ] The UI remains concise and does not expose raw evidence internals.
-- [ ] Copy states that policy analysis is advisory and independent from deterministic stop-loss monitoring/execution where relevant.
+- [ ] Issue is pinned to exact current Regime plan and execution-result artifacts before implementation.
+- [ ] Plan requests are position-scoped and contain no inline candles or client-authored regime state.
+- [ ] Client accepts only `HOLD`, `STAND_DOWN`, and `REQUEST_EXIT_CLMM`.
+- [ ] Unknown action/schema, malformed response, stale position, timeout, and Regime-unavailable cases fail/degrade safely.
+- [ ] Regime failure does not disable deterministic monitoring, breach qualification, alerts, or the existing user-signed exit flow.
+- [ ] `REQUEST_EXIT_CLMM` uses the existing preview/sign/submit/reconcile pipeline and cannot bypass slippage, fee, route, balance, freshness, retry, or signature checks.
+- [ ] `HOLD` and `STAND_DOWN` do not suppress an already-qualified breach.
+- [ ] Plan ID/hash, lifecycle state, and linked result are persisted for audit and restart recovery.
+- [ ] Exact replay is idempotent and conflicting replay fails closed.
+- [ ] Canonical execution results are posted for hold, stand-down, executed, failed, declined/skipped, stale, and abandoned/expired outcomes supported by the live contract.
+- [ ] Unknown network outcomes retry with the same idempotency identity and do not double execute.
+- [ ] Tests cover lower/upper qualified breach precedence, plan outage, stale plan, position-changed-before-signing, user decline, successful exit, failed transaction, app restart, result replay, and conflicting result.
 
-## Parent
+## Dependencies
 
-Part of #90.
-
-## Blocked by
-
-- #92
-- `opsclawd/regime-engine#61`
+- Current Regime Engine position-scoped `/v1/plan` and `/v1/execution-result` contracts must be merged and pinned.
+- Existing clmm-v2 preview/sign/submit/reconcile flow must remain the execution path.

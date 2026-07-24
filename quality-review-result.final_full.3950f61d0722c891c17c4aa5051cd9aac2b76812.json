@@ -1,0 +1,23 @@
+{
+  "result": "fail",
+  "findings": [
+    {
+      "severity": "P0",
+      "summary": "The adapter hardcodes domain-specific exit intents (`exit-to-usdc`) and breach directions (`lower-bound-breach`) to satisfy the PositionPlan type, violating the release-blocker invariant against deriving or faking directional mapping outside the domain layer.",
+      "file": "packages/adapters/src/outbound/storage/PlanStorageAdapter.ts",
+      "suggested_fix": "Add a jsonb column to store the full, domain-constructed state payload (or specific columns for canonicalExitIntent and breachDirection) instead of fabricating these values in the adapter."
+    },
+    {
+      "severity": "P0",
+      "summary": "FakePlanRepository shares the exact same directional hardcoding defect as PlanStorageAdapter, returning fabricated `exit-to-usdc` and `lower-bound-breach` data.",
+      "file": "packages/testing/src/fakes/FakePlanRepository.ts",
+      "suggested_fix": "Update the fake to store and return the actual PlanLifecycleState objects in memory rather than decomposing them into scalar fields and rebuilding them with hardcoded data."
+    },
+    {
+      "severity": "P2",
+      "summary": "The Drizzle schema is missing the requested database check constraint for 'result-delivery consistency'.",
+      "file": "packages/adapters/src/outbound/storage/schema/position-plans.ts",
+      "suggested_fix": "Add a check constraint such as `check('position_plans_delivery_consistency', sql`${table.lifecycleKind} != 'reported' OR ${table.deliveredAt} IS NOT NULL`)` to enforce consistency at the database level."
+    }
+  ]
+}

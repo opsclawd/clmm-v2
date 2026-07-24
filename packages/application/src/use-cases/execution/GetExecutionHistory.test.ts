@@ -12,7 +12,7 @@ describe('GetExecutionHistory', () => {
       eventId: 'evt-1',
       positionId: FIXTURE_POSITION_ID,
       eventType: 'submitted',
-      breachDirection: LOWER_BOUND_BREACH,
+      origin: { kind: 'qualified-breach', breachDirection: LOWER_BOUND_BREACH },
       occurredAt: new FakeClockPort().now(),
       lifecycleState: { kind: 'submitted' },
     });
@@ -30,8 +30,8 @@ describe('GetExecutionHistory', () => {
     expect(result.timeline.events).toHaveLength(0);
   });
 
-  it('events include breachDirection', async () => {
+  it('events include origin', async () => {
     const result = await getExecutionHistory({ positionId: FIXTURE_POSITION_ID, historyRepo });
-    expect(result.timeline.events[0]?.breachDirection).toBeDefined();
+    expect(result.timeline.events[0]?.origin).toBeDefined();
   });
 });

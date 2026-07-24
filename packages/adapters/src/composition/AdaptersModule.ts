@@ -13,6 +13,8 @@ import { DurableNotificationEventAdapter } from '../outbound/notifications/Durab
 import { TelemetryAdapter } from '../outbound/observability/TelemetryAdapter.js';
 import { RegimeEngineExecutionEventAdapter } from '../outbound/regime-engine/RegimeEngineExecutionEventAdapter.js';
 import { CurrentSrLevelsAdapter } from '../outbound/regime-engine/CurrentSrLevelsAdapter.js';
+import { RegimePlanAdapter } from '../outbound/regime-engine/RegimePlanAdapter.js';
+import { PlanStorageAdapter } from '../outbound/storage/PlanStorageAdapter.js';
 import { JupiterPriceAdapter } from '../outbound/price/JupiterPriceAdapter.js';
 import { OrcaPositionPrincipalQuoteHelper } from '../outbound/solana-position-reads/OrcaPositionPrincipalQuoteHelper.js';
 import type { RegimeEngineEventPort } from '../outbound/regime-engine/types.js';
@@ -38,6 +40,8 @@ import {
   REGIME_ENGINE_EVENT_PORT,
   CURRENT_SR_LEVELS_PORT,
   PRICE_PORT,
+  PLAN_REPOSITORY,
+  REGIME_PLAN_PORT,
 } from '../inbound/jobs/tokens.js';
 
 // boundary: process.env values are untyped at runtime; validated via env schema at deploy
@@ -87,6 +91,12 @@ const regimeEngineEventAdapter: RegimeEngineEventPort = new RegimeEngineExecutio
   telemetry,
 );
 const currentSrLevelsAdapter = new CurrentSrLevelsAdapter(regimeEngineBaseUrl, telemetry);
+const regimePlanAdapter = new RegimePlanAdapter(
+  regimeEngineBaseUrl,
+  regimeEngineInternalToken,
+  telemetry,
+);
+const planStorage = new PlanStorageAdapter(db);
 const jupiterPrice = new JupiterPriceAdapter();
 
 const sharedProviders = [
@@ -106,6 +116,8 @@ const sharedProviders = [
   { provide: ID_GENERATOR_PORT, useValue: systemIds },
   { provide: REGIME_ENGINE_EVENT_PORT, useValue: regimeEngineEventAdapter },
   { provide: CURRENT_SR_LEVELS_PORT, useValue: currentSrLevelsAdapter },
+  { provide: PLAN_REPOSITORY, useValue: planStorage },
+  { provide: REGIME_PLAN_PORT, useValue: regimePlanAdapter },
   { provide: PRICE_PORT, useValue: jupiterPrice },
 ];
 

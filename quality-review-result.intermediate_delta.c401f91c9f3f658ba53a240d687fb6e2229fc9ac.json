@@ -1,0 +1,17 @@
+{
+  "result": "fail",
+  "findings": [
+    {
+      "severity": "P0",
+      "summary": "PlanStorageAdapter continues to violate the directional mapping invariant by re-deriving postExitPosture from breach direction and hardcoding swapInstruction to SOL->USDC when reconstructing the exit-previewed state.",
+      "file": "packages/adapters/src/outbound/storage/PlanStorageAdapter.ts",
+      "suggested_fix": "Add a jsonb column (e.g. `lifecycleStateJson`) to store and retrieve the entire PlanLifecycleState object intact, removing the need to fabricate domain-specific preview and executionOrigin structures in the adapter."
+    },
+    {
+      "severity": "P0",
+      "summary": "FakePlanRepository shares the exact same directional hardcoding defect as PlanStorageAdapter, reconstructing the exit-previewed state with derived postExitPosture and hardcoded SOL->USDC swapInstructions.",
+      "file": "packages/testing/src/fakes/FakePlanRepository.ts",
+      "suggested_fix": "Update the fake to store and return the actual PlanLifecycleState objects in memory rather than decomposing them into scalar fields and rebuilding them with hardcoded data."
+    }
+  ]
+}

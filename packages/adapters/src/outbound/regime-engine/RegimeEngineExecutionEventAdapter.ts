@@ -113,7 +113,9 @@ export function buildClmmExecutionEvent(
   clock: ClockPort,
   tokenOut: 'USDC' | 'SOL',
 ): ClmmExecutionEventRequest {
-  const isLower = attempt.breachDirection.kind === 'lower-bound-breach';
+  const isLower =
+    attempt.origin.kind === 'qualified-breach' &&
+    attempt.origin.breachDirection.kind === 'lower-bound-breach';
 
   let txSignature: string;
   if (finalKind === 'confirmed') {

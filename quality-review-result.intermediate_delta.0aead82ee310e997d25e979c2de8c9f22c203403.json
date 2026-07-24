@@ -1,0 +1,23 @@
+{
+  "result": "fail",
+  "findings": [
+    {
+      "severity": "P2",
+      "summary": "The completeDelivery transaction reads planResultOutbox without for('update'), which can lead to race conditions if multiple workers attempt to complete the same delivery concurrently.",
+      "file": "packages/adapters/src/outbound/storage/PlanStorageAdapter.ts",
+      "suggested_fix": "Add .for('update') to the select query on planResultOutbox inside completeDelivery."
+    },
+    {
+      "severity": "P2",
+      "summary": "commitTerminalOutcome updates deliveryAttempts and nextAttemptAt on positionPlans, but retry attempts only update these fields on planResultOutbox (via claimDueResult and rescheduleRetry), leaving the parent plan record out of sync.",
+      "file": "packages/adapters/src/outbound/storage/PlanStorageAdapter.ts",
+      "suggested_fix": "Remove deliveryAttempts and nextAttemptAt from the positionPlans update in commitTerminalOutcome, as the outbox should be the source of truth for delivery state."
+    },
+    {
+      "severity": "P3",
+      "summary": "The lifecycleKind assignment in commitTerminalOutcome uses a ternary operator that evaluates to 'result-pending' in both branches, indicating either dead code or a logic error.",
+      "file": "packages/adapters/src/outbound/storage/PlanStorageAdapter.ts",
+      "suggested_fix": "Simplify the assignment to `const lifecycleKind = 'result-pending';` or fix the branches if a different state was intended."
+    }
+  ]
+}

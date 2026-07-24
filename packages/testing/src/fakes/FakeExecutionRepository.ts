@@ -1,10 +1,10 @@
 import type { ExecutionRepository } from '@clmm/application';
 import type {
   BreachEpisodeId,
-  BreachDirection,
   ClockTimestamp,
   ExecutionPreview,
   ExecutionLifecycleState,
+  ExecutionOrigin,
   PositionId,
 } from '@clmm/domain';
 import type { StoredExecutionAttempt } from '@clmm/application';
@@ -12,7 +12,7 @@ import type { StoredExecutionAttempt } from '@clmm/application';
 type StoredPreview = {
   preview: ExecutionPreview;
   positionId: PositionId;
-  breachDirection: BreachDirection;
+  origin: ExecutionOrigin;
 };
 
 type SavePreparedPayloadParams = {
@@ -39,10 +39,10 @@ export class FakeExecutionRepository implements ExecutionRepository {
   async savePreview(
     positionId: PositionId,
     preview: ExecutionPreview,
-    breachDirection: BreachDirection,
+    origin: ExecutionOrigin,
   ): Promise<{ previewId: string }> {
     const previewId = `preview-${++this._previewCounter}`;
-    this.previews.set(previewId, { preview, positionId, breachDirection });
+    this.previews.set(previewId, { preview, positionId, origin });
     return { previewId };
   }
 

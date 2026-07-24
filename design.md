@@ -1,71 +1,55 @@
-# PolicyInsight UI Delta Design Document (Issue #93)
+# Regime Position Plan Integration Design
 
-## 1. Problem Being Solved and Why It Matters
+## The problem being solved and why it matters
 
-Issue #93 requires completing the UI presentation for the canonical `PolicyInsight v1` contract. Pull Request #92 successfully centralized contract parsing and DTO mapping, ensuring that the frontend only ever receives validated view models. However, the UI component (`PolicyInsightsSection`) and its View-Model (`PolicyInsightsViewModel`) do not yet display several critical pieces of canonical data, nor do they fully implement the distinct presentation states (like `degraded` and `malformed`) required by the product rules.
+Currently, `clmm-v2` reads general pool/pair-level market context from Regime Engine and asynchronously posts execution results for deterministic breaches. However, Regime Engine provides advisory, position-aware plan recommendations. We need to integrate a position-scoped plan request (`POST /v1/plan`) and an execution result reporting loop (`POST /v1/execution-result`) into `clmm-v2` without compromising clmm-v2's execution authority, deterministic safety, and wallet signing loops. It matters because it enables smarter position-level advice (like `HOLD`, `STAND_DOWN`, or `REQUEST_EXIT_CLMM`) based on market regimes without turning over full custody or execution authority to an automated system.
 
-Implementing this delta ensures users have the complete, accurate context—such as market regime, support/resistance levels, and evidence quality—needed to make informed manual exit decisions without relying on raw, confusing JSON dumps.
+## Key design decisions and trade-offs considered
 
-## 2. Key Design Decisions and Trade-offs
+- **Execution Authority**: Regime Engine will never have the authority to bypass user signature or deterministic safety checks. The trade-off is reduced automation for higher safety and strict adherence to the non-custodial model.
+- **Fail Closed vs Degraded Advisory**: If Regime Engine fails or returns malformed data, `clmm-v2` will gracefully degrade the advisory feature but will _not_ disable local deterministic breach monitoring. This ensures stop-loss features remain robust against upstream availability issues.
+- **State Persistence for Audit and Recovery**: We will persist plan state locally. This requires additional storage mechanisms (e.g., `PlanRepository`) but is necessary for accurate execution result reporting, idempotency, and crash recovery.
+- **Action Scope Limitations**: We will explicitly drop support for `REQUEST_ENTER_CLMM` and `REQUEST_REBALANCE` for now, because `clmm-v2` lacks the execution infrastructure for opening or restructuring positions. The trade-off is reduced capability out-of-the-gate, but it prevents the UI from generating commands the execution layer cannot honestly fulfill.
 
-- **View-Model Centralization**: All formatting and conditional logic for the new fields will reside in `PolicyInsightsViewModel.ts`. The React component will only receive pre-formatted strings or boolean flags.
-  - _Trade-off_: Slightly larger View-Model, but ensures the UI remains purely presentational and easily unit-testable.
-- **Distinct `malformed` State**: The acceptance criteria demand that `malformed` and `upstream-error` be _distinct_ states. Currently, `CurrentPolicyInsightsAdapter` maps shape validation failures (supplied by #92) to `upstream-error`. We will update the adapter and port definitions to explicitly return a `malformed` kind.
-  - _Trade-off_: Requires a minor change to the adapter boundary, but is necessary to fulfill the "distinct and tested" UI requirement without duplicating parsing logic.
-- **Evidence Summary Conciseness**: Instead of displaying raw `bundleHash` or `referenceId` arrays, the UI will summarize the evidence (e.g., "Full evidence based on 3 sources").
-  - _Rationale_: Aligns with the product rule "Do not dump raw evidence internals" while satisfying "selected evidence/bundle summary appropriate for a user".
+## Proposed approach with rationale
 
-## 3. Proposed Approach
+1. **Contract Pinning & Vendoring**: Before implementation, vendored schemas for `plan.v1` and `execution-result.v1` will be synced into `schemas/regime-engine/`.
+2. **Domain Layer Expansion**: Add `PlanAction` (`HOLD`, `STAND_DOWN`, `REQUEST_EXIT_CLMM`) and `PlanLifecycleState` to `packages/domain/src/regime/`. Introduce a `PlanRepository` interface for persisting requested plans.
+3. **Application Layer Use Cases**:
+   - `RequestPositionPlan`: Fetches the current position state from local data and requests a plan from Regime Engine. Parses response and persists plan ID/hash to `PlanRepository`.
+   - `AcknowledgePlan`: For `HOLD` and `STAND_DOWN`, records the user acknowledgement and posts the canonical execution result to `/v1/execution-result`.
+   - `RequestExitExecution`: Bridges a `REQUEST_EXIT_CLMM` plan into the existing `CreateExecutionPreview` use case. Upon completion or failure of the execution pipeline, the result is reported to `/v1/execution-result`.
+4. **Adapter Layer**: Implement `RegimePlanAdapter` for `POST /v1/plan` and `POST /v1/execution-result`.
+5. **Safety Constraints**: `clmm-v2` deterministic breach (lower/upper bound exits) has strict priority. An active or qualified breach will override any `HOLD` or `STAND_DOWN` advisory.
 
-### 3.1 View-Model Extensions (`PolicyInsightsViewModel.ts`)
+## Assumptions made
 
-Add the following to the view-model:
+- The `POST /v1/plan` and `POST /v1/execution-result` contracts are (or will be) formalized and available to vendor into `schemas/regime-engine`.
+- Authentication semantics for the `POST` endpoints are identical to those of the existing `GET` regime endpoints.
+- Storing plans locally (e.g., via SQLite or IndexedDB, depending on the client platform) has enough capacity and is architecturally aligned with existing execution attempt storage.
+- The user interface will be updated in a separate, focused effort to display plan advisories on the Position Detail screen.
 
-- `marketRegimeLabel`: Formatted string for `block.marketRegime`.
-- `fundamentalRegimeLabel`: Formatted string for `block.fundamentalRegime`.
-- `supportLevels` & `resistanceLevels`: Arrays of strings representing valid price levels. Empty levels will be filtered out.
-- `evidenceSummary`: A concise string derived from `block.evidence.selectionStatus` and the lengths of `selectedBundleRefs`/`selectedSourceRefs`.
-- `warningsList`: Array of human-readable warning strings mapped from `block.warnings` and `block.reasonCodes`.
-- `isDegraded`: Boolean set to `true` if `selectionStatus` is `PARTIAL` or `DEGRADED`, or if `dataQuality` is not `COMPLETE`.
+## What is in scope and what is explicitly out of scope
 
-### 3.2 UI Component Updates (`PolicyInsightsSection.tsx`)
+**In Scope**:
 
-- **Layout**: Inject the new regimes and levels next to the existing `postureLabel` to keep market context grouped.
-- **Missing Levels**: If `supportLevels` or `resistanceLevels` are empty, display "No eligible levels" or omit the line entirely. Never render `0` or `0.00`.
-- **Degraded State**: If `vm.isDegraded` is true, apply a visual warning treatment (e.g., `colors.warn` text or a distinct border) alongside the `evidenceSummary`.
-- **Unavailable Mapping**: Add support for the new `malformed` unavailable reason to the `unavailableCopy` helper, rendering a fail-closed message: "Policy insight payload was malformed."
+- Vendored pinned contract clients/types/validation for the `v1` plan API.
+- Position-scoped plan request adapter and application use case.
+- Plan persistence, idempotency, and conflict handling.
+- UX integration logic for `HOLD`, `STAND_DOWN`, and `REQUEST_EXIT_CLMM`.
+- Linking `REQUEST_EXIT_CLMM` into the existing preview/sign/submit/reconcile flow.
+- Execution-result reporting and crash/retry reconciliation.
 
-### 3.3 Application Port & Adapter Updates
+**Out of Scope**:
 
-- **`PolicyInsightsUnavailableReason` & `PolicyInsightsReadResult`**: Add `'malformed'` to these types in `@clmm/application/public` and `@clmm/application/ports`.
-- **`CurrentPolicyInsightsAdapter.ts`**: Update line 66 so that if `parsePolicyInsightBlock(body)` returns `null`, the adapter returns `{ kind: 'malformed' }` rather than `{ kind: 'upstream-error' }`.
-- **`PolicyInsightsController` (BFF)**: Ensure the HTTP controller propagates the `malformed` state to the client payload.
+- Inline candle delivery or portfolio allocation targets.
+- Handling `REQUEST_ENTER_CLMM` or `REQUEST_REBALANCE`.
+- Autonomous signing or submission (zero-click execution).
+- Changing Regime Engine synthesis rules or PolicyInsight display.
+- Modifying the separate breach-event telemetry endpoint (`/v1/clmm-execution-result` for deterministic breaches).
 
-## 4. Assumptions Made
+## Risks or concerns identified from code analysis
 
-1.  **Adapter modification is acceptable**: Modifying `CurrentPolicyInsightsAdapter` to return `malformed` is assumed to be within scope, as it's the only way to satisfy the AC requiring `malformed` and `upstream-error` to be strictly distinct without writing a second parser.
-2.  **`PARTIAL` maps to Degraded**: The canonical DTO uses `FULL`, `PARTIAL`, and `DEGRADED` for `selectionStatus`. I assume `PARTIAL` should trigger the same visually degraded presentation state as `DEGRADED`.
-3.  **Loading State Behavior**: I assume "Do not show stale placeholder values as current" means the UI should overlay a loading indicator or dim the existing values when a background refresh is triggered, rather than completely unmounting the card (which would cause layout shift).
-4.  **No `NONE` enum**: The issue description mentions a `NONE` selection status, but the canonical DTO (`PolicyInsightSelectionStatus`) does not include it. I assume the canonical DTO is the source of truth, and `PARTIAL`/`DEGRADED` handle the suboptimal evidence states.
-
-## 5. Scope
-
-**In Scope:**
-
-- Adding `marketRegime`, `fundamentalRegime`, `supportsUsdcPerSol`, `resistancesUsdcPerSol` to the view-model and UI.
-- Formatting an evidence summary and mapping warnings/reason codes to stable copy.
-- Modifying `PolicyInsightsUnavailableReason`, the read port, and `CurrentPolicyInsightsAdapter` to distinctly support the `malformed` state.
-- Implementing distinct visual states for degraded evidence and malformed contracts.
-- Writing fixture-driven tests for the new view-model fields and component states.
-
-**Out of Scope:**
-
-- Creating a new `PolicyInsight` parser.
-- Modifying the canonical wire contract schema (`schemas/regime-engine/policy-insight.v1`).
-- Modifying the deterministic execution preview/sign/submit screens.
-- General redesign of the Positions list screen.
-
-## 6. Risks or Concerns Identified
-
-- **UI Clutter**: Appending regimes, arrays of price levels, warnings, and evidence summaries to a single `PolicyInsightsSection` risks violating the rule to "Keep the UI concise and decision-focused". Care must be taken to format levels compactly (e.g., comma-separated on a single line) and only show warnings if they exist.
-- **Adapter Blast Radius**: Changing `CurrentPolicyInsightsAdapter` to return `malformed` requires ensuring that `PolicyInsightsController` explicitly maps this to the same HTTP 200 null-envelope pattern used by all other unavailable reasons (`not-found`, `store-unavailable`, `config-error`, `upstream-error`), otherwise the client might fail to distinguish malformed from other error types.
+- **Divergent Paths**: The existing `RegimeEngineExecutionEventAdapter` handles deterministic breach events. Care must be taken not to entangle the new `POST /v1/execution-result` (which is plan-driven) with the existing deterministic breach reporting, as they serve different lifecycle audits.
+- **Race Conditions**: A plan may be requested, and before it is executed or acknowledged, a deterministic breach may qualify. The system must gracefully cancel or supersede the plan in favor of the safety exit.
+- **Schema Unavailability**: The vendored schema for `plan.v1` is not present in the workspace yet. The implementation is blocked until the canonical schema is merged in the `regime-engine` repo and vendored here.

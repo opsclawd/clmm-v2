@@ -50,9 +50,10 @@ function makeAttempt(overrides: Partial<StoredExecutionAttempt> = {}): StoredExe
   return {
     attemptId: 'attempt-1',
     positionId: 'pos-1' as unknown as PositionId,
-    breachDirection: {
-      kind: 'lower-bound-breach',
-    } as unknown as StoredExecutionAttempt['breachDirection'],
+    origin: {
+      kind: 'qualified-breach',
+      breachDirection: { kind: 'lower-bound-breach' },
+    } as unknown as StoredExecutionAttempt['origin'],
     lifecycleState: { kind: 'confirmed' } as unknown as StoredExecutionAttempt['lifecycleState'],
     completedSteps: [
       'remove-liquidity',
@@ -361,9 +362,10 @@ describe('buildClmmExecutionEvent', () => {
   it('maps upper-bound-breach + confirmed correctly', () => {
     const result = buildClmmExecutionEvent(
       makeAttempt({
-        breachDirection: {
-          kind: 'upper-bound-breach',
-        } as unknown as StoredExecutionAttempt['breachDirection'],
+        origin: {
+          kind: 'qualified-breach',
+          breachDirection: { kind: 'upper-bound-breach' },
+        } as unknown as StoredExecutionAttempt['origin'],
       }),
       'confirmed',
       clock,

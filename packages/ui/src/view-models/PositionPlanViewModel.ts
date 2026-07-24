@@ -1,0 +1,237 @@
+export type PlanAction =
+  | { kind: 'HOLD' }
+  | { kind: 'STAND_DOWN' }
+  | { kind: 'REQUEST_EXIT_CLMM'; exitIntent: { posture: 'ExitToUSDC' | 'ExitToSOL' } };
+
+export type PlanLifecycleState =
+  | { kind: 'requested' }
+  | {
+      kind: 'advisory-ready';
+      advisoryAction: PlanAction;
+      regimeResponse: {
+        regime: 'UP' | 'DOWN' | 'CHOP';
+        suitability: 'ALLOWED' | 'CAUTION' | 'BLOCKED' | 'UNKNOWN';
+      };
+    }
+  | {
+      kind: 'exit-previewed';
+      previewId: string;
+      advisoryAction: PlanAction;
+      preview: { freshness: { kind: 'fresh' | 'stale' | 'expired' } };
+    }
+  | { kind: 'awaiting-signature'; attemptId?: string; advisoryAction: PlanAction }
+  | { kind: 'submitted'; attemptId?: string; advisoryAction: PlanAction }
+  | { kind: 'result-pending' }
+  | { kind: 'reported' }
+  | { kind: 'report-failed' }
+  | { kind: 'conflict'; priorPlanId: string }
+  | { kind: 'superseded' };
+
+export type CurrentPlanDto = {
+  planId: string;
+  canonicalHash: string;
+  positionId: string;
+  state: PlanLifecycleState;
+} | null;
+
+export type PositionPlanViewModel =
+  | {
+      status: 'unavailable';
+      unavailableReason?: string;
+    }
+  | {
+      status: 'advisory';
+      advisoryKind: 'HOLD' | 'STAND_DOWN';
+      regimeLabel: string;
+      suitabilityLabel: string;
+      canAcknowledge: boolean;
+      showBreachControls: boolean;
+    }
+  | {
+      status: 'requesting-exit';
+      exitPosture: 'ExitToUSDC' | 'ExitToSOL';
+      regimeLabel: string;
+      canPreview: boolean;
+      previewId?: string;
+      showBreachControls: boolean;
+    }
+  | {
+      status: 'preview-ready';
+      previewId: string;
+      exitPosture: 'ExitToUSDC' | 'ExitToSOL';
+      canApprove: boolean;
+      showBreachControls: boolean;
+    }
+  | {
+      status: 'awaiting-signature';
+      exitPosture: 'ExitToUSDC' | 'ExitToSOL';
+      showBreachControls: boolean;
+    }
+  | {
+      status: 'in-flight';
+      attemptId: string;
+      exitPosture: 'ExitToUSDC' | 'ExitToSOL';
+      showBreachControls: boolean;
+    }
+  | {
+      status: 'result-pending';
+      showBreachControls: boolean;
+    }
+  | {
+      status: 'completed';
+      showBreachControls: boolean;
+    }
+  | {
+      status: 'failed';
+      showBreachControls: boolean;
+    }
+  | {
+      status: 'stale';
+      staleReason: string;
+      showBreachControls: boolean;
+    }
+  | {
+      status: 'conflict';
+      conflictReason: string;
+      showBreachControls: boolean;
+    }
+  | {
+      status: 'superseded';
+      supersededReason: string;
+      showBreachControls: boolean;
+    };
+
+function getAdvisoryPosture(
+  action:
+    | { kind: 'HOLD' }
+    | { kind: 'STAND_DOWN' }
+    | { kind: 'REQUEST_EXIT_CLMM'; exitIntent: { posture: 'ExitToUSDC' | 'ExitToSOL' } },
+): 'ExitToUSDC' | 'ExitToSOL' {
+  if (action.kind === 'REQUEST_EXIT_CLMM') {
+    return action.exitIntent.posture;
+  }
+  return 'ExitToUSDC';
+}
+
+export function buildPositionPlanViewModel(
+  plan: CurrentPlanDto,
+  breachDirection?: { kind: 'lower-bound-breach' } | { kind: 'upper-bound-breach' },
+): PositionPlanViewModel {
+  if (plan === null) {
+    return { status: 'unavailable' };
+  }
+
+  const hasBreach = breachDirection != null;
+
+  switch (plan.state.kind) {
+    case 'requested':
+      return { status: 'unavailable', unavailableReason: 'Plan is being requested...' };
+
+    case 'advisory-ready': {
+      const action = plan.state.advisoryAction;
+      const regimeLabel = plan.state.regimeResponse.regime;
+      const suitabilityLabel = plan.state.regimeResponse.suitability;
+
+      if (action.kind === 'HOLD' || action.kind === 'STAND_DOWN') {
+        return {
+          status: 'advisory',
+          advisoryKind: action.kind,
+          regimeLabel,
+          suitabilityLabel,
+          canAcknowledge: true,
+          showBreachControls: hasBreach,
+        };
+      }
+
+      if (action.kind === 'REQUEST_EXIT_CLMM') {
+        const exitPosture = getAdvisoryPosture(action);
+        return {
+          status: 'requesting-exit',
+          exitPosture,
+          regimeLabel,
+          canPreview: true,
+          showBreachControls: false,
+        };
+      }
+
+      return { status: 'unavailable' };
+    }
+
+    case 'exit-previewed': {
+      const action = plan.state.advisoryAction;
+      const exitPosture = getAdvisoryPosture(action);
+      const freshnessKind = plan.state.preview.freshness.kind;
+
+      if (freshnessKind === 'stale') {
+        return {
+          status: 'stale',
+          staleReason: 'Exit preview has gone stale. Request a new preview to continue.',
+          showBreachControls: hasBreach,
+        };
+      }
+
+      if (freshnessKind === 'expired') {
+        return {
+          status: 'stale',
+          staleReason: 'Exit preview has expired. Request a new preview to continue.',
+          showBreachControls: hasBreach,
+        };
+      }
+
+      return {
+        status: 'preview-ready',
+        previewId: plan.state.previewId,
+        exitPosture,
+        canApprove: true,
+        showBreachControls: false,
+      };
+    }
+
+    case 'awaiting-signature': {
+      const action = plan.state.advisoryAction;
+      const exitPosture = getAdvisoryPosture(action);
+      return {
+        status: 'awaiting-signature',
+        exitPosture,
+        showBreachControls: false,
+      };
+    }
+
+    case 'submitted': {
+      const action = plan.state.advisoryAction;
+      const exitPosture = getAdvisoryPosture(action);
+      return {
+        status: 'in-flight',
+        attemptId: plan.state.attemptId ?? 'unknown',
+        exitPosture,
+        showBreachControls: false,
+      };
+    }
+
+    case 'result-pending':
+      return { status: 'result-pending', showBreachControls: false };
+
+    case 'reported':
+      return { status: 'completed', showBreachControls: false };
+
+    case 'report-failed':
+      return { status: 'failed', showBreachControls: hasBreach };
+
+    case 'conflict':
+      return {
+        status: 'conflict',
+        conflictReason: 'A conflicting plan decision was detected',
+        showBreachControls: hasBreach,
+      };
+
+    case 'superseded':
+      return {
+        status: 'superseded',
+        supersededReason: 'A newer plan has superseded this one',
+        showBreachControls: hasBreach,
+      };
+
+    default:
+      return { status: 'unavailable', unavailableReason: 'Unknown plan state' };
+  }
+}

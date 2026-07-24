@@ -54,9 +54,22 @@ export type {
   PoolFees24hMetricDto,
   PoolFinancialMetricsDto,
   PositionListFinancialMetricsDto,
+  RegimePlanActionType,
+  RegimePlanExitPosture,
+  RegimePlanExitIntent,
+  RegimePlanAction,
+  RegimePlanScope,
+  RegimePlanConstraints,
+  RegimePlanReason,
+  RegimePlanRequest,
+  RegimePlanResponse,
+  RegimeExecutionResultStatus,
+  RegimeExecutionResultCosts,
+  RegimeExecutionResult,
 } from '../dto/index.js';
 
 export { parsePolicyInsightBlock } from '../dto/policyInsightValidator.js';
+export { parseRegimePlanResponse, parseRegimeExecutionResult } from '../dto/regimePlanValidator.js';
 
 // Port types needed by UI (capability + permission state)
 export type { PlatformCapabilityState } from '../ports/index.js';
@@ -111,6 +124,7 @@ export type {
 export type {
   BreachDirection,
   ExecutionLifecycleState,
+  ExecutionOrigin,
   DirectionalExitPolicyResult,
   MarketRegime,
   ClmmSuitabilityStatus,
@@ -167,3 +181,7 @@ export { getExecutionHistory } from '../use-cases/execution/GetExecutionHistory.
 export { getWalletExecutionHistory } from '../use-cases/execution/GetWalletExecutionHistory.js';
 export { resolveExecutionEntryContext } from '../use-cases/execution/ResolveExecutionEntryContext.js';
 export { dispatchActionableNotification } from '../use-cases/notifications/DispatchActionableNotification.js';
+export { requestPositionPlan } from '../use-cases/plans/RequestPositionPlan.js';
+export { recordPlanDecision } from '../use-cases/plans/RecordPlanDecision.js';
+export { createPlanExitPreview } from '../use-cases/plans/CreatePlanExitPreview.js';
+export { approvePlanExit } from '../use-cases/plans/ApprovePlanExit.js';

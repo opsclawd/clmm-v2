@@ -33,3 +33,8 @@ export * from './use-cases/execution/ResumeExecutionAttempt.js';
 export * from './use-cases/insights/GetSolUsdcInsightPoolSnapshot.js';
 export * from './use-cases/insights/GetSolUsdcInsightPositions.js';
 export * from './use-cases/insights/GetSolUsdcInsightBundle.js';
+export * from './use-cases/plans/RequestPositionPlan.js';
+export * from './use-cases/plans/RecordPlanDecision.js';
+export * from './use-cases/plans/CreatePlanExitPreview.js';
+export * from './use-cases/plans/ApprovePlanExit.js';
+export * from './use-cases/plans/SyncPlanExecutionResults.js';

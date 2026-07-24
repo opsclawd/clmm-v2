@@ -203,18 +203,47 @@ Never expose regime-engine through `EXPO_PUBLIC_*` variables.
 
 ### Intelligence pipeline
 
-Backend-only env var:
-
-```bash
 INSIGHTS_API_KEY=<shared-read-token-for-sol-usdc-insight-endpoints>
-```
+
+````
+
+### Regime Engine Operational Model
+
+#### Backend-only Regime Variables
+- `REGIME_ENGINE_BASE_URL`: Base URL for the regime-engine service (internal network URL).
+- `REGIME_ENGINE_INTERNAL_TOKEN`: Bearer secret used for authenticating requests between backend services.
+
+#### Migration Ownership & Deployment Order
+- Database migrations for plan and result outbox tables are owned by `packages/adapters` (`pnpm --filter @clmm/adapters db:migrate`).
+- **Deployment Invariant**: Migrations MUST run and complete before deploying new worker or API code requiring new schema tables. The API container executes `pnpm db:migrate` via pre-deploy hooks before worker rollout.
+
+#### Worker & Result-Outbox Behavior
+- `syncPlanExecutionResults` worker job claims due result records from `plan_execution_results` using atomic database locks (`FOR UPDATE SKIP LOCKED`).
+- Outbox workers attempt HTTP delivery to Regime Engine (`POST /v1/execution-result`).
+- Successful or idempotent delivery completes outbox records (`status = 'delivered'`).
+- Retryable failures schedule exponential backoff up to 5 attempts. Permanent failures or cap exhaustion mark rows `failed-permanent`.
+
+#### Endpoint Separation
+- Operational endpoints (`/v1/plan`, `/v1/execution-result`) are backend-only and private. They must never be exposed to client bundles or public networks.
+- Public/Insights endpoints (`/insights/sol-usdc/*`) are read-only and secured via `INSIGHTS_API_KEY`.
+
+#### Execution-Origin Model & Audit Loop
+- Every preview and execution attempt carries an explicit `ExecutionOrigin` (`'qualified-breach'` or `'regime-plan'`).
+- Every received plan requires a terminal result report (`SUCCESS`, `FAILED`, `USER_DECLINED`, `EXPIRED`, `ABANDONED`) to close the audit loop.
+
+#### Breach Precedence
+- Deterministic qualified lower/upper breach triggers ALWAYS outrank advisory plan responses (`HOLD`, `STAND_DOWN`, or degraded/unavailable plan states).
+
+#### Manual Failure Drills
+- **Retryable Result Timeout**: Induce network timeout/retryable errors on result delivery to verify exponential backoff and idempotency preservation.
+- **Worker Restart Recovery**: Stop/restart the worker during pending result delivery to confirm outbox claims resume delivery without re-executing Solana transactions.
 
 The external intelligence repo reads this BFF through:
 
 ```bash
 CLMM_DATA_API_BASE=http://localhost:3001
 CLMM_INSIGHTS_API_KEY=<same-value-as-INSIGHTS_API_KEY>
-```
+````
 
 The intelligence endpoints are read-only. They expose raw/product-owned facts for analysis. They do not submit transactions or request wallet credentials.
 

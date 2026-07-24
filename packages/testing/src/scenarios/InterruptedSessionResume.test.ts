@@ -137,7 +137,10 @@ describe('Interrupted-Session Resume Smoke Scenario', () => {
     if (resumeResult.kind !== 'resumable') throw new Error('Expected resumable');
 
     // Verify resume preserves directional context
-    expect(resumeResult.breachDirection.kind).toBe('lower-bound-breach');
+    expect(resumeResult.origin.kind).toBe('qualified-breach');
+    if (resumeResult.origin.kind === 'qualified-breach') {
+      expect(resumeResult.origin.breachDirection.kind).toBe('lower-bound-breach');
+    }
 
     // 6. Re-approve — set signing port to sign and create fresh preview
     signingPort._nextResult = { kind: 'signed', signedPayload: new Uint8Array([4, 5, 6]) };
@@ -171,7 +174,10 @@ describe('Interrupted-Session Resume Smoke Scenario', () => {
 
     // 8. Verify all history events preserve breach direction
     for (const event of historyRepo.events) {
-      expect(event.breachDirection.kind).toBe('lower-bound-breach');
+      expect(event.origin.kind).toBe('qualified-breach');
+      if (event.origin.kind === 'qualified-breach') {
+        expect(event.origin.breachDirection.kind).toBe('lower-bound-breach');
+      }
     }
   });
 

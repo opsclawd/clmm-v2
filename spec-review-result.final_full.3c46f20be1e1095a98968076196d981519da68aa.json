@@ -1,0 +1,11 @@
+{
+  "result": "fail",
+  "findings": [
+    {
+      "severity": "P2",
+      "summary": "Uses Date.now() instead of the injected clock.now() for request asOfUnixMs and requestedAt, violating the requirement to derive fields from the injected clock for deterministic state.",
+      "file": "packages/application/src/use-cases/plans/RequestPositionPlan.ts",
+      "suggested_fix": "Pass the `now` variable (from `clock.now()`) into `buildRegimePlanRequest` for `asOfUnixMs`, and use `makeClockTimestamp(now)` for `requestedAt`."
+    }
+  ]
+}

@@ -1,0 +1,11 @@
+{
+  "result": "fail",
+  "findings": [
+    {
+      "severity": "P2",
+      "summary": "FakePlanRepository was not updated to preserve the actual terminal outcome during completeDelivery and failDelivery, unconditionally overwriting it. This diverges from the recent fix applied to PlanStorageAdapter and can mask bugs in tests.",
+      "file": "packages/testing/src/fakes/FakePlanRepository.ts",
+      "suggested_fix": "In FakePlanRepository.ts completeDelivery and failDelivery, read the existing outcome via `const storedOutcome = plan.lifecycleStateJson && 'outcome' in plan.lifecycleStateJson ? plan.lifecycleStateJson.outcome : undefined;` and use it instead of hardcoding `{ kind: 'executed' }` or `{ kind: 'failed' }`."
+    }
+  ]
+}

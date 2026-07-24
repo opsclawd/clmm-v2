@@ -1,0 +1,17 @@
+{
+  "result": "fail",
+  "findings": [
+    {
+      "severity": "P1",
+      "summary": "The newly added `abandonDelivery` call is not executed atomically with `recordPermanentFailure`, leaving the system in an inconsistent state if the process crashes between them.",
+      "file": "packages/application/src/use-cases/plans/SyncPlanExecutionResults.ts",
+      "suggested_fix": "Introduce a new method on `PlanRepository` (e.g., `failDelivery`) that performs both the `positionPlans` update and the `planResultOutbox` update inside a single database transaction, mirroring the existing `completeDelivery` approach."
+    },
+    {
+      "severity": "P2",
+      "summary": "Concurrency defect in the queue mechanics: `claimDueResult` claims an outbox row but leaves `nextAttemptAt` in the past, meaning any overlapping sync job will claim the same row and cause duplicate deliveries.",
+      "file": "packages/adapters/src/outbound/storage/PlanStorageAdapter.ts",
+      "suggested_fix": "When incrementing `attemptCount` in `claimDueResult`, also update `nextAttemptAt` to a future lease time (e.g., `now + 300000`) so the row is hidden from concurrent workers until the lease expires."
+    }
+  ]
+}

@@ -20,7 +20,7 @@ describe('RecordSignatureInterruption', () => {
     const attempt: StoredExecutionAttempt = {
       attemptId: 'attempt-1',
       positionId: FIXTURE_POSITION_ID,
-      breachDirection: LOWER_BOUND_BREACH,
+      origin: { kind: 'qualified-breach', breachDirection: LOWER_BOUND_BREACH },
       lifecycleState: { kind: 'awaiting-signature' },
       completedSteps: [],
       transactionReferences: [],
@@ -53,7 +53,7 @@ describe('RecordSignatureInterruption', () => {
     });
     expect(historyRepo.events.at(-1)).toMatchObject({
       eventType: 'signature-interrupted',
-      breachDirection: LOWER_BOUND_BREACH,
+      origin: { kind: 'qualified-breach', breachDirection: LOWER_BOUND_BREACH },
       lifecycleState: { kind: 'awaiting-signature' },
     });
   });
@@ -75,7 +75,7 @@ describe('RecordSignatureInterruption', () => {
     await executionRepo.saveAttempt({
       attemptId: 'attempt-submitted',
       positionId: FIXTURE_POSITION_ID,
-      breachDirection: LOWER_BOUND_BREACH,
+      origin: { kind: 'qualified-breach', breachDirection: LOWER_BOUND_BREACH },
       lifecycleState: { kind: 'submitted' },
       completedSteps: [],
       transactionReferences: [],

@@ -63,7 +63,7 @@ describe('ReconciliationJobHandler', () => {
     await executionRepo.saveAttempt({
       attemptId: 'attempt-1',
       positionId: FIXTURE_POSITION_ID,
-      breachDirection: LOWER_BOUND_BREACH,
+      origin: { kind: 'qualified-breach', breachDirection: LOWER_BOUND_BREACH },
       lifecycleState: { kind: 'submitted' },
       completedSteps: [],
       transactionReferences: [
@@ -92,7 +92,7 @@ describe('ReconciliationJobHandler', () => {
     await executionRepo.saveAttempt({
       attemptId: 'attempt-2',
       positionId: FIXTURE_POSITION_ID,
-      breachDirection: LOWER_BOUND_BREACH,
+      origin: { kind: 'qualified-breach', breachDirection: LOWER_BOUND_BREACH },
       lifecycleState: { kind: 'confirmed' },
       completedSteps: ['remove-liquidity', 'collect-fees', 'swap-assets'],
       transactionReferences: [{ signature: 'sig-1', stepKind: 'remove-liquidity' }],
@@ -131,7 +131,7 @@ describe('ReconciliationJobHandler', () => {
       await executionRepo.saveAttempt({
         attemptId: 'attempt-reconcile-confirmed',
         positionId: FIXTURE_POSITION_ID,
-        breachDirection: LOWER_BOUND_BREACH,
+        origin: { kind: 'qualified-breach', breachDirection: LOWER_BOUND_BREACH },
         lifecycleState: { kind: 'submitted' },
         completedSteps: [],
         transactionReferences: [
@@ -154,7 +154,7 @@ describe('ReconciliationJobHandler', () => {
       await executionRepo.saveAttempt({
         attemptId: 'attempt-reconcile-failed',
         positionId: FIXTURE_POSITION_ID,
-        breachDirection: UPPER_BOUND_BREACH,
+        origin: { kind: 'qualified-breach', breachDirection: UPPER_BOUND_BREACH },
         lifecycleState: { kind: 'submitted' },
         completedSteps: [],
         transactionReferences: [{ signature: 'sig-fail', stepKind: 'remove-liquidity' }],
@@ -174,7 +174,7 @@ describe('ReconciliationJobHandler', () => {
       await executionRepo.saveAttempt({
         attemptId: 'attempt-reconcile-partial',
         positionId: FIXTURE_POSITION_ID,
-        breachDirection: LOWER_BOUND_BREACH,
+        origin: { kind: 'qualified-breach', breachDirection: LOWER_BOUND_BREACH },
         lifecycleState: { kind: 'submitted' },
         completedSteps: [],
         transactionReferences: [],
@@ -190,7 +190,7 @@ describe('ReconciliationJobHandler', () => {
       await executionRepo.saveAttempt({
         attemptId: 'attempt-reconcile-not-submitted',
         positionId: FIXTURE_POSITION_ID,
-        breachDirection: LOWER_BOUND_BREACH,
+        origin: { kind: 'qualified-breach', breachDirection: LOWER_BOUND_BREACH },
         lifecycleState: { kind: 'confirmed' },
         completedSteps: ['remove-liquidity', 'collect-fees', 'swap-assets'],
         transactionReferences: [],
@@ -205,7 +205,7 @@ describe('ReconciliationJobHandler', () => {
       await executionRepo.saveAttempt({
         attemptId: 'attempt-port-rejects',
         positionId: FIXTURE_POSITION_ID,
-        breachDirection: LOWER_BOUND_BREACH,
+        origin: { kind: 'qualified-breach', breachDirection: LOWER_BOUND_BREACH },
         lifecycleState: { kind: 'submitted' },
         completedSteps: [],
         transactionReferences: [{ signature: 'sig-1', stepKind: 'swap-assets' }],
@@ -227,7 +227,7 @@ describe('ReconciliationJobHandler', () => {
       await executionRepo.saveAttempt({
         attemptId: 'attempt-reconcile-null',
         positionId: FIXTURE_POSITION_ID,
-        breachDirection: LOWER_BOUND_BREACH,
+        origin: { kind: 'qualified-breach', breachDirection: LOWER_BOUND_BREACH },
         lifecycleState: { kind: 'submitted' },
         completedSteps: [],
         transactionReferences: [],

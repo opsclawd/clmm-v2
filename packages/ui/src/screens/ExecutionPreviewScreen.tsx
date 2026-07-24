@@ -128,7 +128,13 @@ export function ExecutionPreviewScreen({
         </Text>
 
         <View style={{ marginTop: 16 }}>
-          <DirectionalPolicyCard direction={preview.breachDirection} />
+          {preview.origin.kind === 'qualified-breach' ? (
+            <DirectionalPolicyCard direction={preview.origin.breachDirection} />
+          ) : (
+            <View>
+              <Text style={{ color: colors.text, fontWeight: 'bold' }}>{vm.directionLabel}</Text>
+            </View>
+          )}
         </View>
 
         <View style={{ marginTop: 16 }}>
@@ -142,7 +148,16 @@ export function ExecutionPreviewScreen({
           >
             Execution Steps
           </Text>
-          <PreviewStepSequence direction={preview.breachDirection} />
+          {preview.origin.kind === 'qualified-breach' ? (
+            <PreviewStepSequence direction={preview.origin.breachDirection} />
+          ) : (
+            vm.steps.map((step, index) => (
+              <Text key={`${step.label}-${index}`} style={{ color: colors.text, marginTop: 4 }}>
+                {step.label}
+                {step.sublabel ? ` — ${step.sublabel}` : ''}
+              </Text>
+            ))
+          )}
         </View>
 
         <View

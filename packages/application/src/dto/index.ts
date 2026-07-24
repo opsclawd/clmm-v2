@@ -6,6 +6,7 @@ import type {
   AssetSymbol,
   BreachEpisodeId,
   ClockTimestamp,
+  ExecutionOrigin,
 } from '@clmm/domain';
 import type { ExecutionLifecycleState, PreviewFreshness, TransactionReference } from '@clmm/domain';
 import type { ExitTriggerId, BreachDirection as _BreachDirection } from '@clmm/domain';
@@ -103,7 +104,7 @@ export type ExecutionPreviewDto = {
   previewId: string;
   positionId: PositionId;
   episodeId?: BreachEpisodeId;
-  breachDirection: BreachDirection;
+  origin: ExecutionOrigin;
   postExitPosture: PostExitAssetPosture;
   steps: PreviewStepDto[];
   freshness: PreviewFreshness;
@@ -116,7 +117,7 @@ export type ExecutionPreviewDto = {
 export type ExecutionAttemptDto = {
   attemptId: string;
   positionId: PositionId;
-  breachDirection: BreachDirection;
+  origin: ExecutionOrigin;
   postExitPosture: PostExitAssetPosture;
   lifecycleState: ExecutionLifecycleState;
   completedStepKinds: string[];
@@ -128,7 +129,7 @@ export type ExecutionAttemptDto = {
 export type ExecutionApprovalDto = {
   readonly attemptId: string;
   readonly lifecycleState: ExecutionLifecycleState;
-  readonly breachDirection: BreachDirection;
+  readonly origin: ExecutionOrigin;
 };
 
 export type ExecutionSigningPayloadDto = {
@@ -160,7 +161,7 @@ export type HistoryEventDto = {
   eventId: string;
   positionId: PositionId;
   eventType: string;
-  breachDirection: BreachDirection;
+  origin: ExecutionOrigin;
   occurredAt: ClockTimestamp;
   transactionReference?: TransactionReference;
   // label makes it clear this is NOT on-chain proof
@@ -439,3 +440,20 @@ export type PositionListFinancialMetricsDto = {
   unclaimedFees: UnclaimedFeesMetricDto | null;
   poolsById: Readonly<Record<string, PoolFinancialMetricsDto>>;
 };
+
+export type {
+  RegimePlanActionType,
+  RegimePlanExitPosture,
+  RegimePlanExitIntent,
+  RegimePlanAction,
+  RegimePlanScope,
+  RegimePlanConstraints,
+  RegimePlanReason,
+  RegimePlanRequest,
+  RegimePlanResponse,
+  RegimeExecutionResultStatus,
+  RegimeExecutionResultCosts,
+  RegimeExecutionResult,
+} from './regimePlan.js';
+
+export { parseRegimePlanResponse, parseRegimeExecutionResult } from './regimePlanValidator.js';

@@ -1,0 +1,17 @@
+{
+  "result": "fail",
+  "findings": [
+    {
+      "severity": "P0",
+      "summary": "PlanStorageAdapter.completeDelivery updates positionPlans with a hardcoded empty string for resultIdempotencyKey, failing to update the correct plan.",
+      "file": "packages/adapters/src/outbound/storage/PlanStorageAdapter.ts",
+      "suggested_fix": "Query planResultOutbox by params.resultId to get the planId, and use that planId in the where clause for the positionPlans update."
+    },
+    {
+      "severity": "P1",
+      "summary": "PlanStorageAdapter.completeDelivery performs two sequential database updates without a transaction, risking an inconsistent state (outbox marked delivered but plan still pending) if the second update fails.",
+      "file": "packages/adapters/src/outbound/storage/PlanStorageAdapter.ts",
+      "suggested_fix": "Wrap the completeDelivery updates in a `this.db.transaction(async (tx) => { ... })` block and use `tx.update` for both."
+    }
+  ]
+}
