@@ -60,6 +60,10 @@
 - [ ] API service Railway config has `preDeployCommand = "pnpm --filter @clmm/adapters db:migrate"`
 - [ ] API service Railway config has `startCommand = "pnpm --filter @clmm/adapters start:api"` (not `dev:api`)
 - [ ] Worker service Railway config has no `preDeployCommand`
+- [ ] Database migration (`pnpm --filter @clmm/adapters db:migrate`) completed before API/worker rollout
+- [ ] `REGIME_ENGINE_INTERNAL_TOKEN` private authentication verified on internal POST /v1/execution-result endpoint
+- [ ] Manual drill: induce retryable result timeout and verify exponential backoff with preserved idempotency key
+- [ ] Manual drill: restart worker process during result sync and confirm outbox resumes delivery without duplicate execution
 - [ ] `GET /health` returns 503 with `missing` list when any schema table is missing in the target DB (verify in staging by pointing the API at an unmigrated DB)
 - [ ] Worker exits non-zero with the structured fatal log when schema is missing (same verification)
 - [ ] `wallet_challenges` table exists in production DB after deploy
