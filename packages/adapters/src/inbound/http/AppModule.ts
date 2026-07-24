@@ -29,7 +29,10 @@ import { CurrentSrLevelsAdapter } from '../../outbound/regime-engine/CurrentSrLe
 import { CurrentRegimeAdapter } from '../../outbound/regime-engine/CurrentRegimeAdapter.js';
 import { CurrentSrThesesAdapter } from '../../outbound/regime-engine/CurrentSrThesesAdapter.js';
 import { CurrentPolicyInsightsAdapter } from '../../outbound/regime-engine/CurrentPolicyInsightsAdapter.js';
+import { RegimePlanAdapter } from '../../outbound/regime-engine/RegimePlanAdapter.js';
+import { PlanStorageAdapter } from '../../outbound/storage/PlanStorageAdapter.js';
 import { SrThesesController } from './SrThesesController.js';
+import { PlanController } from './PlanController.js';
 import { PolicyInsightsController } from './PolicyInsightsController.js';
 import { JupiterPriceAdapter } from '../../outbound/price/JupiterPriceAdapter.js';
 // InsightsApiKeyGuard is used via @UseGuards on InsightsDataController and
@@ -69,6 +72,8 @@ import {
   SR_THESES_READ_PORT,
   SR_THESES_POOL_ALLOWLIST,
   POLICY_INSIGHTS_READ_PORT,
+  PLAN_REPOSITORY,
+  REGIME_PLAN_PORT,
 } from './tokens.js';
 
 // boundary: process.env values are untyped at runtime; validated via env schema at deploy
@@ -132,6 +137,12 @@ const currentPolicyInsightsAdapter = new CurrentPolicyInsightsAdapter(
   telemetry,
 );
 const jupiterPrice = new JupiterPriceAdapter();
+const regimePlanAdapter = new RegimePlanAdapter(
+  regimeEngineBaseUrl,
+  regimeEngineInternalToken,
+  telemetry,
+);
+const planStorage = new PlanStorageAdapter(db);
 const reconciliationJobPort = {
   async enqueue(attemptId: string): Promise<void> {
     await boss.send(ReconciliationJobHandler.JOB_NAME, { attemptId });
@@ -163,6 +174,7 @@ export const SR_THESES_POOL_ALLOWLIST_MAP = new Map<string, { symbol: string; so
     PreviewController,
     ExecutionController,
     WalletController,
+    PlanController,
   ],
   providers: [
     { provide: DB, useValue: db },
@@ -186,6 +198,8 @@ export const SR_THESES_POOL_ALLOWLIST_MAP = new Map<string, { symbol: string; so
     { provide: SR_THESES_READ_PORT, useValue: currentSrThesesAdapter },
     { provide: SR_THESES_POOL_ALLOWLIST, useValue: SR_THESES_POOL_ALLOWLIST_MAP },
     { provide: POLICY_INSIGHTS_READ_PORT, useValue: currentPolicyInsightsAdapter },
+    { provide: PLAN_REPOSITORY, useValue: planStorage },
+    { provide: REGIME_PLAN_PORT, useValue: regimePlanAdapter },
     { provide: OBSERVABILITY_PORT, useValue: telemetry },
     { provide: PG_BOSS_INSTANCE, useValue: boss },
     { provide: RECONCILIATION_JOB_PORT, useValue: reconciliationJobPort },
