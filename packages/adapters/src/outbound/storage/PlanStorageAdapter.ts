@@ -426,9 +426,11 @@ export class PlanStorageAdapter implements PlanRepository {
       }
 
       const stored = rowToStoredPlan(planRow);
+      const storedOutcome = (stored.lifecycleStateJson as { outcome?: { kind: string } } | null)
+        ?.outcome;
       const state = {
         kind: 'reported',
-        outcome: { kind: 'executed' },
+        outcome: storedOutcome ?? { kind: 'executed' },
         executionOrigin: resolveExecutionOrigin(stored),
         reportedAt: params.deliveredAt,
       } as PlanLifecycleState;
@@ -511,9 +513,11 @@ export class PlanStorageAdapter implements PlanRepository {
       }
 
       const stored = rowToStoredPlan(planRow);
+      const storedOutcome = (stored.lifecycleStateJson as { outcome?: { kind: string } } | null)
+        ?.outcome;
       const state = {
         kind: 'report-failed',
-        outcome: { kind: 'failed' },
+        outcome: storedOutcome ?? { kind: 'failed' },
         executionOrigin: resolveExecutionOrigin(stored),
       } as PlanLifecycleState;
 
