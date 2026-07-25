@@ -1,55 +1,55 @@
-# Regime Position Plan Integration Design
+# Design Document: Drizzle Schema Tracking Integrity
 
-## The problem being solved and why it matters
+## 1. Problem Being Solved & Why It Matters
 
-Currently, `clmm-v2` reads general pool/pair-level market context from Regime Engine and asynchronously posts execution results for deterministic breaches. However, Regime Engine provides advisory, position-aware plan recommendations. We need to integrate a position-scoped plan request (`POST /v1/plan`) and an execution result reporting loop (`POST /v1/execution-result`) into `clmm-v2` without compromising clmm-v2's execution authority, deterministic safety, and wallet signing loops. It matters because it enables smarter position-level advice (like `HOLD`, `STAND_DOWN`, or `REQUEST_EXIT_CLMM`) based on market regimes without turning over full custody or execution authority to an automated system.
+When `drizzle-kit generate` is run with a narrowed schema path (e.g., via CLI argument `schema: './src/.../position-plans.ts'`) instead of relying on the configured `schema/index.ts`, Drizzle creates a snapshot JSON that excludes the omitted tables. Since Drizzle uses these snapshots to calculate schema diffs, subsequent migration generation attempts will falsely conclude that the missing tables don't exist in the database and attempt to recreate them. Applying such a migration fails outright due to duplicate table/constraint errors. This risks developers unknowingly committing corrupted migration chains, blocking deployments, and breaking local database setups.
 
-## Key design decisions and trade-offs considered
+## 2. Key Design Decisions and Trade-offs
 
-- **Execution Authority**: Regime Engine will never have the authority to bypass user signature or deterministic safety checks. The trade-off is reduced automation for higher safety and strict adherence to the non-custodial model.
-- **Fail Closed vs Degraded Advisory**: If Regime Engine fails or returns malformed data, `clmm-v2` will gracefully degrade the advisory feature but will _not_ disable local deterministic breach monitoring. This ensures stop-loss features remain robust against upstream availability issues.
-- **State Persistence for Audit and Recovery**: We will persist plan state locally. This requires additional storage mechanisms (e.g., `PlanRepository`) but is necessary for accurate execution result reporting, idempotency, and crash recovery.
-- **Action Scope Limitations**: We will explicitly drop support for `REQUEST_ENTER_CLMM` and `REQUEST_REBALANCE` for now, because `clmm-v2` lacks the execution infrastructure for opening or restructuring positions. The trade-off is reduced capability out-of-the-gate, but it prevents the UI from generating commands the execution layer cannot honestly fulfill.
+**Option A: Wrap `db:generate` in `package.json` to enforce configuration**
+_Trade-off:_ Prevents manual CLI errors when using `pnpm db:generate`, but doesn't prevent someone from running `npx drizzle-kit generate` directly, nor does it catch corrupted snapshots introduced via merge conflicts or manual editing.
 
-## Proposed approach with rationale
+**Option B: CI bash script parsing `schema/index.ts` and snapshots**
+_Trade-off:_ Bash/grep parsing of TypeScript ASTs or barrel files is brittle and error-prone. It's difficult to distinguish actual tables from types, enums, or relations.
 
-1. **Contract Pinning & Vendoring**: Before implementation, vendored schemas for `plan.v1` and `execution-result.v1` will be synced into `schemas/regime-engine/`.
-2. **Domain Layer Expansion**: Add `PlanAction` (`HOLD`, `STAND_DOWN`, `REQUEST_EXIT_CLMM`) and `PlanLifecycleState` to `packages/domain/src/regime/`. Introduce a `PlanRepository` interface for persisting requested plans.
-3. **Application Layer Use Cases**:
-   - `RequestPositionPlan`: Fetches the current position state from local data and requests a plan from Regime Engine. Parses response and persists plan ID/hash to `PlanRepository`.
-   - `AcknowledgePlan`: For `HOLD` and `STAND_DOWN`, records the user acknowledgement and posts the canonical execution result to `/v1/execution-result`.
-   - `RequestExitExecution`: Bridges a `REQUEST_EXIT_CLMM` plan into the existing `CreateExecutionPreview` use case. Upon completion or failure of the execution pipeline, the result is reported to `/v1/execution-result`.
-4. **Adapter Layer**: Implement `RegimePlanAdapter` for `POST /v1/plan` and `POST /v1/execution-result`.
-5. **Safety Constraints**: `clmm-v2` deterministic breach (lower/upper bound exits) has strict priority. An active or qualified breach will override any `HOLD` or `STAND_DOWN` advisory.
+**Option C: Automated test validating the latest snapshot against the initialized schema**
+_Trade-off:_ By adding a unit test (using `vitest`) that parses the latest `drizzle/meta/*_snapshot.json` and compares it against the imported `schema` object, we can catch mismatches in CI (`pnpm test`) and locally before commits. It is less brittle than parsing text and integrates perfectly into the existing test pipeline.
 
-## Assumptions made
+## 3. Proposed Approach with Rationale
 
-- The `POST /v1/plan` and `POST /v1/execution-result` contracts are (or will be) formalized and available to vendor into `schemas/regime-engine`.
-- Authentication semantics for the `POST` endpoints are identical to those of the existing `GET` regime endpoints.
-- Storing plans locally (e.g., via SQLite or IndexedDB, depending on the client platform) has enough capacity and is architecturally aligned with existing execution attempt storage.
-- The user interface will be updated in a separate, focused effort to display plan advisories on the Position Detail screen.
+We will adopt **Option C** (Automated Test Validation).
 
-## What is in scope and what is explicitly out of scope
+- Create a test file `packages/adapters/src/outbound/storage/schema/__tests__/schema-snapshot.test.ts`.
+- The test will dynamically read the `packages/adapters/drizzle/meta/_journal.json` to find the latest snapshot file, or simply list the directory to find the highest numbered snapshot.
+- It will parse the JSON and extract the table names present in the snapshot.
+- It will import `* as schema from '../index.js'` and extract the actual table objects defined in the codebase.
+- The test will assert that the snapshot contains an entry for every table exported by the schema.
 
-**In Scope**:
+**Rationale:**
+Testing is a built-in step of the development and CI process. A test will fail fast if a developer commits a bad snapshot. It leverages existing tools (`vitest`, which is already configured in `packages/adapters/package.json`) and requires no additional CI orchestration, bash scripting, or build steps.
 
-- Vendored pinned contract clients/types/validation for the `v1` plan API.
-- Position-scoped plan request adapter and application use case.
-- Plan persistence, idempotency, and conflict handling.
-- UX integration logic for `HOLD`, `STAND_DOWN`, and `REQUEST_EXIT_CLMM`.
-- Linking `REQUEST_EXIT_CLMM` into the existing preview/sign/submit/reconcile flow.
-- Execution-result reporting and crash/retry reconciliation.
+## 4. Assumptions Made
 
-**Out of Scope**:
+- A snapshot's `tables` object keys match the real table names.
+- The `schema/index.ts` exports tables directly, and the exported schema objects contain the Drizzle table metadata (we can identify them using Drizzle's `is(pgTable)` or by checking properties unique to Drizzle tables).
+- `vitest` is run on every CI build and PR, effectively gating any PR with a corrupted snapshot.
+- The issue mentions 14 tables in total. We assume all schema exports are either tables, relations, or types, and we can programmatically filter for actual table objects to reach the correct expected count.
 
-- Inline candle delivery or portfolio allocation targets.
-- Handling `REQUEST_ENTER_CLMM` or `REQUEST_REBALANCE`.
-- Autonomous signing or submission (zero-click execution).
-- Changing Regime Engine synthesis rules or PolicyInsight display.
-- Modifying the separate breach-event telemetry endpoint (`/v1/clmm-execution-result` for deterministic breaches).
+## 5. Scope
 
-## Risks or concerns identified from code analysis
+**In Scope:**
 
-- **Divergent Paths**: The existing `RegimeEngineExecutionEventAdapter` handles deterministic breach events. Care must be taken not to entangle the new `POST /v1/execution-result` (which is plan-driven) with the existing deterministic breach reporting, as they serve different lifecycle audits.
-- **Race Conditions**: A plan may be requested, and before it is executed or acknowledged, a deterministic breach may qualify. The system must gracefully cancel or supersede the plan in favor of the safety exit.
-- **Schema Unavailability**: The vendored schema for `plan.v1` is not present in the workspace yet. The implementation is blocked until the canonical schema is merged in the `regime-engine` repo and vendored here.
+- A validation test script that verifies the latest Drizzle snapshot includes all tables defined in `schema/index.ts`.
+- Necessary documentation or comments within the test explaining why this check exists (referencing the issue).
+
+**Out of Scope:**
+
+- Retroactively fixing previous snapshots (like `0002`), since they have already been bypassed/fixed by merging the missing tables into `0003` / `0004` (as described in the issue).
+- Scanning historical migrations for errors (already done manually by the issue author).
+- Modifying how `drizzle-kit` itself generates snapshots.
+
+## 6. Risks or Concerns Identified from Code Analysis
+
+- **Identifying Tables vs. Relations:** Drizzle's `schema/index.ts` might export types, relations, or enums alongside tables. The validation logic must accurately filter these out to count only tables; otherwise, the test will falsely fail.
+- **Snapshot Format Changes:** Drizzle occasionally updates its internal snapshot schema (e.g. `version: "5"` to `"6"`). The test should be robust enough to handle the structure or focus strictly on the `tables` dictionary, which is generally stable across minor versions.
+- **Test Execution Context:** The test needs access to the file system to read the `meta` directory. `vitest` runs in a Node.js environment, so `fs` is available, but paths must be resolved correctly relative to the `packages/adapters` directory, regardless of where the test is invoked from.
