@@ -1,0 +1,30 @@
+{
+  "pair": "SOL/USDC",
+  "source": "orca",
+  "observedAtUnixMs": 1700000000000,
+  "pool": {
+    "poolId": "Czfq3xZZDmsdGdUyrNLtRhGc47cXcZtLG4crryfu44zE",
+    "pair": "SOL/USDC",
+    "source": "orca",
+    "observedAtUnixMs": 1700000000000,
+    "tokenPairLabel": "SOL/USDC",
+    "currentPrice": 140.5,
+    "currentPriceLabel": "$140.50",
+    "sqrtPrice": "123456789012345678",
+    "tickCurrentIndex": -12345,
+    "tickSpacing": 64,
+    "feeRate": 3000,
+    "feeRateLabel": "0.3%",
+    "poolLiquidity": "98765432101234",
+    "priceSource": "orca_whirlpool_sqrt_price"
+  },
+  "srLevels": null,
+  "positions": [],
+  "alerts": [],
+  "dataQuality": {
+    "partial": true,
+    "warnings": [
+      "usd_price_quote_unavailable: USD price quote unavailable for mint EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v"
+    ]
+  }
+}

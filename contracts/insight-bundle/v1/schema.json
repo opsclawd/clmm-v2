@@ -1,0 +1,340 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://contracts.opsclawd.dev/clmm-v2/insight-bundle/v1/insight-bundle.schema.json",
+  "$ref": "#/$defs/InsightBundle",
+  "$defs": {
+    "InsightBundle": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "pair",
+        "source",
+        "observedAtUnixMs",
+        "pool",
+        "srLevels",
+        "positions",
+        "alerts",
+        "dataQuality"
+      ],
+      "properties": {
+        "pair": {
+          "const": "SOL/USDC"
+        },
+        "source": {
+          "const": "orca"
+        },
+        "observedAtUnixMs": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "pool": {
+          "$ref": "#/$defs/SolUsdcPoolSnapshot"
+        },
+        "srLevels": {
+          "anyOf": [
+            { "$ref": "#/$defs/SrLevelsBlock" },
+            { "type": "null" }
+          ]
+        },
+        "positions": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/SolUsdcPositionInsight"
+          }
+        },
+        "alerts": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["triggerId", "positionId", "breachDirection", "triggeredAt"],
+            "properties": {
+              "triggerId": { "type": "string" },
+              "positionId": { "type": "string" },
+              "breachDirection": { "$ref": "#/$defs/ExternalBreachDirection" },
+              "triggeredAt": { "type": "integer", "minimum": 0 }
+            }
+          }
+        },
+        "dataQuality": {
+          "$ref": "#/$defs/InsightDataQuality"
+        }
+      }
+    },
+    "SolUsdcPoolSnapshot": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "poolId",
+        "pair",
+        "source",
+        "observedAtUnixMs",
+        "tokenPairLabel",
+        "currentPrice",
+        "currentPriceLabel",
+        "sqrtPrice",
+        "tickCurrentIndex",
+        "tickSpacing",
+        "feeRate",
+        "feeRateLabel",
+        "poolLiquidity",
+        "priceSource"
+      ],
+      "properties": {
+        "poolId": { "type": "string" },
+        "pair": { "const": "SOL/USDC" },
+        "source": { "const": "orca" },
+        "observedAtUnixMs": { "type": "integer", "minimum": 0 },
+        "tokenPairLabel": { "type": "string" },
+        "currentPrice": { "type": "number" },
+        "currentPriceLabel": { "type": "string" },
+        "sqrtPrice": { "type": "string" },
+        "tickCurrentIndex": { "type": "integer" },
+        "tickSpacing": { "type": "integer" },
+        "feeRate": { "type": "integer", "minimum": 0 },
+        "feeRateLabel": { "type": "string" },
+        "poolLiquidity": { "type": "string" },
+        "priceSource": { "const": "orca_whirlpool_sqrt_price" }
+      }
+    },
+    "SrLevelsBlock": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "briefId",
+        "sourceRecordedAtIso",
+        "summary",
+        "capturedAtUnixMs",
+        "supports",
+        "resistances"
+      ],
+      "properties": {
+        "briefId": { "type": "string" },
+        "sourceRecordedAtIso": {
+          "anyOf": [
+            {
+              "type": "string",
+              "pattern": "^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}(\\.\\d{3})?Z$"
+            },
+            { "type": "null" }
+          ]
+        },
+        "summary": {
+          "anyOf": [
+            { "type": "string" },
+            { "type": "null" }
+          ]
+        },
+        "capturedAtUnixMs": { "type": "integer", "minimum": 0 },
+        "supports": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/SrLevel" }
+        },
+        "resistances": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/SrLevel" }
+        }
+      }
+    },
+    "SrLevel": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["price"],
+      "properties": {
+        "price": { "type": "number" },
+        "rank": { "type": "string" },
+        "timeframe": { "type": "string" },
+        "invalidation": { "type": "number" },
+        "notes": { "type": "string" }
+      }
+    },
+    "ExternalBreachDirection": {
+      "enum": ["lower-bound-breach", "upper-bound-breach"]
+    },
+    "SolUsdcPositionInsight": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "walletId",
+        "positionId",
+        "poolId",
+        "pair",
+        "source",
+        "observedAtUnixMs",
+        "rangeState",
+        "lowerTick",
+        "upperTick",
+        "currentTick",
+        "lowerPriceLabel",
+        "upperPriceLabel",
+        "currentPrice",
+        "currentPriceLabel",
+        "rangeDistance",
+        "feeRateLabel",
+        "unclaimedFees",
+        "unclaimedRewards",
+        "unclaimedFeesUsd",
+        "unclaimedRewardsUsd",
+        "principalTokenAmounts",
+        "usdPriceQuotes",
+        "positionLiquidity",
+        "poolLiquidity",
+        "hasActionableTrigger"
+      ],
+      "properties": {
+        "walletId": { "type": "string" },
+        "positionId": { "type": "string" },
+        "poolId": { "type": "string" },
+        "pair": { "const": "SOL/USDC" },
+        "source": { "const": "orca" },
+        "observedAtUnixMs": { "type": "integer", "minimum": 0 },
+        "rangeState": { "enum": ["in-range", "below-range", "above-range"] },
+        "lowerTick": { "type": "integer" },
+        "upperTick": { "type": "integer" },
+        "currentTick": { "type": "integer" },
+        "lowerPriceLabel": { "type": "string" },
+        "upperPriceLabel": { "type": "string" },
+        "currentPrice": { "type": "number" },
+        "currentPriceLabel": { "type": "string" },
+        "rangeDistance": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["belowLowerTickPercent", "aboveUpperTickPercent"],
+          "properties": {
+            "belowLowerTickPercent": { "type": "number" },
+            "aboveUpperTickPercent": { "type": "number" },
+            "belowLowerPricePercent": { "type": "number" },
+            "aboveUpperPricePercent": { "type": "number" }
+          }
+        },
+        "feeRateLabel": { "type": "string" },
+        "unclaimedFees": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["feeOwedA", "feeOwedB"],
+          "properties": {
+            "feeOwedA": { "$ref": "#/$defs/SolUsdcFeeAmount" },
+            "feeOwedB": { "$ref": "#/$defs/SolUsdcFeeAmount" }
+          }
+        },
+        "unclaimedRewards": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/SolUsdcRewardAmount" }
+        },
+        "unclaimedFeesUsd": { "type": ["number", "null"] },
+        "unclaimedRewardsUsd": { "type": ["number", "null"] },
+        "principalTokenAmounts": {
+          "anyOf": [
+            { "$ref": "#/$defs/SolUsdcPrincipalTokenAmounts" },
+            { "type": "null" }
+          ]
+        },
+        "usdPriceQuotes": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/SolUsdcUsdPriceQuote" }
+        },
+        "positionLiquidity": { "type": "string" },
+        "poolLiquidity": { "type": "string" },
+        "hasActionableTrigger": { "type": "boolean" },
+        "triggerId": { "type": "string" },
+        "breachDirection": { "$ref": "#/$defs/ExternalBreachDirection" }
+      }
+    },
+    "SolUsdcFeeAmount": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["raw", "decimals", "symbol"],
+      "properties": {
+        "raw": { "type": "string" },
+        "decimals": { "type": ["integer", "null"] },
+        "symbol": { "type": "string" },
+        "mint": { "type": "string" }
+      }
+    },
+    "SolUsdcRewardAmount": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["mint", "raw", "decimals", "symbol"],
+      "properties": {
+        "mint": { "type": "string" },
+        "raw": { "type": "string" },
+        "decimals": { "type": ["integer", "null"] },
+        "symbol": { "type": "string" }
+      }
+    },
+    "SolUsdcPrincipalTokenAmounts": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["tokenA", "tokenB", "observedAtUnixMs", "source", "basis"],
+      "properties": {
+        "tokenA": { "$ref": "#/$defs/SolUsdcRawTokenAmount" },
+        "tokenB": { "$ref": "#/$defs/SolUsdcRawTokenAmount" },
+        "observedAtUnixMs": { "type": "integer", "minimum": 0 },
+        "source": { "const": "orca_full_liquidity_quote" },
+        "basis": { "const": "principal-only" }
+      }
+    },
+    "SolUsdcRawTokenAmount": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["raw", "decimals", "symbol", "mint"],
+      "properties": {
+        "raw": { "type": "string" },
+        "decimals": { "type": "integer" },
+        "symbol": { "type": "string" },
+        "mint": { "type": "string" }
+      }
+    },
+    "SolUsdcUsdPriceQuote": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["mint", "symbol", "usdPerToken", "quotedAtUnixMs", "source"],
+      "properties": {
+        "mint": { "type": "string" },
+        "symbol": { "type": "string" },
+        "usdPerToken": { "type": "number" },
+        "quotedAtUnixMs": { "type": "integer", "minimum": 0 },
+        "source": { "type": "string" }
+      }
+    },
+    "InsightDataQuality": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["partial", "warnings"],
+      "properties": {
+        "partial": { "type": "boolean" },
+        "warnings": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/InsightDataWarning" }
+        }
+      }
+    },
+    "InsightDataWarning": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["code", "message"],
+      "properties": {
+        "code": {
+          "enum": [
+            "sr_levels_unavailable",
+            "actionable_triggers_unavailable",
+            "fee_reward_usd_unavailable",
+            "price_distance_unavailable",
+            "principal_token_amounts_unavailable",
+            "usd_price_quote_unavailable"
+          ]
+        },
+        "message": { "type": "string" },
+        "scope": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "poolId": { "type": "string" },
+            "positionId": { "type": "string" },
+            "tokenMint": { "type": "string" }
+          }
+        }
+      }
+    }
+  }
+}
