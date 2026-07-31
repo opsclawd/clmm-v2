@@ -45,6 +45,7 @@ import { createPgBossProvider } from '../jobs/PgBossProvider.js';
 import { ReconciliationJobHandler } from '../jobs/ReconciliationJobHandler.js';
 import type { ClockPort, IdGeneratorPort } from '@clmm/application';
 import type { ClockTimestamp } from '@clmm/domain';
+import { resolveRegimePlanRequestConfig } from '../../composition/RegimePlanRequestConfig.js';
 import {
   TRIGGER_REPOSITORY,
   EXECUTION_REPOSITORY,
@@ -74,6 +75,7 @@ import {
   POLICY_INSIGHTS_READ_PORT,
   PLAN_REPOSITORY,
   REGIME_PLAN_PORT,
+  REGIME_PLAN_REQUEST_CONFIG,
 } from './tokens.js';
 
 // boundary: process.env values are untyped at runtime; validated via env schema at deploy
@@ -143,6 +145,9 @@ const regimePlanAdapter = new RegimePlanAdapter(
   telemetry,
 );
 const planStorage = new PlanStorageAdapter(db);
+const resolvedRegimePlanRequestConfig = resolveRegimePlanRequestConfig(
+  (process.env as Record<string, string | undefined>)['REGIME_PLAN_CONFIG_JSON'],
+);
 const reconciliationJobPort = {
   async enqueue(attemptId: string): Promise<void> {
     await boss.send(ReconciliationJobHandler.JOB_NAME, { attemptId });
@@ -200,6 +205,7 @@ export const SR_THESES_POOL_ALLOWLIST_MAP = new Map<string, { symbol: string; so
     { provide: POLICY_INSIGHTS_READ_PORT, useValue: currentPolicyInsightsAdapter },
     { provide: PLAN_REPOSITORY, useValue: planStorage },
     { provide: REGIME_PLAN_PORT, useValue: regimePlanAdapter },
+    { provide: REGIME_PLAN_REQUEST_CONFIG, useValue: resolvedRegimePlanRequestConfig },
     { provide: OBSERVABILITY_PORT, useValue: telemetry },
     { provide: PG_BOSS_INSTANCE, useValue: boss },
     { provide: RECONCILIATION_JOB_PORT, useValue: reconciliationJobPort },

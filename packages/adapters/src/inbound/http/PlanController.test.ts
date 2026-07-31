@@ -18,6 +18,8 @@ import {
 import type { RegimePlanResponse, TriggerRepository } from '@clmm/application';
 import { makeWalletId, makePositionId } from '@clmm/domain';
 import type { WalletId } from '@clmm/domain';
+import type { ResolveRegimePlanRequestConfigResult } from '../../composition/RegimePlanRequestConfig.js';
+import inRangeFixture from '../../../../../schemas/regime-engine/plan-request.v1/fixtures/valid/in-range.json';
 
 const TEST_WALLET = FIXTURE_POSITION_IN_RANGE.walletId;
 const TEST_POSITION = FIXTURE_POSITION_IN_RANGE.positionId;
@@ -103,6 +105,11 @@ describe('PlanController', () => {
     fakeIds = new FakeIdGeneratorPort();
     fakeObservability = new FakeObservabilityPort();
 
+    const configuredConfig: ResolveRegimePlanRequestConfigResult = {
+      kind: 'configured',
+      config: inRangeFixture.config,
+    };
+
     controller = new PlanController(
       fakePlanRepo,
       fakeRegimePort,
@@ -111,6 +118,7 @@ describe('PlanController', () => {
       fakeExecutionRepo,
       fakePrepPort,
       fakeHistoryRepo,
+      configuredConfig,
       fakeClock,
       fakeIds,
       fakeObservability,

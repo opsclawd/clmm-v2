@@ -25,6 +25,7 @@ type PlanRow = {
   nextAttemptAt: number | null;
   lastErrorClass: string | null;
   deliveredAt: number | null;
+  lifecycleStateJson: Record<string, unknown> | null;
 };
 
 type OutboxRow = {
@@ -158,13 +159,23 @@ function makeFakeDb(
     return {
       where: (predicate: unknown) => {
         const rows = filtered(predicate);
+        const sortedRows = [...rows].sort((a, b) => {
+          if (a['requestedAt'] !== b['requestedAt']) {
+            return Number(b['requestedAt']) - Number(a['requestedAt']);
+          }
+          return String(b['planId']).localeCompare(String(a['planId']));
+        });
         return {
           for: (_mode: string, _opts?: unknown) => ({
-            limit: async (n: number) => rows.slice(0, n),
-            then: (resolve: (v: unknown[]) => unknown) => resolve(rows),
+            limit: async (n: number) => sortedRows.slice(0, n),
+            then: (resolve: (v: unknown[]) => unknown) => resolve(sortedRows),
           }),
-          limit: async (n: number) => rows.slice(0, n),
-          then: (resolve: (v: unknown[]) => unknown) => resolve(rows),
+          orderBy: (..._args: unknown[]) => ({
+            limit: async (n: number) => sortedRows.slice(0, n),
+            then: (resolve: (v: unknown[]) => unknown) => resolve(sortedRows),
+          }),
+          limit: async (n: number) => sortedRows.slice(0, n),
+          then: (resolve: (v: unknown[]) => unknown) => resolve(sortedRows),
         };
       },
     };
@@ -250,6 +261,7 @@ function makePlanRow(overrides: Partial<PlanRow> = {}): PlanRow {
     nextAttemptAt: null,
     lastErrorClass: null,
     deliveredAt: null,
+    lifecycleStateJson: null,
     ...overrides,
   };
 }
@@ -534,6 +546,32 @@ describe('PlanStorageAdapter', () => {
       expect(outbox[0]?.canonicalResultJson).toEqual({ ok: true });
       expect(outbox[0]?.nextAttemptAt).toBe(5_000);
       expect(outbox[0]?.lastErrorClass).toBe('NetworkError');
+    });
+  });
+
+  describe('getCurrentPlan ordering', () => {
+    it('returns the newest plan for a position deterministically', async () => {
+      const { db } = makeFakeDb({
+        planRows: [
+          makePlanRow({
+            planId: 'plan-older',
+            positionId: 'position-1',
+            requestedAt: 1000,
+            lifecycleStateJson: { kind: 'requested' },
+          }),
+          makePlanRow({
+            planId: 'plan-newer',
+            positionId: 'position-1',
+            requestedAt: 2000,
+            lifecycleStateJson: { kind: 'requested' },
+          }),
+        ],
+      });
+      const adapter = new PlanStorageAdapter(db);
+
+      const plan = await adapter.getCurrentPlan(makePositionId('position-1'));
+      expect(plan).not.toBeNull();
+      expect(plan?.planId).toBe('plan-newer');
     });
   });
 });

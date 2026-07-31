@@ -31,8 +31,43 @@ export type RegimePlanReason = {
   message: string;
 };
 
+export type RegimePlanRequestConfig = {
+  regime: {
+    confirmBars: number;
+    minHoldBars: number;
+    enterUpTrend: number;
+    exitUpTrend: number;
+    enterDownTrend: number;
+    exitDownTrend: number;
+    chopVolRatioMax: number;
+  };
+  allocation: {
+    upSolBps: number;
+    downSolBps: number;
+    chopSolBps: number;
+    maxDeltaExposureBpsPerDay: number;
+    maxTurnoverPerDayBps: number;
+  };
+  churn: {
+    maxStopouts24h: number;
+    maxRedeploys24h: number;
+    cooldownMsAfterStopout: number;
+    standDownTriggerStrikes: number;
+  };
+  baselines: {
+    dcaIntervalDays: number;
+    dcaAmountUsd: number;
+    usdcCarryApr: number;
+  };
+};
+
+export type ResolveRegimePlanRequestConfigResult =
+  | { kind: 'configured'; config: RegimePlanRequestConfig }
+  | { kind: 'missing' }
+  | { kind: 'invalid'; error: string };
+
 export type RegimePlanRequest = {
-  schemaVersion: 'position-plan.v1';
+  schemaVersion: 'plan-request.v1';
   asOfUnixMs: number;
   market: {
     symbol: string;
@@ -58,6 +93,26 @@ export type RegimePlanRequest = {
     inventorySkewSolPct?: number;
     inventorySkewUsdcPct?: number;
   };
+  portfolio: {
+    navUsd: number;
+    solUnits: number;
+    usdcUnits: number;
+  };
+  autopilotState: {
+    activeClmm: boolean;
+    stopouts24h: number;
+    redeploys24h: number;
+    cooldownUntilUnixMs: number;
+    standDownUntilUnixMs: number;
+    strikeCount: number;
+  };
+  regimeState?: {
+    current: 'UP' | 'DOWN' | 'CHOP';
+    barsInRegime: number;
+    pending: 'UP' | 'DOWN' | 'CHOP' | null;
+    pendingBars: number;
+  };
+  config: RegimePlanRequestConfig;
 };
 
 export type RegimePlanResponse = {

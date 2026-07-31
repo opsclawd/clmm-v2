@@ -27,26 +27,9 @@ function createFakeObservability() {
   return { logs, port };
 }
 
-const VALID_PLAN_REQUEST: RegimePlanRequest = {
-  schemaVersion: 'position-plan.v1',
-  asOfUnixMs: 1700000000000,
-  market: {
-    symbol: 'SOL/USDC',
-    source: 'geckoterminal',
-    network: 'solana',
-    poolAddress: 'Czfq3xZZDmsdGdUyrNLtRhGc47cXcZtLG4crryfu44zE',
-    timeframe: '1h',
-  },
-  position: {
-    positionId: 'pos_sol_usdc_01',
-    observedAtUnixMs: 1700000000000,
-    lowerBoundPrice: 30.0,
-    upperBoundPrice: 50.0,
-    currentPrice: 40.0,
-    rangeState: 'in-range',
-    breachQualified: false,
-  },
-};
+import inRangeFixture from '../../../../../schemas/regime-engine/plan-request.v1/fixtures/valid/in-range.json';
+
+const VALID_PLAN_REQUEST: RegimePlanRequest = inRangeFixture as unknown as RegimePlanRequest;
 
 const VALID_EXECUTION_RESULT: RegimeExecutionResult = {
   schemaVersion: 'execution-result.v1',
@@ -130,16 +113,14 @@ describe('RegimePlanAdapter', () => {
       expect(calledMethod).toBe('POST');
       expect(calledHeaders['Content-Type']).toBe('application/json');
       expect(calledHeaders['X-CLMM-Internal-Token']).toBe('test-token');
-      expect(calledBody['schemaVersion']).toBe('position-plan.v1');
+      expect(calledBody['schemaVersion']).toBe('plan-request.v1');
       expect((calledBody['market'] as Record<string, unknown>)['symbol']).toBe('SOL/USDC');
       expect((calledBody['market'] as Record<string, unknown>)['source']).toBe('geckoterminal');
       expect((calledBody['market'] as Record<string, unknown>)['network']).toBe('solana');
-      expect((calledBody['market'] as Record<string, unknown>)['poolAddress']).toBe(
-        'Czfq3xZZDmsdGdUyrNLtRhGc47cXcZtLG4crryfu44zE',
-      );
+      expect((calledBody['market'] as Record<string, unknown>)['poolAddress']).toBe('Hf2vQZk...');
       expect((calledBody['market'] as Record<string, unknown>)['timeframe']).toBe('1h');
       expect((calledBody['position'] as Record<string, unknown>)['positionId']).toBe(
-        'pos_sol_usdc_01',
+        'pos-sol-usdc-1',
       );
     });
 

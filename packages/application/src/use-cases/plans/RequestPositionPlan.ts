@@ -3,6 +3,7 @@ import type {
   TriggerRepository,
   PlanRepository,
   RegimePlanPort,
+  ExecutionHistoryRepository,
   ClockPort,
   ObservabilityPort,
   IdGeneratorPort,
@@ -13,14 +14,16 @@ import type {
   ClockTimestamp,
   BreachDirection,
   PlanAction,
+  PlanId,
+  CanonicalHash,
 } from '@clmm/domain';
 import { makeClockTimestamp } from '@clmm/domain';
-import type { CanonicalHash } from '@clmm/domain';
 import type {
-  RegimePlanRequest,
   RegimePlanResponse,
   RegimePlanExitPosture,
-} from '@clmm/application';
+  ResolveRegimePlanRequestConfigResult,
+} from '../../dto/regimePlan.js';
+import { buildRegimePlanRequest } from './buildRegimePlanRequest.js';
 
 const STALENESS_THRESHOLD_MS = 5 * 60 * 1000;
 
@@ -62,7 +65,14 @@ export type PositionPlanRequestResult =
     }
   | { readonly status: 'ok'; readonly conflict: true; readonly reason: 'exact-replay' }
   | { readonly status: 'conflict'; readonly priorPlanId: string; readonly newFingerprint: string }
-  | { readonly status: 'unavailable'; readonly reason: 'position-not-found' | 'ownership-mismatch' }
+  | {
+      readonly status: 'unavailable';
+      readonly reason:
+        | 'position-not-found'
+        | 'ownership-mismatch'
+        | 'portfolio-unavailable'
+        | 'config-unavailable';
+    }
   | { readonly status: 'stale'; readonly reason: 'position-stale' }
   | { readonly status: 'degraded'; readonly reason: string }
   | { readonly status: 'superseded'; readonly breachDirection: BreachDirection }
@@ -87,63 +97,6 @@ function computeFingerprint(params: {
   return fields.join('|');
 }
 
-function buildRegimePlanRequest(params: {
-  position: {
-    positionId: PositionId;
-    walletId?: string;
-    lowerBoundPrice: number;
-    upperBoundPrice: number;
-    currentPrice: number;
-    rangeState: 'in-range' | 'below-range' | 'above-range';
-    breachQualified: boolean;
-    observedAtUnixMs: number;
-    breachQualifiedAtUnixMs?: number;
-  };
-  market: {
-    symbol: string;
-    source: string;
-    network: string;
-    poolAddress: string;
-    timeframe: '15m' | '1h';
-  };
-  asOfUnixMs: number;
-}): RegimePlanRequest {
-  const positionPart: {
-    positionId: string;
-    walletId?: string;
-    observedAtUnixMs: number;
-    breachQualifiedAtUnixMs?: number;
-    lowerBoundPrice: number;
-    upperBoundPrice: number;
-    currentPrice: number;
-    rangeState: 'in-range' | 'below-range' | 'above-range';
-    breachQualified: boolean;
-  } = {
-    positionId: params.position.positionId as string,
-    observedAtUnixMs: params.position.observedAtUnixMs,
-    lowerBoundPrice: params.position.lowerBoundPrice,
-    upperBoundPrice: params.position.upperBoundPrice,
-    currentPrice: params.position.currentPrice,
-    rangeState: params.position.rangeState,
-    breachQualified: params.position.breachQualified,
-  };
-
-  if (params.position.walletId !== undefined) {
-    positionPart.walletId = params.position.walletId;
-  }
-
-  if (params.position.breachQualifiedAtUnixMs !== undefined) {
-    positionPart.breachQualifiedAtUnixMs = params.position.breachQualifiedAtUnixMs;
-  }
-
-  return {
-    schemaVersion: 'position-plan.v1',
-    asOfUnixMs: params.asOfUnixMs,
-    market: params.market,
-    position: positionPart,
-  };
-}
-
 export async function requestPositionPlan(params: {
   walletId: WalletId;
   positionId: PositionId;
@@ -151,8 +104,10 @@ export async function requestPositionPlan(params: {
   triggerRepository: TriggerRepository;
   planRepository: PlanRepository;
   regimePlanPort: RegimePlanPort;
+  executionHistoryRepository: ExecutionHistoryRepository;
+  config: ResolveRegimePlanRequestConfigResult;
   clock: ClockPort;
-  idGenerator: IdGeneratorPort;
+  idGenerator?: IdGeneratorPort;
   observability: ObservabilityPort;
 }): Promise<PositionPlanRequestResult> {
   const {
@@ -162,8 +117,9 @@ export async function requestPositionPlan(params: {
     triggerRepository,
     planRepository,
     regimePlanPort,
+    executionHistoryRepository,
+    config,
     clock,
-    idGenerator,
     observability,
   } = params;
 
@@ -193,19 +149,43 @@ export async function requestPositionPlan(params: {
     return { status: 'stale', reason: 'position-stale' };
   }
 
-  const existingPlan = await planRepository.getCurrentPlan(positionId);
-
-  const positionDetail = await positionReadPort.getPositionDetail(walletId, positionId);
-  const poolData = positionDetail
-    ? await positionReadPort.getPoolData(positionDetail.position.poolId)
-    : null;
-
-  if (!poolData) {
-    observability.log('warn', 'RequestPositionPlan: pool data not available', { positionId });
-    return { status: 'unavailable', reason: 'position-not-found' };
+  if (config.kind !== 'configured') {
+    observability.log('warn', 'RequestPositionPlan: config unavailable', {
+      positionId,
+      configResult: config.kind,
+    });
+    return { status: 'unavailable', reason: 'config-unavailable' };
   }
 
-  const symbol = `${poolData.tokenPair.symbolA}/${poolData.tokenPair.symbolB}`;
+  const positionDetail = await positionReadPort.getPositionDetail(walletId, positionId);
+  if (!positionDetail) {
+    observability.log('warn', 'RequestPositionPlan: position detail not available', { positionId });
+    return { status: 'unavailable', reason: 'portfolio-unavailable' };
+  }
+
+  const supportedPositions = await positionReadPort.listSupportedPositions(walletId);
+  const triggers = await triggerRepository.listActionableTriggers(walletId);
+  const qualifiedTrigger = triggers.find(
+    (t) => t.positionId === positionId && t.confirmationPassed,
+  );
+  const walletHistory = await executionHistoryRepository.getWalletHistory(walletId);
+  const existingPlan = await planRepository.getCurrentPlan(positionId);
+
+  const request = buildRegimePlanRequest({
+    positionDetail,
+    config: config.config,
+    asOfUnixMs: now,
+    supportedPositionsCount: supportedPositions.length,
+    qualifiedTrigger: qualifiedTrigger ?? null,
+    walletHistory,
+  });
+
+  if (!request) {
+    observability.log('warn', 'RequestPositionPlan: failed to build contract-valid request', {
+      positionId,
+    });
+    return { status: 'unavailable', reason: 'portfolio-unavailable' };
+  }
 
   const rangeStateKind = position.rangeState.kind;
   const currentPrice =
@@ -214,11 +194,6 @@ export async function requestPositionPlan(params: {
     position.rangeState.kind === 'above-range'
       ? position.rangeState.currentPrice
       : 0;
-
-  const triggers = await triggerRepository.listActionableTriggers(walletId);
-  const qualifiedTrigger = triggers.find(
-    (t) => t.positionId === positionId && t.confirmationPassed,
-  );
 
   const fingerprint = computeFingerprint({
     positionId: position.positionId,
@@ -229,40 +204,12 @@ export async function requestPositionPlan(params: {
     observedAt: position.lastObservedAt,
   });
 
-  const breachQualifiedAtUnixMs = qualifiedTrigger
-    ? Number(qualifiedTrigger.triggeredAt)
-    : undefined;
-
-  const market = {
-    symbol,
-    source: 'clmm',
-    network: 'solana',
-    poolAddress: position.poolId,
-    timeframe: '1h' as const,
-  };
-
-  const request = buildRegimePlanRequest({
-    position: {
-      positionId,
-      ...(walletId !== undefined && { walletId: walletId as string }),
-      lowerBoundPrice: position.bounds.lowerBound,
-      upperBoundPrice: position.bounds.upperBound,
-      currentPrice,
-      rangeState: rangeStateKind,
-      breachQualified: !!qualifiedTrigger,
-      observedAtUnixMs: position.lastObservedAt as number,
-      ...(breachQualifiedAtUnixMs !== undefined && { breachQualifiedAtUnixMs }),
-    },
-    market,
-    asOfUnixMs: now,
-  });
-
   const transportResult = await regimePlanPort.requestPositionPlan(request);
 
   if (transportResult.kind === 'ok') {
     const response = transportResult.response;
-    const planId = idGenerator.generateId() as import('@clmm/domain').PlanId;
-    const canonicalHash = fingerprint as CanonicalHash;
+    const planId = response.planId as PlanId;
+    const canonicalHash = response.planHash as CanonicalHash;
     const advisoryActionFromResponse = extractAdvisoryAction(response);
 
     const createResult = await planRepository.createRequest({
@@ -276,12 +223,15 @@ export async function requestPositionPlan(params: {
     });
 
     if (createResult.kind === 'exact-replay') {
-      observability.log('info', 'RequestPositionPlan: exact replay detected', { positionId });
+      observability.log('info', 'RequestPositionPlan: exact replay detected', {
+        positionId,
+        planId,
+      });
       return {
         status: 'ok',
         conflict: false,
         reason: 'exact-replay',
-        plan: existingPlan as unknown as RegimePlanResponse,
+        plan: response,
         fingerprint,
       };
     }
@@ -289,11 +239,11 @@ export async function requestPositionPlan(params: {
     if (createResult.kind === 'conflict') {
       observability.log('warn', 'RequestPositionPlan: conflicting plan detected', {
         positionId,
-        fingerprint,
+        planId: response.planId,
       });
       return {
         status: 'conflict',
-        priorPlanId: existingPlan?.planId ?? 'unknown',
+        priorPlanId: response.planId,
         newFingerprint: fingerprint,
       };
     }

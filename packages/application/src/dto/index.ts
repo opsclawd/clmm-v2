@@ -449,6 +449,8 @@ export type {
   RegimePlanScope,
   RegimePlanConstraints,
   RegimePlanReason,
+  RegimePlanRequestConfig,
+  ResolveRegimePlanRequestConfigResult,
   RegimePlanRequest,
   RegimePlanResponse,
   RegimeExecutionResultStatus,
@@ -456,4 +458,8 @@ export type {
   RegimeExecutionResult,
 } from './regimePlan.js';
 
-export { parseRegimePlanResponse, parseRegimeExecutionResult } from './regimePlanValidator.js';
+export {
+  parseRegimePlanResponse,
+  parseRegimeExecutionResult,
+  parseRegimePlanRequest,
+} from './regimePlanValidator.js';

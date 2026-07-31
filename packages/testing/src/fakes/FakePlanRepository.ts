@@ -178,10 +178,19 @@ export class FakePlanRepository implements PlanRepository {
   }
 
   async getCurrentPlan(positionId: PositionId): Promise<PositionPlan | null> {
-    const plan = Array.from(this.plans.values()).find((p) => p.positionId === positionId);
-    if (!plan) {
+    const matchingPlans = Array.from(this.plans.values()).filter(
+      (p) => p.positionId === positionId,
+    );
+    if (matchingPlans.length === 0) {
       return null;
     }
+    matchingPlans.sort((a, b) => {
+      if (b.requestedAt !== a.requestedAt) {
+        return Number(b.requestedAt) - Number(a.requestedAt);
+      }
+      return b.planId.localeCompare(a.planId);
+    });
+    const plan = matchingPlans[0]!;
 
     if (plan.lifecycleStateJson === null) {
       throw new Error(`Plan ${plan.planId} has no lifecycle state recorded`);

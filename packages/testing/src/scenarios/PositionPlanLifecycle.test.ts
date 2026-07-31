@@ -40,6 +40,13 @@ import {
   FakeObservabilityPort,
 } from '../fakes/index.js';
 import { FIXTURE_POSITION_BELOW_RANGE, FIXTURE_POOL_DATA } from '../fixtures/index.js';
+import type { ResolveRegimePlanRequestConfigResult } from '@clmm/application';
+import inRangeFixture from '../../../../schemas/regime-engine/plan-request.v1/fixtures/valid/in-range.json';
+
+const CONFIGURED_CONFIG: ResolveRegimePlanRequestConfigResult = {
+  kind: 'configured',
+  config: inRangeFixture.config,
+};
 
 describe('PositionPlanLifecycle Scenarios', () => {
   function buildEnvironment() {
@@ -152,6 +159,8 @@ describe('PositionPlanLifecycle Scenarios', () => {
       triggerRepository: env.triggerRepository,
       planRepository: env.planRepository,
       regimePlanPort: env.regimePlanPort,
+      executionHistoryRepository: env.historyRepo,
+      config: CONFIGURED_CONFIG,
       clock: env.clock,
       idGenerator: env.idGenerator,
       observability: env.observability,
@@ -163,7 +172,7 @@ describe('PositionPlanLifecycle Scenarios', () => {
     }
   });
 
-  it('qualified upper breach outranks hold plan', async () => {
+  it('qualified upper breach remains authoritative over an accepted hold plan', async () => {
     const env = buildEnvironment();
     env.regimePlanPort.setPlanResponse({
       planId: 'plan-hold',
@@ -205,6 +214,8 @@ describe('PositionPlanLifecycle Scenarios', () => {
       triggerRepository: env.triggerRepository,
       planRepository: env.planRepository,
       regimePlanPort: env.regimePlanPort,
+      executionHistoryRepository: env.historyRepo,
+      config: CONFIGURED_CONFIG,
       clock: env.clock,
       idGenerator: env.idGenerator,
       observability: env.observability,

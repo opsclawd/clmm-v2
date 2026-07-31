@@ -1,4 +1,4 @@
-import { and, eq, isNull, lte } from 'drizzle-orm';
+import { and, eq, isNull, lte, desc } from 'drizzle-orm';
 import type { Db } from './db.js';
 import { positionPlans, planResultOutbox } from './schema/index.js';
 import type {
@@ -203,6 +203,7 @@ export class PlanStorageAdapter implements PlanRepository {
       .select()
       .from(positionPlans)
       .where(eq(positionPlans.positionId, positionId))
+      .orderBy(desc(positionPlans.requestedAt), desc(positionPlans.planId))
       .limit(1);
 
     if (rows.length === 0) {
