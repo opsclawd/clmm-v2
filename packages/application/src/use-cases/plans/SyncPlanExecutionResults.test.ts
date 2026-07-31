@@ -49,6 +49,7 @@ function makeClaim(overrides: Partial<PlanResultClaim> = {}): PlanResultClaim {
         canonicalHash: FIXTURE_CANONICAL_HASH,
         positionId: FIXTURE_POSITION_ID,
         decisionKind: 'acknowledged',
+        completedAtUnixMs: 1700000000000,
       },
     },
     idempotencyKey: FIXTURE_IDEMPOTENCY_KEY,
@@ -135,6 +136,7 @@ describe('SyncPlanExecutionResults', () => {
             canonicalHash: 'f9e8d7c6b5a40123456789abcdef0123456789abcdef0123456789abcdef0123',
             positionId: 'pos_sol_usdc_02',
             decisionKind: 'executed',
+            completedAtUnixMs: 1700000000000,
           },
         },
       });
@@ -161,6 +163,64 @@ describe('SyncPlanExecutionResults', () => {
       expect(callArg?.requestedAction).toBe('REQUEST_EXIT_CLMM');
     });
 
+    it('extracts completedAtUnixMs from canonicalResult payload instead of using clock.now()', async () => {
+      const customTimestamp = 1695000000000;
+      const claim = makeClaim({
+        canonicalResult: {
+          id: FIXTURE_RESULT_ID,
+          payload: {
+            planId: FIXTURE_PLAN_ID,
+            canonicalHash: FIXTURE_CANONICAL_HASH,
+            positionId: FIXTURE_POSITION_ID,
+            decisionKind: 'executed',
+            completedAtUnixMs: customTimestamp,
+          },
+        },
+      });
+      vi.mocked(planRepo.claimDueResult).mockResolvedValueOnce(claim);
+      vi.mocked(regimePort.reportExecutionResult).mockResolvedValueOnce({ kind: 'ok' });
+
+      await syncPlanExecutionResults(deps);
+
+      // eslint-disable-next-line @typescript-eslint/unbound-method
+      expect(regimePort.reportExecutionResult).toHaveBeenCalledOnce();
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment,@typescript-eslint/unbound-method
+      const callArg = vi.mocked(regimePort.reportExecutionResult).mock.calls[0]?.[0] as {
+        completedAtUnixMs: number;
+      };
+      expect(callArg?.completedAtUnixMs).toBe(customTimestamp);
+    });
+
+    it('permanently rejects unrecognized decision kinds without defaulting to SKIPPED or UNKNOWN', async () => {
+      const invalidDecisionClaim = makeClaim({
+        canonicalResult: {
+          id: FIXTURE_RESULT_ID,
+          payload: {
+            planId: FIXTURE_PLAN_ID,
+            canonicalHash: FIXTURE_CANONICAL_HASH,
+            positionId: FIXTURE_POSITION_ID,
+            decisionKind: 'unrecognized_decision_kind',
+            completedAtUnixMs: 1700000000000,
+          },
+        },
+      });
+      vi.mocked(planRepo.claimDueResult).mockResolvedValueOnce(invalidDecisionClaim);
+
+      const result = await syncPlanExecutionResults(deps);
+
+      // eslint-disable-next-line @typescript-eslint/unbound-method
+      expect(regimePort.reportExecutionResult).not.toHaveBeenCalled();
+      // eslint-disable-next-line @typescript-eslint/unbound-method
+      expect(planRepo.failDelivery).toHaveBeenCalledWith(
+        expect.objectContaining({
+          planId: FIXTURE_PLAN_ID,
+          resultId: FIXTURE_RESULT_ID,
+          reason: 'permanent:schema-invalid',
+        }),
+      );
+      expect(result.permanentlyRejected).toBe(1);
+    });
+
     it('validates the built result before transport', async () => {
       const invalidHashClaim = makeClaim({
         canonicalResult: {
@@ -170,6 +230,7 @@ describe('SyncPlanExecutionResults', () => {
             canonicalHash: 'not-a-valid-sha256',
             positionId: FIXTURE_POSITION_ID,
             decisionKind: 'executed',
+            completedAtUnixMs: 1700000000000,
           },
         },
       });
@@ -202,6 +263,7 @@ describe('SyncPlanExecutionResults', () => {
             canonicalHash: 'f9e8d7c6b5a40123456789abcdef0123456789abcdef0123456789abcdef0123',
             positionId: 'pos_sol_usdc_02',
             decisionKind: 'executed',
+            completedAtUnixMs: 1700000000000,
           },
         },
       });

@@ -1,0 +1,11 @@
+{
+  "result": "fail",
+  "findings": [
+    {
+      "severity": "P1",
+      "summary": "The sha256 checksum of the vendored fixture inline-candles-and-portfolio.json (ad7c7da5...) does not match the checksum recorded in its provenance.json (473cb5...), indicating a local modification or incorrect pinning.",
+      "file": "schemas/regime-engine/position-plan.v1/fixtures/invalid/inline-candles-and-portfolio.json",
+      "suggested_fix": "Re-vendor the position-plan.v1 contract to ensure all local files exactly match the upstream assets from regime-engine, or restore the unmodified inline-candles-and-portfolio.json file."
+    }
+  ]
+}

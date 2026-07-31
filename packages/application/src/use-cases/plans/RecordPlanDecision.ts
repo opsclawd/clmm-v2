@@ -36,13 +36,15 @@ function buildCanonicalResult(params: {
   positionId: PositionId;
   decision: PlanOutcome;
   canonicalHash: CanonicalHash;
+  completedAtUnixMs: number;
 }): { id: string; payload: Record<string, unknown> } {
-  const { planId, positionId, decision, canonicalHash } = params;
+  const { planId, positionId, decision, canonicalHash, completedAtUnixMs } = params;
   const payload: Record<string, unknown> = {
     planId,
     positionId,
     decisionKind: decision.kind,
     canonicalHash,
+    completedAtUnixMs,
   };
 
   if (decision.kind === 'acknowledged' || decision.kind === 'stand-down') {
@@ -167,6 +169,7 @@ export async function recordPlanDecision(params: {
       positionId,
       decision: effectiveDecision,
       canonicalHash: existingPlan.canonicalHash,
+      completedAtUnixMs: now,
     });
     observability.log('info', 'RecordPlanDecision: decision replayed idempotently', {
       planId,
@@ -206,6 +209,7 @@ export async function recordPlanDecision(params: {
     positionId,
     decision: effectiveDecision,
     canonicalHash: existingPlan.canonicalHash,
+    completedAtUnixMs: decidedAt,
   });
 
   await planRepository.commitTerminalOutcome({

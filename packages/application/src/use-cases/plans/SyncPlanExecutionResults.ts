@@ -8,6 +8,7 @@ import type {
 } from '../../ports/index.js';
 import type { ClockTimestamp } from '@clmm/domain';
 import type { RegimeExecutionResult } from '../../dto/regimePlan.js';
+import { parseRegimeExecutionResult } from '../../dto/index.js';
 
 export type SyncPlanExecutionResultsDeps = {
   planRepository: PlanRepository;
@@ -29,7 +30,7 @@ function computeBackoff(attemptCount: number, now: number): ClockTimestamp {
 
 function mapDecisionKindToStatus(
   decisionKind: string | undefined,
-): RegimeExecutionResult['status'] {
+): RegimeExecutionResult['status'] | undefined {
   switch (decisionKind) {
     case 'acknowledged':
     case 'stand-down':
@@ -42,11 +43,11 @@ function mapDecisionKindToStatus(
     case 'rejected':
       return 'SKIPPED';
     default:
-      return 'SKIPPED';
+      return undefined;
   }
 }
 
-function mapDecisionKindToReasonCode(decisionKind: string | undefined): string {
+function mapDecisionKindToReasonCode(decisionKind: string | undefined): string | undefined {
   switch (decisionKind) {
     case 'acknowledged':
       return 'ACKNOWLEDGED';
@@ -63,17 +64,15 @@ function mapDecisionKindToReasonCode(decisionKind: string | undefined): string {
     case 'rejected':
       return 'REJECTED';
     default:
-      return 'UNKNOWN';
+      return undefined;
   }
 }
-
-import { parseRegimeExecutionResult } from '../../dto/index.js';
 
 async function deliverResult(
   claim: PlanResultClaim,
   regimePort: RegimePlanPort,
   planRepository: PlanRepository,
-  clock: ClockPort,
+  _clock: ClockPort,
 ): Promise<PlanExecutionResultTransportResult> {
   const payload = claim.canonicalResult.payload;
   const canonicalHash =
@@ -85,9 +84,26 @@ async function deliverResult(
   const positionId = typeof payload['positionId'] === 'string' ? payload['positionId'] : undefined;
   const decisionKind =
     typeof payload['decisionKind'] === 'string' ? payload['decisionKind'] : undefined;
+  const rawCompletedAt =
+    payload['completedAtUnixMs'] ??
+    payload['completedAt'] ??
+    payload['decidedAt'] ??
+    payload['timestamp'];
+  const completedAtUnixMs = typeof rawCompletedAt === 'number' ? rawCompletedAt : undefined;
   const storedActionKind = await planRepository.getPlanActionKind(claim.planId);
 
-  if (!canonicalHash || !positionId || !decisionKind || !storedActionKind) {
+  const status = mapDecisionKindToStatus(decisionKind);
+  const reasonCode = mapDecisionKindToReasonCode(decisionKind);
+
+  if (
+    !canonicalHash ||
+    !positionId ||
+    !decisionKind ||
+    !storedActionKind ||
+    completedAtUnixMs === undefined ||
+    status === undefined ||
+    reasonCode === undefined
+  ) {
     return { kind: 'permanent', reason: 'schema-invalid' };
   }
 
@@ -97,9 +113,9 @@ async function deliverResult(
     planHash: canonicalHash,
     positionId,
     requestedAction: storedActionKind as RegimeExecutionResult['requestedAction'],
-    status: mapDecisionKindToStatus(decisionKind),
-    reasonCode: mapDecisionKindToReasonCode(decisionKind),
-    completedAtUnixMs: clock.now() as number,
+    status,
+    reasonCode,
+    completedAtUnixMs,
     idempotencyKey: claim.idempotencyKey,
   };
 
