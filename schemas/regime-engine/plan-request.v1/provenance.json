@@ -1,0 +1,44 @@
+{
+  "repository": "https://github.com/opsclawd/regime-engine",
+  "commit": "260d144f653fc95e1b86d3d65c7305b80170e0a0",
+  "schemaPath": "contracts/plan-request/v1/plan-request.schema.json",
+  "schemaVersion": "v1",
+  "copiedAt": "2026-07-23T14:15:00Z",
+  "assets": [
+    {
+      "sourcePath": "contracts/plan-request/v1/plan-request.schema.json",
+      "localPath": "schemas/regime-engine/plan-request.v1/schema.json",
+      "sha256": "7819f99ef5885620d22d69cd95d6b95b8a8c6e9264d44cc1536911b617d18a56"
+    },
+    {
+      "sourcePath": "contracts/plan-request/v1/schema.sha256",
+      "localPath": "schemas/regime-engine/plan-request.v1/schema.sha256",
+      "sha256": "7c4ce97298e1878f5e4dd3e6daec0dde2bb07e420b4bef685ed845dc7df3d9b8"
+    },
+    {
+      "sourcePath": "contracts/plan-request/v1/fixtures/valid/in-range.json",
+      "localPath": "schemas/regime-engine/plan-request.v1/fixtures/valid/in-range.json",
+      "sha256": "cd2ec045003966e034808ac451e6c60d1456fbc1bf121be400fbf85ea4c50fa1"
+    },
+    {
+      "sourcePath": "contracts/plan-request/v1/fixtures/valid/breach-qualified.json",
+      "localPath": "schemas/regime-engine/plan-request.v1/fixtures/valid/breach-qualified.json",
+      "sha256": "33325e0ac1d7e73886adc77762db82abb5b9d81b023177eed4996ef6b5a06e4c"
+    },
+    {
+      "sourcePath": "contracts/plan-request/v1/fixtures/invalid/missing-portfolio.json",
+      "localPath": "schemas/regime-engine/plan-request.v1/fixtures/invalid/missing-portfolio.json",
+      "sha256": "4473a1101fede2228fb92ae661402251e6e758d2b500a274b61e2b5c4db142e5"
+    },
+    {
+      "sourcePath": "contracts/plan-request/v1/fixtures/invalid/missing-autopilot-state.json",
+      "localPath": "schemas/regime-engine/plan-request.v1/fixtures/invalid/missing-autopilot-state.json",
+      "sha256": "a41bc9ee60e4f68b8a0727ea93152620a33a5f3e900949a9c44632c46a7db1bd"
+    },
+    {
+      "sourcePath": "contracts/plan-request/v1/fixtures/invalid/missing-config.json",
+      "localPath": "schemas/regime-engine/plan-request.v1/fixtures/invalid/missing-config.json",
+      "sha256": "d533007078ebed92f20125515f12fe4321f837c86d4be9d5b7cfb211807b8f3d"
+    }
+  ]
+}

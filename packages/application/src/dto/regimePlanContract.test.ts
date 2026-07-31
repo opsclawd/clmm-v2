@@ -2,6 +2,11 @@ import { describe, expect, it } from 'vitest';
 import { Ajv2020 } from 'ajv/dist/2020.js';
 import positionPlanSchema from '../../../../schemas/regime-engine/position-plan.v1/schema.json' with { type: 'json' };
 import executionResultSchema from '../../../../schemas/regime-engine/execution-result.v1/schema.json' with { type: 'json' };
+import planRequestSchema from '../../../../schemas/regime-engine/plan-request.v1/schema.json' with { type: 'json' };
+
+import positionPlanProvenance from '../../../../schemas/regime-engine/position-plan.v1/provenance.json' with { type: 'json' };
+import executionResultProvenance from '../../../../schemas/regime-engine/execution-result.v1/provenance.json' with { type: 'json' };
+import planRequestProvenance from '../../../../schemas/regime-engine/plan-request.v1/provenance.json' with { type: 'json' };
 
 import holdFixture from '../../../../schemas/regime-engine/position-plan.v1/fixtures/valid/hold.json' with { type: 'json' };
 import requestExitFixture from '../../../../schemas/regime-engine/position-plan.v1/fixtures/valid/request-exit.json' with { type: 'json' };
@@ -14,6 +19,12 @@ import skippedFixture from '../../../../schemas/regime-engine/execution-result.v
 import unsupportedStatusFixture from '../../../../schemas/regime-engine/execution-result.v1/fixtures/invalid/unsupported-status.json' with { type: 'json' };
 import extraFieldsFixture from '../../../../schemas/regime-engine/execution-result.v1/fixtures/invalid/extra-forbidden-fields.json' with { type: 'json' };
 
+import inRangeFixture from '../../../../schemas/regime-engine/plan-request.v1/fixtures/valid/in-range.json' with { type: 'json' };
+import breachQualifiedFixture from '../../../../schemas/regime-engine/plan-request.v1/fixtures/valid/breach-qualified.json' with { type: 'json' };
+import missingPortfolioFixture from '../../../../schemas/regime-engine/plan-request.v1/fixtures/invalid/missing-portfolio.json' with { type: 'json' };
+import missingAutopilotStateFixture from '../../../../schemas/regime-engine/plan-request.v1/fixtures/invalid/missing-autopilot-state.json' with { type: 'json' };
+import missingConfigFixture from '../../../../schemas/regime-engine/plan-request.v1/fixtures/invalid/missing-config.json' with { type: 'json' };
+
 const ajv = new Ajv2020({
   strict: true,
   coerceTypes: false,
@@ -23,9 +34,11 @@ const ajv = new Ajv2020({
 
 ajv.addSchema(positionPlanSchema);
 ajv.addSchema(executionResultSchema);
+ajv.addSchema(planRequestSchema);
 
 const validatePositionPlan = ajv.compile(positionPlanSchema);
 const validateExecutionResult = ajv.compile(executionResultSchema);
+const validatePlanRequest = ajv.compile(planRequestSchema);
 
 function deepClone<T>(obj: T): T {
   return JSON.parse(JSON.stringify(obj)) as T;
@@ -51,5 +64,27 @@ describe('Regime plan contract schema validation', () => {
   it('rejects every canonical execution-result invalid fixture', () => {
     expect(validateExecutionResult(deepClone(unsupportedStatusFixture))).toBe(false);
     expect(validateExecutionResult(deepClone(extraFieldsFixture))).toBe(false);
+  });
+
+  it('accepts every canonical plan-request valid fixture', () => {
+    expect(validatePlanRequest(deepClone(inRangeFixture))).toBe(true);
+    expect(validatePlanRequest(deepClone(breachQualifiedFixture))).toBe(true);
+  });
+
+  it('rejects every canonical plan-request invalid fixture', () => {
+    expect(validatePlanRequest(deepClone(missingPortfolioFixture))).toBe(false);
+    expect(validatePlanRequest(deepClone(missingAutopilotStateFixture))).toBe(false);
+    expect(validatePlanRequest(deepClone(missingConfigFixture))).toBe(false);
+  });
+
+  it('pins all regime plan contracts to one upstream commit', () => {
+    expect(positionPlanSchema.properties.schemaVersion.const).toBe('position-plan.v1');
+    expect(executionResultSchema.properties.schemaVersion.const).toBe('execution-result.v1');
+    expect(planRequestSchema.properties.schemaVersion.const).toBe('plan-request.v1');
+
+    expect(planRequestProvenance.commit).toBeDefined();
+    expect(planRequestProvenance.commit.length).toBeGreaterThan(0);
+    expect(positionPlanProvenance.commit).toBe(planRequestProvenance.commit);
+    expect(executionResultProvenance.commit).toBe(planRequestProvenance.commit);
   });
 });

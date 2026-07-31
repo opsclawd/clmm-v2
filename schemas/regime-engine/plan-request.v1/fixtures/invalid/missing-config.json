@@ -1,0 +1,40 @@
+{
+  "schemaVersion": "plan-request.v1",
+  "asOfUnixMs": 1776272593000,
+  "market": {
+    "symbol": "SOL/USDC",
+    "source": "geckoterminal",
+    "network": "solana",
+    "poolAddress": "Hf2vQZk...",
+    "timeframe": "1h"
+  },
+  "position": {
+    "positionId": "pos-sol-usdc-1",
+    "walletId": "wallet-1",
+    "observedAtUnixMs": 1776272593000,
+    "lowerBoundPrice": 140,
+    "upperBoundPrice": 160,
+    "currentPrice": 150,
+    "rangeState": "in-range",
+    "breachQualified": false,
+    "distanceToLowerPct": 6.67,
+    "distanceToUpperPct": 6.67,
+    "liquidityUsd": 5000,
+    "unclaimedFeesUsd": 12.5,
+    "inventorySkewSolPct": 50,
+    "inventorySkewUsdcPct": 50
+  },
+  "portfolio": {
+    "navUsd": 10000,
+    "solUnits": 33.333333,
+    "usdcUnits": 5000
+  },
+  "autopilotState": {
+    "activeClmm": true,
+    "stopouts24h": 0,
+    "redeploys24h": 0,
+    "cooldownUntilUnixMs": 0,
+    "standDownUntilUnixMs": 0,
+    "strikeCount": 0
+  }
+}

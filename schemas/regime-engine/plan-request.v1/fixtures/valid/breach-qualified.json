@@ -1,0 +1,70 @@
+{
+  "schemaVersion": "plan-request.v1",
+  "asOfUnixMs": 1776272593000,
+  "market": {
+    "symbol": "SOL/USDC",
+    "source": "geckoterminal",
+    "network": "solana",
+    "poolAddress": "Hf2vQZk...",
+    "timeframe": "1h"
+  },
+  "position": {
+    "positionId": "pos-sol-usdc-1",
+    "walletId": "wallet-1",
+    "observedAtUnixMs": 1776272593000,
+    "breachQualifiedAtUnixMs": 1776272500000,
+    "lowerBoundPrice": 140,
+    "upperBoundPrice": 160,
+    "currentPrice": 135,
+    "rangeState": "below-range",
+    "breachQualified": true,
+    "distanceToLowerPct": -3.57,
+    "distanceToUpperPct": -15.625,
+    "liquidityUsd": 5000,
+    "unclaimedFeesUsd": 12.5,
+    "inventorySkewSolPct": 100,
+    "inventorySkewUsdcPct": 0
+  },
+  "portfolio": {
+    "navUsd": 10000,
+    "solUnits": 74.074074,
+    "usdcUnits": 0
+  },
+  "autopilotState": {
+    "activeClmm": true,
+    "stopouts24h": 0,
+    "redeploys24h": 0,
+    "cooldownUntilUnixMs": 0,
+    "standDownUntilUnixMs": 0,
+    "strikeCount": 0
+  },
+  "config": {
+    "regime": {
+      "confirmBars": 3,
+      "minHoldBars": 6,
+      "enterUpTrend": 0.05,
+      "exitUpTrend": -0.02,
+      "enterDownTrend": -0.05,
+      "exitDownTrend": 0.02,
+      "chopVolRatioMax": 1.5
+    },
+    "allocation": {
+      "upSolBps": 7000,
+      "downSolBps": 3000,
+      "chopSolBps": 5000,
+      "maxDeltaExposureBpsPerDay": 2000,
+      "maxTurnoverPerDayBps": 10000
+    },
+    "churn": {
+      "maxStopouts24h": 2,
+      "maxRedeploys24h": 0,
+      "cooldownMsAfterStopout": 86400000,
+      "standDownTriggerStrikes": 3
+    },
+    "baselines": {
+      "dcaIntervalDays": 7,
+      "dcaAmountUsd": 100,
+      "usdcCarryApr": 0.05
+    }
+  }
+}
