@@ -600,23 +600,10 @@ export class PlanStorageAdapter implements PlanRepository {
       const closedCandleAtNum =
         closedCandleAt !== undefined && closedCandleAt !== null ? Number(closedCandleAt) : null;
 
-      const recordValues = {
-        positionId: positionId as string,
-        leaseToken,
-        leaseUntil: leaseUntilNum,
-        lastAttemptAt: nowNum,
-        lastRangeState: rangeState as string,
-        lastBreachQualifiedAt: breachQualifiedAtNum,
-        lastClosedCandleAt: closedCandleAtNum,
-        updatedAt: nowNum,
-      };
-
-      await tx
-        .insert(positionPlanRequestState)
-        .values(recordValues)
-        .onConflictDoUpdate({
-          target: positionPlanRequestState.positionId,
-          set: {
+      if (row) {
+        await tx
+          .update(positionPlanRequestState)
+          .set({
             leaseToken,
             leaseUntil: leaseUntilNum,
             lastAttemptAt: nowNum,
@@ -624,8 +611,28 @@ export class PlanStorageAdapter implements PlanRepository {
             lastBreachQualifiedAt: breachQualifiedAtNum,
             lastClosedCandleAt: closedCandleAtNum,
             updatedAt: nowNum,
-          },
-        });
+          })
+          .where(eq(positionPlanRequestState.positionId, positionId as string));
+      } else {
+        const inserted = await tx
+          .insert(positionPlanRequestState)
+          .values({
+            positionId: positionId as string,
+            leaseToken,
+            leaseUntil: leaseUntilNum,
+            lastAttemptAt: nowNum,
+            lastRangeState: rangeState as string,
+            lastBreachQualifiedAt: breachQualifiedAtNum,
+            lastClosedCandleAt: closedCandleAtNum,
+            updatedAt: nowNum,
+          })
+          .onConflictDoNothing()
+          .returning({ positionId: positionPlanRequestState.positionId });
+
+        if (inserted.length === 0) {
+          return { kind: 'suppressed', reason: 'active-request' } as const;
+        }
+      }
 
       return { kind: 'claimed', leaseToken } as const;
     }) as Promise<ClaimPlanRequestResult>;
