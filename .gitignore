@@ -6,6 +6,7 @@ dist/
 .next/
 coverage/
 .worktrees
+.ai-worktrees/
 .env
 .env.local
 .context/

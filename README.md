@@ -17,7 +17,8 @@ CLMM V2 currently provides:
 - adapter implementations for Orca position reads, Jupiter quotes, Solana transaction preparation/submission, Postgres persistence, notification dispatch, and regime-engine integration;
 - a read-only `/insights/sol-usdc/*` API that exposes CLMM pool, position, alert, and S/R snapshots to the external intelligence pipeline;
 - backend-only regime-engine reads for current regime, S/R levels, S/R theses, and policy insights;
-- backend-only regime-engine writes for terminal CLMM execution events.
+- backend-only regime-engine writes for terminal CLMM execution events;
+- a position-scoped Regime plan request/decision/preview/approval flow, plus a result-outbox worker job that reports every received plan's terminal outcome back to regime-engine.
 
 The current execution model is explicit user approval. The backend may prepare and submit signed payloads, but signing authority remains with the user's wallet.
 
@@ -60,49 +61,45 @@ Today:
 - `regime-engine` is the deterministic analytics and ledger service. It stores candles, computes current regime, stores S/R and current insight blocks, and records CLMM execution-result events.
 - `sol-usdc-clmm-intelligence` is the advisory/evidence pipeline. It pulls CLMM bundles from this repo's BFF, runs OpenClaw-backed analysis against durable policies/memory, and produces advisory artifacts. It does not perform execution.
 
-## Open roadmap and future state
+## Evidence-driven policy loop (delivered)
 
-Open issues currently frame the next architecture as an evidence-driven policy loop, not three independent services.
+The evidence-driven policy loop described below was the near-term roadmap through #90–#93, #62, #72, #73, and #76. All of those issues are closed and the work has shipped; this section documents delivered behavior, not upcoming work.
 
 ### Evidence-driven PolicyInsights consumption
 
-Tracked by #90, #91, #92, and #93.
+Delivered:
 
-Future CLMM V2 should:
-
-- remain the source of truth for live wallet, LP, position, alert, execution, and history state;
-- extend the read-only SOL/USDC intelligence bundle with missing raw LP facts needed by downstream evidence derivation, such as inventory skew, fee-capture inputs, unclaimed-fee valuation lineage, token composition, and explicit data-quality warnings;
-- consume one canonical Regime Engine PolicyInsight contract instead of hand-rolled or duplicated parser shapes;
-- render synthesized PolicyInsights in the app with freshness, confidence, risk, reasoning, levels, and degraded/unavailable states;
-- keep the UI concise and decision-focused rather than becoming a raw analytics dump.
+- CLMM V2 remains the source of truth for live wallet, LP, position, alert, execution, and history state;
+- the read-only SOL/USDC intelligence bundle was extended with raw LP facts needed by downstream evidence derivation, such as inventory skew, fee-capture inputs, unclaimed-fee valuation lineage, token composition, and explicit data-quality warnings;
+- `clmm-v2` consumes one canonical Regime Engine PolicyInsight contract, vendored at `schemas/regime-engine/policy-insight.v1/` (see `AGENTS.md` for the vendoring convention), instead of hand-rolled or duplicated parser shapes;
+- the app renders synthesized PolicyInsights with freshness, confidence, risk, reasoning, levels, and degraded/unavailable states through `PolicyInsightsSection`;
+- the UI stays concise and decision-focused rather than becoming a raw analytics dump.
 
 The important boundary: intelligence gets raw evidence inputs from CLMM; Regime Engine synthesizes the final PolicyInsight; CLMM displays/consumes the final policy while preserving live LP and signed-transaction responsibility.
 
 ### Regime Engine plan/result loop
 
-Tracked by #62.
-
-A later operating mode adds a plan/result audit loop:
+Delivered as a position-scoped plan/result audit loop:
 
 ```text
-CLMM -> POST /v1/plan             -> Regime Engine returns a plan
-CLMM -> user approval flow        -> signed transaction handling when applicable
-CLMM -> POST /v1/execution-result -> Regime Engine records the outcome
+CLMM -> POST /plans/:walletId/:positionId/request           -> Regime Engine returns a plan
+CLMM -> POST /plans/:walletId/:positionId/:planId/decision  -> user accept/decline recorded
+CLMM -> POST /plans/:walletId/:positionId/:planId/preview   -> signed transaction handling when applicable
+CLMM -> POST /plans/:walletId/:positionId/:planId/approve   -> user approval recorded
+CLMM worker -> POST /v1/execution-result                    -> Regime Engine records the outcome
 ```
 
-The audit rule is the important part: every received plan should eventually have a recorded result, including hold, skipped, failed, and completed cases. Regime Engine records decisions and outcomes; CLMM remains responsible for user approval, safety checks, transaction submission, and reconciliation.
+Every preview and execution attempt carries an explicit `ExecutionOrigin` (`qualified-breach` or `regime-plan`). The `syncPlanExecutionResults` worker job claims due rows from the `plan_execution_results` outbox table using atomic database locks (`FOR UPDATE SKIP LOCKED`), delivers `POST /v1/execution-result` to Regime Engine, and retries retryable failures with exponential backoff up to 5 attempts before marking a row `failed-permanent`. Deterministic qualified lower/upper breach triggers always outrank advisory plan responses (`HOLD`, `STAND_DOWN`, or degraded/unavailable plan states). The audit rule is the important part: every received plan eventually gets a recorded result, including hold, skipped, failed, and completed cases. Regime Engine records decisions and outcomes; CLMM remains responsible for user approval, safety checks, transaction submission, and reconciliation.
 
 ### Product/data hardening
 
-Tracked by #72, #73, and #76.
+Also delivered:
 
-Near-term polish and safety work includes:
-
-- making impossible or inconsistent `hasAlert + in-range` display states explicit instead of silently showing a normal chip;
-- avoiding plausible-looking RangeBar output when price inputs are non-finite or unavailable;
-- replacing placeholder portfolio metrics with real application-layer data or visibly marking them as unavailable;
-- reducing placeholder hash collisions and improving pair glyph fallbacks;
-- hardening market insight fetch timeouts so the timeout covers response body reads, not only response headers.
+- impossible or inconsistent `hasAlert + in-range` display states are now explicit instead of silently showing a normal chip;
+- `RangeBar` no longer renders plausible-looking output when price inputs are non-finite or unavailable (`RangeBarUtils` validates each bound and reports a specific non-finite reason);
+- placeholder portfolio and position-card financial metrics were replaced with real application-layer data or visibly marked as unavailable;
+- `PairGlyph` fallbacks were hardened for non-canonical pool labels to reduce placeholder hash collisions;
+- market insight fetch timeouts now cover response body reads, not only response headers.
 
 ## Mature system vision
 
@@ -138,6 +135,9 @@ Key route groups:
 
 ```text
 GET  /health
+POST /wallets/:walletId/challenge
+POST /wallets/:walletId/enroll
+POST /wallets/:walletId/monitor
 GET  /positions/:walletId
 GET  /positions/:walletId/:positionId
 GET  /alerts/:walletId
@@ -147,10 +147,17 @@ POST /previews/:triggerId/refresh
 GET  /previews/:previewId
 POST /executions/approve
 GET  /executions/:attemptId/signing-payload
+POST /executions/:attemptId/decline-signature
+POST /executions/:attemptId/interrupt-signature
 POST /executions/:attemptId/submit
 POST /executions/:attemptId/abandon
 GET  /executions/:attemptId
 GET  /executions/history/wallet/:walletId
+POST /plans/:walletId/:positionId/request
+GET  /plans/:walletId/:positionId/current
+POST /plans/:walletId/:positionId/:planId/decision
+POST /plans/:walletId/:positionId/:planId/preview
+POST /plans/:walletId/:positionId/:planId/approve
 GET  /regime/pools/:poolId/current
 GET  /sr-levels/pools/:poolId/current
 GET  /sr-theses/pools/:poolId/current
@@ -193,57 +200,34 @@ REGIME_ENGINE_INTERNAL_TOKEN=<must-match-regime-engine-CLMM_INTERNAL_TOKEN>
 
 - `POST /v1/clmm-execution-result` for terminal execution outcomes.
 
-Planned integration adds:
+`clmm-v2` also implements the position-scoped plan/result audit loop (see [Regime Engine plan/result loop](#regime-engine-planresult-loop) above):
 
-- `POST /v1/plan` plan requests;
-- `POST /v1/execution-result` result records for every received plan;
-- canonical PolicyInsight contract fixtures/schema consumed from Regime Engine instead of duplicated parser logic.
+- inbound `POST /plans/:walletId/:positionId/request`, `.../decision`, `.../preview`, and `.../approve` accept and progress a position plan requested from Regime Engine;
+- outbound `POST /v1/execution-result` reports every received plan's terminal outcome back to Regime Engine;
+- `clmm-v2` consumes one canonical PolicyInsight contract (fixtures/schema vendored from Regime Engine at `schemas/regime-engine/policy-insight.v1/`) instead of duplicated parser logic.
+
+Database migrations for the plan and result-outbox tables (`position_plans`, `plan_execution_results`) are owned by `packages/adapters` (`pnpm --filter @clmm/adapters db:migrate`). Migrations must run and complete before deploying new worker or API code that requires the new schema tables — the API container runs `pnpm db:migrate` via a pre-deploy hook before worker rollout.
+
+The `syncPlanExecutionResults` worker job claims due rows from `plan_execution_results` using atomic database locks (`FOR UPDATE SKIP LOCKED`), delivers `POST /v1/execution-result` to Regime Engine, and marks successful or idempotent deliveries `status = 'delivered'`. Retryable failures back off exponentially up to 5 attempts; permanent failures or cap exhaustion mark the row `failed-permanent`.
+
+Operational endpoints (`/v1/plan`, `/v1/execution-result` on Regime Engine; `/plans/*` on this BFF) are backend-only and private and must never be exposed to client bundles or public networks. Public/Insights endpoints (`/insights/sol-usdc/*`) are read-only and secured via `INSIGHTS_API_KEY`.
 
 Never expose regime-engine through `EXPO_PUBLIC_*` variables.
 
 ### Intelligence pipeline
 
+Backend-only env var:
+
+```bash
 INSIGHTS_API_KEY=<shared-read-token-for-sol-usdc-insight-endpoints>
-
-````
-
-### Regime Engine Operational Model
-
-#### Backend-only Regime Variables
-- `REGIME_ENGINE_BASE_URL`: Base URL for the regime-engine service (internal network URL).
-- `REGIME_ENGINE_INTERNAL_TOKEN`: Bearer secret used for authenticating requests between backend services.
-
-#### Migration Ownership & Deployment Order
-- Database migrations for plan and result outbox tables are owned by `packages/adapters` (`pnpm --filter @clmm/adapters db:migrate`).
-- **Deployment Invariant**: Migrations MUST run and complete before deploying new worker or API code requiring new schema tables. The API container executes `pnpm db:migrate` via pre-deploy hooks before worker rollout.
-
-#### Worker & Result-Outbox Behavior
-- `syncPlanExecutionResults` worker job claims due result records from `plan_execution_results` using atomic database locks (`FOR UPDATE SKIP LOCKED`).
-- Outbox workers attempt HTTP delivery to Regime Engine (`POST /v1/execution-result`).
-- Successful or idempotent delivery completes outbox records (`status = 'delivered'`).
-- Retryable failures schedule exponential backoff up to 5 attempts. Permanent failures or cap exhaustion mark rows `failed-permanent`.
-
-#### Endpoint Separation
-- Operational endpoints (`/v1/plan`, `/v1/execution-result`) are backend-only and private. They must never be exposed to client bundles or public networks.
-- Public/Insights endpoints (`/insights/sol-usdc/*`) are read-only and secured via `INSIGHTS_API_KEY`.
-
-#### Execution-Origin Model & Audit Loop
-- Every preview and execution attempt carries an explicit `ExecutionOrigin` (`'qualified-breach'` or `'regime-plan'`).
-- Every received plan requires a terminal result report (`SUCCESS`, `FAILED`, `USER_DECLINED`, `EXPIRED`, `ABANDONED`) to close the audit loop.
-
-#### Breach Precedence
-- Deterministic qualified lower/upper breach triggers ALWAYS outrank advisory plan responses (`HOLD`, `STAND_DOWN`, or degraded/unavailable plan states).
-
-#### Manual Failure Drills
-- **Retryable Result Timeout**: Induce network timeout/retryable errors on result delivery to verify exponential backoff and idempotency preservation.
-- **Worker Restart Recovery**: Stop/restart the worker during pending result delivery to confirm outbox claims resume delivery without re-executing Solana transactions.
+```
 
 The external intelligence repo reads this BFF through:
 
 ```bash
 CLMM_DATA_API_BASE=http://localhost:3001
 CLMM_INSIGHTS_API_KEY=<same-value-as-INSIGHTS_API_KEY>
-````
+```
 
 The intelligence endpoints are read-only. They expose raw/product-owned facts for analysis. They do not submit transactions or request wallet credentials.
 
@@ -286,9 +270,14 @@ pnpm typecheck
 pnpm lint
 pnpm boundaries
 pnpm test
+pnpm test:domain
+pnpm test:application
+pnpm test:adapters
+pnpm test:e2e
 pnpm db:migrate
 pnpm db:generate
 pnpm db:studio
+pnpm format
 ```
 
 ## Verification gate
