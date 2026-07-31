@@ -87,4 +87,20 @@ describe('Regime plan contract schema validation', () => {
     expect(positionPlanProvenance.commit).toBe(planRequestProvenance.commit);
     expect(executionResultProvenance.commit).toBe(planRequestProvenance.commit);
   });
+
+  it('verifies that all vendored asset sha256 checksums match provenance.json', async () => {
+    const fs = await import('fs');
+    const path = await import('path');
+    const crypto = await import('crypto');
+
+    const provenances = [positionPlanProvenance, executionResultProvenance, planRequestProvenance];
+    for (const prov of provenances) {
+      for (const asset of prov.assets) {
+        const filePath = path.resolve(__dirname, '../../../../', asset.localPath);
+        const fileBytes = fs.readFileSync(filePath);
+        const actualSha256 = crypto.createHash('sha256').update(fileBytes).digest('hex');
+        expect(actualSha256).toBe(asset.sha256);
+      }
+    }
+  });
 });

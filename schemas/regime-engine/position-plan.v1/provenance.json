@@ -38,7 +38,7 @@
     {
       "sourcePath": "contracts/position-plan/v1/fixtures/invalid/inline-candles-and-portfolio.json",
       "localPath": "schemas/regime-engine/position-plan.v1/fixtures/invalid/inline-candles-and-portfolio.json",
-      "sha256": "473cb5112e3a6ab98f0f631c440445262013445d6fa0acbee4d9d6643f0f9e59"
+      "sha256": "ad7c7da5da4c96cc21086256e6a6da2c2ac3d696c316ad4a560ddccf2a2778c2"
     }
   ]
 }
