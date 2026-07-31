@@ -218,9 +218,15 @@ function makeFakeDb(
         };
 
         return {
-          onConflictDoNothing: async () => {
+          onConflictDoNothing: (_config?: unknown) => {
+            const beforeLen = rowsFor(table).length;
             insert();
-            return undefined;
+            const afterLen = rowsFor(table).length;
+            const inserted = afterLen > beforeLen ? [row] : [];
+            return {
+              returning: async () => inserted,
+              then: (resolve: (v: undefined) => unknown) => resolve(undefined),
+            };
           },
           onConflictDoUpdate: async (config: { set: Record<string, unknown> }) => {
             const target = rowsFor(table);

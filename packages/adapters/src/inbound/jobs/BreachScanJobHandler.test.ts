@@ -67,9 +67,9 @@ describe('BreachScanJobHandler', () => {
 
     await handler.handle();
 
-    expect(enqueuedJobs).toHaveLength(1);
-    expect(enqueuedJobs[0]!.name).toBe('qualify-trigger');
-    const data = enqueuedJobs[0]!.data as Record<string, unknown>;
+    const triggerJobs = enqueuedJobs.filter((j) => j.name === 'qualify-trigger');
+    expect(triggerJobs).toHaveLength(1);
+    const data = triggerJobs[0]!.data as Record<string, unknown>;
     expect(data['positionId']).toBe(FIXTURE_POSITION_BELOW_RANGE.positionId);
     expect(data['directionKind']).toBe('lower-bound-breach');
     expect(data['walletId']).toBe(FIXTURE_WALLET_ID);
@@ -85,19 +85,86 @@ describe('BreachScanJobHandler', () => {
     clock.advance(60_000);
     await handler.handle();
 
-    expect(enqueuedJobs).toHaveLength(2);
-    const data = enqueuedJobs[1]!.data as Record<string, unknown>;
+    const triggerJobs = enqueuedJobs.filter((j) => j.name === 'qualify-trigger');
+    expect(triggerJobs).toHaveLength(2);
+    const data = triggerJobs[1]!.data as Record<string, unknown>;
     expect(data['consecutiveCount']).toBe(2);
   });
 
-  it('does not enqueue jobs for in-range positions', async () => {
+  it('enqueues one plan request for every successfully observed open position', async () => {
+    await walletRepo.enroll(FIXTURE_WALLET_ID, makeClockTimestamp(1_000));
+    const positionRead = new FakeSupportedPositionReadPort([
+      FIXTURE_POSITION_IN_RANGE,
+      FIXTURE_POSITION_BELOW_RANGE,
+    ]);
+    const handler = buildHandler(positionRead);
+
+    await handler.handle();
+
+    const planJobs = enqueuedJobs.filter((job) => job.name === 'request-position-plan');
+    expect(planJobs).toHaveLength(2);
+    expect(planJobs[0]!.data).toEqual({
+      walletId: FIXTURE_WALLET_ID,
+      positionId: FIXTURE_POSITION_IN_RANGE.positionId,
+    });
+    expect(planJobs[1]!.data).toEqual({
+      walletId: FIXTURE_WALLET_ID,
+      positionId: FIXTURE_POSITION_BELOW_RANGE.positionId,
+    });
+  });
+
+  it('enqueues in-range positions even when no trigger job exists', async () => {
     await walletRepo.enroll(FIXTURE_WALLET_ID, makeClockTimestamp(1_000));
     const positionRead = new FakeSupportedPositionReadPort([FIXTURE_POSITION_IN_RANGE]);
     const handler = buildHandler(positionRead);
 
     await handler.handle();
 
-    expect(enqueuedJobs).toHaveLength(0);
+    const triggerJobs = enqueuedJobs.filter((job) => job.name === 'qualify-trigger');
+    const planJobs = enqueuedJobs.filter((job) => job.name === 'request-position-plan');
+
+    expect(triggerJobs).toHaveLength(0);
+    expect(planJobs).toHaveLength(1);
+    expect(planJobs[0]!.data).toEqual({
+      walletId: FIXTURE_WALLET_ID,
+      positionId: FIXTURE_POSITION_IN_RANGE.positionId,
+    });
+  });
+
+  it('plan enqueue failure does not suppress trigger qualification', async () => {
+    await walletRepo.enroll(FIXTURE_WALLET_ID, makeClockTimestamp(1_000));
+    const positionRead = new FakeSupportedPositionReadPort([FIXTURE_POSITION_BELOW_RANGE]);
+    const failingEnqueue = async (name: string, data: unknown) => {
+      if (name === 'request-position-plan') {
+        throw new Error('pg-boss queue full');
+      }
+      enqueuedJobs.push({ name, data });
+    };
+
+    const handler = new BreachScanJobHandler(
+      walletRepo,
+      positionRead,
+      clock,
+      ids,
+      observability,
+      episodeRepo,
+      executionRepo,
+      historyRepo,
+      failingEnqueue,
+    );
+
+    await handler.handle();
+
+    const triggerJobs = enqueuedJobs.filter((job) => job.name === 'qualify-trigger');
+    expect(triggerJobs).toHaveLength(1);
+
+    const errorLogs = observability.logs.filter((entry) => entry.level === 'error');
+    expect(errorLogs.some((log) => log.message.includes('Failed to enqueue plan request'))).toBe(
+      true,
+    );
+
+    const wallets = await walletRepo.listActiveWallets();
+    expect(wallets[0]!.lastScannedAt).toBe(clock.now());
   });
 
   it('marks wallet as scanned after processing', async () => {
@@ -222,7 +289,8 @@ describe('BreachScanJobHandler', () => {
     const updated = await executionRepo.getAttempt('attempt-reversal-1');
     expect(updated?.lifecycleState.kind).toBe('abandoned');
 
-    const secondQueueData = enqueuedJobs[1]!.data as Record<string, unknown>;
+    const triggerJobs = enqueuedJobs.filter((j) => j.name === 'qualify-trigger');
+    const secondQueueData = triggerJobs[1]!.data as Record<string, unknown>;
     expect(secondQueueData['directionKind']).toBe(UPPER_BOUND_BREACH.kind);
   });
 

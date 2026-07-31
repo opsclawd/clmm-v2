@@ -7,6 +7,7 @@ import { ReconciliationJobHandler } from './ReconciliationJobHandler.js';
 import { TriggerQualificationJobHandler } from './TriggerQualificationJobHandler.js';
 import { SubmittedAttemptSweepHandler } from './SubmittedAttemptSweepHandler.js';
 import { PlanResultSweepHandler } from './PlanResultSweepHandler.js';
+import { PositionPlanRequestJobHandler } from './PositionPlanRequestJobHandler.js';
 import { WorkerLifecycle } from './WorkerLifecycle.js';
 import { PG_BOSS_INSTANCE } from './tokens.js';
 
@@ -27,7 +28,45 @@ describe('WorkerLifecycle', () => {
       { index: 4, param: NotificationDispatchJobHandler },
       { index: 5, param: SubmittedAttemptSweepHandler },
       { index: 6, param: PlanResultSweepHandler },
+      { index: 7, param: PositionPlanRequestJobHandler },
     ]);
+  });
+
+  it('worker registers request-position-plan without scheduling a second cron', async () => {
+    const callbacks = new Map<string, (jobs: Job<object>[]) => Promise<void>>();
+    const createdQueues: string[] = [];
+    const scheduledQueues: string[] = [];
+
+    const boss = {
+      start: vi.fn().mockResolvedValue(undefined),
+      stop: vi.fn().mockResolvedValue(undefined),
+      createQueue: vi.fn(async (name: string) => {
+        createdQueues.push(name);
+      }),
+      work: vi.fn(async (name: string, callback: (jobs: Job<object>[]) => Promise<void>) => {
+        callbacks.set(name, callback);
+      }),
+      schedule: vi.fn(async (name: string) => {
+        scheduledQueues.push(name);
+      }),
+    } as unknown as PgBoss;
+
+    const lifecycle = new WorkerLifecycle(
+      boss,
+      { handle: vi.fn() } as unknown as BreachScanJobHandler,
+      { handle: vi.fn() } as unknown as TriggerQualificationJobHandler,
+      { handle: vi.fn() } as unknown as ReconciliationJobHandler,
+      { handle: vi.fn() } as unknown as NotificationDispatchJobHandler,
+      { handle: vi.fn() } as unknown as SubmittedAttemptSweepHandler,
+      { handle: vi.fn() } as unknown as PlanResultSweepHandler,
+      { handle: vi.fn() } as unknown as PositionPlanRequestJobHandler,
+    );
+
+    await lifecycle.onModuleInit();
+
+    expect(createdQueues).toContain(PositionPlanRequestJobHandler.JOB_NAME);
+    expect(callbacks.has(PositionPlanRequestJobHandler.JOB_NAME)).toBe(true);
+    expect(scheduledQueues).not.toContain(PositionPlanRequestJobHandler.JOB_NAME);
   });
 
   it('invokes the breach scan handler from the registered pg-boss callback', async () => {
@@ -46,30 +85,16 @@ describe('WorkerLifecycle', () => {
     const breachScanHandler = {
       handle: breachScanHandle,
     } as unknown as BreachScanJobHandler;
-    const triggerQualificationHandler = {
-      handle: vi.fn().mockResolvedValue(undefined),
-    } as unknown as TriggerQualificationJobHandler;
-    const reconciliationHandler = {
-      handle: vi.fn().mockResolvedValue(undefined),
-    } as unknown as ReconciliationJobHandler;
-    const notificationDispatchHandler = {
-      handle: vi.fn().mockResolvedValue(undefined),
-    } as unknown as NotificationDispatchJobHandler;
-    const submittedAttemptSweepHandler = {
-      handle: vi.fn().mockResolvedValue(undefined),
-    } as unknown as SubmittedAttemptSweepHandler;
-    const planResultSweepHandler = {
-      handle: vi.fn().mockResolvedValue(undefined),
-    } as unknown as PlanResultSweepHandler;
 
     const lifecycle = new WorkerLifecycle(
       boss,
       breachScanHandler,
-      triggerQualificationHandler,
-      reconciliationHandler,
-      notificationDispatchHandler,
-      submittedAttemptSweepHandler,
-      planResultSweepHandler,
+      { handle: vi.fn() } as unknown as TriggerQualificationJobHandler,
+      { handle: vi.fn() } as unknown as ReconciliationJobHandler,
+      { handle: vi.fn() } as unknown as NotificationDispatchJobHandler,
+      { handle: vi.fn() } as unknown as SubmittedAttemptSweepHandler,
+      { handle: vi.fn() } as unknown as PlanResultSweepHandler,
+      { handle: vi.fn() } as unknown as PositionPlanRequestJobHandler,
     );
 
     await lifecycle.onModuleInit();

@@ -136,6 +136,25 @@ export class BreachScanJobHandler {
           }
         }
 
+        for (const positionId of observations.observedPositions) {
+          try {
+            await this.enqueue('request-position-plan', {
+              walletId: wallet.walletId,
+              positionId,
+            });
+          } catch (enqueueError: unknown) {
+            this.observability.log(
+              'error',
+              `Failed to enqueue plan request for position ${positionId}`,
+              {
+                walletId: wallet.walletId,
+                positionId,
+                error: enqueueError instanceof Error ? enqueueError.message : String(enqueueError),
+              },
+            );
+          }
+        }
+
         await this.monitoredWalletRepo.markScanned(wallet.walletId, this.clock.now());
       } catch (error: unknown) {
         this.observability.log('error', `Breach scan failed for wallet ${wallet.walletId}`, {

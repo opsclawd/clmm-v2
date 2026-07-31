@@ -710,9 +710,9 @@ describe('RequestPositionPlan', () => {
       });
 
       clock.advance(16 * 60 * 1000);
-      position.lastObservedAt = clock.now();
-      positionRead.setPosition(position);
-      positionRead.setDetail(makeFixtureDetail(position));
+      const freshPosition = { ...position, lastObservedAt: clock.now() };
+      positionRead.setPosition(freshPosition);
+      positionRead.setDetail(makeFixtureDetail(freshPosition));
 
       const replayResult = await requestPositionPlan({
         walletId: FIXTURE_WALLET_ID,

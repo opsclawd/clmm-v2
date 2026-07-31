@@ -261,6 +261,7 @@ export async function requestPositionPlan(params: {
         });
 
         if (createResult.kind === 'exact-replay') {
+          leaseOutcome = 'succeeded';
           observability.log('info', 'RequestPositionPlan: exact replay detected', {
             positionId,
             planId,

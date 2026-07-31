@@ -626,7 +626,7 @@ export class PlanStorageAdapter implements PlanRepository {
             lastClosedCandleAt: closedCandleAtNum,
             updatedAt: nowNum,
           })
-          .onConflictDoNothing()
+          .onConflictDoNothing({ target: positionPlanRequestState.positionId })
           .returning({ positionId: positionPlanRequestState.positionId });
 
         if (inserted.length === 0) {

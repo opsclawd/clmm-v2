@@ -161,4 +161,23 @@ describe('ScanPositionsForBreaches', () => {
 
     expect(second.observations[0]?.consecutiveCount).toBe(first.observations[0]?.consecutiveCount);
   });
+
+  it('includes both in-range and out-of-range open positions in observedPositions', async () => {
+    const positionRead = new FakeSupportedPositionReadPort([
+      FIXTURE_POSITION_IN_RANGE,
+      FIXTURE_POSITION_BELOW_RANGE,
+    ]);
+
+    const result = await scanPositionsForBreaches({
+      walletId: FIXTURE_WALLET_ID,
+      positionReadPort: positionRead,
+      clock,
+      episodeRepo,
+    });
+
+    expect(result.observedPositions).toEqual([
+      FIXTURE_POSITION_IN_RANGE.positionId,
+      FIXTURE_POSITION_BELOW_RANGE.positionId,
+    ]);
+  });
 });
