@@ -22,6 +22,7 @@ import { createDb } from '../outbound/storage/db.js';
 import type { ClockPort, IdGeneratorPort } from '@clmm/application';
 import type { ClockTimestamp } from '@clmm/domain';
 
+import { resolveRegimePlanRequestConfig } from './RegimePlanRequestConfig.js';
 import {
   MONITORED_WALLET_REPOSITORY,
   SUPPORTED_POSITION_READ_PORT,
@@ -42,6 +43,7 @@ import {
   PRICE_PORT,
   PLAN_REPOSITORY,
   REGIME_PLAN_PORT,
+  REGIME_PLAN_REQUEST_CONFIG,
 } from '../inbound/jobs/tokens.js';
 
 // boundary: process.env values are untyped at runtime; validated via env schema at deploy
@@ -98,6 +100,9 @@ const regimePlanAdapter = new RegimePlanAdapter(
 );
 const planStorage = new PlanStorageAdapter(db);
 const jupiterPrice = new JupiterPriceAdapter();
+const resolvedRegimePlanRequestConfig = resolveRegimePlanRequestConfig(
+  (process.env as Record<string, string | undefined>)['REGIME_PLAN_CONFIG_JSON'],
+);
 
 const sharedProviders = [
   { provide: MONITORED_WALLET_REPOSITORY, useValue: monitoredWalletStorage },
@@ -118,6 +123,7 @@ const sharedProviders = [
   { provide: CURRENT_SR_LEVELS_PORT, useValue: currentSrLevelsAdapter },
   { provide: PLAN_REPOSITORY, useValue: planStorage },
   { provide: REGIME_PLAN_PORT, useValue: regimePlanAdapter },
+  { provide: REGIME_PLAN_REQUEST_CONFIG, useValue: resolvedRegimePlanRequestConfig },
   { provide: PRICE_PORT, useValue: jupiterPrice },
 ];
 

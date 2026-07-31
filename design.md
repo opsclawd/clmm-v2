@@ -1,55 +1,57 @@
-# Design Document: Drizzle Schema Tracking Integrity
+# Design Document: Reconcile /v1/plan Integration
 
-## 1. Problem Being Solved & Why It Matters
+## The Problem and Why It Matters
 
-When `drizzle-kit generate` is run with a narrowed schema path (e.g., via CLI argument `schema: './src/.../position-plans.ts'`) instead of relying on the configured `schema/index.ts`, Drizzle creates a snapshot JSON that excludes the omitted tables. Since Drizzle uses these snapshots to calculate schema diffs, subsequent migration generation attempts will falsely conclude that the missing tables don't exist in the database and attempt to recreate them. Applying such a migration fails outright due to duplicate table/constraint errors. This risks developers unknowingly committing corrupted migration chains, blocking deployments, and breaking local database setups.
+The CLMM V2 exit assistant requires an automated integration with the `regime-engine` to request position plans and report execution results. Currently, the integration is fundamentally broken due to several mismatches:
 
-## 2. Key Design Decisions and Trade-offs
+- The endpoint path is incorrect (`/v1/position-plan` instead of `/v1/plan`).
+- The request contract is mismatched (missing `portfolio`, `autopilotState`, and `config` fields).
+- The `regime-engine`'s `/v1/plan` endpoint lacks authentication.
+- The authoritative `planId` and `planHash` from `regime-engine` are discarded in favor of locally generated IDs.
+- The `RequestPositionPlan` use case is not invoked on an automated background cadence.
 
-**Option A: Wrap `db:generate` in `package.json` to enforce configuration**
-_Trade-off:_ Prevents manual CLI errors when using `pnpm db:generate`, but doesn't prevent someone from running `npx drizzle-kit generate` directly, nor does it catch corrupted snapshots introduced via merge conflicts or manual editing.
+Without fixing these defects, the application cannot successfully request automated exit plans or report their results, rendering the core non-custodial LP exit assistant non-functional and resulting in 404s, schema validation errors, or a corrupted audit trail.
 
-**Option B: CI bash script parsing `schema/index.ts` and snapshots**
-_Trade-off:_ Bash/grep parsing of TypeScript ASTs or barrel files is brittle and error-prone. It's difficult to distinguish actual tables from types, enums, or relations.
+## Key Design Decisions and Trade-offs
 
-**Option C: Automated test validating the latest snapshot against the initialized schema**
-_Trade-off:_ By adding a unit test (using `vitest`) that parses the latest `drizzle/meta/*_snapshot.json` and compares it against the imported `schema` object, we can catch mismatches in CI (`pnpm test`) and locally before commits. It is less brittle than parsing text and integrates perfectly into the existing test pipeline.
+1. **Contract Reconciliation for Missing Fields:**
+   - _Trade-off:_ We need to provide `portfolio`, `autopilotState`, and `config` to `regime-engine`. Deriving these locally requires extending the local domain models and read ports. Hardcoding or mocking them is dangerous for a financial application.
+   - _Decision:_ We will extend the `RegimePlanRequest` DTO and the `RequestPositionPlan` use case to populate these fields correctly using the existing `PositionDetail` and trigger repository state.
 
-## 3. Proposed Approach with Rationale
+2. **Preserving Plan Identity:**
+   - _Trade-off:_ `RequestPositionPlan` currently generates a local `planId`. Using the remote `planId` requires ensuring it conforms to local storage constraints and doesn't break optimistic UI assumptions.
+   - _Decision:_ We will use `response.planId` and `response.planHash` returned by `regime-engine` as the authoritative identifiers end-to-end, removing the local `idGenerator.generateId()` call for plans.
 
-We will adopt **Option C** (Automated Test Validation).
+3. **Background Invocation Cadence:**
+   - _Trade-off:_ Polling on a strict timer (cron) can lead to unnecessary API calls, while purely event-driven invocation can spam the endpoint if observations are frequent.
+   - _Decision:_ We will trigger `RequestPositionPlan` reactively after a successful position observation, but implement explicit throttling (e.g., minimum refresh interval), bypassing the throttle only on range-state changes or qualified breaches.
 
-- Create a test file `packages/adapters/src/outbound/storage/schema/__tests__/schema-snapshot.test.ts`.
-- The test will dynamically read the `packages/adapters/drizzle/meta/_journal.json` to find the latest snapshot file, or simply list the directory to find the highest numbered snapshot.
-- It will parse the JSON and extract the table names present in the snapshot.
-- It will import `* as schema from '../index.js'` and extract the actual table objects defined in the codebase.
-- The test will assert that the snapshot contains an entry for every table exported by the schema.
+## Proposed Approach and Rationale
 
-**Rationale:**
-Testing is a built-in step of the development and CI process. A test will fail fast if a developer commits a bad snapshot. It leverages existing tools (`vitest`, which is already configured in `packages/adapters/package.json`) and requires no additional CI orchestration, bash scripting, or build steps.
+1. **Contract Updates:**
+   - Update `packages/application/src/dto/regimePlan.ts` to include the missing fields (`portfolio`, `autopilotState`, `config`) required by `regime-engine`'s actual `PlanRequest`.
+   - Update the `market.source` from `'clmm'` to `'geckoterminal'` or `'solana'` to match `regime-engine`'s ingestion format.
+2. **Endpoint and Auth Fixes:**
+   - Fix the endpoint path in `RegimePlanAdapter.ts` to `/v1/plan`.
+   - The adapter already sends `X-CLMM-Internal-Token`. We will file a companion PR/issue in `regime-engine` to enforce `requireSharedSecret` for this token on the backend.
+3. **Identity Preservation:**
+   - Modify `RequestPositionPlan.ts` to extract and store `response.planId` and `response.planHash` instead of generating local ones.
+   - Ensure `SyncPlanExecutionResults.ts` accurately maps these values back to `regime-engine`'s `execution-result.v1` schema.
+4. **Invocation Cadence:**
+   - Introduce a throttled background task or event listener that observes position updates and conditionally calls `RequestPositionPlan`.
 
-## 4. Assumptions Made
+## Assumptions
 
-- A snapshot's `tables` object keys match the real table names.
-- The `schema/index.ts` exports tables directly, and the exported schema objects contain the Drizzle table metadata (we can identify them using Drizzle's `is(pgTable)` or by checking properties unique to Drizzle tables).
-- `vitest` is run on every CI build and PR, effectively gating any PR with a corrupted snapshot.
-- The issue mentions 14 tables in total. We assume all schema exports are either tables, relations, or types, and we can programmatically filter for actual table objects to reach the correct expected count.
+- We assume that `portfolio`, `autopilotState`, and `config` data can be accurately derived from the existing `positionReadPort` and `triggerRepository` without requiring new external APIs.
+- We assume that the `planId` string format returned by `regime-engine` is compatible with the local database schema for `PlanId`.
+- We assume that adding authentication to the `regime-engine` is handled in the `opsclawd/regime-engine` repository, but tracked as part of this epic's completion criteria.
 
-## 5. Scope
+## Scope
 
-**In Scope:**
+- **In Scope:** Modifying `clmm-v2` application DTOs, `RegimePlanAdapter`, `RequestPositionPlan` use case, and `SyncPlanExecutionResults` use case. Setting up the throttled background cadence for plan requests. Fixing the `market.source` value.
+- **Out of Scope:** Making direct changes to `regime-engine` backend code within this repository (companion issue required). Modifying the core directional mapping logic (`DirectionalExitPolicyService`). Building UI screens.
 
-- A validation test script that verifies the latest Drizzle snapshot includes all tables defined in `schema/index.ts`.
-- Necessary documentation or comments within the test explaining why this check exists (referencing the issue).
+## Risks and Concerns Identified
 
-**Out of Scope:**
-
-- Retroactively fixing previous snapshots (like `0002`), since they have already been bypassed/fixed by merging the missing tables into `0003` / `0004` (as described in the issue).
-- Scanning historical migrations for errors (already done manually by the issue author).
-- Modifying how `drizzle-kit` itself generates snapshots.
-
-## 6. Risks or Concerns Identified from Code Analysis
-
-- **Identifying Tables vs. Relations:** Drizzle's `schema/index.ts` might export types, relations, or enums alongside tables. The validation logic must accurately filter these out to count only tables; otherwise, the test will falsely fail.
-- **Snapshot Format Changes:** Drizzle occasionally updates its internal snapshot schema (e.g. `version: "5"` to `"6"`). The test should be robust enough to handle the structure or focus strictly on the `tables` dictionary, which is generally stable across minor versions.
-- **Test Execution Context:** The test needs access to the file system to read the `meta` directory. `vitest` runs in a Node.js environment, so `fs` is available, but paths must be resolved correctly relative to the `packages/adapters` directory, regardless of where the test is invoked from.
+- **Execution Result Schema Match:** While fixing `position-plan.v1`, we must verify `execution-result.v1` in `SyncPlanExecutionResults.ts` maps `decisionKind` correctly to `status` and `reasonCode` expected by `regime-engine`. Any mismatch here will silently corrupt the audit trail.
+- **Throttling Edge Cases:** The request fingerprint currently includes `observedAtUnixMs`, meaning it changes on every observation. We must ensure the new throttling logic doesn't rely solely on fingerprint changes, otherwise it will still spam the endpoint.

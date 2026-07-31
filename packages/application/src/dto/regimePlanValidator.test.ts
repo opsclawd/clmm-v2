@@ -1,8 +1,14 @@
 import { describe, expect, it } from 'vitest';
-import { parseRegimePlanResponse, parseRegimeExecutionResult } from './regimePlanValidator.js';
+import {
+  parseRegimePlanResponse,
+  parseRegimeExecutionResult,
+  parseRegimePlanRequest,
+} from './regimePlanValidator.js';
 import holdFixture from '../../../../schemas/regime-engine/position-plan.v1/fixtures/valid/hold.json' with { type: 'json' };
 import requestExitFixture from '../../../../schemas/regime-engine/position-plan.v1/fixtures/valid/request-exit.json' with { type: 'json' };
 import successFixture from '../../../../schemas/regime-engine/execution-result.v1/fixtures/valid/success.json' with { type: 'json' };
+import inRangeRequestFixture from '../../../../schemas/regime-engine/plan-request.v1/fixtures/valid/in-range.json' with { type: 'json' };
+import breachQualifiedRequestFixture from '../../../../schemas/regime-engine/plan-request.v1/fixtures/valid/breach-qualified.json' with { type: 'json' };
 
 function deepClone<T>(obj: T): T {
   return JSON.parse(JSON.stringify(obj)) as T;
@@ -28,6 +34,14 @@ describe('regimePlanValidator', () => {
     const invalidExecVersion = deepClone(successFixture) as MutableFixture;
     invalidExecVersion['schemaVersion'] = 'execution-result.v999';
     expect(parseRegimeExecutionResult(invalidExecVersion)).toBeNull();
+
+    const invalidExecHash = deepClone(successFixture) as MutableFixture;
+    invalidExecHash['planHash'] = 'invalid-hash-string';
+    expect(parseRegimeExecutionResult(invalidExecHash)).toBeNull();
+
+    const missingExecField = deepClone(successFixture) as MutableFixture;
+    delete missingExecField['positionId'];
+    expect(parseRegimeExecutionResult(missingExecField)).toBeNull();
   });
 
   it('rejects a request-exit plan without canonical exit intent', () => {
@@ -63,6 +77,17 @@ describe('regimePlanValidator', () => {
 
   it('parses valid execution result fixtures cleanly', () => {
     expect(parseRegimeExecutionResult(successFixture)).not.toBeNull();
+  });
+
+  it('parses valid plan request fixtures cleanly', () => {
+    expect(parseRegimePlanRequest(inRangeRequestFixture)).not.toBeNull();
+    expect(parseRegimePlanRequest(breachQualifiedRequestFixture)).not.toBeNull();
+  });
+
+  it('rejects invalid plan requests missing required fields', () => {
+    const missingPortfolio = deepClone(inRangeRequestFixture) as MutableFixture;
+    delete missingPortfolio['portfolio'];
+    expect(parseRegimePlanRequest(missingPortfolio)).toBeNull();
   });
 
   it('rejects invalid expiry ordering where expiresAtUnixMs < asOfUnixMs', () => {

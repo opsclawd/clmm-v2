@@ -1,0 +1,331 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://contracts.opsclawd.dev/regime-engine/plan-request/v1/plan-request.schema.json",
+  "title": "PlanRequest",
+  "type": "object",
+  "required": [
+    "schemaVersion",
+    "asOfUnixMs",
+    "market",
+    "position",
+    "portfolio",
+    "autopilotState",
+    "config"
+  ],
+  "additionalProperties": false,
+  "properties": {
+    "schemaVersion": {
+      "type": "string",
+      "const": "plan-request.v1"
+    },
+    "asOfUnixMs": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "market": {
+      "type": "object",
+      "required": ["symbol", "source", "network", "poolAddress", "timeframe"],
+      "additionalProperties": false,
+      "properties": {
+        "symbol": {
+          "type": "string",
+          "minLength": 1
+        },
+        "source": {
+          "type": "string",
+          "minLength": 1
+        },
+        "network": {
+          "type": "string",
+          "minLength": 1
+        },
+        "poolAddress": {
+          "type": "string",
+          "minLength": 1
+        },
+        "timeframe": {
+          "type": "string",
+          "enum": ["15m", "1h"]
+        }
+      }
+    },
+    "position": {
+      "type": "object",
+      "required": [
+        "positionId",
+        "observedAtUnixMs",
+        "lowerBoundPrice",
+        "upperBoundPrice",
+        "currentPrice",
+        "rangeState",
+        "breachQualified"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "positionId": {
+          "type": "string",
+          "minLength": 1
+        },
+        "walletId": {
+          "type": "string",
+          "minLength": 1
+        },
+        "observedAtUnixMs": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "breachQualifiedAtUnixMs": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "lowerBoundPrice": {
+          "type": "number",
+          "exclusiveMinimum": 0
+        },
+        "upperBoundPrice": {
+          "type": "number",
+          "exclusiveMinimum": 0
+        },
+        "currentPrice": {
+          "type": "number",
+          "exclusiveMinimum": 0
+        },
+        "rangeState": {
+          "type": "string",
+          "enum": ["in-range", "below-range", "above-range"]
+        },
+        "breachQualified": {
+          "type": "boolean"
+        },
+        "distanceToLowerPct": {
+          "type": "number"
+        },
+        "distanceToUpperPct": {
+          "type": "number"
+        },
+        "liquidityUsd": {
+          "type": "number",
+          "minimum": 0
+        },
+        "unclaimedFeesUsd": {
+          "type": "number",
+          "minimum": 0
+        },
+        "inventorySkewSolPct": {
+          "type": "number"
+        },
+        "inventorySkewUsdcPct": {
+          "type": "number"
+        }
+      }
+    },
+    "portfolio": {
+      "type": "object",
+      "required": ["navUsd", "solUnits", "usdcUnits"],
+      "additionalProperties": false,
+      "properties": {
+        "navUsd": {
+          "type": "number",
+          "minimum": 0
+        },
+        "solUnits": {
+          "type": "number",
+          "minimum": 0
+        },
+        "usdcUnits": {
+          "type": "number",
+          "minimum": 0
+        }
+      }
+    },
+    "autopilotState": {
+      "type": "object",
+      "required": [
+        "activeClmm",
+        "stopouts24h",
+        "redeploys24h",
+        "cooldownUntilUnixMs",
+        "standDownUntilUnixMs",
+        "strikeCount"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "activeClmm": {
+          "type": "boolean"
+        },
+        "stopouts24h": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "redeploys24h": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "cooldownUntilUnixMs": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "standDownUntilUnixMs": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "strikeCount": {
+          "type": "integer",
+          "minimum": 0
+        }
+      }
+    },
+    "regimeState": {
+      "type": "object",
+      "required": ["current", "barsInRegime", "pending", "pendingBars"],
+      "additionalProperties": false,
+      "properties": {
+        "current": {
+          "type": "string",
+          "enum": ["UP", "DOWN", "CHOP"]
+        },
+        "barsInRegime": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "pending": {
+          "type": ["string", "null"],
+          "enum": ["UP", "DOWN", "CHOP", null]
+        },
+        "pendingBars": {
+          "type": "integer",
+          "minimum": 0
+        }
+      }
+    },
+    "config": {
+      "type": "object",
+      "required": ["regime", "allocation", "churn", "baselines"],
+      "additionalProperties": false,
+      "properties": {
+        "regime": {
+          "type": "object",
+          "required": [
+            "confirmBars",
+            "minHoldBars",
+            "enterUpTrend",
+            "exitUpTrend",
+            "enterDownTrend",
+            "exitDownTrend",
+            "chopVolRatioMax"
+          ],
+          "additionalProperties": false,
+          "properties": {
+            "confirmBars": {
+              "type": "integer",
+              "minimum": 1
+            },
+            "minHoldBars": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "enterUpTrend": {
+              "type": "number"
+            },
+            "exitUpTrend": {
+              "type": "number"
+            },
+            "enterDownTrend": {
+              "type": "number"
+            },
+            "exitDownTrend": {
+              "type": "number"
+            },
+            "chopVolRatioMax": {
+              "type": "number",
+              "exclusiveMinimum": 0
+            }
+          }
+        },
+        "allocation": {
+          "type": "object",
+          "required": [
+            "upSolBps",
+            "downSolBps",
+            "chopSolBps",
+            "maxDeltaExposureBpsPerDay",
+            "maxTurnoverPerDayBps"
+          ],
+          "additionalProperties": false,
+          "properties": {
+            "upSolBps": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 10000
+            },
+            "downSolBps": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 10000
+            },
+            "chopSolBps": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 10000
+            },
+            "maxDeltaExposureBpsPerDay": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "maxTurnoverPerDayBps": {
+              "type": "integer",
+              "minimum": 0
+            }
+          }
+        },
+        "churn": {
+          "type": "object",
+          "required": [
+            "maxStopouts24h",
+            "maxRedeploys24h",
+            "cooldownMsAfterStopout",
+            "standDownTriggerStrikes"
+          ],
+          "additionalProperties": false,
+          "properties": {
+            "maxStopouts24h": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "maxRedeploys24h": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "cooldownMsAfterStopout": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "standDownTriggerStrikes": {
+              "type": "integer",
+              "minimum": 1
+            }
+          }
+        },
+        "baselines": {
+          "type": "object",
+          "required": ["dcaIntervalDays", "dcaAmountUsd", "usdcCarryApr"],
+          "additionalProperties": false,
+          "properties": {
+            "dcaIntervalDays": {
+              "type": "integer",
+              "minimum": 1
+            },
+            "dcaAmountUsd": {
+              "type": "number",
+              "minimum": 0
+            },
+            "usdcCarryApr": {
+              "type": "number",
+              "minimum": 0
+            }
+          }
+        }
+      }
+    }
+  }
+}

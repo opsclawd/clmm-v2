@@ -25,6 +25,7 @@ type PlanRow = {
   nextAttemptAt: number | null;
   lastErrorClass: string | null;
   deliveredAt: number | null;
+  lifecycleStateJson: Record<string, unknown> | null;
 };
 
 type OutboxRow = {
@@ -120,14 +121,32 @@ function matchesPredicate(row: Record<string, unknown>, node: unknown): boolean 
  * rather than a real Postgres connection, which nothing in this package uses.
  * Table identity is distinguished by drizzle's table name symbol.
  */
+type PositionPlanRequestStateRow = {
+  positionId: string;
+  leaseToken: string | null;
+  leaseUntil: number | null;
+  lastAttemptAt: number | null;
+  lastRangeState: string | null;
+  lastBreachQualifiedAt: number | null;
+  lastClosedCandleAt: number | null;
+  updatedAt: number;
+};
+
 function makeFakeDb(
   params: {
     planRows?: PlanRow[];
     outboxRows?: OutboxRow[];
+    requestStateRows?: PositionPlanRequestStateRow[];
   } = {},
-): { db: Db; plans: PlanRow[]; outbox: OutboxRow[] } {
+): {
+  db: Db;
+  plans: PlanRow[];
+  outbox: OutboxRow[];
+  requestStates: PositionPlanRequestStateRow[];
+} {
   const plans: PlanRow[] = params.planRows ?? [];
   const outbox: OutboxRow[] = params.outboxRows ?? [];
+  const requestStates: PositionPlanRequestStateRow[] = params.requestStateRows ?? [];
 
   function tableName(table: unknown): string {
     return (
@@ -140,10 +159,10 @@ function makeFakeDb(
   }
 
   function rowsFor(table: unknown): Record<string, unknown>[] {
-    return (tableName(table) === 'plan_result_outbox' ? outbox : plans) as Record<
-      string,
-      unknown
-    >[];
+    const name = tableName(table);
+    if (name === 'plan_result_outbox') return outbox as Record<string, unknown>[];
+    if (name === 'position_plan_request_state') return requestStates as Record<string, unknown>[];
+    return plans as Record<string, unknown>[];
   }
 
   function selectFrom(table: unknown) {
@@ -158,13 +177,23 @@ function makeFakeDb(
     return {
       where: (predicate: unknown) => {
         const rows = filtered(predicate);
+        const sortedRows = [...rows].sort((a, b) => {
+          if (a['requestedAt'] !== b['requestedAt']) {
+            return Number(b['requestedAt']) - Number(a['requestedAt']);
+          }
+          return String(b['planId']).localeCompare(String(a['planId']));
+        });
         return {
           for: (_mode: string, _opts?: unknown) => ({
-            limit: async (n: number) => rows.slice(0, n),
-            then: (resolve: (v: unknown[]) => unknown) => resolve(rows),
+            limit: async (n: number) => sortedRows.slice(0, n),
+            then: (resolve: (v: unknown[]) => unknown) => resolve(sortedRows),
           }),
-          limit: async (n: number) => rows.slice(0, n),
-          then: (resolve: (v: unknown[]) => unknown) => resolve(rows),
+          orderBy: (..._args: unknown[]) => ({
+            limit: async (n: number) => sortedRows.slice(0, n),
+            then: (resolve: (v: unknown[]) => unknown) => resolve(sortedRows),
+          }),
+          limit: async (n: number) => sortedRows.slice(0, n),
+          then: (resolve: (v: unknown[]) => unknown) => resolve(sortedRows),
         };
       },
     };
@@ -173,21 +202,42 @@ function makeFakeDb(
   function insertInto(table: unknown) {
     return {
       values: (row: Record<string, unknown>) => {
+        const name = tableName(table);
+        const idKey =
+          name === 'plan_result_outbox'
+            ? 'resultId'
+            : name === 'position_plan_request_state'
+              ? 'positionId'
+              : 'planId';
+
         const insert = () => {
           const target = rowsFor(table);
-          const idKey = tableName(table) === 'plan_result_outbox' ? 'resultId' : 'planId';
           if (!target.some((r) => r[idKey] === row[idKey])) {
             target.push(row);
           }
         };
+
         return {
-          onConflictDoNothing: async () => {
+          onConflictDoNothing: (_config?: unknown) => {
+            const beforeLen = rowsFor(table).length;
             insert();
+            const afterLen = rowsFor(table).length;
+            const inserted = afterLen > beforeLen ? [row] : [];
+            return {
+              returning: async () => inserted,
+              then: (resolve: (v: undefined) => unknown) => resolve(undefined),
+            };
+          },
+          onConflictDoUpdate: async (config: { set: Record<string, unknown> }) => {
+            const target = rowsFor(table);
+            const existing = target.find((r) => r[idKey] === row[idKey]);
+            if (existing) {
+              Object.assign(existing, config.set);
+            } else {
+              target.push({ ...row });
+            }
             return undefined;
           },
-          // createRequest's insert has no onConflictDoNothing chain and is
-          // awaited directly, so `.values(...)` itself must be a thenable
-          // that performs the insert.
           then: (resolve: (v: undefined) => unknown) => {
             insert();
             resolve(undefined);
@@ -225,7 +275,7 @@ function makeFakeDb(
     },
   };
 
-  return { db: db as unknown as Db, plans, outbox };
+  return { db: db as unknown as Db, plans, outbox, requestStates };
 }
 
 function makePlanRow(overrides: Partial<PlanRow> = {}): PlanRow {
@@ -250,6 +300,7 @@ function makePlanRow(overrides: Partial<PlanRow> = {}): PlanRow {
     nextAttemptAt: null,
     lastErrorClass: null,
     deliveredAt: null,
+    lifecycleStateJson: null,
     ...overrides,
   };
 }
@@ -534,6 +585,342 @@ describe('PlanStorageAdapter', () => {
       expect(outbox[0]?.canonicalResultJson).toEqual({ ok: true });
       expect(outbox[0]?.nextAttemptAt).toBe(5_000);
       expect(outbox[0]?.lastErrorClass).toBe('NetworkError');
+    });
+  });
+
+  describe('getCurrentPlan ordering', () => {
+    it('returns the newest plan for a position deterministically', async () => {
+      const { db } = makeFakeDb({
+        planRows: [
+          makePlanRow({
+            planId: 'plan-older',
+            positionId: 'position-1',
+            requestedAt: 1000,
+            lifecycleStateJson: { kind: 'requested' },
+          }),
+          makePlanRow({
+            planId: 'plan-newer',
+            positionId: 'position-1',
+            requestedAt: 2000,
+            lifecycleStateJson: { kind: 'requested' },
+          }),
+        ],
+      });
+      const adapter = new PlanStorageAdapter(db);
+
+      const plan = await adapter.getCurrentPlan(makePositionId('position-1'));
+      expect(plan).not.toBeNull();
+      expect(plan?.planId).toBe('plan-newer');
+    });
+  });
+
+  describe('PlanStorageAdapter - plan request cadence lease', () => {
+    it('claims the first request for a position', async () => {
+      const { db, requestStates } = makeFakeDb();
+      const adapter = new PlanStorageAdapter(db);
+
+      const result = await adapter.claimPlanRequest({
+        positionId: makePositionId('pos-1'),
+        now: makeClockTimestamp(1000),
+        minimumIntervalMs: 900_000,
+        leaseDurationMs: 120_000,
+        rangeState: 'in-range',
+      });
+
+      expect(result.kind).toBe('claimed');
+      if (result.kind === 'claimed') {
+        expect(result.leaseToken).toBeTruthy();
+      }
+      expect(requestStates).toHaveLength(1);
+      expect(requestStates[0]?.positionId).toBe('pos-1');
+      expect(requestStates[0]?.leaseUntil).toBe(121_000);
+      expect(requestStates[0]?.lastAttemptAt).toBe(1000);
+      expect(requestStates[0]?.lastRangeState).toBe('in-range');
+    });
+
+    it('suppresses a concurrent request while the lease is active', async () => {
+      const { db } = makeFakeDb();
+      const adapter = new PlanStorageAdapter(db);
+
+      const claim1 = await adapter.claimPlanRequest({
+        positionId: makePositionId('pos-1'),
+        now: makeClockTimestamp(1000),
+        minimumIntervalMs: 900_000,
+        leaseDurationMs: 120_000,
+        rangeState: 'in-range',
+      });
+      expect(claim1.kind).toBe('claimed');
+
+      const claim2 = await adapter.claimPlanRequest({
+        positionId: makePositionId('pos-1'),
+        now: makeClockTimestamp(2000),
+        minimumIntervalMs: 900_000,
+        leaseDurationMs: 120_000,
+        rangeState: 'in-range',
+      });
+      expect(claim2).toEqual({ kind: 'suppressed', reason: 'active-request' });
+    });
+
+    it('claims independent positions concurrently', async () => {
+      const { db } = makeFakeDb();
+      const adapter = new PlanStorageAdapter(db);
+
+      const claim1 = await adapter.claimPlanRequest({
+        positionId: makePositionId('pos-1'),
+        now: makeClockTimestamp(1000),
+        minimumIntervalMs: 900_000,
+        leaseDurationMs: 120_000,
+        rangeState: 'in-range',
+      });
+      const claim2 = await adapter.claimPlanRequest({
+        positionId: makePositionId('pos-2'),
+        now: makeClockTimestamp(1000),
+        minimumIntervalMs: 900_000,
+        leaseDurationMs: 120_000,
+        rangeState: 'in-range',
+      });
+
+      expect(claim1.kind).toBe('claimed');
+      expect(claim2.kind).toBe('claimed');
+    });
+
+    it('reclaims an expired lease', async () => {
+      const { db } = makeFakeDb();
+      const adapter = new PlanStorageAdapter(db);
+
+      const claim1 = await adapter.claimPlanRequest({
+        positionId: makePositionId('pos-1'),
+        now: makeClockTimestamp(1000),
+        minimumIntervalMs: 900_000,
+        leaseDurationMs: 120_000,
+        rangeState: 'in-range',
+      });
+      expect(claim1.kind).toBe('claimed');
+
+      const claim2 = await adapter.claimPlanRequest({
+        positionId: makePositionId('pos-1'),
+        now: makeClockTimestamp(130_000),
+        minimumIntervalMs: 900_000,
+        leaseDurationMs: 120_000,
+        rangeState: 'in-range',
+      });
+      expect(claim2.kind).toBe('claimed');
+      if (claim1.kind === 'claimed' && claim2.kind === 'claimed') {
+        expect(claim2.leaseToken).not.toBe(claim1.leaseToken);
+      }
+    });
+
+    it('bypasses interval on range-state change', async () => {
+      const { db } = makeFakeDb();
+      const adapter = new PlanStorageAdapter(db);
+
+      const claim1 = await adapter.claimPlanRequest({
+        positionId: makePositionId('pos-1'),
+        now: makeClockTimestamp(1000),
+        minimumIntervalMs: 900_000,
+        leaseDurationMs: 120_000,
+        rangeState: 'in-range',
+      });
+      if (claim1.kind === 'claimed') {
+        await adapter.finishPlanRequest({
+          positionId: makePositionId('pos-1'),
+          leaseToken: claim1.leaseToken,
+          outcome: 'succeeded',
+          completedAt: makeClockTimestamp(2000),
+        });
+      }
+
+      const claim2 = await adapter.claimPlanRequest({
+        positionId: makePositionId('pos-1'),
+        now: makeClockTimestamp(3000),
+        minimumIntervalMs: 900_000,
+        leaseDurationMs: 120_000,
+        rangeState: 'below-range',
+      });
+      expect(claim2.kind).toBe('claimed');
+    });
+
+    it('bypasses interval when a breach becomes qualified', async () => {
+      const { db } = makeFakeDb();
+      const adapter = new PlanStorageAdapter(db);
+
+      const claim1 = await adapter.claimPlanRequest({
+        positionId: makePositionId('pos-1'),
+        now: makeClockTimestamp(1000),
+        minimumIntervalMs: 900_000,
+        leaseDurationMs: 120_000,
+        rangeState: 'below-range',
+        breachQualifiedAt: null,
+      });
+      if (claim1.kind === 'claimed') {
+        await adapter.finishPlanRequest({
+          positionId: makePositionId('pos-1'),
+          leaseToken: claim1.leaseToken,
+          outcome: 'succeeded',
+          completedAt: makeClockTimestamp(2000),
+        });
+      }
+
+      const claim2 = await adapter.claimPlanRequest({
+        positionId: makePositionId('pos-1'),
+        now: makeClockTimestamp(3000),
+        minimumIntervalMs: 900_000,
+        leaseDurationMs: 120_000,
+        rangeState: 'below-range',
+        breachQualifiedAt: makeClockTimestamp(3000),
+      });
+      expect(claim2.kind).toBe('claimed');
+    });
+
+    it('bypasses interval for a different qualified breach', async () => {
+      const { db } = makeFakeDb();
+      const adapter = new PlanStorageAdapter(db);
+
+      const claim1 = await adapter.claimPlanRequest({
+        positionId: makePositionId('pos-1'),
+        now: makeClockTimestamp(1000),
+        minimumIntervalMs: 900_000,
+        leaseDurationMs: 120_000,
+        rangeState: 'below-range',
+        breachQualifiedAt: makeClockTimestamp(1000),
+      });
+      if (claim1.kind === 'claimed') {
+        await adapter.finishPlanRequest({
+          positionId: makePositionId('pos-1'),
+          leaseToken: claim1.leaseToken,
+          outcome: 'succeeded',
+          completedAt: makeClockTimestamp(2000),
+        });
+      }
+
+      const claim2 = await adapter.claimPlanRequest({
+        positionId: makePositionId('pos-1'),
+        now: makeClockTimestamp(3000),
+        minimumIntervalMs: 900_000,
+        leaseDurationMs: 120_000,
+        rangeState: 'below-range',
+        breachQualifiedAt: makeClockTimestamp(3000),
+      });
+      expect(claim2.kind).toBe('claimed');
+    });
+
+    it('bypasses interval for a newly closed candle', async () => {
+      const { db } = makeFakeDb();
+      const adapter = new PlanStorageAdapter(db);
+
+      const claim1 = await adapter.claimPlanRequest({
+        positionId: makePositionId('pos-1'),
+        now: makeClockTimestamp(1000),
+        minimumIntervalMs: 900_000,
+        leaseDurationMs: 120_000,
+        rangeState: 'in-range',
+        closedCandleAt: makeClockTimestamp(3600),
+      });
+      if (claim1.kind === 'claimed') {
+        await adapter.finishPlanRequest({
+          positionId: makePositionId('pos-1'),
+          leaseToken: claim1.leaseToken,
+          outcome: 'succeeded',
+          completedAt: makeClockTimestamp(2000),
+        });
+      }
+
+      const claim2 = await adapter.claimPlanRequest({
+        positionId: makePositionId('pos-1'),
+        now: makeClockTimestamp(3000),
+        minimumIntervalMs: 900_000,
+        leaseDurationMs: 120_000,
+        rangeState: 'in-range',
+        closedCandleAt: makeClockTimestamp(7200),
+      });
+      expect(claim2.kind).toBe('claimed');
+    });
+
+    it('suppresses an unchanged observation inside the interval', async () => {
+      const { db } = makeFakeDb();
+      const adapter = new PlanStorageAdapter(db);
+
+      const claim1 = await adapter.claimPlanRequest({
+        positionId: makePositionId('pos-1'),
+        now: makeClockTimestamp(1000),
+        minimumIntervalMs: 900_000,
+        leaseDurationMs: 120_000,
+        rangeState: 'below-range',
+        breachQualifiedAt: makeClockTimestamp(1000),
+        closedCandleAt: makeClockTimestamp(3600),
+      });
+      if (claim1.kind === 'claimed') {
+        await adapter.finishPlanRequest({
+          positionId: makePositionId('pos-1'),
+          leaseToken: claim1.leaseToken,
+          outcome: 'succeeded',
+          completedAt: makeClockTimestamp(2000),
+        });
+      }
+
+      const claim2 = await adapter.claimPlanRequest({
+        positionId: makePositionId('pos-1'),
+        now: makeClockTimestamp(3000),
+        minimumIntervalMs: 900_000,
+        leaseDurationMs: 120_000,
+        rangeState: 'below-range',
+        breachQualifiedAt: makeClockTimestamp(1000),
+        closedCandleAt: makeClockTimestamp(3600),
+      });
+      expect(claim2).toEqual({ kind: 'suppressed', reason: 'minimum-interval' });
+    });
+
+    it('retains lastAttemptAt after failed completion', async () => {
+      const { db } = makeFakeDb();
+      const adapter = new PlanStorageAdapter(db);
+
+      const claim1 = await adapter.claimPlanRequest({
+        positionId: makePositionId('pos-1'),
+        now: makeClockTimestamp(1000),
+        minimumIntervalMs: 900_000,
+        leaseDurationMs: 120_000,
+        rangeState: 'in-range',
+      });
+      if (claim1.kind === 'claimed') {
+        await adapter.finishPlanRequest({
+          positionId: makePositionId('pos-1'),
+          leaseToken: claim1.leaseToken,
+          outcome: 'failed',
+          completedAt: makeClockTimestamp(1500),
+        });
+      }
+
+      const claim2 = await adapter.claimPlanRequest({
+        positionId: makePositionId('pos-1'),
+        now: makeClockTimestamp(2000),
+        minimumIntervalMs: 900_000,
+        leaseDurationMs: 120_000,
+        rangeState: 'in-range',
+      });
+      expect(claim2).toEqual({ kind: 'suppressed', reason: 'minimum-interval' });
+    });
+
+    it('rejects completion with a stale lease token', async () => {
+      const { db, requestStates } = makeFakeDb();
+      const adapter = new PlanStorageAdapter(db);
+
+      const claim1 = await adapter.claimPlanRequest({
+        positionId: makePositionId('pos-1'),
+        now: makeClockTimestamp(1000),
+        minimumIntervalMs: 900_000,
+        leaseDurationMs: 120_000,
+        rangeState: 'in-range',
+      });
+      expect(claim1.kind).toBe('claimed');
+
+      await adapter.finishPlanRequest({
+        positionId: makePositionId('pos-1'),
+        leaseToken: 'stale-token-xyz',
+        outcome: 'succeeded',
+        completedAt: makeClockTimestamp(2000),
+      });
+
+      expect(requestStates[0]?.leaseToken).toBe((claim1 as { leaseToken: string }).leaseToken);
     });
   });
 });

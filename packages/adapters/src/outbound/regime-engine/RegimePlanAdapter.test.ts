@@ -27,26 +27,9 @@ function createFakeObservability() {
   return { logs, port };
 }
 
-const VALID_PLAN_REQUEST: RegimePlanRequest = {
-  schemaVersion: 'position-plan.v1',
-  asOfUnixMs: 1700000000000,
-  market: {
-    symbol: 'SOL/USDC',
-    source: 'geckoterminal',
-    network: 'solana',
-    poolAddress: 'Czfq3xZZDmsdGdUyrNLtRhGc47cXcZtLG4crryfu44zE',
-    timeframe: '1h',
-  },
-  position: {
-    positionId: 'pos_sol_usdc_01',
-    observedAtUnixMs: 1700000000000,
-    lowerBoundPrice: 30.0,
-    upperBoundPrice: 50.0,
-    currentPrice: 40.0,
-    rangeState: 'in-range',
-    breachQualified: false,
-  },
-};
+import inRangeFixture from '../../../../../schemas/regime-engine/plan-request.v1/fixtures/valid/in-range.json';
+
+const VALID_PLAN_REQUEST: RegimePlanRequest = inRangeFixture as unknown as RegimePlanRequest;
 
 const VALID_EXECUTION_RESULT: RegimeExecutionResult = {
   schemaVersion: 'execution-result.v1',
@@ -126,20 +109,18 @@ describe('RegimePlanAdapter', () => {
         (fetch as ReturnType<typeof vi.fn>).mock.calls[0]![1]!.body as string,
       ) as Record<string, unknown>;
 
-      expect(calledUrl).toBe('https://regime.example.com/v1/position-plan');
+      expect(calledUrl).toBe('https://regime.example.com/v1/plan');
       expect(calledMethod).toBe('POST');
       expect(calledHeaders['Content-Type']).toBe('application/json');
       expect(calledHeaders['X-CLMM-Internal-Token']).toBe('test-token');
-      expect(calledBody['schemaVersion']).toBe('position-plan.v1');
+      expect(calledBody['schemaVersion']).toBe('plan-request.v1');
       expect((calledBody['market'] as Record<string, unknown>)['symbol']).toBe('SOL/USDC');
       expect((calledBody['market'] as Record<string, unknown>)['source']).toBe('geckoterminal');
       expect((calledBody['market'] as Record<string, unknown>)['network']).toBe('solana');
-      expect((calledBody['market'] as Record<string, unknown>)['poolAddress']).toBe(
-        'Czfq3xZZDmsdGdUyrNLtRhGc47cXcZtLG4crryfu44zE',
-      );
+      expect((calledBody['market'] as Record<string, unknown>)['poolAddress']).toBe('Hf2vQZk...');
       expect((calledBody['market'] as Record<string, unknown>)['timeframe']).toBe('1h');
       expect((calledBody['position'] as Record<string, unknown>)['positionId']).toBe(
-        'pos_sol_usdc_01',
+        'pos-sol-usdc-1',
       );
     });
 
@@ -405,7 +386,52 @@ describe('RegimePlanAdapter', () => {
       await adapter.requestPositionPlan(VALID_PLAN_REQUEST);
 
       const calledUrl = (fetch as ReturnType<typeof vi.fn>).mock.calls[0]![0] as string;
-      expect(calledUrl).toBe('https://regime.example.com/v1/position-plan');
+      expect(calledUrl).toBe('https://regime.example.com/v1/plan');
+    });
+
+    it('preserves auth timeout client-error and server-error classifications after the route change', async () => {
+      // 401 Unauthorized -> permanent
+      vi.mocked(fetch).mockResolvedValue(
+        new Response(
+          JSON.stringify({ error: { code: 'UNAUTHORIZED', message: 'Unauthorized access' } }),
+          { status: 401 },
+        ),
+      );
+      const adapter = new RegimePlanAdapter('https://regime.example.com', 'test-token', obs.port);
+      const res401 = await adapter.requestPositionPlan(VALID_PLAN_REQUEST);
+      expect(res401.kind).toBe('permanent');
+
+      // 400 Client Error -> permanent
+      vi.mocked(fetch).mockClear();
+      vi.mocked(fetch).mockResolvedValue(
+        new Response(
+          JSON.stringify({ error: { code: 'BAD_REQUEST', message: 'Invalid parameter' } }),
+          { status: 400 },
+        ),
+      );
+      const res400 = await adapter.requestPositionPlan(VALID_PLAN_REQUEST);
+      expect(res400.kind).toBe('permanent');
+
+      // 500 Server Error -> retryable-degraded
+      vi.mocked(fetch).mockClear();
+      vi.mocked(fetch).mockResolvedValue(new Response('Internal Server Error', { status: 500 }));
+      const res500 = await adapter.requestPositionPlan(VALID_PLAN_REQUEST);
+      expect(res500.kind).toBe('retryable-degraded');
+
+      // Timeout -> retryable-degraded
+      vi.useFakeTimers();
+      vi.mocked(fetch).mockClear();
+      vi.mocked(fetch).mockImplementation(
+        () =>
+          new Promise((_, reject) => {
+            setTimeout(() => reject({ name: 'AbortError' }), 100);
+          }),
+      );
+      const pendingTimeout = adapter.requestPositionPlan(VALID_PLAN_REQUEST);
+      await vi.advanceTimersByTimeAsync(5000);
+      const resTimeout = await pendingTimeout;
+      expect(resTimeout.kind).toBe('retryable-degraded');
+      vi.useRealTimers();
     });
 
     it('logs bounded metadata without secrets', async () => {
@@ -447,6 +473,22 @@ describe('RegimePlanAdapter', () => {
   });
 
   describe('reportExecutionResult', () => {
+    it('fails preflight with permanent schema-invalid when reporting an invalid execution result payload', async () => {
+      const adapter = new RegimePlanAdapter('https://regime.example.com', 'test-token', obs.port);
+      const invalidResult = {
+        ...VALID_EXECUTION_RESULT,
+        planHash: 'not-a-valid-sha256',
+      };
+
+      const result = await adapter.reportExecutionResult(invalidResult as RegimeExecutionResult);
+
+      expect(result.kind).toBe('permanent');
+      if (result.kind === 'permanent') {
+        expect(result.reason).toBe('schema-invalid');
+      }
+      expect(fetch).not.toHaveBeenCalled();
+    });
+
     it('posts execution result to correct endpoint', async () => {
       vi.mocked(fetch).mockResolvedValue(new Response(null, { status: 200 }));
 

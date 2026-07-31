@@ -31,6 +31,7 @@ import {
 import type { PlanId } from '@clmm/domain';
 import type { PlanOutcome } from '@clmm/application';
 import { makeWalletId, makePositionId } from '@clmm/domain';
+import type { ResolveRegimePlanRequestConfigResult } from '../../composition/RegimePlanRequestConfig.js';
 import {
   PLAN_REPOSITORY,
   REGIME_PLAN_PORT,
@@ -42,6 +43,7 @@ import {
   CLOCK_PORT,
   ID_GENERATOR_PORT,
   OBSERVABILITY_PORT,
+  REGIME_PLAN_REQUEST_CONFIG,
 } from './tokens.js';
 
 type PlanRequestResponse =
@@ -72,7 +74,11 @@ type PlanRequestResponse =
   | {
       status: 'unavailable';
       conflict?: never;
-      reason: 'position-not-found' | 'ownership-mismatch';
+      reason:
+        | 'position-not-found'
+        | 'ownership-mismatch'
+        | 'portfolio-unavailable'
+        | 'config-unavailable';
     }
   | {
       status: 'stale';
@@ -88,6 +94,11 @@ type PlanRequestResponse =
       status: 'superseded';
       conflict?: never;
       breachDirection: { kind: 'lower-bound-breach' } | { kind: 'upper-bound-breach' };
+    }
+  | {
+      status: 'throttled';
+      conflict?: never;
+      reason: 'active-request' | 'minimum-interval';
     }
   | {
       status: 'error';
@@ -152,6 +163,8 @@ export class PlanController {
     private readonly prepPort: ExecutionPreparationPort,
     @Inject(EXECUTION_HISTORY_REPOSITORY)
     private readonly historyRepo: ExecutionHistoryRepository,
+    @Inject(REGIME_PLAN_REQUEST_CONFIG)
+    private readonly config: ResolveRegimePlanRequestConfigResult,
     @Inject(CLOCK_PORT)
     private readonly clock: ClockPort,
     @Inject(ID_GENERATOR_PORT)
@@ -175,6 +188,8 @@ export class PlanController {
       triggerRepository: this.triggerRepo,
       planRepository: this.planRepo,
       regimePlanPort: this.regimePlanPort,
+      executionHistoryRepository: this.historyRepo,
+      config: this.config,
       clock: this.clock,
       idGenerator: this.ids,
       observability: this.observability,

@@ -29,6 +29,7 @@ export type AbandonmentDirective = {
 export type ScanResult = {
   observations: BreachObservationResult[];
   abandonments: AbandonmentDirective[];
+  observedPositions: PositionId[];
 };
 
 export async function scanPositionsForBreaches(params: {
@@ -42,6 +43,7 @@ export async function scanPositionsForBreaches(params: {
   const now = makeClockTimestamp(Math.floor(clock.now() / 60_000) * 60_000);
   const observations: BreachObservationResult[] = [];
   const abandonments: AbandonmentDirective[] = [];
+  const observedPositions: PositionId[] = positions.map((p) => p.positionId);
 
   for (const position of positions) {
     const rangeKind = position.rangeState.kind;
@@ -86,5 +88,5 @@ export async function scanPositionsForBreaches(params: {
     }
   }
 
-  return { observations, abandonments };
+  return { observations, abandonments, observedPositions };
 }

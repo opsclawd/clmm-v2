@@ -6,6 +6,7 @@ import { ReconciliationJobHandler } from './ReconciliationJobHandler.js';
 import { TriggerQualificationJobHandler } from './TriggerQualificationJobHandler.js';
 import { SubmittedAttemptSweepHandler } from './SubmittedAttemptSweepHandler.js';
 import { PlanResultSweepHandler } from './PlanResultSweepHandler.js';
+import { PositionPlanRequestJobHandler } from './PositionPlanRequestJobHandler.js';
 import { BREACH_SCAN_CRON } from './breach-scan-schedule.js';
 import { PG_BOSS_INSTANCE } from './tokens.js';
 
@@ -26,6 +27,8 @@ export class WorkerLifecycle implements OnModuleInit, OnModuleDestroy {
     private readonly submittedAttemptSweepHandler: SubmittedAttemptSweepHandler,
     @Inject(PlanResultSweepHandler)
     private readonly planResultSweepHandler: PlanResultSweepHandler,
+    @Inject(PositionPlanRequestJobHandler)
+    private readonly positionPlanRequestHandler: PositionPlanRequestJobHandler,
   ) {}
 
   async onModuleInit(): Promise<void> {
@@ -38,6 +41,7 @@ export class WorkerLifecycle implements OnModuleInit, OnModuleDestroy {
       NotificationDispatchJobHandler.JOB_NAME,
       SubmittedAttemptSweepHandler.JOB_NAME,
       PlanResultSweepHandler.JOB_NAME,
+      PositionPlanRequestJobHandler.JOB_NAME,
     ] as const;
 
     for (const queueName of queueNames) {
@@ -92,6 +96,14 @@ export class WorkerLifecycle implements OnModuleInit, OnModuleDestroy {
 
     await this.boss.work(PlanResultSweepHandler.JOB_NAME, async () => {
       await this.planResultSweepHandler.handle();
+    });
+
+    await this.boss.work(PositionPlanRequestJobHandler.JOB_NAME, async (jobs: Job<object>[]) => {
+      for (const job of jobs) {
+        await this.positionPlanRequestHandler.handle(
+          job.data as Parameters<PositionPlanRequestJobHandler['handle']>[0],
+        );
+      }
     });
 
     await this.boss.schedule(

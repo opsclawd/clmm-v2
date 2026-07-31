@@ -18,6 +18,8 @@ import {
 import type { RegimePlanResponse, TriggerRepository } from '@clmm/application';
 import { makeWalletId, makePositionId } from '@clmm/domain';
 import type { WalletId } from '@clmm/domain';
+import type { ResolveRegimePlanRequestConfigResult } from '../../composition/RegimePlanRequestConfig.js';
+import inRangeFixture from '../../../../../schemas/regime-engine/plan-request.v1/fixtures/valid/in-range.json';
 
 const TEST_WALLET = FIXTURE_POSITION_IN_RANGE.walletId;
 const TEST_POSITION = FIXTURE_POSITION_IN_RANGE.positionId;
@@ -103,6 +105,11 @@ describe('PlanController', () => {
     fakeIds = new FakeIdGeneratorPort();
     fakeObservability = new FakeObservabilityPort();
 
+    const configuredConfig: ResolveRegimePlanRequestConfigResult = {
+      kind: 'configured',
+      config: inRangeFixture.config,
+    };
+
     controller = new PlanController(
       fakePlanRepo,
       fakeRegimePort,
@@ -111,6 +118,7 @@ describe('PlanController', () => {
       fakeExecutionRepo,
       fakePrepPort,
       fakeHistoryRepo,
+      configuredConfig,
       fakeClock,
       fakeIds,
       fakeObservability,
@@ -165,9 +173,46 @@ describe('PlanController', () => {
       expect(first.status).toBe('ok');
       expect(first.conflict).toBe(false);
 
+      fakeClock.advance(16 * 60 * 1000);
+      const freshPos = { ...FIXTURE_POSITION_IN_RANGE, lastObservedAt: fakeClock.now() };
+      fakePositionRepo = new FakeSupportedPositionReadPort(
+        [freshPos],
+        { [freshPos.poolId]: FIXTURE_POOL_DATA },
+        { ...FIXTURE_POSITION_DETAIL, position: freshPos },
+      );
+      controller = new PlanController(
+        fakePlanRepo,
+        fakeRegimePort,
+        fakePositionRepo,
+        fakeTriggerRepo,
+        fakeExecutionRepo,
+        fakePrepPort,
+        fakeHistoryRepo,
+        { kind: 'configured', config: inRangeFixture.config },
+        fakeClock,
+        fakeIds,
+        fakeObservability,
+      );
+
       const second = await controller.requestPlan(TEST_WALLET, TEST_POSITION);
       expect(second.status).toBe('ok');
       expect(second.conflict).toBe(false);
+    });
+  });
+
+  describe('returns throttled envelope when request is inside minimum interval', () => {
+    it('returns throttled envelope without throwing 409 when called repeatedly', async () => {
+      const planResponse = createAdvisoryReadyPlanResponse();
+      fakeRegimePort.setPlanResponse(planResponse);
+
+      const first = await controller.requestPlan(TEST_WALLET, TEST_POSITION);
+      expect(first.status).toBe('ok');
+
+      const second = await controller.requestPlan(TEST_WALLET, TEST_POSITION);
+      expect(second.status).toBe('throttled');
+      if (second.status === 'throttled') {
+        expect(second.reason).toBe('minimum-interval');
+      }
     });
   });
 
@@ -179,9 +224,25 @@ describe('PlanController', () => {
       await controller.requestPlan(TEST_WALLET, TEST_POSITION);
 
       fakeRegimePort.setPlanError('conflict');
-
-      await expect(controller.requestPlan(TEST_WALLET, TEST_POSITION)).rejects.toThrow(
-        HttpException,
+      fakeClock.advance(16 * 60 * 1000);
+      const freshPos = { ...FIXTURE_POSITION_IN_RANGE, lastObservedAt: fakeClock.now() };
+      fakePositionRepo = new FakeSupportedPositionReadPort(
+        [freshPos],
+        { [freshPos.poolId]: FIXTURE_POOL_DATA },
+        { ...FIXTURE_POSITION_DETAIL, position: freshPos },
+      );
+      controller = new PlanController(
+        fakePlanRepo,
+        fakeRegimePort,
+        fakePositionRepo,
+        fakeTriggerRepo,
+        fakeExecutionRepo,
+        fakePrepPort,
+        fakeHistoryRepo,
+        { kind: 'configured', config: inRangeFixture.config },
+        fakeClock,
+        fakeIds,
+        fakeObservability,
       );
 
       try {

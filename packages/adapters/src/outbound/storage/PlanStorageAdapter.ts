@@ -1,6 +1,7 @@
-import { and, eq, isNull, lte } from 'drizzle-orm';
+import { randomUUID } from 'node:crypto';
+import { and, eq, isNull, lte, desc } from 'drizzle-orm';
 import type { Db } from './db.js';
-import { positionPlans, planResultOutbox } from './schema/index.js';
+import { positionPlans, planResultOutbox, positionPlanRequestState } from './schema/index.js';
 import type {
   PlanRepository,
   PlanRequestParams,
@@ -15,6 +16,9 @@ import type {
   PlanDeliveryCompletionParams,
   PlanPermanentFailureParams,
   PlanLifecycleStateUpdateParams,
+  ClaimPlanRequestParams,
+  ClaimPlanRequestResult,
+  FinishPlanRequestParams,
 } from '@clmm/application';
 import type {
   PositionPlan,
@@ -203,6 +207,7 @@ export class PlanStorageAdapter implements PlanRepository {
       .select()
       .from(positionPlans)
       .where(eq(positionPlans.positionId, positionId))
+      .orderBy(desc(positionPlans.requestedAt), desc(positionPlans.planId))
       .limit(1);
 
     if (rows.length === 0) {
@@ -536,5 +541,126 @@ export class PlanStorageAdapter implements PlanRepository {
       .update(positionPlans)
       .set(relationalPatchForState(params.lifecycleState))
       .where(eq(positionPlans.planId, params.planId));
+  }
+
+  async claimPlanRequest(params: ClaimPlanRequestParams): Promise<ClaimPlanRequestResult> {
+    const {
+      positionId,
+      now,
+      minimumIntervalMs,
+      leaseDurationMs,
+      rangeState,
+      breachQualifiedAt,
+      closedCandleAt,
+    } = params;
+
+    const nowNum = Number(now);
+
+    return this.db.transaction(async (tx) => {
+      const rows = (await tx
+        .select()
+        .from(positionPlanRequestState)
+        .where(eq(positionPlanRequestState.positionId, positionId as string))
+        .for('update')) as Array<typeof positionPlanRequestState.$inferSelect>;
+
+      const [row] = rows;
+
+      if (row && row.leaseToken !== null && row.leaseUntil !== null && row.leaseUntil > nowNum) {
+        return { kind: 'suppressed', reason: 'active-request' } as const;
+      }
+
+      const isFinishedRequest = row?.leaseToken === null;
+      if (
+        row &&
+        isFinishedRequest &&
+        row.lastAttemptAt !== null &&
+        nowNum - row.lastAttemptAt < minimumIntervalMs
+      ) {
+        const rangeStateChanged = row.lastRangeState !== rangeState;
+        const breachQualifiedChanged =
+          breachQualifiedAt !== undefined &&
+          breachQualifiedAt !== null &&
+          Number(breachQualifiedAt) !== row.lastBreachQualifiedAt;
+        const closedCandleChanged =
+          closedCandleAt !== undefined &&
+          closedCandleAt !== null &&
+          (row.lastClosedCandleAt === null || Number(closedCandleAt) > row.lastClosedCandleAt);
+
+        if (!rangeStateChanged && !breachQualifiedChanged && !closedCandleChanged) {
+          return { kind: 'suppressed', reason: 'minimum-interval' } as const;
+        }
+      }
+
+      const leaseToken = randomUUID();
+      const leaseUntilNum = nowNum + leaseDurationMs;
+      const breachQualifiedAtNum =
+        breachQualifiedAt !== undefined && breachQualifiedAt !== null
+          ? Number(breachQualifiedAt)
+          : null;
+      const closedCandleAtNum =
+        closedCandleAt !== undefined && closedCandleAt !== null ? Number(closedCandleAt) : null;
+
+      if (row) {
+        await tx
+          .update(positionPlanRequestState)
+          .set({
+            leaseToken,
+            leaseUntil: leaseUntilNum,
+            lastAttemptAt: nowNum,
+            lastRangeState: rangeState as string,
+            lastBreachQualifiedAt: breachQualifiedAtNum,
+            lastClosedCandleAt: closedCandleAtNum,
+            updatedAt: nowNum,
+          })
+          .where(eq(positionPlanRequestState.positionId, positionId as string));
+      } else {
+        const inserted = await tx
+          .insert(positionPlanRequestState)
+          .values({
+            positionId: positionId as string,
+            leaseToken,
+            leaseUntil: leaseUntilNum,
+            lastAttemptAt: nowNum,
+            lastRangeState: rangeState as string,
+            lastBreachQualifiedAt: breachQualifiedAtNum,
+            lastClosedCandleAt: closedCandleAtNum,
+            updatedAt: nowNum,
+          })
+          .onConflictDoNothing({ target: positionPlanRequestState.positionId })
+          .returning({ positionId: positionPlanRequestState.positionId });
+
+        if (inserted.length === 0) {
+          return { kind: 'suppressed', reason: 'active-request' } as const;
+        }
+      }
+
+      return { kind: 'claimed', leaseToken } as const;
+    }) as Promise<ClaimPlanRequestResult>;
+  }
+
+  async finishPlanRequest(params: FinishPlanRequestParams): Promise<void> {
+    const { positionId, leaseToken, completedAt } = params;
+
+    await this.db.transaction(async (tx) => {
+      const rows = (await tx
+        .select()
+        .from(positionPlanRequestState)
+        .where(eq(positionPlanRequestState.positionId, positionId as string))
+        .for('update')) as Array<typeof positionPlanRequestState.$inferSelect>;
+
+      const [row] = rows;
+      if (!row || row.leaseToken !== leaseToken) {
+        return;
+      }
+
+      await tx
+        .update(positionPlanRequestState)
+        .set({
+          leaseToken: null,
+          leaseUntil: null,
+          updatedAt: Number(completedAt),
+        })
+        .where(eq(positionPlanRequestState.positionId, positionId as string));
+    });
   }
 }

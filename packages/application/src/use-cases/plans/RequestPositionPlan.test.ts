@@ -5,12 +5,12 @@ import type {
   TriggerRepository,
   PlanRepository,
   RegimePlanPort,
+  ExecutionHistoryRepository,
   ClockPort,
   ObservabilityPort,
-  IdGeneratorPort,
   PlanRequestTransportResult,
 } from '../../ports/index.js';
-import type { RegimePlanRequest } from '@clmm/application';
+import type { RegimePlanRequest, RegimePlanResponse } from '../../dto/regimePlan.js';
 import type {
   WalletId,
   PositionId,
@@ -26,6 +26,9 @@ import type {
   PositionPlan,
   PlanLifecycleState,
   CanonicalHash,
+  HistoryEvent,
+  HistoryTimeline,
+  ExecutionOutcomeSummary,
 } from '@clmm/domain';
 import {
   makeWalletId,
@@ -34,10 +37,17 @@ import {
   LOWER_BOUND_BREACH,
   UPPER_BOUND_BREACH,
 } from '@clmm/domain';
+import type { ResolveRegimePlanRequestConfigResult } from '../../dto/regimePlan.js';
+import inRangeFixture from '../../../../../schemas/regime-engine/plan-request.v1/fixtures/valid/in-range.json';
 
 const FIXTURE_WALLET_ID = makeWalletId('test-wallet-1');
 const FIXTURE_POSITION_ID = makePositionId('test-position-1');
 const FIXTURE_POOL_ID = 'test-pool-1' as PoolId;
+
+const CONFIGURED_CONFIG: ResolveRegimePlanRequestConfigResult = {
+  kind: 'configured',
+  config: inRangeFixture.config,
+};
 
 function makeInRangePosition(
   positionId: PositionId,
@@ -107,6 +117,20 @@ const mockPoolData: PoolData = {
   liquidity: 2400000000n,
   tickCurrentIndex: 150,
 };
+
+function makeFixtureDetail(position: LiquidityPosition): PositionDetail {
+  return {
+    position,
+    poolData: mockPoolData,
+    fees: { feeOwedA: 0n, feeOwedB: 0n, rewardInfos: [] },
+    positionLiquidity: 1000n,
+    principalTokenAmounts: {
+      amountA: 33333333000n,
+      amountB: 5000000000n,
+      observedAt: position.lastObservedAt,
+    },
+  };
+}
 
 function makeLowerTrigger(positionId: PositionId): ExitTrigger {
   return {
@@ -189,6 +213,24 @@ class FakeTriggerRepository implements TriggerRepository {
 
   async deleteTrigger(_triggerId: ExitTriggerId): Promise<void> {
     this._triggers = [];
+  }
+}
+
+class FakeExecutionHistoryRepository implements ExecutionHistoryRepository {
+  async appendEvent(_event: HistoryEvent): Promise<void> {}
+  async recordWalletPositionOwnership(
+    _walletId: WalletId,
+    _positionId: PositionId,
+    _observedAt: number,
+  ): Promise<void> {}
+  async getWalletHistory(_walletId: WalletId): Promise<readonly HistoryEvent[]> {
+    return [];
+  }
+  async getTimeline(positionId: PositionId): Promise<HistoryTimeline> {
+    return { positionId, events: [] };
+  }
+  async getOutcomeSummary(_positionId: PositionId): Promise<ExecutionOutcomeSummary | null> {
+    return null;
   }
 }
 
@@ -349,28 +391,112 @@ class FakePlanRepository implements PlanRepository {
     planId: PlanId;
     lifecycleState: PlanLifecycleState;
   }): Promise<void> {}
+  private requestStates: Map<
+    string,
+    {
+      positionId: PositionId;
+      leaseToken: string | null;
+      leaseUntil: ClockTimestamp | null;
+      lastAttemptAt: ClockTimestamp | null;
+      lastRangeState: string | null;
+      lastBreachQualifiedAt: ClockTimestamp | null;
+      lastClosedCandleAt: ClockTimestamp | null;
+      updatedAt: ClockTimestamp;
+    }
+  > = new Map();
+
+  claimedCalls: import('../../ports/index.js').ClaimPlanRequestParams[] = [];
+  claimedLeaseTokens: string[] = [];
+  finishedCalls: import('../../ports/index.js').FinishPlanRequestParams[] = [];
+
+  async claimPlanRequest(
+    params: import('../../ports/index.js').ClaimPlanRequestParams,
+  ): Promise<import('../../ports/index.js').ClaimPlanRequestResult> {
+    this.claimedCalls.push(params);
+    const row = this.requestStates.get(params.positionId);
+    const now = params.now;
+
+    if (row && row.leaseToken !== null && row.leaseUntil !== null && row.leaseUntil > now) {
+      return { kind: 'suppressed', reason: 'active-request' };
+    }
+
+    const isFinishedRequest = row?.leaseToken === null;
+    if (
+      row &&
+      isFinishedRequest &&
+      row.lastAttemptAt !== null &&
+      now - row.lastAttemptAt < params.minimumIntervalMs
+    ) {
+      const rangeStateChanged = row.lastRangeState !== params.rangeState;
+      const breachQualifiedChanged =
+        params.breachQualifiedAt !== undefined &&
+        params.breachQualifiedAt !== null &&
+        params.breachQualifiedAt !== row.lastBreachQualifiedAt;
+      const closedCandleChanged =
+        params.closedCandleAt !== undefined &&
+        params.closedCandleAt !== null &&
+        (row.lastClosedCandleAt === null || params.closedCandleAt > row.lastClosedCandleAt);
+
+      if (!rangeStateChanged && !breachQualifiedChanged && !closedCandleChanged) {
+        return { kind: 'suppressed', reason: 'minimum-interval' };
+      }
+    }
+
+    const leaseToken = `fake-lease-token-${this.claimedCalls.length}`;
+    const leaseUntil = (now + params.leaseDurationMs) as ClockTimestamp;
+
+    this.requestStates.set(params.positionId, {
+      positionId: params.positionId,
+      leaseToken,
+      leaseUntil,
+      lastAttemptAt: now,
+      lastRangeState: params.rangeState,
+      lastBreachQualifiedAt: params.breachQualifiedAt ?? null,
+      lastClosedCandleAt: params.closedCandleAt ?? null,
+      updatedAt: now,
+    });
+
+    this.claimedLeaseTokens.push(leaseToken);
+    return { kind: 'claimed', leaseToken };
+  }
+
+  async finishPlanRequest(
+    params: import('../../ports/index.js').FinishPlanRequestParams,
+  ): Promise<void> {
+    this.finishedCalls.push(params);
+    const row = this.requestStates.get(params.positionId);
+    if (!row || row.leaseToken !== params.leaseToken) {
+      return;
+    }
+
+    row.leaseToken = null;
+    row.leaseUntil = null;
+    row.updatedAt = params.completedAt;
+  }
 }
+
+const VALID_UPSTREAM_RESPONSE: RegimePlanResponse = {
+  schemaVersion: 'position-plan.v1',
+  planId: 'plan_upstream_9999',
+  planHash: 'a1b2c3d4e5f60123456789abcdef0123456789abcdef0123456789abcdef0123',
+  asOfUnixMs: 1_000_000,
+  expiresAtUnixMs: 1_000_000 + 3600000,
+  scope: {
+    kind: 'position',
+    positionId: FIXTURE_POSITION_ID,
+    poolAddress: 'test-pool-1',
+    symbol: 'SOL/USDC',
+  },
+  regime: 'UP',
+  actions: [{ type: 'HOLD', reasonCode: 'HOLD_POLICY' }],
+  constraints: { cooldownUntilUnixMs: 0, standDownUntilUnixMs: 0, notes: [] },
+  reasons: [{ code: 'HOLD_POLICY', severity: 'INFO', message: 'Hold' }],
+};
 
 class FakeRegimePlanPort implements RegimePlanPort {
   private _response: PlanRequestTransportResult = {
     kind: 'ok',
-    response: {
-      schemaVersion: 'position-plan.v1' as const,
-      planId: 'regime-plan-1',
-      planHash: 'hash123',
-      asOfUnixMs: Date.now(),
-      expiresAtUnixMs: Date.now() + 3600000,
-      scope: {
-        kind: 'position' as const,
-        positionId: 'test-position-1',
-        poolAddress: 'pool-1',
-        symbol: 'SOL/USDC',
-      },
-      regime: 'UP' as const,
-      actions: [{ type: 'HOLD' as const, reasonCode: 'FAKE' }],
-      constraints: { cooldownUntilUnixMs: 0, standDownUntilUnixMs: 0, notes: [] },
-      reasons: [{ code: 'FAKE', severity: 'INFO' as const, message: 'test' }],
-    },
+    response: VALID_UPSTREAM_RESPONSE,
   };
   private _requests: RegimePlanRequest[] = [];
 
@@ -415,14 +541,6 @@ class FakeClockPort implements ClockPort {
   }
 }
 
-class FakeIdGeneratorPort implements IdGeneratorPort {
-  private _id = 0;
-
-  generateId(): string {
-    return `generated-id-${++this._id}`;
-  }
-}
-
 class FakeObservabilityPort implements ObservabilityPort {
   logs: { level: string; message: string; context?: Record<string, unknown> }[] = [];
 
@@ -451,8 +569,8 @@ describe('RequestPositionPlan', () => {
   let triggerRepo: FakeTriggerRepository;
   let planRepo: FakePlanRepository;
   let regimePort: FakeRegimePlanPort;
+  let historyRepo: FakeExecutionHistoryRepository;
   let clock: FakeClockPort;
-  let idGenerator: FakeIdGeneratorPort;
   let observability: FakeObservabilityPort;
 
   beforeEach(() => {
@@ -461,8 +579,8 @@ describe('RequestPositionPlan', () => {
     triggerRepo = new FakeTriggerRepository();
     planRepo = new FakePlanRepository();
     regimePort = new FakeRegimePlanPort();
+    historyRepo = new FakeExecutionHistoryRepository();
     clock = new FakeClockPort(1_000_000);
-    idGenerator = new FakeIdGeneratorPort();
     observability = new FakeObservabilityPort();
   });
 
@@ -470,13 +588,7 @@ describe('RequestPositionPlan', () => {
     it('includes correct position fields from SupportedPositionReadPort', async () => {
       const position = makeBelowRangePosition(FIXTURE_POSITION_ID, FIXTURE_WALLET_ID);
       positionRead.setPosition(position);
-      positionRead.setDetail({
-        position,
-        poolData: mockPoolData,
-        fees: { feeOwedA: 0n, feeOwedB: 0n, rewardInfos: [] },
-        positionLiquidity: 0n,
-        principalTokenAmounts: null,
-      });
+      positionRead.setDetail(makeFixtureDetail(position));
       triggerRepo.setTriggers([]);
 
       await requestPositionPlan({
@@ -486,8 +598,9 @@ describe('RequestPositionPlan', () => {
         triggerRepository: triggerRepo,
         planRepository: planRepo,
         regimePlanPort: regimePort,
+        executionHistoryRepository: historyRepo,
+        config: CONFIGURED_CONFIG,
         clock,
-        idGenerator,
         observability,
       });
 
@@ -501,13 +614,7 @@ describe('RequestPositionPlan', () => {
     it('does not send candles or client-authored regime state', async () => {
       const position = makeBelowRangePosition(FIXTURE_POSITION_ID, FIXTURE_WALLET_ID);
       positionRead.setPosition(position);
-      positionRead.setDetail({
-        position,
-        poolData: mockPoolData,
-        fees: { feeOwedA: 0n, feeOwedB: 0n, rewardInfos: [] },
-        positionLiquidity: 0n,
-        principalTokenAmounts: null,
-      });
+      positionRead.setDetail(makeFixtureDetail(position));
       triggerRepo.setTriggers([]);
 
       await requestPositionPlan({
@@ -517,8 +624,9 @@ describe('RequestPositionPlan', () => {
         triggerRepository: triggerRepo,
         planRepository: planRepo,
         regimePlanPort: regimePort,
+        executionHistoryRepository: historyRepo,
+        config: CONFIGURED_CONFIG,
         clock,
-        idGenerator,
         observability,
       });
 
@@ -528,6 +636,102 @@ describe('RequestPositionPlan', () => {
       expect(req.market.symbol).toBe('SOL/USDC');
       expect(req.market.poolAddress).toBe(FIXTURE_POOL_ID);
       expect(req.market.timeframe).toBe('1h');
+    });
+  });
+
+  describe('upstream identity persistence', () => {
+    it('persists response planId and planHash unchanged', async () => {
+      const position = makeInRangePosition(FIXTURE_POSITION_ID, FIXTURE_WALLET_ID);
+      positionRead.setPosition(position);
+      positionRead.setDetail(makeFixtureDetail(position));
+
+      const result = await requestPositionPlan({
+        walletId: FIXTURE_WALLET_ID,
+        positionId: FIXTURE_POSITION_ID,
+        positionReadPort: positionRead,
+        triggerRepository: triggerRepo,
+        planRepository: planRepo,
+        regimePlanPort: regimePort,
+        executionHistoryRepository: historyRepo,
+        config: CONFIGURED_CONFIG,
+        clock,
+        observability,
+      });
+
+      expect(result.status).toBe('ok');
+      if (result.status === 'ok') {
+        const plan = (result as unknown as { plan: { planId: string; planHash: string } }).plan;
+        expect(plan.planId).toBe('plan_upstream_9999');
+        expect(plan.planHash).toBe(VALID_UPSTREAM_RESPONSE.planHash);
+      }
+    });
+
+    it('does not generate a local plan identity', async () => {
+      const position = makeInRangePosition(FIXTURE_POSITION_ID, FIXTURE_WALLET_ID);
+      positionRead.setPosition(position);
+      positionRead.setDetail(makeFixtureDetail(position));
+
+      const result = await requestPositionPlan({
+        walletId: FIXTURE_WALLET_ID,
+        positionId: FIXTURE_POSITION_ID,
+        positionReadPort: positionRead,
+        triggerRepository: triggerRepo,
+        planRepository: planRepo,
+        regimePlanPort: regimePort,
+        executionHistoryRepository: historyRepo,
+        config: CONFIGURED_CONFIG,
+        clock,
+        observability,
+      });
+
+      expect(result.status).toBe('ok');
+      if (result.status === 'ok') {
+        const plan = (result as unknown as { plan: { planId: string } }).plan;
+        expect(plan.planId).toBe('plan_upstream_9999');
+      }
+    });
+
+    it('returns the validated remote response for an exact replay', async () => {
+      const position = makeInRangePosition(FIXTURE_POSITION_ID, FIXTURE_WALLET_ID);
+      positionRead.setPosition(position);
+      positionRead.setDetail(makeFixtureDetail(position));
+
+      await requestPositionPlan({
+        walletId: FIXTURE_WALLET_ID,
+        positionId: FIXTURE_POSITION_ID,
+        positionReadPort: positionRead,
+        triggerRepository: triggerRepo,
+        planRepository: planRepo,
+        regimePlanPort: regimePort,
+        executionHistoryRepository: historyRepo,
+        config: CONFIGURED_CONFIG,
+        clock,
+        observability,
+      });
+
+      clock.advance(16 * 60 * 1000);
+      const freshPosition = { ...position, lastObservedAt: clock.now() };
+      positionRead.setPosition(freshPosition);
+      positionRead.setDetail(makeFixtureDetail(freshPosition));
+
+      const replayResult = await requestPositionPlan({
+        walletId: FIXTURE_WALLET_ID,
+        positionId: FIXTURE_POSITION_ID,
+        positionReadPort: positionRead,
+        triggerRepository: triggerRepo,
+        planRepository: planRepo,
+        regimePlanPort: regimePort,
+        executionHistoryRepository: historyRepo,
+        config: CONFIGURED_CONFIG,
+        clock,
+        observability,
+      });
+
+      expect(replayResult.status).toBe('ok');
+      if (replayResult.status === 'ok') {
+        const plan = (replayResult as unknown as { plan: { planId: string } }).plan;
+        expect(plan.planId).toBe('plan_upstream_9999');
+      }
     });
   });
 
@@ -544,8 +748,9 @@ describe('RequestPositionPlan', () => {
         triggerRepository: triggerRepo,
         planRepository: planRepo,
         regimePlanPort: regimePort,
+        executionHistoryRepository: historyRepo,
+        config: CONFIGURED_CONFIG,
         clock,
-        idGenerator,
         observability,
       });
 
@@ -564,8 +769,9 @@ describe('RequestPositionPlan', () => {
         triggerRepository: triggerRepo,
         planRepository: planRepo,
         regimePlanPort: regimePort,
+        executionHistoryRepository: historyRepo,
+        config: CONFIGURED_CONFIG,
         clock,
-        idGenerator,
         observability,
       });
 
@@ -585,8 +791,9 @@ describe('RequestPositionPlan', () => {
         triggerRepository: triggerRepo,
         planRepository: planRepo,
         regimePlanPort: regimePort,
+        executionHistoryRepository: historyRepo,
+        config: CONFIGURED_CONFIG,
         clock,
-        idGenerator,
         observability,
       });
 
@@ -599,13 +806,7 @@ describe('RequestPositionPlan', () => {
     it('returns superseded-with-breach when lower breach trigger exists and regime times out', async () => {
       const position = makeBelowRangePosition(FIXTURE_POSITION_ID, FIXTURE_WALLET_ID);
       positionRead.setPosition(position);
-      positionRead.setDetail({
-        position,
-        poolData: mockPoolData,
-        fees: { feeOwedA: 0n, feeOwedB: 0n, rewardInfos: [] },
-        positionLiquidity: 0n,
-        principalTokenAmounts: null,
-      });
+      positionRead.setDetail(makeFixtureDetail(position));
       triggerRepo.setTriggers([makeLowerTrigger(FIXTURE_POSITION_ID)]);
       regimePort.setResponse({ kind: 'retryable-degraded', reason: 'timeout' });
 
@@ -616,8 +817,9 @@ describe('RequestPositionPlan', () => {
         triggerRepository: triggerRepo,
         planRepository: planRepo,
         regimePlanPort: regimePort,
+        executionHistoryRepository: historyRepo,
+        config: CONFIGURED_CONFIG,
         clock,
-        idGenerator,
         observability,
       });
 
@@ -629,16 +831,10 @@ describe('RequestPositionPlan', () => {
   });
 
   describe('keeps qualified upper breach authoritative over hold', () => {
-    it('returns superseded-with-breach when upper breach trigger exists', async () => {
+    it('qualified upper breach remains authoritative over an accepted hold plan', async () => {
       const position = makeAboveRangePosition(FIXTURE_POSITION_ID, FIXTURE_WALLET_ID);
       positionRead.setPosition(position);
-      positionRead.setDetail({
-        position,
-        poolData: mockPoolData,
-        fees: { feeOwedA: 0n, feeOwedB: 0n, rewardInfos: [] },
-        positionLiquidity: 0n,
-        principalTokenAmounts: null,
-      });
+      positionRead.setDetail(makeFixtureDetail(position));
       triggerRepo.setTriggers([makeUpperTrigger(FIXTURE_POSITION_ID)]);
 
       const result = await requestPositionPlan({
@@ -648,8 +844,9 @@ describe('RequestPositionPlan', () => {
         triggerRepository: triggerRepo,
         planRepository: planRepo,
         regimePlanPort: regimePort,
+        executionHistoryRepository: historyRepo,
+        config: CONFIGURED_CONFIG,
         clock,
-        idGenerator,
         observability,
       });
 
@@ -664,13 +861,7 @@ describe('RequestPositionPlan', () => {
     it('returns degraded when regime is unavailable', async () => {
       const position = makeInRangePosition(FIXTURE_POSITION_ID, FIXTURE_WALLET_ID);
       positionRead.setPosition(position);
-      positionRead.setDetail({
-        position,
-        poolData: mockPoolData,
-        fees: { feeOwedA: 0n, feeOwedB: 0n, rewardInfos: [] },
-        positionLiquidity: 0n,
-        principalTokenAmounts: null,
-      });
+      positionRead.setDetail(makeFixtureDetail(position));
       triggerRepo.setTriggers([]);
       regimePort.setResponse({ kind: 'retryable-degraded', reason: 'timeout' });
 
@@ -681,8 +872,9 @@ describe('RequestPositionPlan', () => {
         triggerRepository: triggerRepo,
         planRepository: planRepo,
         regimePlanPort: regimePort,
+        executionHistoryRepository: historyRepo,
+        config: CONFIGURED_CONFIG,
         clock,
-        idGenerator,
         observability,
       });
 
@@ -695,6 +887,7 @@ describe('RequestPositionPlan', () => {
     it('does not modify trigger repository on regime failure', async () => {
       const position = makeInRangePosition(FIXTURE_POSITION_ID, FIXTURE_WALLET_ID);
       positionRead.setPosition(position);
+      positionRead.setDetail(makeFixtureDetail(position));
       const trigger = makeLowerTrigger(FIXTURE_POSITION_ID);
       triggerRepo.setTriggers([trigger]);
       regimePort.setResponse({ kind: 'permanent', reason: 'adapter-disabled' });
@@ -706,8 +899,9 @@ describe('RequestPositionPlan', () => {
         triggerRepository: triggerRepo,
         planRepository: planRepo,
         regimePlanPort: regimePort,
+        executionHistoryRepository: historyRepo,
+        config: CONFIGURED_CONFIG,
         clock,
-        idGenerator,
         observability,
       });
 
@@ -717,30 +911,11 @@ describe('RequestPositionPlan', () => {
     });
   });
 
-  describe('returns the existing plan for exact replay', () => {
-    it('returns conflict=false and status=ok when fingerprint matches', async () => {
-      const position = makeInRangePosition(FIXTURE_POSITION_ID, FIXTURE_WALLET_ID);
-      positionRead.setPosition(position);
-      positionRead.setDetail({
-        position,
-        poolData: mockPoolData,
-        fees: { feeOwedA: 0n, feeOwedB: 0n, rewardInfos: [] },
-        positionLiquidity: 0n,
-        principalTokenAmounts: null,
-      });
+  describe('enforces request cadence and lease management', () => {
+    it('stale snapshot does not acquire a plan request lease', async () => {
+      const stalePosition = makeStalePosition(FIXTURE_POSITION_ID, FIXTURE_WALLET_ID);
+      positionRead.setPosition(stalePosition);
       triggerRepo.setTriggers([]);
-
-      await requestPositionPlan({
-        walletId: FIXTURE_WALLET_ID,
-        positionId: FIXTURE_POSITION_ID,
-        positionReadPort: positionRead,
-        triggerRepository: triggerRepo,
-        planRepository: planRepo,
-        regimePlanPort: regimePort,
-        clock,
-        idGenerator,
-        observability,
-      });
 
       const result = await requestPositionPlan({
         walletId: FIXTURE_WALLET_ID,
@@ -749,49 +924,138 @@ describe('RequestPositionPlan', () => {
         triggerRepository: triggerRepo,
         planRepository: planRepo,
         regimePlanPort: regimePort,
+        executionHistoryRepository: historyRepo,
+        config: CONFIGURED_CONFIG,
         clock,
-        idGenerator,
+        observability,
+      });
+
+      expect(result.status).toBe('stale');
+      expect(planRepo.claimedCalls).toHaveLength(0);
+    });
+
+    it('unchanged observation inside the interval does not call regime', async () => {
+      const position = makeInRangePosition(FIXTURE_POSITION_ID, FIXTURE_WALLET_ID);
+      positionRead.setPosition(position);
+      positionRead.setDetail(makeFixtureDetail(position));
+      triggerRepo.setTriggers([]);
+
+      const first = await requestPositionPlan({
+        walletId: FIXTURE_WALLET_ID,
+        positionId: FIXTURE_POSITION_ID,
+        positionReadPort: positionRead,
+        triggerRepository: triggerRepo,
+        planRepository: planRepo,
+        regimePlanPort: regimePort,
+        executionHistoryRepository: historyRepo,
+        config: CONFIGURED_CONFIG,
+        clock,
+        observability,
+      });
+      expect(first.status).toBe('ok');
+      expect(regimePort.getRequests()).toHaveLength(1);
+
+      // Subsequent call inside interval without changes
+      const second = await requestPositionPlan({
+        walletId: FIXTURE_WALLET_ID,
+        positionId: FIXTURE_POSITION_ID,
+        positionReadPort: positionRead,
+        triggerRepository: triggerRepo,
+        planRepository: planRepo,
+        regimePlanPort: regimePort,
+        executionHistoryRepository: historyRepo,
+        config: CONFIGURED_CONFIG,
+        clock,
+        observability,
+      });
+
+      expect(second.status).toBe('throttled');
+      if (second.status === 'throttled') {
+        expect(second.reason).toBe('minimum-interval');
+      }
+      expect(regimePort.getRequests()).toHaveLength(1);
+    });
+
+    it('finishes a claimed lease exactly once after persisting a valid response', async () => {
+      const position = makeInRangePosition(FIXTURE_POSITION_ID, FIXTURE_WALLET_ID);
+      positionRead.setPosition(position);
+      positionRead.setDetail(makeFixtureDetail(position));
+      triggerRepo.setTriggers([]);
+
+      const result = await requestPositionPlan({
+        walletId: FIXTURE_WALLET_ID,
+        positionId: FIXTURE_POSITION_ID,
+        positionReadPort: positionRead,
+        triggerRepository: triggerRepo,
+        planRepository: planRepo,
+        regimePlanPort: regimePort,
+        executionHistoryRepository: historyRepo,
+        config: CONFIGURED_CONFIG,
+        clock,
         observability,
       });
 
       expect(result.status).toBe('ok');
-      expect((result as { conflict: boolean }).conflict).toBe(false);
+      expect(planRepo.claimedCalls).toHaveLength(1);
+      expect(planRepo.finishedCalls).toHaveLength(1);
+      expect(planRepo.finishedCalls[0]).toMatchObject({
+        positionId: FIXTURE_POSITION_ID,
+        leaseToken: planRepo.claimedLeaseTokens[0],
+        outcome: 'succeeded',
+      });
     });
-  });
 
-  describe('fails closed on conflicting replay', () => {
-    it('returns conflict=true when fingerprint differs', async () => {
+    it('transport failure clears the lease without allowing immediate retry spam', async () => {
       const position = makeInRangePosition(FIXTURE_POSITION_ID, FIXTURE_WALLET_ID);
       positionRead.setPosition(position);
-      positionRead.setDetail({
-        position,
-        poolData: mockPoolData,
-        fees: { feeOwedA: 0n, feeOwedB: 0n, rewardInfos: [] },
-        positionLiquidity: 0n,
-        principalTokenAmounts: null,
-      });
+      positionRead.setDetail(makeFixtureDetail(position));
       triggerRepo.setTriggers([]);
+      regimePort.setResponse({ kind: 'retryable-degraded', reason: 'timeout' });
 
-      await requestPositionPlan({
+      const first = await requestPositionPlan({
         walletId: FIXTURE_WALLET_ID,
         positionId: FIXTURE_POSITION_ID,
         positionReadPort: positionRead,
         triggerRepository: triggerRepo,
         planRepository: planRepo,
         regimePlanPort: regimePort,
+        executionHistoryRepository: historyRepo,
+        config: CONFIGURED_CONFIG,
         clock,
-        idGenerator,
         observability,
       });
 
-      clock.advance(60_000);
+      expect(first.status).toBe('degraded');
+      expect(planRepo.finishedCalls).toHaveLength(1);
+      expect(planRepo.finishedCalls[0]?.outcome).toBe('failed');
 
-      const updatedPosition = makeInRangePosition(
-        FIXTURE_POSITION_ID,
-        FIXTURE_WALLET_ID,
-        makeClockTimestamp(clock.now()),
-      );
-      positionRead.setPosition(updatedPosition);
+      // Immediate retry inside interval is suppressed
+      clock.advance(1000);
+      const retry = await requestPositionPlan({
+        walletId: FIXTURE_WALLET_ID,
+        positionId: FIXTURE_POSITION_ID,
+        positionReadPort: positionRead,
+        triggerRepository: triggerRepo,
+        planRepository: planRepo,
+        regimePlanPort: regimePort,
+        executionHistoryRepository: historyRepo,
+        config: CONFIGURED_CONFIG,
+        clock,
+        observability,
+      });
+
+      expect(retry.status).toBe('throttled');
+      if (retry.status === 'throttled') {
+        expect(retry.reason).toBe('minimum-interval');
+      }
+      expect(regimePort.getRequests()).toHaveLength(1);
+    });
+
+    it('qualified breach still supersedes an accepted advisory without bypassing lease completion', async () => {
+      const position = makeBelowRangePosition(FIXTURE_POSITION_ID, FIXTURE_WALLET_ID);
+      positionRead.setPosition(position);
+      positionRead.setDetail(makeFixtureDetail(position));
+      triggerRepo.setTriggers([makeLowerTrigger(FIXTURE_POSITION_ID)]);
 
       const result = await requestPositionPlan({
         walletId: FIXTURE_WALLET_ID,
@@ -800,12 +1064,16 @@ describe('RequestPositionPlan', () => {
         triggerRepository: triggerRepo,
         planRepository: planRepo,
         regimePlanPort: regimePort,
+        executionHistoryRepository: historyRepo,
+        config: CONFIGURED_CONFIG,
         clock,
-        idGenerator,
         observability,
       });
 
-      expect(result.status).toBe('conflict');
+      expect(result.status).toBe('superseded');
+      expect(planRepo.claimedCalls).toHaveLength(1);
+      expect(planRepo.finishedCalls).toHaveLength(1);
+      expect(planRepo.finishedCalls[0]?.outcome).toBe('succeeded');
     });
   });
 });
