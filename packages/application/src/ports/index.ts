@@ -548,6 +548,27 @@ export type PlanLifecycleStateUpdateParams = {
   readonly lifecycleState: PlanLifecycleState;
 };
 
+export type ClaimPlanRequestParams = {
+  readonly positionId: PositionId;
+  readonly now: ClockTimestamp;
+  readonly minimumIntervalMs: number;
+  readonly leaseDurationMs: number;
+  readonly rangeState: 'in-range' | 'below-range' | 'above-range';
+  readonly breachQualifiedAt?: ClockTimestamp | null;
+  readonly closedCandleAt?: ClockTimestamp | null;
+};
+
+export type ClaimPlanRequestResult =
+  | { readonly kind: 'claimed'; readonly leaseToken: string }
+  | { readonly kind: 'suppressed'; readonly reason: 'active-request' | 'minimum-interval' };
+
+export type FinishPlanRequestParams = {
+  readonly positionId: PositionId;
+  readonly leaseToken: string;
+  readonly outcome: 'succeeded' | 'failed';
+  readonly completedAt: ClockTimestamp;
+};
+
 export interface PlanRepository {
   createRequest(params: PlanRequestParams): Promise<PlanRequestResult>;
   acceptResponse(
@@ -564,4 +585,6 @@ export interface PlanRepository {
   recordPermanentFailure(params: PlanPermanentFailureParams): Promise<void>;
   failDelivery(params: PlanFailDeliveryParams): Promise<void>;
   updateLifecycleState(params: PlanLifecycleStateUpdateParams): Promise<void>;
+  claimPlanRequest(params: ClaimPlanRequestParams): Promise<ClaimPlanRequestResult>;
+  finishPlanRequest(params: FinishPlanRequestParams): Promise<void>;
 }

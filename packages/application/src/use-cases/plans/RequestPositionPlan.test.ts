@@ -391,6 +391,14 @@ class FakePlanRepository implements PlanRepository {
     planId: PlanId;
     lifecycleState: PlanLifecycleState;
   }): Promise<void> {}
+  async claimPlanRequest(
+    _params: import('../../ports/index.js').ClaimPlanRequestParams,
+  ): Promise<import('../../ports/index.js').ClaimPlanRequestResult> {
+    return { kind: 'claimed', leaseToken: 'fake-lease-token' };
+  }
+  async finishPlanRequest(
+    _params: import('../../ports/index.js').FinishPlanRequestParams,
+  ): Promise<void> {}
 }
 
 const VALID_UPSTREAM_RESPONSE: RegimePlanResponse = {

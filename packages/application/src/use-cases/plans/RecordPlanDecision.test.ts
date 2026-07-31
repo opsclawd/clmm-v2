@@ -159,6 +159,16 @@ class FakePlanRepository implements PlanRepository {
 
   async updateLifecycleState(): Promise<void> {}
 
+  async claimPlanRequest(
+    _params: import('@clmm/application').ClaimPlanRequestParams,
+  ): Promise<import('@clmm/application').ClaimPlanRequestResult> {
+    return { kind: 'claimed', leaseToken: 'fake-lease-token' };
+  }
+
+  async finishPlanRequest(
+    _params: import('@clmm/application').FinishPlanRequestParams,
+  ): Promise<void> {}
+
   setPlan(plan: PositionPlan): void {
     this._plans.set(plan.positionId, plan as MutablePositionPlan);
   }

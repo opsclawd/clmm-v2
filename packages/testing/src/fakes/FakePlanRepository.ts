@@ -1,3 +1,4 @@
+import { randomUUID } from 'node:crypto';
 import type {
   PlanRepository,
   PlanRequestParams,
@@ -14,6 +15,9 @@ import type {
   PlanFailDeliveryParams,
   PlanLifecycleStateUpdateParams,
   CanonicalResult,
+  ClaimPlanRequestParams,
+  ClaimPlanRequestResult,
+  FinishPlanRequestParams,
 } from '@clmm/application';
 import type {
   PositionPlan,
@@ -105,10 +109,22 @@ function resolveExecutionOrigin(plan: StoredPlan): unknown {
   return null;
 }
 
+type StoredRequestState = {
+  positionId: PositionId;
+  leaseToken: string | null;
+  leaseUntil: ClockTimestamp | null;
+  lastAttemptAt: ClockTimestamp | null;
+  lastRangeState: 'in-range' | 'below-range' | 'above-range' | null;
+  lastBreachQualifiedAt: ClockTimestamp | null;
+  lastClosedCandleAt: ClockTimestamp | null;
+  updatedAt: ClockTimestamp;
+};
+
 export class FakePlanRepository implements PlanRepository {
   private plans = new Map<string, StoredPlan>();
   private outbox = new Map<string, StoredOutbox>();
   private resultIdempotencyIndex = new Map<string, string>();
+  private requestStates = new Map<string, StoredRequestState>();
 
   async createRequest(params: PlanRequestParams): Promise<PlanRequestResult> {
     const existing = this.plans.get(params.planId);
@@ -401,5 +417,65 @@ export class FakePlanRepository implements PlanRepository {
     if (plan) {
       Object.assign(plan, relationalPatchForState(params.lifecycleState));
     }
+  }
+
+  async claimPlanRequest(params: ClaimPlanRequestParams): Promise<ClaimPlanRequestResult> {
+    const row = this.requestStates.get(params.positionId);
+    const now = params.now;
+
+    if (row && row.leaseToken !== null && row.leaseUntil !== null && row.leaseUntil > now) {
+      return { kind: 'suppressed', reason: 'active-request' };
+    }
+
+    const isFinishedRequest = row?.leaseToken === null;
+    if (
+      row &&
+      isFinishedRequest &&
+      row.lastAttemptAt !== null &&
+      now - row.lastAttemptAt < params.minimumIntervalMs
+    ) {
+      const rangeStateChanged = row.lastRangeState !== params.rangeState;
+      const breachQualifiedChanged =
+        params.breachQualifiedAt !== undefined &&
+        params.breachQualifiedAt !== null &&
+        params.breachQualifiedAt !== row.lastBreachQualifiedAt;
+      const closedCandleChanged =
+        params.closedCandleAt !== undefined &&
+        params.closedCandleAt !== null &&
+        (row.lastClosedCandleAt === null || params.closedCandleAt > row.lastClosedCandleAt);
+
+      if (!rangeStateChanged && !breachQualifiedChanged && !closedCandleChanged) {
+        return { kind: 'suppressed', reason: 'minimum-interval' };
+      }
+    }
+
+    const leaseToken = randomUUID();
+    const leaseUntil = (now + params.leaseDurationMs) as ClockTimestamp;
+
+    const updatedRow: StoredRequestState = {
+      positionId: params.positionId,
+      leaseToken,
+      leaseUntil,
+      lastAttemptAt: now,
+      lastRangeState: params.rangeState,
+      lastBreachQualifiedAt: params.breachQualifiedAt ?? null,
+      lastClosedCandleAt: params.closedCandleAt ?? null,
+      updatedAt: now,
+    };
+
+    this.requestStates.set(params.positionId, updatedRow);
+
+    return { kind: 'claimed', leaseToken };
+  }
+
+  async finishPlanRequest(params: FinishPlanRequestParams): Promise<void> {
+    const row = this.requestStates.get(params.positionId);
+    if (!row || row.leaseToken !== params.leaseToken) {
+      return;
+    }
+
+    row.leaseToken = null;
+    row.leaseUntil = null;
+    row.updatedAt = params.completedAt;
   }
 }

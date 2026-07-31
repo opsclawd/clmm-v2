@@ -80,5 +80,6 @@ describe('Drizzle schema snapshot integrity', () => {
     expect(
       findMissingTableNames(getSchemaTableNames(schema), getSnapshotTableNames(latestSnapshot)),
     ).toEqual([]);
+    expect(getSchemaTableNames(schema)).toContain('position_plan_request_state');
   });
 });
