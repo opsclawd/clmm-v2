@@ -67,6 +67,8 @@ function mapDecisionKindToReasonCode(decisionKind: string | undefined): string {
   }
 }
 
+import { parseRegimeExecutionResult } from '../../dto/index.js';
+
 async function deliverResult(
   claim: PlanResultClaim,
   regimePort: RegimePlanPort,
@@ -74,25 +76,39 @@ async function deliverResult(
   clock: ClockPort,
 ): Promise<PlanExecutionResultTransportResult> {
   const payload = claim.canonicalResult.payload;
-  const planHash = (payload['canonicalHash'] as string) ?? '';
-  const positionId = (payload['positionId'] as string) ?? '';
-  const decisionKind = (payload['decisionKind'] as string | undefined) ?? 'executed';
+  const canonicalHash =
+    typeof payload['canonicalHash'] === 'string'
+      ? payload['canonicalHash']
+      : typeof payload['planHash'] === 'string'
+        ? payload['planHash']
+        : undefined;
+  const positionId = typeof payload['positionId'] === 'string' ? payload['positionId'] : undefined;
+  const decisionKind =
+    typeof payload['decisionKind'] === 'string' ? payload['decisionKind'] : undefined;
   const storedActionKind = await planRepository.getPlanActionKind(claim.planId);
-  const requestedAction = storedActionKind ?? 'HOLD';
 
-  const regimeResult: RegimeExecutionResult = {
+  if (!canonicalHash || !positionId || !decisionKind || !storedActionKind) {
+    return { kind: 'permanent', reason: 'schema-invalid' };
+  }
+
+  const candidate: unknown = {
     schemaVersion: 'execution-result.v1',
     planId: claim.planId as string,
-    planHash,
+    planHash: canonicalHash,
     positionId,
-    requestedAction: requestedAction as RegimeExecutionResult['requestedAction'],
+    requestedAction: storedActionKind as RegimeExecutionResult['requestedAction'],
     status: mapDecisionKindToStatus(decisionKind),
     reasonCode: mapDecisionKindToReasonCode(decisionKind),
     completedAtUnixMs: clock.now() as number,
     idempotencyKey: claim.idempotencyKey,
   };
 
-  return regimePort.reportExecutionResult(regimeResult);
+  const validated = parseRegimeExecutionResult(candidate);
+  if (!validated) {
+    return { kind: 'permanent', reason: 'schema-invalid' };
+  }
+
+  return regimePort.reportExecutionResult(validated);
 }
 
 export async function syncPlanExecutionResults(deps: SyncPlanExecutionResultsDeps): Promise<{

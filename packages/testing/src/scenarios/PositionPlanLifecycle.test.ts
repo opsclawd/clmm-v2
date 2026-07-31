@@ -117,7 +117,8 @@ describe('PositionPlanLifecycle Scenarios', () => {
     exitIntent: 'exit-to-usdc' | 'exit-to-sol' = 'exit-to-usdc',
   ) {
     const planId = planIdStr as PlanId;
-    const canonicalHash = 'hash-1' as CanonicalHash;
+    const canonicalHash =
+      'a1b2c3d4e5f60123456789abcdef0123456789abcdef0123456789abcdef0123' as CanonicalHash;
     await env.planRepository.createRequest({
       planId,
       canonicalHash,
@@ -286,7 +287,7 @@ describe('PositionPlanLifecycle Scenarios', () => {
 
   it('user decline reports once', async () => {
     const env = buildEnvironment();
-    const { planId } = await seedAdvisoryReadyPlan(env);
+    const { planId, canonicalHash } = await seedAdvisoryReadyPlan(env);
 
     const previewResult = await createPlanExitPreview({
       planId,
@@ -361,7 +362,11 @@ describe('PositionPlanLifecycle Scenarios', () => {
 
     expect(env.regimePlanPort.getResults()).toHaveLength(1);
     expect(env.regimePlanPort.getResults()[0]).toMatchObject({
+      schemaVersion: 'execution-result.v1',
       planId,
+      planHash: canonicalHash,
+      positionId: env.positionId,
+      requestedAction: 'REQUEST_EXIT_CLMM',
       status: 'SKIPPED',
       reasonCode: 'REJECTED',
     });
@@ -379,7 +384,7 @@ describe('PositionPlanLifecycle Scenarios', () => {
 
   it('successful exit reports authoritative result once', async () => {
     const env = buildEnvironment();
-    const { planId } = await seedAdvisoryReadyPlan(env);
+    const { planId, canonicalHash } = await seedAdvisoryReadyPlan(env);
 
     const previewResult = await createPlanExitPreview({
       planId,
@@ -458,7 +463,11 @@ describe('PositionPlanLifecycle Scenarios', () => {
 
     expect(env.regimePlanPort.getResults()).toHaveLength(1);
     expect(env.regimePlanPort.getResults()[0]).toMatchObject({
+      schemaVersion: 'execution-result.v1',
       planId,
+      planHash: canonicalHash,
+      positionId: env.positionId,
+      requestedAction: 'REQUEST_EXIT_CLMM',
       status: 'SUCCESS',
       reasonCode: 'EXECUTED',
     });
@@ -476,7 +485,7 @@ describe('PositionPlanLifecycle Scenarios', () => {
 
   it('failed transaction reports failure once', async () => {
     const env = buildEnvironment();
-    const { planId } = await seedAdvisoryReadyPlan(env);
+    const { planId, canonicalHash } = await seedAdvisoryReadyPlan(env);
 
     const previewResult = await createPlanExitPreview({
       planId,
@@ -524,7 +533,11 @@ describe('PositionPlanLifecycle Scenarios', () => {
 
     expect(env.regimePlanPort.getResults()).toHaveLength(1);
     expect(env.regimePlanPort.getResults()[0]).toMatchObject({
+      schemaVersion: 'execution-result.v1',
       planId,
+      planHash: canonicalHash,
+      positionId: env.positionId,
+      requestedAction: 'REQUEST_EXIT_CLMM',
       status: 'FAILED',
       reasonCode: 'FAILED',
     });
@@ -542,7 +555,7 @@ describe('PositionPlanLifecycle Scenarios', () => {
 
   it('restart resumes reporting without reexecution', async () => {
     const env = buildEnvironment();
-    const { planId } = await seedAdvisoryReadyPlan(env);
+    const { planId, canonicalHash } = await seedAdvisoryReadyPlan(env);
 
     const previewResult = await createPlanExitPreview({
       planId,
@@ -604,7 +617,11 @@ describe('PositionPlanLifecycle Scenarios', () => {
 
     expect(env.regimePlanPort.getResults()).toHaveLength(1);
     expect(env.regimePlanPort.getResults()[0]).toMatchObject({
+      schemaVersion: 'execution-result.v1',
       planId,
+      planHash: canonicalHash,
+      positionId: env.positionId,
+      requestedAction: 'REQUEST_EXIT_CLMM',
       status: 'SUCCESS',
       reasonCode: 'EXECUTED',
     });

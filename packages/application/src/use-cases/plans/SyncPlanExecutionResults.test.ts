@@ -35,13 +35,21 @@ class FakeClockPort {
   }
 }
 
+const FIXTURE_CANONICAL_HASH = 'a1b2c3d4e5f60123456789abcdef0123456789abcdef0123456789abcdef0123';
+const FIXTURE_POSITION_ID = 'pos-sol-usdc-01';
+
 function makeClaim(overrides: Partial<PlanResultClaim> = {}): PlanResultClaim {
   return {
     resultId: FIXTURE_RESULT_ID,
     planId: FIXTURE_PLAN_ID,
     canonicalResult: {
       id: FIXTURE_RESULT_ID,
-      payload: { planId: FIXTURE_PLAN_ID, decisionKind: 'acknowledged' },
+      payload: {
+        planId: FIXTURE_PLAN_ID,
+        canonicalHash: FIXTURE_CANONICAL_HASH,
+        positionId: FIXTURE_POSITION_ID,
+        decisionKind: 'acknowledged',
+      },
     },
     idempotencyKey: FIXTURE_IDEMPOTENCY_KEY,
     attemptCount: 0,
@@ -116,26 +124,89 @@ describe('SyncPlanExecutionResults', () => {
     });
   });
 
-  describe('retries unknown network outcome with the same idempotency identity', () => {
-    it('re-schedules retry when upstream returns retryable-degraded', async () => {
-      const claim = makeClaim({ attemptCount: 1, idempotencyKey: FIXTURE_IDEMPOTENCY_KEY });
-      vi.mocked(planRepo.claimDueResult).mockResolvedValueOnce(claim);
-      vi.mocked(regimePort.reportExecutionResult).mockResolvedValueOnce({
-        kind: 'retryable-degraded',
-        reason: 'timeout',
+  describe('correlates execution result identity', () => {
+    it('reports the persisted remote planId and planHash unchanged', async () => {
+      const claim = makeClaim({
+        planId: 'plan_exit_987654321' as PlanId,
+        canonicalResult: {
+          id: 'result-001',
+          payload: {
+            planId: 'plan_exit_987654321',
+            canonicalHash: 'f9e8d7c6b5a40123456789abcdef0123456789abcdef0123456789abcdef0123',
+            positionId: 'pos_sol_usdc_02',
+            decisionKind: 'executed',
+          },
+        },
       });
+      vi.mocked(planRepo.claimDueResult).mockResolvedValueOnce(claim);
+      vi.mocked(planRepo.getPlanActionKind).mockResolvedValueOnce('REQUEST_EXIT_CLMM');
+      vi.mocked(regimePort.reportExecutionResult).mockResolvedValueOnce({ kind: 'ok' });
 
       await syncPlanExecutionResults(deps);
 
       // eslint-disable-next-line @typescript-eslint/unbound-method
-      expect(planRepo.rescheduleRetry).toHaveBeenCalledTimes(1);
-      // eslint-disable-next-line @typescript-eslint/unbound-method
-      expect(planRepo.completeDelivery).not.toHaveBeenCalled();
+      expect(regimePort.reportExecutionResult).toHaveBeenCalledOnce();
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment,@typescript-eslint/unbound-method
+      const callArg = vi.mocked(regimePort.reportExecutionResult).mock.calls[0]?.[0] as {
+        planId: string;
+        planHash: string;
+        positionId: string;
+        requestedAction: string;
+      };
+      expect(callArg?.planId).toBe('plan_exit_987654321');
+      expect(callArg?.planHash).toBe(
+        'f9e8d7c6b5a40123456789abcdef0123456789abcdef0123456789abcdef0123',
+      );
+      expect(callArg?.positionId).toBe('pos_sol_usdc_02');
+      expect(callArg?.requestedAction).toBe('REQUEST_EXIT_CLMM');
     });
 
-    it('preserves the idempotency identity across retries', async () => {
-      const claim = makeClaim({ attemptCount: 2, idempotencyKey: 'stable-idempotency-key' });
+    it('validates the built result before transport', async () => {
+      const invalidHashClaim = makeClaim({
+        canonicalResult: {
+          id: 'result-001',
+          payload: {
+            planId: FIXTURE_PLAN_ID,
+            canonicalHash: 'not-a-valid-sha256',
+            positionId: FIXTURE_POSITION_ID,
+            decisionKind: 'executed',
+          },
+        },
+      });
+      vi.mocked(planRepo.claimDueResult).mockResolvedValueOnce(invalidHashClaim);
+
+      const result = await syncPlanExecutionResults(deps);
+
+      // eslint-disable-next-line @typescript-eslint/unbound-method
+      expect(regimePort.reportExecutionResult).not.toHaveBeenCalled();
+      // eslint-disable-next-line @typescript-eslint/unbound-method
+      expect(planRepo.failDelivery).toHaveBeenCalledWith(
+        expect.objectContaining({
+          planId: FIXTURE_PLAN_ID,
+          resultId: FIXTURE_RESULT_ID,
+          reason: 'permanent:schema-invalid',
+        }),
+      );
+      expect(result.permanentlyRejected).toBe(1);
+    });
+
+    it('preserves remote identity across retries', async () => {
+      const claim = makeClaim({
+        planId: 'plan_exit_987654321' as PlanId,
+        idempotencyKey: 'idem_exit_987654321_01',
+        attemptCount: 1,
+        canonicalResult: {
+          id: 'result-001',
+          payload: {
+            planId: 'plan_exit_987654321',
+            canonicalHash: 'f9e8d7c6b5a40123456789abcdef0123456789abcdef0123456789abcdef0123',
+            positionId: 'pos_sol_usdc_02',
+            decisionKind: 'executed',
+          },
+        },
+      });
       vi.mocked(planRepo.claimDueResult).mockResolvedValueOnce(claim);
+      vi.mocked(planRepo.getPlanActionKind).mockResolvedValueOnce('REQUEST_EXIT_CLMM');
       vi.mocked(regimePort.reportExecutionResult).mockResolvedValueOnce({
         kind: 'retryable-degraded',
         reason: 'timeout',
@@ -144,8 +215,49 @@ describe('SyncPlanExecutionResults', () => {
       await syncPlanExecutionResults(deps);
 
       // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment,@typescript-eslint/unbound-method
-      const retryCalls = vi.mocked(planRepo.rescheduleRetry).mock.calls;
-      expect(retryCalls.length).toBeGreaterThan(0);
+      const callArg = vi.mocked(regimePort.reportExecutionResult).mock.calls[0]?.[0] as {
+        planId: string;
+        planHash: string;
+        idempotencyKey: string;
+      };
+      expect(callArg?.planId).toBe('plan_exit_987654321');
+      expect(callArg?.planHash).toBe(
+        'f9e8d7c6b5a40123456789abcdef0123456789abcdef0123456789abcdef0123',
+      );
+      expect(callArg?.idempotencyKey).toBe('idem_exit_987654321_01');
+      // eslint-disable-next-line @typescript-eslint/unbound-method
+      expect(planRepo.rescheduleRetry).toHaveBeenCalledWith(
+        expect.objectContaining({
+          resultId: FIXTURE_RESULT_ID,
+        }),
+      );
+    });
+
+    it('fails the outbox row permanently when the persisted payload cannot form a canonical result', async () => {
+      const incompletePayloadClaim = makeClaim({
+        canonicalResult: {
+          id: 'result-001',
+          payload: {
+            planId: FIXTURE_PLAN_ID,
+            // missing canonicalHash, positionId, decisionKind
+          },
+        },
+      });
+      vi.mocked(planRepo.claimDueResult).mockResolvedValueOnce(incompletePayloadClaim);
+
+      const result = await syncPlanExecutionResults(deps);
+
+      // eslint-disable-next-line @typescript-eslint/unbound-method
+      expect(regimePort.reportExecutionResult).not.toHaveBeenCalled();
+      // eslint-disable-next-line @typescript-eslint/unbound-method
+      expect(planRepo.failDelivery).toHaveBeenCalledWith(
+        expect.objectContaining({
+          planId: FIXTURE_PLAN_ID,
+          resultId: FIXTURE_RESULT_ID,
+          reason: 'permanent:schema-invalid',
+        }),
+      );
+      expect(result.permanentlyRejected).toBe(1);
     });
   });
 

@@ -473,6 +473,22 @@ describe('RegimePlanAdapter', () => {
   });
 
   describe('reportExecutionResult', () => {
+    it('fails preflight with permanent schema-invalid when reporting an invalid execution result payload', async () => {
+      const adapter = new RegimePlanAdapter('https://regime.example.com', 'test-token', obs.port);
+      const invalidResult = {
+        ...VALID_EXECUTION_RESULT,
+        planHash: 'not-a-valid-sha256',
+      };
+
+      const result = await adapter.reportExecutionResult(invalidResult as RegimeExecutionResult);
+
+      expect(result.kind).toBe('permanent');
+      if (result.kind === 'permanent') {
+        expect(result.reason).toBe('schema-invalid');
+      }
+      expect(fetch).not.toHaveBeenCalled();
+    });
+
     it('posts execution result to correct endpoint', async () => {
       vi.mocked(fetch).mockResolvedValue(new Response(null, { status: 200 }));
 

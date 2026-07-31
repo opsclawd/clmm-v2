@@ -34,6 +34,14 @@ describe('regimePlanValidator', () => {
     const invalidExecVersion = deepClone(successFixture) as MutableFixture;
     invalidExecVersion['schemaVersion'] = 'execution-result.v999';
     expect(parseRegimeExecutionResult(invalidExecVersion)).toBeNull();
+
+    const invalidExecHash = deepClone(successFixture) as MutableFixture;
+    invalidExecHash['planHash'] = 'invalid-hash-string';
+    expect(parseRegimeExecutionResult(invalidExecHash)).toBeNull();
+
+    const missingExecField = deepClone(successFixture) as MutableFixture;
+    delete missingExecField['positionId'];
+    expect(parseRegimeExecutionResult(missingExecField)).toBeNull();
   });
 
   it('rejects a request-exit plan without canonical exit intent', () => {

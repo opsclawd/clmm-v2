@@ -5,7 +5,7 @@ import type {
   PlanExecutionResultTransportResult,
 } from '@clmm/application';
 import type { RegimePlanRequest, RegimeExecutionResult } from '@clmm/application';
-import { parseRegimePlanResponse } from '@clmm/application';
+import { parseRegimePlanResponse, parseRegimeExecutionResult } from '@clmm/application';
 
 const REQUEST_TIMEOUT_MS = 5000;
 
@@ -174,6 +174,15 @@ export class RegimePlanAdapter implements RegimePlanPort {
     result: RegimeExecutionResult,
   ): Promise<PlanExecutionResultTransportResult> {
     const startMs = Date.now();
+
+    const validated = parseRegimeExecutionResult(result);
+    if (!validated) {
+      this.observability.log('warn', 'RegimePlan result failed schema validation preflight', {
+        resultId: result?.idempotencyKey,
+        planId: result?.planId,
+      });
+      return { kind: 'permanent', reason: 'schema-invalid' };
+    }
 
     if (!this.baseUrl || !this.internalToken) {
       if (!this.disabledLogged) {
