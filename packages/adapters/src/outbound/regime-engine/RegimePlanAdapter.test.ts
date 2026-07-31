@@ -126,7 +126,7 @@ describe('RegimePlanAdapter', () => {
         (fetch as ReturnType<typeof vi.fn>).mock.calls[0]![1]!.body as string,
       ) as Record<string, unknown>;
 
-      expect(calledUrl).toBe('https://regime.example.com/v1/position-plan');
+      expect(calledUrl).toBe('https://regime.example.com/v1/plan');
       expect(calledMethod).toBe('POST');
       expect(calledHeaders['Content-Type']).toBe('application/json');
       expect(calledHeaders['X-CLMM-Internal-Token']).toBe('test-token');
@@ -405,7 +405,52 @@ describe('RegimePlanAdapter', () => {
       await adapter.requestPositionPlan(VALID_PLAN_REQUEST);
 
       const calledUrl = (fetch as ReturnType<typeof vi.fn>).mock.calls[0]![0] as string;
-      expect(calledUrl).toBe('https://regime.example.com/v1/position-plan');
+      expect(calledUrl).toBe('https://regime.example.com/v1/plan');
+    });
+
+    it('preserves auth timeout client-error and server-error classifications after the route change', async () => {
+      // 401 Unauthorized -> permanent
+      vi.mocked(fetch).mockResolvedValue(
+        new Response(
+          JSON.stringify({ error: { code: 'UNAUTHORIZED', message: 'Unauthorized access' } }),
+          { status: 401 },
+        ),
+      );
+      const adapter = new RegimePlanAdapter('https://regime.example.com', 'test-token', obs.port);
+      const res401 = await adapter.requestPositionPlan(VALID_PLAN_REQUEST);
+      expect(res401.kind).toBe('permanent');
+
+      // 400 Client Error -> permanent
+      vi.mocked(fetch).mockClear();
+      vi.mocked(fetch).mockResolvedValue(
+        new Response(
+          JSON.stringify({ error: { code: 'BAD_REQUEST', message: 'Invalid parameter' } }),
+          { status: 400 },
+        ),
+      );
+      const res400 = await adapter.requestPositionPlan(VALID_PLAN_REQUEST);
+      expect(res400.kind).toBe('permanent');
+
+      // 500 Server Error -> retryable-degraded
+      vi.mocked(fetch).mockClear();
+      vi.mocked(fetch).mockResolvedValue(new Response('Internal Server Error', { status: 500 }));
+      const res500 = await adapter.requestPositionPlan(VALID_PLAN_REQUEST);
+      expect(res500.kind).toBe('retryable-degraded');
+
+      // Timeout -> retryable-degraded
+      vi.useFakeTimers();
+      vi.mocked(fetch).mockClear();
+      vi.mocked(fetch).mockImplementation(
+        () =>
+          new Promise((_, reject) => {
+            setTimeout(() => reject({ name: 'AbortError' }), 100);
+          }),
+      );
+      const pendingTimeout = adapter.requestPositionPlan(VALID_PLAN_REQUEST);
+      await vi.advanceTimersByTimeAsync(5000);
+      const resTimeout = await pendingTimeout;
+      expect(resTimeout.kind).toBe('retryable-degraded');
+      vi.useRealTimers();
     });
 
     it('logs bounded metadata without secrets', async () => {

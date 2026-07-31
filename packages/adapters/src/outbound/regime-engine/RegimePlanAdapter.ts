@@ -42,7 +42,7 @@ export class RegimePlanAdapter implements RegimePlanPort {
 
     let url: URL;
     try {
-      url = new URL(`${this.baseUrl.replace(/\/+$/, '')}/v1/position-plan`);
+      url = new URL(`${this.baseUrl.replace(/\/+$/, '')}/v1/plan`);
     } catch {
       this.observability.log('warn', 'RegimePlan base URL is malformed', { baseUrl: this.baseUrl });
       return { kind: 'permanent', reason: 'config-error' };
