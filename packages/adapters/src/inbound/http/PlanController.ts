@@ -96,6 +96,11 @@ type PlanRequestResponse =
       breachDirection: { kind: 'lower-bound-breach' } | { kind: 'upper-bound-breach' };
     }
   | {
+      status: 'throttled';
+      conflict?: never;
+      reason: 'active-request' | 'minimum-interval';
+    }
+  | {
       status: 'error';
       conflict?: never;
       reason: string;

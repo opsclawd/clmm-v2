@@ -391,14 +391,88 @@ class FakePlanRepository implements PlanRepository {
     planId: PlanId;
     lifecycleState: PlanLifecycleState;
   }): Promise<void> {}
+  private requestStates: Map<
+    string,
+    {
+      positionId: PositionId;
+      leaseToken: string | null;
+      leaseUntil: ClockTimestamp | null;
+      lastAttemptAt: ClockTimestamp | null;
+      lastRangeState: string | null;
+      lastBreachQualifiedAt: ClockTimestamp | null;
+      lastClosedCandleAt: ClockTimestamp | null;
+      updatedAt: ClockTimestamp;
+    }
+  > = new Map();
+
+  claimedCalls: import('../../ports/index.js').ClaimPlanRequestParams[] = [];
+  claimedLeaseTokens: string[] = [];
+  finishedCalls: import('../../ports/index.js').FinishPlanRequestParams[] = [];
+
   async claimPlanRequest(
-    _params: import('../../ports/index.js').ClaimPlanRequestParams,
+    params: import('../../ports/index.js').ClaimPlanRequestParams,
   ): Promise<import('../../ports/index.js').ClaimPlanRequestResult> {
-    return { kind: 'claimed', leaseToken: 'fake-lease-token' };
+    this.claimedCalls.push(params);
+    const row = this.requestStates.get(params.positionId);
+    const now = params.now;
+
+    if (row && row.leaseToken !== null && row.leaseUntil !== null && row.leaseUntil > now) {
+      return { kind: 'suppressed', reason: 'active-request' };
+    }
+
+    const isFinishedRequest = row?.leaseToken === null;
+    if (
+      row &&
+      isFinishedRequest &&
+      row.lastAttemptAt !== null &&
+      now - row.lastAttemptAt < params.minimumIntervalMs
+    ) {
+      const rangeStateChanged = row.lastRangeState !== params.rangeState;
+      const breachQualifiedChanged =
+        params.breachQualifiedAt !== undefined &&
+        params.breachQualifiedAt !== null &&
+        params.breachQualifiedAt !== row.lastBreachQualifiedAt;
+      const closedCandleChanged =
+        params.closedCandleAt !== undefined &&
+        params.closedCandleAt !== null &&
+        (row.lastClosedCandleAt === null || params.closedCandleAt > row.lastClosedCandleAt);
+
+      if (!rangeStateChanged && !breachQualifiedChanged && !closedCandleChanged) {
+        return { kind: 'suppressed', reason: 'minimum-interval' };
+      }
+    }
+
+    const leaseToken = `fake-lease-token-${this.claimedCalls.length}`;
+    const leaseUntil = (now + params.leaseDurationMs) as ClockTimestamp;
+
+    this.requestStates.set(params.positionId, {
+      positionId: params.positionId,
+      leaseToken,
+      leaseUntil,
+      lastAttemptAt: now,
+      lastRangeState: params.rangeState,
+      lastBreachQualifiedAt: params.breachQualifiedAt ?? null,
+      lastClosedCandleAt: params.closedCandleAt ?? null,
+      updatedAt: now,
+    });
+
+    this.claimedLeaseTokens.push(leaseToken);
+    return { kind: 'claimed', leaseToken };
   }
+
   async finishPlanRequest(
-    _params: import('../../ports/index.js').FinishPlanRequestParams,
-  ): Promise<void> {}
+    params: import('../../ports/index.js').FinishPlanRequestParams,
+  ): Promise<void> {
+    this.finishedCalls.push(params);
+    const row = this.requestStates.get(params.positionId);
+    if (!row || row.leaseToken !== params.leaseToken) {
+      return;
+    }
+
+    row.leaseToken = null;
+    row.leaseUntil = null;
+    row.updatedAt = params.completedAt;
+  }
 }
 
 const VALID_UPSTREAM_RESPONSE: RegimePlanResponse = {
@@ -635,6 +709,11 @@ describe('RequestPositionPlan', () => {
         observability,
       });
 
+      clock.advance(16 * 60 * 1000);
+      position.lastObservedAt = clock.now();
+      positionRead.setPosition(position);
+      positionRead.setDetail(makeFixtureDetail(position));
+
       const replayResult = await requestPositionPlan({
         walletId: FIXTURE_WALLET_ID,
         positionId: FIXTURE_POSITION_ID,
@@ -829,6 +908,172 @@ describe('RequestPositionPlan', () => {
       const triggers = await triggerRepo.listActionableTriggers(FIXTURE_WALLET_ID);
       expect(triggers).toHaveLength(1);
       expect(triggers[0]?.triggerId).toBe(trigger.triggerId);
+    });
+  });
+
+  describe('enforces request cadence and lease management', () => {
+    it('stale snapshot does not acquire a plan request lease', async () => {
+      const stalePosition = makeStalePosition(FIXTURE_POSITION_ID, FIXTURE_WALLET_ID);
+      positionRead.setPosition(stalePosition);
+      triggerRepo.setTriggers([]);
+
+      const result = await requestPositionPlan({
+        walletId: FIXTURE_WALLET_ID,
+        positionId: FIXTURE_POSITION_ID,
+        positionReadPort: positionRead,
+        triggerRepository: triggerRepo,
+        planRepository: planRepo,
+        regimePlanPort: regimePort,
+        executionHistoryRepository: historyRepo,
+        config: CONFIGURED_CONFIG,
+        clock,
+        observability,
+      });
+
+      expect(result.status).toBe('stale');
+      expect(planRepo.claimedCalls).toHaveLength(0);
+    });
+
+    it('unchanged observation inside the interval does not call regime', async () => {
+      const position = makeInRangePosition(FIXTURE_POSITION_ID, FIXTURE_WALLET_ID);
+      positionRead.setPosition(position);
+      positionRead.setDetail(makeFixtureDetail(position));
+      triggerRepo.setTriggers([]);
+
+      const first = await requestPositionPlan({
+        walletId: FIXTURE_WALLET_ID,
+        positionId: FIXTURE_POSITION_ID,
+        positionReadPort: positionRead,
+        triggerRepository: triggerRepo,
+        planRepository: planRepo,
+        regimePlanPort: regimePort,
+        executionHistoryRepository: historyRepo,
+        config: CONFIGURED_CONFIG,
+        clock,
+        observability,
+      });
+      expect(first.status).toBe('ok');
+      expect(regimePort.getRequests()).toHaveLength(1);
+
+      // Subsequent call inside interval without changes
+      const second = await requestPositionPlan({
+        walletId: FIXTURE_WALLET_ID,
+        positionId: FIXTURE_POSITION_ID,
+        positionReadPort: positionRead,
+        triggerRepository: triggerRepo,
+        planRepository: planRepo,
+        regimePlanPort: regimePort,
+        executionHistoryRepository: historyRepo,
+        config: CONFIGURED_CONFIG,
+        clock,
+        observability,
+      });
+
+      expect(second.status).toBe('throttled');
+      if (second.status === 'throttled') {
+        expect(second.reason).toBe('minimum-interval');
+      }
+      expect(regimePort.getRequests()).toHaveLength(1);
+    });
+
+    it('finishes a claimed lease exactly once after persisting a valid response', async () => {
+      const position = makeInRangePosition(FIXTURE_POSITION_ID, FIXTURE_WALLET_ID);
+      positionRead.setPosition(position);
+      positionRead.setDetail(makeFixtureDetail(position));
+      triggerRepo.setTriggers([]);
+
+      const result = await requestPositionPlan({
+        walletId: FIXTURE_WALLET_ID,
+        positionId: FIXTURE_POSITION_ID,
+        positionReadPort: positionRead,
+        triggerRepository: triggerRepo,
+        planRepository: planRepo,
+        regimePlanPort: regimePort,
+        executionHistoryRepository: historyRepo,
+        config: CONFIGURED_CONFIG,
+        clock,
+        observability,
+      });
+
+      expect(result.status).toBe('ok');
+      expect(planRepo.claimedCalls).toHaveLength(1);
+      expect(planRepo.finishedCalls).toHaveLength(1);
+      expect(planRepo.finishedCalls[0]).toMatchObject({
+        positionId: FIXTURE_POSITION_ID,
+        leaseToken: planRepo.claimedLeaseTokens[0],
+        outcome: 'succeeded',
+      });
+    });
+
+    it('transport failure clears the lease without allowing immediate retry spam', async () => {
+      const position = makeInRangePosition(FIXTURE_POSITION_ID, FIXTURE_WALLET_ID);
+      positionRead.setPosition(position);
+      positionRead.setDetail(makeFixtureDetail(position));
+      triggerRepo.setTriggers([]);
+      regimePort.setResponse({ kind: 'retryable-degraded', reason: 'timeout' });
+
+      const first = await requestPositionPlan({
+        walletId: FIXTURE_WALLET_ID,
+        positionId: FIXTURE_POSITION_ID,
+        positionReadPort: positionRead,
+        triggerRepository: triggerRepo,
+        planRepository: planRepo,
+        regimePlanPort: regimePort,
+        executionHistoryRepository: historyRepo,
+        config: CONFIGURED_CONFIG,
+        clock,
+        observability,
+      });
+
+      expect(first.status).toBe('degraded');
+      expect(planRepo.finishedCalls).toHaveLength(1);
+      expect(planRepo.finishedCalls[0]?.outcome).toBe('failed');
+
+      // Immediate retry inside interval is suppressed
+      clock.advance(1000);
+      const retry = await requestPositionPlan({
+        walletId: FIXTURE_WALLET_ID,
+        positionId: FIXTURE_POSITION_ID,
+        positionReadPort: positionRead,
+        triggerRepository: triggerRepo,
+        planRepository: planRepo,
+        regimePlanPort: regimePort,
+        executionHistoryRepository: historyRepo,
+        config: CONFIGURED_CONFIG,
+        clock,
+        observability,
+      });
+
+      expect(retry.status).toBe('throttled');
+      if (retry.status === 'throttled') {
+        expect(retry.reason).toBe('minimum-interval');
+      }
+      expect(regimePort.getRequests()).toHaveLength(1);
+    });
+
+    it('qualified breach still supersedes an accepted advisory without bypassing lease completion', async () => {
+      const position = makeBelowRangePosition(FIXTURE_POSITION_ID, FIXTURE_WALLET_ID);
+      positionRead.setPosition(position);
+      positionRead.setDetail(makeFixtureDetail(position));
+      triggerRepo.setTriggers([makeLowerTrigger(FIXTURE_POSITION_ID)]);
+
+      const result = await requestPositionPlan({
+        walletId: FIXTURE_WALLET_ID,
+        positionId: FIXTURE_POSITION_ID,
+        positionReadPort: positionRead,
+        triggerRepository: triggerRepo,
+        planRepository: planRepo,
+        regimePlanPort: regimePort,
+        executionHistoryRepository: historyRepo,
+        config: CONFIGURED_CONFIG,
+        clock,
+        observability,
+      });
+
+      expect(result.status).toBe('superseded');
+      expect(planRepo.claimedCalls).toHaveLength(1);
+      expect(planRepo.finishedCalls).toHaveLength(1);
+      expect(planRepo.finishedCalls[0]?.outcome).toBe('succeeded');
     });
   });
 });

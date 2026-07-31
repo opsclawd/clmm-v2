@@ -26,6 +26,9 @@ import type {
 import { buildRegimePlanRequest } from './buildRegimePlanRequest.js';
 
 const STALENESS_THRESHOLD_MS = 5 * 60 * 1000;
+const CANDLE_INTERVAL_MS = 60 * 60 * 1000;
+const MINIMUM_INTERVAL_MS = 15 * 60 * 1000;
+const LEASE_DURATION_MS = 2 * 60 * 1000;
 
 function mapRegimeExitPostureToDomain(
   posture: RegimePlanExitPosture,
@@ -76,6 +79,7 @@ export type PositionPlanRequestResult =
   | { readonly status: 'stale'; readonly reason: 'position-stale' }
   | { readonly status: 'degraded'; readonly reason: string }
   | { readonly status: 'superseded'; readonly breachDirection: BreachDirection }
+  | { readonly status: 'throttled'; readonly reason: 'active-request' | 'minimum-interval' }
   | { readonly status: 'error'; readonly reason: string };
 
 function computeFingerprint(params: {
@@ -149,213 +153,292 @@ export async function requestPositionPlan(params: {
     return { status: 'stale', reason: 'position-stale' };
   }
 
-  if (config.kind !== 'configured') {
-    observability.log('warn', 'RequestPositionPlan: config unavailable', {
-      positionId,
-      configResult: config.kind,
-    });
-    return { status: 'unavailable', reason: 'config-unavailable' };
-  }
+  const rangeStateKind = position.rangeState.kind;
+  const closedCandleAt = makeClockTimestamp(
+    Math.floor(now / CANDLE_INTERVAL_MS) * CANDLE_INTERVAL_MS,
+  );
 
-  const positionDetail = await positionReadPort.getPositionDetail(walletId, positionId);
-  if (!positionDetail) {
-    observability.log('warn', 'RequestPositionPlan: position detail not available', { positionId });
-    return { status: 'unavailable', reason: 'portfolio-unavailable' };
-  }
-
-  const supportedPositions = await positionReadPort.listSupportedPositions(walletId);
   const triggers = await triggerRepository.listActionableTriggers(walletId);
   const qualifiedTrigger = triggers.find(
     (t) => t.positionId === positionId && t.confirmationPassed,
   );
-  const walletHistory = await executionHistoryRepository.getWalletHistory(walletId);
-  const existingPlan = await planRepository.getCurrentPlan(positionId);
+  const breachQualifiedAt = qualifiedTrigger ? qualifiedTrigger.triggeredAt : null;
 
-  const request = buildRegimePlanRequest({
-    positionDetail,
-    config: config.config,
-    asOfUnixMs: now,
-    supportedPositionsCount: supportedPositions.length,
-    qualifiedTrigger: qualifiedTrigger ?? null,
-    walletHistory,
-  });
-
-  if (!request) {
-    observability.log('warn', 'RequestPositionPlan: failed to build contract-valid request', {
-      positionId,
-    });
-    return { status: 'unavailable', reason: 'portfolio-unavailable' };
-  }
-
-  const rangeStateKind = position.rangeState.kind;
-  const currentPrice =
-    position.rangeState.kind === 'in-range' ||
-    position.rangeState.kind === 'below-range' ||
-    position.rangeState.kind === 'above-range'
-      ? position.rangeState.currentPrice
-      : 0;
-
-  const fingerprint = computeFingerprint({
-    positionId: position.positionId,
-    lowerBoundPrice: position.bounds.lowerBound,
-    upperBoundPrice: position.bounds.upperBound,
-    currentPrice,
+  const claimResult = await planRepository.claimPlanRequest({
+    positionId,
+    now,
+    minimumIntervalMs: MINIMUM_INTERVAL_MS,
+    leaseDurationMs: LEASE_DURATION_MS,
     rangeState: rangeStateKind,
-    observedAt: position.lastObservedAt,
+    breachQualifiedAt,
+    closedCandleAt,
   });
 
-  const transportResult = await regimePlanPort.requestPositionPlan(request);
-
-  if (transportResult.kind === 'ok') {
-    const response = transportResult.response;
-    const planId = response.planId as PlanId;
-    const canonicalHash = response.planHash as CanonicalHash;
-    const advisoryActionFromResponse = extractAdvisoryAction(response);
-
-    const createResult = await planRepository.createRequest({
-      planId,
-      canonicalHash,
+  if (claimResult.kind === 'suppressed') {
+    observability.log('info', 'RequestPositionPlan: request throttled', {
       positionId,
-      walletId,
-      requestedAt: makeClockTimestamp(now),
-      action: advisoryActionFromResponse,
-      snapshotFingerprint: fingerprint,
+      reason: claimResult.reason,
     });
-
-    if (createResult.kind === 'exact-replay') {
-      observability.log('info', 'RequestPositionPlan: exact replay detected', {
-        positionId,
-        planId,
-      });
-      return {
-        status: 'ok',
-        conflict: false,
-        reason: 'exact-replay',
-        plan: response,
-        fingerprint,
-      };
-    }
-
-    if (createResult.kind === 'conflict') {
-      observability.log('warn', 'RequestPositionPlan: conflicting plan detected', {
-        positionId,
-        planId: response.planId,
-      });
-      return {
-        status: 'conflict',
-        priorPlanId: response.planId,
-        newFingerprint: fingerprint,
-      };
-    }
-
-    await planRepository.acceptResponse({
-      planId,
-      regimeResponse: {
-        kind: 'regime-response',
-        regime: response.regime,
-        suitability: 'ALLOWED',
-      },
-      advisoryAction: advisoryActionFromResponse,
-      respondedAt: makeClockTimestamp(response.asOfUnixMs),
-      asOfAt: makeClockTimestamp(response.asOfUnixMs),
-      expiresAt: makeClockTimestamp(response.expiresAtUnixMs),
-    });
-
-    if (qualifiedTrigger) {
-      observability.log('info', 'RequestPositionPlan: qualified trigger outranks advisory', {
-        positionId,
-        triggerId: qualifiedTrigger.triggerId,
-        breachDirection: qualifiedTrigger.breachDirection.kind,
-      });
-      return {
-        status: 'superseded',
-        breachDirection: qualifiedTrigger.breachDirection,
-      };
-    }
-
-    observability.log('info', 'RequestPositionPlan: plan received', {
-      positionId,
-      planId: response.planId,
-      regime: response.regime,
-    });
-
-    return {
-      status: 'ok',
-      conflict: false,
-      plan: response,
-      fingerprint,
-    };
+    return { status: 'throttled', reason: claimResult.reason };
   }
 
-  if (transportResult.kind === 'conflict') {
-    if (qualifiedTrigger) {
-      observability.log('info', 'RequestPositionPlan: qualified trigger outranks conflict', {
-        positionId,
-        triggerId: qualifiedTrigger.triggerId,
-        breachDirection: qualifiedTrigger.breachDirection.kind,
+  const leaseToken = claimResult.leaseToken;
+  let leaseOutcome: 'succeeded' | 'failed' = 'failed';
+  let originalResult: PositionPlanRequestResult | undefined;
+  let originalError: unknown;
+  let finishError: unknown;
+
+  try {
+    const executeWork = async (): Promise<PositionPlanRequestResult> => {
+      if (config.kind !== 'configured') {
+        observability.log('warn', 'RequestPositionPlan: config unavailable', {
+          positionId,
+          configResult: config.kind,
+        });
+        return { status: 'unavailable', reason: 'config-unavailable' };
+      }
+
+      const positionDetail = await positionReadPort.getPositionDetail(walletId, positionId);
+      if (!positionDetail) {
+        observability.log('warn', 'RequestPositionPlan: position detail not available', {
+          positionId,
+        });
+        return { status: 'unavailable', reason: 'portfolio-unavailable' };
+      }
+
+      const supportedPositions = await positionReadPort.listSupportedPositions(walletId);
+      const walletHistory = await executionHistoryRepository.getWalletHistory(walletId);
+      const existingPlan = await planRepository.getCurrentPlan(positionId);
+
+      const request = buildRegimePlanRequest({
+        positionDetail,
+        config: config.config,
+        asOfUnixMs: now,
+        supportedPositionsCount: supportedPositions.length,
+        qualifiedTrigger: qualifiedTrigger ?? null,
+        walletHistory,
       });
+
+      if (!request) {
+        observability.log('warn', 'RequestPositionPlan: failed to build contract-valid request', {
+          positionId,
+        });
+        return { status: 'unavailable', reason: 'portfolio-unavailable' };
+      }
+
+      const currentPrice =
+        position.rangeState.kind === 'in-range' ||
+        position.rangeState.kind === 'below-range' ||
+        position.rangeState.kind === 'above-range'
+          ? position.rangeState.currentPrice
+          : 0;
+
+      const fingerprint = computeFingerprint({
+        positionId: position.positionId,
+        lowerBoundPrice: position.bounds.lowerBound,
+        upperBoundPrice: position.bounds.upperBound,
+        currentPrice,
+        rangeState: rangeStateKind,
+        observedAt: position.lastObservedAt,
+      });
+
+      const transportResult = await regimePlanPort.requestPositionPlan(request);
+
+      if (transportResult.kind === 'ok') {
+        const response = transportResult.response;
+        const planId = response.planId as PlanId;
+        const canonicalHash = response.planHash as CanonicalHash;
+        const advisoryActionFromResponse = extractAdvisoryAction(response);
+
+        const createResult = await planRepository.createRequest({
+          planId,
+          canonicalHash,
+          positionId,
+          walletId,
+          requestedAt: makeClockTimestamp(now),
+          action: advisoryActionFromResponse,
+          snapshotFingerprint: fingerprint,
+        });
+
+        if (createResult.kind === 'exact-replay') {
+          observability.log('info', 'RequestPositionPlan: exact replay detected', {
+            positionId,
+            planId,
+          });
+          return {
+            status: 'ok',
+            conflict: false,
+            reason: 'exact-replay',
+            plan: response,
+            fingerprint,
+          };
+        }
+
+        if (createResult.kind === 'conflict') {
+          observability.log('warn', 'RequestPositionPlan: conflicting plan detected', {
+            positionId,
+            planId: response.planId,
+          });
+          return {
+            status: 'conflict',
+            priorPlanId: response.planId,
+            newFingerprint: fingerprint,
+          };
+        }
+
+        await planRepository.acceptResponse({
+          planId,
+          regimeResponse: {
+            kind: 'regime-response',
+            regime: response.regime,
+            suitability: 'ALLOWED',
+          },
+          advisoryAction: advisoryActionFromResponse,
+          respondedAt: makeClockTimestamp(response.asOfUnixMs),
+          asOfAt: makeClockTimestamp(response.asOfUnixMs),
+          expiresAt: makeClockTimestamp(response.expiresAtUnixMs),
+        });
+
+        leaseOutcome = 'succeeded';
+
+        if (qualifiedTrigger) {
+          observability.log('info', 'RequestPositionPlan: qualified trigger outranks advisory', {
+            positionId,
+            triggerId: qualifiedTrigger.triggerId,
+            breachDirection: qualifiedTrigger.breachDirection.kind,
+          });
+          return {
+            status: 'superseded',
+            breachDirection: qualifiedTrigger.breachDirection,
+          };
+        }
+
+        observability.log('info', 'RequestPositionPlan: plan received', {
+          positionId,
+          planId: response.planId,
+          regime: response.regime,
+        });
+
+        return {
+          status: 'ok',
+          conflict: false,
+          plan: response,
+          fingerprint,
+        };
+      }
+
+      if (transportResult.kind === 'conflict') {
+        if (qualifiedTrigger) {
+          observability.log('info', 'RequestPositionPlan: qualified trigger outranks conflict', {
+            positionId,
+            triggerId: qualifiedTrigger.triggerId,
+            breachDirection: qualifiedTrigger.breachDirection.kind,
+          });
+          return {
+            status: 'superseded',
+            breachDirection: qualifiedTrigger.breachDirection,
+          };
+        }
+        observability.log('warn', 'RequestPositionPlan: regime returned conflict', {
+          positionId,
+          reason: transportResult.reason,
+        });
+        return {
+          status: 'conflict',
+          priorPlanId: existingPlan?.planId ?? 'unknown',
+          newFingerprint: fingerprint,
+        };
+      }
+
+      if (transportResult.kind === 'permanent') {
+        if (qualifiedTrigger) {
+          observability.log(
+            'info',
+            'RequestPositionPlan: qualified trigger outranks permanent error',
+            {
+              positionId,
+              triggerId: qualifiedTrigger.triggerId,
+              breachDirection: qualifiedTrigger.breachDirection.kind,
+            },
+          );
+          return {
+            status: 'superseded',
+            breachDirection: qualifiedTrigger.breachDirection,
+          };
+        }
+        observability.log('warn', 'RequestPositionPlan: regime returned permanent error', {
+          positionId,
+          reason: transportResult.reason,
+        });
+        return {
+          status: 'degraded',
+          reason: transportResult.reason,
+        };
+      }
+
+      if (transportResult.kind === 'retryable-degraded') {
+        if (qualifiedTrigger) {
+          observability.log('info', 'RequestPositionPlan: qualified trigger outranks timeout', {
+            positionId,
+            triggerId: qualifiedTrigger.triggerId,
+            breachDirection: qualifiedTrigger.breachDirection.kind,
+          });
+          return {
+            status: 'superseded',
+            breachDirection: qualifiedTrigger.breachDirection,
+          };
+        }
+        observability.log('warn', 'RequestPositionPlan: regime timeout/unavailable', {
+          positionId,
+          reason: transportResult.reason,
+        });
+        return {
+          status: 'degraded',
+          reason: transportResult.reason,
+        };
+      }
+
       return {
-        status: 'superseded',
-        breachDirection: qualifiedTrigger.breachDirection,
+        status: 'error',
+        reason: 'unknown-transport-result',
       };
-    }
-    observability.log('warn', 'RequestPositionPlan: regime returned conflict', {
-      positionId,
-      reason: transportResult.reason,
-    });
-    return {
-      status: 'conflict',
-      priorPlanId: existingPlan?.planId ?? 'unknown',
-      newFingerprint: fingerprint,
     };
+
+    originalResult = await executeWork();
+  } catch (err) {
+    originalError = err;
+  } finally {
+    try {
+      await planRepository.finishPlanRequest({
+        positionId,
+        leaseToken,
+        outcome: leaseOutcome,
+        completedAt: clock.now(),
+      });
+    } catch (finishErr) {
+      observability.log('error', 'RequestPositionPlan: failed to finish plan request lease', {
+        positionId,
+        leaseToken,
+        error: finishErr instanceof Error ? finishErr.message : String(finishErr),
+      });
+      finishError = finishErr;
+    }
   }
 
-  if (transportResult.kind === 'permanent') {
-    if (qualifiedTrigger) {
-      observability.log('info', 'RequestPositionPlan: qualified trigger outranks permanent error', {
-        positionId,
-        triggerId: qualifiedTrigger.triggerId,
-        breachDirection: qualifiedTrigger.breachDirection.kind,
-      });
-      return {
-        status: 'superseded',
-        breachDirection: qualifiedTrigger.breachDirection,
-      };
-    }
-    observability.log('warn', 'RequestPositionPlan: regime returned permanent error', {
-      positionId,
-      reason: transportResult.reason,
-    });
-    return {
-      status: 'degraded',
-      reason: transportResult.reason,
-    };
+  if (originalError) {
+    throw originalError;
   }
 
-  if (transportResult.kind === 'retryable-degraded') {
-    if (qualifiedTrigger) {
-      observability.log('info', 'RequestPositionPlan: qualified trigger outranks timeout', {
-        positionId,
-        triggerId: qualifiedTrigger.triggerId,
-        breachDirection: qualifiedTrigger.breachDirection.kind,
-      });
-      return {
-        status: 'superseded',
-        breachDirection: qualifiedTrigger.breachDirection,
-      };
-    }
-    observability.log('warn', 'RequestPositionPlan: regime timeout/unavailable', {
-      positionId,
-      reason: transportResult.reason,
-    });
-    return {
-      status: 'degraded',
-      reason: transportResult.reason,
-    };
+  if (originalResult) {
+    return originalResult;
+  }
+
+  if (finishError) {
+    throw finishError;
   }
 
   return {
     status: 'error',
-    reason: 'unknown-transport-result',
+    reason: 'unknown-execution-outcome',
   };
 }
