@@ -18,7 +18,7 @@
   "properties": {
     "schemaVersion": {
       "type": "string",
-      "const": "execution-result.v1"
+      "const": "1.0"
     },
     "planId": {
       "type": "string",

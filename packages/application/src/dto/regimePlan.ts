@@ -137,7 +137,7 @@ export type RegimeExecutionResultCosts = {
 };
 
 export type RegimeExecutionResult = {
-  schemaVersion: 'execution-result.v1';
+  schemaVersion: '1.0';
   planId: string;
   planHash: string;
   positionId: string;

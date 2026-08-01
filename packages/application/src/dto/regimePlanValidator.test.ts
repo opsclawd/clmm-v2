@@ -30,6 +30,13 @@ describe('regimePlanValidator', () => {
     expect(parseRegimePlanRequest(legacyRequest)).toBeNull();
   });
 
+  it('accepts 1.0 and rejects execution-result.v1 for execution-result contract', () => {
+    expect(parseRegimeExecutionResult(successFixture)).not.toBeNull();
+    const legacyResult = deepClone(successFixture) as MutableFixture;
+    legacyResult['schemaVersion'] = 'execution-result.v1';
+    expect(parseRegimeExecutionResult(legacyResult)).toBeNull();
+  });
+
   it('rejects unsupported plan actions and schema versions', () => {
     const invalidAction = deepClone(holdFixture) as MutableFixture;
     const actions = invalidAction['actions'] as Array<Record<string, unknown>>;

@@ -32,7 +32,7 @@ import inRangeFixture from '../../../../../schemas/regime-engine/plan-request.v1
 const VALID_PLAN_REQUEST: RegimePlanRequest = inRangeFixture as unknown as RegimePlanRequest;
 
 const VALID_EXECUTION_RESULT: RegimeExecutionResult = {
-  schemaVersion: 'execution-result.v1',
+  schemaVersion: '1.0',
   planId: 'plan_exit_987654321',
   planHash: 'f9e8d7c6b5a40123456789abcdef0123456789abcdef0123456789abcdef0123',
   positionId: 'pos_sol_usdc_02',
