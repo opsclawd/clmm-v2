@@ -19,26 +19,40 @@ const validatePlanResponse = ajv.compile<RegimePlanResponse>(positionPlanSchema)
 const validateExecutionResult = ajv.compile<RegimeExecutionResult>(executionResultSchema);
 const validatePlanRequest = ajv.compile<RegimePlanRequest>(planRequestSchema);
 
-export function parseRegimePlanResponse(value: unknown): RegimePlanResponse | null {
-  if (!validatePlanResponse(value)) {
-    return null;
-  }
-  if (value.expiresAtUnixMs < value.asOfUnixMs) {
-    return null;
+function migrateSchemaVersion(value: unknown, legacyVersions: string[]): unknown {
+  if (typeof value === 'object' && value !== null && 'schemaVersion' in value) {
+    const obj = value as Record<string, unknown>;
+    const version = obj['schemaVersion'];
+    if (typeof version === 'string' && legacyVersions.includes(version)) {
+      return { ...obj, schemaVersion: '1.0' };
+    }
   }
   return value;
+}
+
+export function parseRegimePlanResponse(value: unknown): RegimePlanResponse | null {
+  const migrated = migrateSchemaVersion(value, ['position-plan.v1', 'v1']);
+  if (!validatePlanResponse(migrated)) {
+    return null;
+  }
+  if (migrated.expiresAtUnixMs < migrated.asOfUnixMs) {
+    return null;
+  }
+  return migrated;
 }
 
 export function parseRegimeExecutionResult(value: unknown): RegimeExecutionResult | null {
-  if (!validateExecutionResult(value)) {
+  const migrated = migrateSchemaVersion(value, ['execution-result.v1', 'v1']);
+  if (!validateExecutionResult(migrated)) {
     return null;
   }
-  return value;
+  return migrated;
 }
 
 export function parseRegimePlanRequest(value: unknown): RegimePlanRequest | null {
-  if (!validatePlanRequest(value)) {
+  const migrated = migrateSchemaVersion(value, ['plan-request.v1', 'v1']);
+  if (!validatePlanRequest(migrated)) {
     return null;
   }
-  return value;
+  return migrated;
 }

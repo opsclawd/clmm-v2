@@ -17,24 +17,30 @@ function deepClone<T>(obj: T): T {
 type MutableFixture = Record<string, unknown>;
 
 describe('regimePlanValidator', () => {
-  it('accepts 1.0 and rejects endpoint-named schema versions for plan-request and position-plan contracts', () => {
+  it('accepts 1.0 and migrates legacy schema versions for plan-request and position-plan contracts', () => {
     expect(parseRegimePlanResponse(holdFixture)).not.toBeNull();
     expect(parseRegimePlanRequest(inRangeRequestFixture)).not.toBeNull();
 
     const legacyPlan = deepClone(holdFixture) as MutableFixture;
     legacyPlan['schemaVersion'] = 'position-plan.v1';
-    expect(parseRegimePlanResponse(legacyPlan)).toBeNull();
+    const parsedPlan = parseRegimePlanResponse(legacyPlan);
+    expect(parsedPlan).not.toBeNull();
+    expect(parsedPlan?.schemaVersion).toBe('1.0');
 
     const legacyRequest = deepClone(inRangeRequestFixture) as MutableFixture;
     legacyRequest['schemaVersion'] = 'plan-request.v1';
-    expect(parseRegimePlanRequest(legacyRequest)).toBeNull();
+    const parsedRequest = parseRegimePlanRequest(legacyRequest);
+    expect(parsedRequest).not.toBeNull();
+    expect(parsedRequest?.schemaVersion).toBe('1.0');
   });
 
-  it('accepts 1.0 and rejects execution-result.v1 for execution-result contract', () => {
+  it('accepts 1.0 and migrates execution-result.v1 for execution-result contract', () => {
     expect(parseRegimeExecutionResult(successFixture)).not.toBeNull();
     const legacyResult = deepClone(successFixture) as MutableFixture;
     legacyResult['schemaVersion'] = 'execution-result.v1';
-    expect(parseRegimeExecutionResult(legacyResult)).toBeNull();
+    const parsedResult = parseRegimeExecutionResult(legacyResult);
+    expect(parsedResult).not.toBeNull();
+    expect(parsedResult?.schemaVersion).toBe('1.0');
   });
 
   it('rejects unsupported plan actions and schema versions', () => {
