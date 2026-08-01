@@ -2,8 +2,6 @@
   "extends": "@clmm/config/tsconfig/nestjs",
   "compilerOptions": {
     "composite": false,
-    "resolveJsonModule": true,
-    "esModuleInterop": true,
     "types": ["node"],
     "paths": {
       "@solana-mobile/mobile-wallet-adapter-protocol": ["./src/types/wallet-adapter.d.ts"],

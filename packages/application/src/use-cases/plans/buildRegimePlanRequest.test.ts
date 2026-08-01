@@ -16,15 +16,26 @@ const VALID_CONFIG: RegimePlanRequestConfig = inRangeFixture.config;
 const SOL_MINT = 'So11111111111111111111111111111111111111112';
 const USDC_MINT = 'EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v';
 
+const LIVE_SQRT_PRICE = 4978797822892653552n;
+// Synthetic sqrtPrice for a distinct A=USDC/B=SOL pool (decimalsA=6, decimalsB=9),
+// derived so 1 / priceFromSqrtPrice(INVERTED_SQRT_PRICE, 6, 9) === EXPECTED_CURRENT_PRICE
+// exactly (verified: price of A in B = 0.013727468728492998, reciprocal = 72.84664199776181).
+// This is deliberately NOT the same raw value as LIVE_SQRT_PRICE — that value is specific
+// to the real A=SOL/B=USDC pool and is not a valid sqrtPrice for an inverted pool.
+const INVERTED_SQRT_PRICE = 68346291419247927296n;
+const EXPECTED_CURRENT_PRICE = 72.84664199776181;
+const EXPECTED_LOWER_BOUND_PRICE = 67.21458549154151;
+const EXPECTED_UPPER_BOUND_PRICE = 82.0952592059893;
+
 function createFixtureDetail(overrides?: Partial<PositionDetail>): PositionDetail {
   return {
     position: {
       positionId: makePositionId('pos-1'),
       walletId: makeWalletId('wallet-1'),
       poolId: makePoolId('pool-1'),
-      bounds: { lowerBound: 140, upperBound: 160 },
+      bounds: { lowerBound: -27000, upperBound: -25000 },
       lastObservedAt: makeClockTimestamp(1776272593000),
-      rangeState: { kind: 'in-range', currentPrice: 150 },
+      rangeState: { kind: 'in-range', currentPrice: -26196 },
       monitoringReadiness: { kind: 'active' },
     },
     poolData: {
@@ -37,17 +48,17 @@ function createFixtureDetail(overrides?: Partial<PositionDetail>): PositionDetai
         decimalsA: 9,
         decimalsB: 6,
       },
-      sqrtPrice: 0n,
+      sqrtPrice: LIVE_SQRT_PRICE,
       feeRate: 0,
       tickSpacing: 64,
       liquidity: 1000n,
-      tickCurrentIndex: 0,
+      tickCurrentIndex: -26196,
     },
     fees: { feeOwedA: 0n, feeOwedB: 0n, rewardInfos: [] },
     positionLiquidity: 1000n,
     principalTokenAmounts: {
-      amountA: 33333333000n, // 33.333333 SOL
-      amountB: 5000000000n, // 5000 USDC
+      amountA: 33333333000n,
+      amountB: 5000000000n,
       observedAt: makeClockTimestamp(1776272593000),
     },
     ...overrides,
@@ -55,6 +66,79 @@ function createFixtureDetail(overrides?: Partial<PositionDetail>): PositionDetai
 }
 
 describe('buildRegimePlanRequest', () => {
+  it('converts negative tick-space position values to positive price-space request values', () => {
+    const req = buildRegimePlanRequest({
+      positionDetail: createFixtureDetail(),
+      config: VALID_CONFIG,
+      asOfUnixMs: 1776272593000,
+      supportedPositionsCount: 1,
+      qualifiedTrigger: null,
+      walletHistory: [],
+    });
+
+    expect(req).not.toBeNull();
+    expect(req?.position.currentPrice).toBeCloseTo(EXPECTED_CURRENT_PRICE);
+    expect(req?.position.lowerBoundPrice).toBeCloseTo(EXPECTED_LOWER_BOUND_PRICE);
+    expect(req?.position.upperBoundPrice).toBeCloseTo(EXPECTED_UPPER_BOUND_PRICE);
+    expect(req?.position.currentPrice).not.toBe(-26196);
+    expect(req?.position.lowerBoundPrice).not.toBe(-27000);
+    expect(req?.position.upperBoundPrice).not.toBe(-25000);
+    expect(req?.position.rangeState).toBe('in-range');
+  });
+
+  it('converts prices correctly when pool token orientation is inverted (isA_Usdc && isB_Sol)', () => {
+    const detailReversed = createFixtureDetail({
+      poolData: {
+        ...createFixtureDetail().poolData,
+        tokenPair: {
+          mintA: USDC_MINT,
+          mintB: SOL_MINT,
+          symbolA: 'USDC',
+          symbolB: 'SOL',
+          decimalsA: 6,
+          decimalsB: 9,
+        },
+        sqrtPrice: INVERTED_SQRT_PRICE, // see fixture derivation note above
+      },
+    });
+
+    const req = buildRegimePlanRequest({
+      positionDetail: detailReversed,
+      config: VALID_CONFIG,
+      asOfUnixMs: 1776272593000,
+      supportedPositionsCount: 1,
+      qualifiedTrigger: null,
+      walletHistory: [],
+    });
+
+    expect(req).not.toBeNull();
+    expect(req?.position.currentPrice).toBeCloseTo(EXPECTED_CURRENT_PRICE);
+    // Bound assignment must account for inversion flipping which raw tick produces the
+    // larger price: assert lowerBoundPrice < upperBoundPrice regardless of which tick
+    // was originally "lower" in tick-space.
+    expect(req?.position.lowerBoundPrice).toBeLessThan(req!.position.upperBoundPrice);
+  });
+
+  it('rejects a non-positive price converted from pool sqrtPrice', () => {
+    const detail = createFixtureDetail({
+      poolData: {
+        ...createFixtureDetail().poolData,
+        sqrtPrice: 0n,
+      },
+    });
+
+    const req = buildRegimePlanRequest({
+      positionDetail: detail,
+      config: VALID_CONFIG,
+      asOfUnixMs: 1776272593000,
+      supportedPositionsCount: 1,
+      qualifiedTrigger: null,
+      walletHistory: [],
+    });
+
+    expect(req).toBeNull();
+  });
+
   it('maps SOL and USDC principal units regardless of pool token order', () => {
     const detailNormal = createFixtureDetail();
     const reqNormal = buildRegimePlanRequest({
@@ -104,8 +188,8 @@ describe('buildRegimePlanRequest', () => {
     expect(reqReversed?.portfolio.usdcUnits).toBeCloseTo(5000);
   });
 
-  it('computes navUsd from principal units and current SOL price', () => {
-    const detail = createFixtureDetail(); // 33.333333 SOL, 5000 USDC, currentPrice = 150
+  it('computes navUsd from principal units and the converted pool price', () => {
+    const detail = createFixtureDetail();
     const req = buildRegimePlanRequest({
       positionDetail: detail,
       config: VALID_CONFIG,
@@ -116,8 +200,7 @@ describe('buildRegimePlanRequest', () => {
     });
 
     expect(req).not.toBeNull();
-    // navUsd = (33.333333 * 150) + 5000 = 4999.99995 + 5000 = 9999.99995
-    const expectedNav = 33.333333 * 150 + 5000;
+    const expectedNav = 33.333333 * EXPECTED_CURRENT_PRICE + 5000;
     expect(req?.portfolio.navUsd).toBeCloseTo(expectedNav);
   });
 
