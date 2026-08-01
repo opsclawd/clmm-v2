@@ -1,4 +1,5 @@
 import type { PositionDetail, HistoryEvent, ExitTrigger } from '@clmm/domain';
+import { priceFromSqrtPrice, tickToPrice } from '@clmm/domain';
 import type { RegimePlanRequest, RegimePlanRequestConfig } from '../../dto/regimePlan.js';
 import { parseRegimePlanRequest } from '../../dto/regimePlanValidator.js';
 
@@ -76,8 +77,39 @@ export function buildRegimePlanRequest(
     return null;
   }
 
-  const currentPrice = positionDetail.position.rangeState.currentPrice;
-  if (!Number.isFinite(currentPrice) || currentPrice <= 0) {
+  let currentPrice: number;
+  let lowerBoundPrice: number;
+  let upperBoundPrice: number;
+
+  if (isA_Sol && isB_Usdc) {
+    // Direct conversion already yields USDC-per-SOL.
+    currentPrice = priceFromSqrtPrice(positionDetail.poolData.sqrtPrice, decimalsA, decimalsB);
+    lowerBoundPrice = tickToPrice(positionDetail.position.bounds.lowerBound, decimalsA, decimalsB);
+    upperBoundPrice = tickToPrice(positionDetail.position.bounds.upperBound, decimalsA, decimalsB);
+  } else if (isA_Usdc && isB_Sol) {
+    // Direct conversion yields SOL-per-USDC; invert to get USDC-per-SOL. Inversion is
+    // monotonically decreasing in tick, so the pool's lower-tick bound becomes the
+    // larger USDC-per-SOL bound and vice versa — take min/max rather than assuming
+    // tick ordering carries over.
+    currentPrice = 1 / priceFromSqrtPrice(positionDetail.poolData.sqrtPrice, decimalsA, decimalsB);
+    const invertedAtLowerTick =
+      1 / tickToPrice(positionDetail.position.bounds.lowerBound, decimalsA, decimalsB);
+    const invertedAtUpperTick =
+      1 / tickToPrice(positionDetail.position.bounds.upperBound, decimalsA, decimalsB);
+    lowerBoundPrice = Math.min(invertedAtLowerTick, invertedAtUpperTick);
+    upperBoundPrice = Math.max(invertedAtLowerTick, invertedAtUpperTick);
+  } else {
+    return null;
+  }
+
+  if (
+    !Number.isFinite(currentPrice) ||
+    currentPrice <= 0 ||
+    !Number.isFinite(lowerBoundPrice) ||
+    lowerBoundPrice <= 0 ||
+    !Number.isFinite(upperBoundPrice) ||
+    upperBoundPrice <= 0
+  ) {
     return null;
   }
 
@@ -125,8 +157,8 @@ export function buildRegimePlanRequest(
       positionId: positionDetail.position.positionId as string,
       walletId: positionDetail.position.walletId as string,
       observedAtUnixMs: positionDetail.position.lastObservedAt as number,
-      lowerBoundPrice: positionDetail.position.bounds.lowerBound,
-      upperBoundPrice: positionDetail.position.bounds.upperBound,
+      lowerBoundPrice,
+      upperBoundPrice,
       currentPrice,
       rangeState: positionDetail.position.rangeState.kind,
       breachQualified,
