@@ -16,7 +16,7 @@
   "properties": {
     "schemaVersion": {
       "type": "string",
-      "const": "plan-request.v1"
+      "const": "1.0"
     },
     "asOfUnixMs": {
       "type": "integer",

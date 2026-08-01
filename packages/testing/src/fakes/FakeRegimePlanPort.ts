@@ -63,7 +63,7 @@ export class FakeRegimePlanPort implements RegimePlanPort {
     return {
       kind: 'ok',
       response: {
-        schemaVersion: 'position-plan.v1',
+        schemaVersion: '1.0',
         planId: 'fake-plan-id',
         planHash: 'a1b2c3d4e5f60123456789abcdef0123456789abcdef0123456789abcdef0123',
         asOfUnixMs: Date.now(),

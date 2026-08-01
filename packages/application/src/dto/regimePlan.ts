@@ -67,7 +67,7 @@ export type ResolveRegimePlanRequestConfigResult =
   | { kind: 'invalid'; error: string };
 
 export type RegimePlanRequest = {
-  schemaVersion: 'plan-request.v1';
+  schemaVersion: '1.0';
   asOfUnixMs: number;
   market: {
     symbol: string;
@@ -116,7 +116,7 @@ export type RegimePlanRequest = {
 };
 
 export type RegimePlanResponse = {
-  schemaVersion: 'position-plan.v1';
+  schemaVersion: '1.0';
   planId: string;
   planHash: string;
   asOfUnixMs: number;

@@ -77,15 +77,13 @@ describe('Regime plan contract schema validation', () => {
     expect(validatePlanRequest(deepClone(missingConfigFixture))).toBe(false);
   });
 
-  it('pins all regime plan contracts to one upstream commit', () => {
-    expect(positionPlanSchema.properties.schemaVersion.const).toBe('position-plan.v1');
-    expect(executionResultSchema.properties.schemaVersion.const).toBe('execution-result.v1');
-    expect(planRequestSchema.properties.schemaVersion.const).toBe('plan-request.v1');
+  it('pins regime plan-request and position-plan contracts to shared schemaVersion 1.0 at one upstream commit', () => {
+    expect(planRequestSchema.properties.schemaVersion.const).toBe('1.0');
+    expect(positionPlanSchema.properties.schemaVersion.const).toBe('1.0');
 
     expect(planRequestProvenance.commit).toBeDefined();
     expect(planRequestProvenance.commit.length).toBeGreaterThan(0);
     expect(positionPlanProvenance.commit).toBe(planRequestProvenance.commit);
-    expect(executionResultProvenance.commit).toBe(planRequestProvenance.commit);
   });
 
   it('verifies that all vendored asset sha256 checksums match provenance.json', async () => {

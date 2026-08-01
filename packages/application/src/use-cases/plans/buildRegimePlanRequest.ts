@@ -150,7 +150,7 @@ export function buildRegimePlanRequest(
     : undefined;
 
   const candidate: RegimePlanRequest = {
-    schemaVersion: 'plan-request.v1',
+    schemaVersion: '1.0',
     asOfUnixMs,
     market,
     position: {

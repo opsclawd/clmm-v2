@@ -28,7 +28,7 @@ const OTHER_WALLET = makeWalletId('other-wallet');
 
 function createAdvisoryReadyPlanResponse(): RegimePlanResponse {
   return {
-    schemaVersion: 'position-plan.v1',
+    schemaVersion: '1.0',
     planId: 'regime-plan-id',
     planHash: 'abc123',
     asOfUnixMs: Date.now(),

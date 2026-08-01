@@ -1,5 +1,5 @@
 {
-  "schemaVersion": "position-plan.v1",
+  "schemaVersion": "1.0",
   "planId": "plan_exit_987654321",
   "planHash": "f9e8d7c6b5a40123456789abcdef0123456789abcdef0123456789abcdef0123",
   "asOfUnixMs": 1700000000000,
