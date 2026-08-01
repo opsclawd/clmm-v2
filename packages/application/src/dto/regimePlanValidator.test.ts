@@ -17,30 +17,29 @@ function deepClone<T>(obj: T): T {
 type MutableFixture = Record<string, unknown>;
 
 describe('regimePlanValidator', () => {
-  it('accepts 1.0 and migrates legacy schema versions for plan-request and position-plan contracts', () => {
+  it('accepts the shared schemaVersion 1.0 for plan-request and position-plan contracts', () => {
     expect(parseRegimePlanResponse(holdFixture)).not.toBeNull();
     expect(parseRegimePlanRequest(inRangeRequestFixture)).not.toBeNull();
+  });
 
+  it('rejects the old endpoint-named schema versions for plan-request and position-plan contracts', () => {
     const legacyPlan = deepClone(holdFixture) as MutableFixture;
     legacyPlan['schemaVersion'] = 'position-plan.v1';
-    const parsedPlan = parseRegimePlanResponse(legacyPlan);
-    expect(parsedPlan).not.toBeNull();
-    expect(parsedPlan?.schemaVersion).toBe('1.0');
+    expect(parseRegimePlanResponse(legacyPlan)).toBeNull();
 
     const legacyRequest = deepClone(inRangeRequestFixture) as MutableFixture;
     legacyRequest['schemaVersion'] = 'plan-request.v1';
-    const parsedRequest = parseRegimePlanRequest(legacyRequest);
-    expect(parsedRequest).not.toBeNull();
-    expect(parsedRequest?.schemaVersion).toBe('1.0');
+    expect(parseRegimePlanRequest(legacyRequest)).toBeNull();
   });
 
-  it('accepts 1.0 and migrates execution-result.v1 for execution-result contract', () => {
+  it('accepts the shared schemaVersion 1.0 for execution-result contract', () => {
     expect(parseRegimeExecutionResult(successFixture)).not.toBeNull();
+  });
+
+  it('rejects the old endpoint-named schema version for execution-result contract', () => {
     const legacyResult = deepClone(successFixture) as MutableFixture;
     legacyResult['schemaVersion'] = 'execution-result.v1';
-    const parsedResult = parseRegimeExecutionResult(legacyResult);
-    expect(parsedResult).not.toBeNull();
-    expect(parsedResult?.schemaVersion).toBe('1.0');
+    expect(parseRegimeExecutionResult(legacyResult)).toBeNull();
   });
 
   it('rejects unsupported plan actions and schema versions', () => {
