@@ -32,7 +32,7 @@ import inRangeFixture from '../../../../../schemas/regime-engine/plan-request.v1
 const VALID_PLAN_REQUEST: RegimePlanRequest = inRangeFixture as unknown as RegimePlanRequest;
 
 const VALID_EXECUTION_RESULT: RegimeExecutionResult = {
-  schemaVersion: 'execution-result.v1',
+  schemaVersion: '1.0',
   planId: 'plan_exit_987654321',
   planHash: 'f9e8d7c6b5a40123456789abcdef0123456789abcdef0123456789abcdef0123',
   positionId: 'pos_sol_usdc_02',
@@ -64,11 +64,54 @@ describe('RegimePlanAdapter', () => {
   });
 
   describe('requestPositionPlan', () => {
+    it('accepts a shared-version PlanResponse and rejects the endpoint-named version', async () => {
+      const valid10Response = {
+        schemaVersion: '1.0',
+        planId: 'plan_hold_123456789',
+        planHash: 'a1b2c3d4e5f60123456789abcdef0123456789abcdef0123456789abcdef0123',
+        asOfUnixMs: 1700000000000,
+        expiresAtUnixMs: 1700003600000,
+        scope: {
+          kind: 'position',
+          positionId: 'pos_sol_usdc_01',
+          poolAddress: 'Czfq3xZZDmsdGdUyrNLtRhGc47cXcZtLG4crryfu44zE',
+          symbol: 'SOL/USDC',
+        },
+        regime: 'UP',
+        actions: [{ type: 'HOLD', reasonCode: 'IN_RANGE_STABLE' }],
+        constraints: { cooldownUntilUnixMs: 0, standDownUntilUnixMs: 0, notes: [] },
+        reasons: [],
+      };
+
+      vi.mocked(fetch).mockResolvedValue(
+        new Response(JSON.stringify(valid10Response), { status: 200 }),
+      );
+
+      const adapter = new RegimePlanAdapter('https://regime.example.com', 'test-token', obs.port);
+      const resOk = await adapter.requestPositionPlan(VALID_PLAN_REQUEST);
+      expect(resOk.kind).toBe('ok');
+
+      const legacyResponse = {
+        ...valid10Response,
+        schemaVersion: 'position-plan.v1',
+      };
+
+      vi.mocked(fetch).mockResolvedValue(
+        new Response(JSON.stringify(legacyResponse), { status: 200 }),
+      );
+
+      const resFail = await adapter.requestPositionPlan(VALID_PLAN_REQUEST);
+      expect(resFail.kind).toBe('permanent');
+      if (resFail.kind === 'permanent') {
+        expect(resFail.reason).toBe('schema-invalid');
+      }
+    });
+
     it('posts the exact canonical position-plan request', async () => {
       vi.mocked(fetch).mockResolvedValue(
         new Response(
           JSON.stringify({
-            schemaVersion: 'position-plan.v1',
+            schemaVersion: '1.0',
             planId: 'plan_hold_123456789',
             planHash: 'a1b2c3d4e5f60123456789abcdef0123456789abcdef0123456789abcdef0123',
             asOfUnixMs: 1700000000000,
@@ -113,7 +156,7 @@ describe('RegimePlanAdapter', () => {
       expect(calledMethod).toBe('POST');
       expect(calledHeaders['Content-Type']).toBe('application/json');
       expect(calledHeaders['X-CLMM-Internal-Token']).toBe('test-token');
-      expect(calledBody['schemaVersion']).toBe('plan-request.v1');
+      expect(calledBody['schemaVersion']).toBe('1.0');
       expect((calledBody['market'] as Record<string, unknown>)['symbol']).toBe('SOL/USDC');
       expect((calledBody['market'] as Record<string, unknown>)['source']).toBe('geckoterminal');
       expect((calledBody['market'] as Record<string, unknown>)['network']).toBe('solana');
@@ -128,7 +171,7 @@ describe('RegimePlanAdapter', () => {
       vi.mocked(fetch).mockResolvedValue(
         new Response(
           JSON.stringify({
-            schemaVersion: 'position-plan.v1',
+            schemaVersion: '1.0',
             planId: 'plan_hold_123456789',
             planHash: 'a1b2c3d4e5f60123456789abcdef0123456789abcdef0123456789abcdef0123',
             asOfUnixMs: 1700000000000,
@@ -172,7 +215,7 @@ describe('RegimePlanAdapter', () => {
       vi.mocked(fetch).mockResolvedValue(
         new Response(
           JSON.stringify({
-            schemaVersion: 'position-plan.v1',
+            schemaVersion: '1.0',
             planId: 'plan_invalid_01',
             planHash: 'a1b2c3d4e5f60123456789abcdef0123456789abcdef0123456789abcdef0123',
             asOfUnixMs: 1700000000000,
@@ -216,7 +259,7 @@ describe('RegimePlanAdapter', () => {
       vi.mocked(fetch).mockResolvedValue(
         new Response(
           JSON.stringify({
-            schemaVersion: 'position-plan.v1',
+            schemaVersion: '1.0',
             planId: 'plan_hold_123456789',
             planHash: 'a1b2c3d4e5f60123456789abcdef0123456789abcdef0123456789abcdef0123',
             asOfUnixMs: 1700003600000,
@@ -362,7 +405,7 @@ describe('RegimePlanAdapter', () => {
       vi.mocked(fetch).mockResolvedValue(
         new Response(
           JSON.stringify({
-            schemaVersion: 'position-plan.v1',
+            schemaVersion: '1.0',
             planId: 'plan_hold_123456789',
             planHash: 'a1b2c3d4e5f60123456789abcdef0123456789abcdef0123456789abcdef0123',
             asOfUnixMs: 1700000000000,
@@ -438,7 +481,7 @@ describe('RegimePlanAdapter', () => {
       vi.mocked(fetch).mockResolvedValue(
         new Response(
           JSON.stringify({
-            schemaVersion: 'position-plan.v1',
+            schemaVersion: '1.0',
             planId: 'plan_hold_123456789',
             planHash: 'a1b2c3d4e5f60123456789abcdef0123456789abcdef0123456789abcdef0123',
             asOfUnixMs: 1700000000000,

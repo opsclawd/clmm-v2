@@ -476,7 +476,7 @@ class FakePlanRepository implements PlanRepository {
 }
 
 const VALID_UPSTREAM_RESPONSE: RegimePlanResponse = {
-  schemaVersion: 'position-plan.v1',
+  schemaVersion: '1.0',
   planId: 'plan_upstream_9999',
   planHash: 'a1b2c3d4e5f60123456789abcdef0123456789abcdef0123456789abcdef0123',
   asOfUnixMs: 1_000_000,

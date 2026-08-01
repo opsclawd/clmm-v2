@@ -1,39 +1,39 @@
 {
   "repository": "https://github.com/opsclawd/regime-engine",
-  "commit": "260d144f653fc95e1b86d3d65c7305b80170e0a0",
+  "commit": "fbdec486b4e744aee5c65c378eed5a113f0da68c",
   "schemaPath": "contracts/execution-result/v1/execution-result.schema.json",
   "schemaVersion": "v1",
-  "copiedAt": "2026-07-23T14:15:00Z",
+  "copiedAt": "2026-08-01T21:38:26.100Z",
   "assets": [
     {
       "sourcePath": "contracts/execution-result/v1/execution-result.schema.json",
       "localPath": "schemas/regime-engine/execution-result.v1/schema.json",
-      "sha256": "92a1c59b8d2998f69c3f0575e69265aee64d764bcc948324eab5352adc765f4f"
+      "sha256": "886a29aefea3e288046c78f8b5e40d948be622a1b11ef0c1687d09f21c29af9b"
     },
     {
       "sourcePath": "contracts/execution-result/v1/schema.sha256",
       "localPath": "schemas/regime-engine/execution-result.v1/schema.sha256",
-      "sha256": "e85c59f9bfcb506c93e0a02327d7df27a518019f59acd81b58a02a782019406f"
+      "sha256": "a7a28d6d044f5786a1fc7044441fc7a70bdc3a4986079454e042784d3f47b0d4"
     },
     {
       "sourcePath": "contracts/execution-result/v1/fixtures/valid/success.json",
       "localPath": "schemas/regime-engine/execution-result.v1/fixtures/valid/success.json",
-      "sha256": "6113053a11b65baa9b812d11a51ccdc98ab434e3634ef24b240bc4c800cfcb6a"
+      "sha256": "f3c1bc01f4298e6287d34c0f7cce530dbe889ab4501c189ed62b8678c4a61224"
     },
     {
       "sourcePath": "contracts/execution-result/v1/fixtures/valid/skipped.json",
       "localPath": "schemas/regime-engine/execution-result.v1/fixtures/valid/skipped.json",
-      "sha256": "2e7b1d9412bfe6e7050a85d1a564256123006e27b671c17d11613fe025d95034"
+      "sha256": "9f46e5a69b2102e6ca972ac9346046075d86f01609803568bc96b1604cd08ddc"
     },
     {
       "sourcePath": "contracts/execution-result/v1/fixtures/invalid/unsupported-status.json",
       "localPath": "schemas/regime-engine/execution-result.v1/fixtures/invalid/unsupported-status.json",
-      "sha256": "9fb3c87c302783c80c5d08b1555c1969fe7e14f31c60692bbdfc7167970bcf1c"
+      "sha256": "3dbc7a1176d263e6f669573c96d26d19d95ec12e05147fda0244e293c8aaafd5"
     },
     {
       "sourcePath": "contracts/execution-result/v1/fixtures/invalid/extra-forbidden-fields.json",
       "localPath": "schemas/regime-engine/execution-result.v1/fixtures/invalid/extra-forbidden-fields.json",
-      "sha256": "6210329410aa89fa86b60320f10e7eef22ed4cb70abc7e4d4f07012e38b35240"
+      "sha256": "d35e5b0c19ef1983daa5588af079bf5c132456598ca77fe8123f63fa3c9a4855"
     }
   ]
 }

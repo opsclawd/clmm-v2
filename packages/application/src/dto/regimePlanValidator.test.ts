@@ -17,6 +17,31 @@ function deepClone<T>(obj: T): T {
 type MutableFixture = Record<string, unknown>;
 
 describe('regimePlanValidator', () => {
+  it('accepts the shared schemaVersion 1.0 for plan-request and position-plan contracts', () => {
+    expect(parseRegimePlanResponse(holdFixture)).not.toBeNull();
+    expect(parseRegimePlanRequest(inRangeRequestFixture)).not.toBeNull();
+  });
+
+  it('rejects the old endpoint-named schema versions for plan-request and position-plan contracts', () => {
+    const legacyPlan = deepClone(holdFixture) as MutableFixture;
+    legacyPlan['schemaVersion'] = 'position-plan.v1';
+    expect(parseRegimePlanResponse(legacyPlan)).toBeNull();
+
+    const legacyRequest = deepClone(inRangeRequestFixture) as MutableFixture;
+    legacyRequest['schemaVersion'] = 'plan-request.v1';
+    expect(parseRegimePlanRequest(legacyRequest)).toBeNull();
+  });
+
+  it('accepts the shared schemaVersion 1.0 for execution-result contract', () => {
+    expect(parseRegimeExecutionResult(successFixture)).not.toBeNull();
+  });
+
+  it('rejects the old endpoint-named schema version for execution-result contract', () => {
+    const legacyResult = deepClone(successFixture) as MutableFixture;
+    legacyResult['schemaVersion'] = 'execution-result.v1';
+    expect(parseRegimeExecutionResult(legacyResult)).toBeNull();
+  });
+
   it('rejects unsupported plan actions and schema versions', () => {
     const invalidAction = deepClone(holdFixture) as MutableFixture;
     const actions = invalidAction['actions'] as Array<Record<string, unknown>>;

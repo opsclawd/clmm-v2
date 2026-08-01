@@ -66,6 +66,19 @@ function createFixtureDetail(overrides?: Partial<PositionDetail>): PositionDetai
 }
 
 describe('buildRegimePlanRequest', () => {
+  it('emits shared schemaVersion 1.0 in a built plan request', () => {
+    const request = buildRegimePlanRequest({
+      positionDetail: createFixtureDetail(),
+      config: VALID_CONFIG,
+      asOfUnixMs: 1776272593000,
+      supportedPositionsCount: 1,
+      qualifiedTrigger: null,
+      walletHistory: [],
+    });
+
+    expect(request?.schemaVersion).toBe('1.0');
+  });
+
   it('converts negative tick-space position values to positive price-space request values', () => {
     const req = buildRegimePlanRequest({
       positionDetail: createFixtureDetail(),

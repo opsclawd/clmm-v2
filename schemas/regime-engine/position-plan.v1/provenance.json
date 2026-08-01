@@ -1,44 +1,44 @@
 {
   "repository": "https://github.com/opsclawd/regime-engine",
-  "commit": "260d144f653fc95e1b86d3d65c7305b80170e0a0",
+  "commit": "fbdec486b4e744aee5c65c378eed5a113f0da68c",
   "schemaPath": "contracts/position-plan/v1/position-plan.schema.json",
   "schemaVersion": "v1",
-  "copiedAt": "2026-07-23T14:15:00Z",
+  "copiedAt": "2026-08-01T21:28:04.570Z",
   "assets": [
     {
       "sourcePath": "contracts/position-plan/v1/position-plan.schema.json",
       "localPath": "schemas/regime-engine/position-plan.v1/schema.json",
-      "sha256": "5af731657942d811d52657f6421ded102f5ac21cad861da302196853a7087aec"
+      "sha256": "829a898c30e3b85a0723504dcc07f241a7e44b249ba986e05fd33d26764cf4fe"
     },
     {
       "sourcePath": "contracts/position-plan/v1/schema.sha256",
       "localPath": "schemas/regime-engine/position-plan.v1/schema.sha256",
-      "sha256": "d0fce7d6bb6d5b95fb8fb297af87288dab8736d2311800badbd6a0232f9fcb98"
+      "sha256": "80cde637adff87a215d43bdfc13acc2dfe604ff33583b79e458496e809eb4138"
     },
     {
       "sourcePath": "contracts/position-plan/v1/fixtures/valid/hold.json",
       "localPath": "schemas/regime-engine/position-plan.v1/fixtures/valid/hold.json",
-      "sha256": "1c1d59aaec689abdc6cb303a06f4864e5e29dc33cb0d452070f574378fe50676"
+      "sha256": "7591f8afeab082c71ae2e8d52b681fbb5c86e969645e5f297884dbd951193d2f"
     },
     {
       "sourcePath": "contracts/position-plan/v1/fixtures/valid/request-exit.json",
       "localPath": "schemas/regime-engine/position-plan.v1/fixtures/valid/request-exit.json",
-      "sha256": "221e21e5f5ee2cb9dddbe4865b110436290ab0091155a56c2cee694d08519759"
+      "sha256": "0f1cba9ce484af5f05b523d9e7731069dd9b2b61fb483186df2aeaff786aac16"
     },
     {
       "sourcePath": "contracts/position-plan/v1/fixtures/invalid/unsupported-action.json",
       "localPath": "schemas/regime-engine/position-plan.v1/fixtures/invalid/unsupported-action.json",
-      "sha256": "113d0a0b5bd25a6270ab7fca5970217619ed6d3102d885b17cdf9850c916111d"
+      "sha256": "b4cbdfe240acf79a250f91e5651b906847a4ef6f68efdb68f82bc236a0da5116"
     },
     {
       "sourcePath": "contracts/position-plan/v1/fixtures/invalid/missing-exit-intent.json",
       "localPath": "schemas/regime-engine/position-plan.v1/fixtures/invalid/missing-exit-intent.json",
-      "sha256": "fdd7799daac9571268687e6f6cb79f5f128951c6c6a9a2aaaf90386188755913"
+      "sha256": "e448e70404eae082b2e59ee948d6de566ff6e31454d60bd51d0c0482b01d073d"
     },
     {
       "sourcePath": "contracts/position-plan/v1/fixtures/invalid/inline-candles-and-portfolio.json",
       "localPath": "schemas/regime-engine/position-plan.v1/fixtures/invalid/inline-candles-and-portfolio.json",
-      "sha256": "ad7c7da5da4c96cc21086256e6a6da2c2ac3d696c316ad4a560ddccf2a2778c2"
+      "sha256": "16912a0d75d00a96d4568017c9df923b8701a51eebcb2deaf5c0680a1d1c8c07"
     }
   ]
 }

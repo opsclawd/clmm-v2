@@ -19,7 +19,7 @@
   "properties": {
     "schemaVersion": {
       "type": "string",
-      "const": "position-plan.v1"
+      "const": "1.0"
     },
     "planId": {
       "type": "string",

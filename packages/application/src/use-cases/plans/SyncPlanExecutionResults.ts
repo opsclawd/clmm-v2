@@ -108,7 +108,7 @@ async function deliverResult(
   }
 
   const candidate: unknown = {
-    schemaVersion: 'execution-result.v1',
+    schemaVersion: '1.0',
     planId: claim.planId as string,
     planHash: canonicalHash,
     positionId,

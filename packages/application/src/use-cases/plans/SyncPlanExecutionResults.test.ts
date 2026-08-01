@@ -87,7 +87,7 @@ describe('SyncPlanExecutionResults', () => {
   });
 
   describe('reports a persisted terminal result after app restart', () => {
-    it('discovers and delivers a result that was committed but not yet delivered', async () => {
+    it('reports a persisted terminal result with shared schemaVersion 1.0', async () => {
       const claim = makeClaim({ attemptCount: 0 });
       vi.mocked(planRepo.claimDueResult).mockResolvedValueOnce(claim);
       vi.mocked(regimePort.reportExecutionResult).mockResolvedValueOnce({ kind: 'ok' });
@@ -100,9 +100,11 @@ describe('SyncPlanExecutionResults', () => {
       const callArg = vi.mocked(regimePort.reportExecutionResult).mock.calls[0]?.[0] as {
         idempotencyKey: string;
         status: string;
+        schemaVersion: string;
       };
       expect(callArg?.idempotencyKey).toBe(FIXTURE_IDEMPOTENCY_KEY);
       expect(callArg?.status).toBe('SUCCESS');
+      expect(callArg?.schemaVersion).toBe('1.0');
       // eslint-disable-next-line @typescript-eslint/unbound-method
       expect(planRepo.completeDelivery).toHaveBeenCalledWith(
         expect.objectContaining({ resultId: FIXTURE_RESULT_ID }),

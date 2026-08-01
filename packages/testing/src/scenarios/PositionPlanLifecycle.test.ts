@@ -177,7 +177,7 @@ describe('PositionPlanLifecycle Scenarios', () => {
     const env = buildEnvironment();
     env.regimePlanPort.setPlanResponse({
       planId: 'plan-hold',
-      schemaVersion: 'position-plan.v1',
+      schemaVersion: '1.0',
       planHash: 'a1b2c3d4e5f60123456789abcdef0123456789abcdef0123456789abcdef0123',
       asOfUnixMs: 1000,
       expiresAtUnixMs: 60000,
@@ -362,7 +362,7 @@ describe('PositionPlanLifecycle Scenarios', () => {
 
     expect(env.regimePlanPort.getResults()).toHaveLength(1);
     expect(env.regimePlanPort.getResults()[0]).toMatchObject({
-      schemaVersion: 'execution-result.v1',
+      schemaVersion: '1.0',
       planId,
       planHash: canonicalHash,
       positionId: env.positionId,
@@ -463,7 +463,7 @@ describe('PositionPlanLifecycle Scenarios', () => {
 
     expect(env.regimePlanPort.getResults()).toHaveLength(1);
     expect(env.regimePlanPort.getResults()[0]).toMatchObject({
-      schemaVersion: 'execution-result.v1',
+      schemaVersion: '1.0',
       planId,
       planHash: canonicalHash,
       positionId: env.positionId,
@@ -533,7 +533,7 @@ describe('PositionPlanLifecycle Scenarios', () => {
 
     expect(env.regimePlanPort.getResults()).toHaveLength(1);
     expect(env.regimePlanPort.getResults()[0]).toMatchObject({
-      schemaVersion: 'execution-result.v1',
+      schemaVersion: '1.0',
       planId,
       planHash: canonicalHash,
       positionId: env.positionId,
@@ -617,7 +617,7 @@ describe('PositionPlanLifecycle Scenarios', () => {
 
     expect(env.regimePlanPort.getResults()).toHaveLength(1);
     expect(env.regimePlanPort.getResults()[0]).toMatchObject({
-      schemaVersion: 'execution-result.v1',
+      schemaVersion: '1.0',
       planId,
       planHash: canonicalHash,
       positionId: env.positionId,

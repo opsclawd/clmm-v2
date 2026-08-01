@@ -77,10 +77,10 @@ describe('Regime plan contract schema validation', () => {
     expect(validatePlanRequest(deepClone(missingConfigFixture))).toBe(false);
   });
 
-  it('pins all regime plan contracts to one upstream commit', () => {
-    expect(positionPlanSchema.properties.schemaVersion.const).toBe('position-plan.v1');
-    expect(executionResultSchema.properties.schemaVersion.const).toBe('execution-result.v1');
-    expect(planRequestSchema.properties.schemaVersion.const).toBe('plan-request.v1');
+  it('pins regime plan-request, position-plan, and execution-result contracts to shared schemaVersion 1.0 at one upstream commit', () => {
+    expect(planRequestSchema.properties.schemaVersion.const).toBe('1.0');
+    expect(positionPlanSchema.properties.schemaVersion.const).toBe('1.0');
+    expect(executionResultSchema.properties.schemaVersion.const).toBe('1.0');
 
     expect(planRequestProvenance.commit).toBeDefined();
     expect(planRequestProvenance.commit.length).toBeGreaterThan(0);

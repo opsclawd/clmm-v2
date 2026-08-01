@@ -23,7 +23,7 @@ export function resolveRegimePlanRequestConfig(
   }
 
   const dummyRequest: RegimePlanRequest = {
-    schemaVersion: 'plan-request.v1',
+    schemaVersion: '1.0',
     asOfUnixMs: 1776272593000,
     market: {
       symbol: 'SOL/USDC',

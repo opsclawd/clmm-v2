@@ -1,5 +1,5 @@
 {
-  "schemaVersion": "execution-result.v1",
+  "schemaVersion": "1.0",
   "planId": "plan_hold_123456789",
   "planHash": "a1b2c3d4e5f60123456789abcdef0123456789abcdef0123456789abcdef0123",
   "positionId": "pos_sol_usdc_01",
