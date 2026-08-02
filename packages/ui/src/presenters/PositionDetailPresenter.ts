@@ -44,6 +44,7 @@ function normalizePositionDetailDto(
     poolDepthLabel: dto.poolDepthLabel ?? 'depth unavailable',
     ...(dto.triggerId ? { triggerId: dto.triggerId } : {}),
     ...(dto.breachDirection ? { breachDirection: dto.breachDirection } : {}),
+    ...(dto.positionAmounts ? { positionAmounts: dto.positionAmounts } : {}),
   };
 }
 

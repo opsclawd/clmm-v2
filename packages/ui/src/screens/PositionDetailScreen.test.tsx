@@ -36,6 +36,11 @@ function makePosition(overrides: Partial<PositionDetailDto> = {}): PositionDetai
       totalUsd: 0,
     },
     positionLiquidity: '5000000000',
+    positionAmounts: {
+      amountA: { raw: '10500000000', decimals: 9, symbol: 'SOL', usdValue: 1575 },
+      amountB: { raw: '250000000', decimals: 6, symbol: 'USDC', usdValue: 0 },
+      totalUsd: 1575,
+    },
     poolLiquidity: '2400000000',
     poolDepthLabel: 'depth unavailable',
     triggerId: 'trigger-1' as NonNullable<PositionDetailDto['triggerId']>,
@@ -140,7 +145,8 @@ describe('PositionDetailScreen', () => {
     expect(screen.getByText('10 bps')).toBeTruthy();
     expect(screen.getByText('$45.00 in unclaimed fees')).toBeTruthy();
     expect(screen.getByText('No rewards')).toBeTruthy();
-    expect(screen.getByText('5000000000 liquidity units')).toBeTruthy();
+    expect(screen.getByText('$1575.00 position size')).toBeTruthy();
+    expect(screen.queryByText('5000000000 liquidity units')).toBeNull();
     expect(screen.getByText('depth unavailable')).toBeTruthy();
     expect(screen.getByText('20.0% below lower bound')).toBeTruthy();
   });

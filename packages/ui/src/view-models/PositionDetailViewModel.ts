@@ -66,6 +66,20 @@ export function buildPositionDetailViewModel(dto: PositionDetailDto): PositionDe
             .join(', ') + ' rewards'
         : 'No rewards';
 
+  const positionSizeLabel = dto.positionAmounts
+    ? dto.positionAmounts.totalUsd > 0
+      ? `$${dto.positionAmounts.totalUsd.toFixed(2)} position size`
+      : `${formatTokenAmount(
+          dto.positionAmounts.amountA.raw,
+          dto.positionAmounts.amountA.decimals,
+          dto.positionAmounts.amountA.symbol,
+        )} + ${formatTokenAmount(
+          dto.positionAmounts.amountB.raw,
+          dto.positionAmounts.amountB.decimals,
+          dto.positionAmounts.amountB.symbol,
+        )} position size`
+    : `${dto.positionLiquidity.toString()} liquidity units`;
+
   const base = {
     positionId: dto.positionId,
     poolLabel: dto.tokenPairLabel,
@@ -89,7 +103,7 @@ export function buildPositionDetailViewModel(dto: PositionDetailDto): PositionDe
       ),
     },
     unclaimedRewardsLabel,
-    positionSizeLabel: `${dto.positionLiquidity.toString()} liquidity units`,
+    positionSizeLabel,
     poolDepthLabel: dto.poolDepthLabel,
     hasAlert: dto.hasActionableTrigger,
     alertLabel: dto.hasActionableTrigger ? 'Action Required' : 'No Alerts',
