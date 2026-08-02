@@ -88,6 +88,7 @@ export type PriceQuote = {
 
 export {
   calculateInRangeReserves,
+  calculatePositionAmounts,
   priceFromSqrtPrice,
   tickToPrice,
   rangeDistancePercent,
