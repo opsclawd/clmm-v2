@@ -77,7 +77,7 @@ function makeRequestExitPlan(): CurrentPlanDto {
     positionId: 'position-1',
     state: {
       kind: 'advisory-ready',
-      advisoryAction: { kind: 'REQUEST_EXIT_CLMM', exitIntent: { posture: 'ExitToUSDC' } },
+      advisoryAction: { kind: 'REQUEST_EXIT_CLMM' },
       regimeResponse: { regime: 'DOWN', suitability: 'ALLOWED' },
     },
   };
@@ -91,7 +91,7 @@ function makePreviewReadyPlan(): CurrentPlanDto {
     state: {
       kind: 'exit-previewed',
       previewId: 'preview-123',
-      advisoryAction: { kind: 'REQUEST_EXIT_CLMM', exitIntent: { posture: 'ExitToUSDC' } },
+      advisoryAction: { kind: 'REQUEST_EXIT_CLMM' },
       preview: { freshness: { kind: 'fresh' } },
     },
   };
@@ -215,6 +215,7 @@ describe('PositionDetailScreen', () => {
         />,
       );
 
+      expect(screen.queryByText('Plan information unavailable')).toBeNull();
       expect(screen.getByText('Plan Recommends Exit')).toBeTruthy();
       expect(screen.getByText('Preview Exit')).toBeTruthy();
       expect(screen.queryByText('Approve & Sign')).toBeNull();
