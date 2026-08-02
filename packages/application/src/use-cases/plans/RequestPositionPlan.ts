@@ -20,7 +20,6 @@ import type {
 import { makeClockTimestamp } from '@clmm/domain';
 import type {
   RegimePlanResponse,
-  RegimePlanExitPosture,
   ResolveRegimePlanRequestConfigResult,
 } from '../../dto/regimePlan.js';
 import { buildRegimePlanRequest } from './buildRegimePlanRequest.js';
@@ -30,12 +29,6 @@ const CANDLE_INTERVAL_MS = 60 * 60 * 1000;
 const MINIMUM_INTERVAL_MS = 15 * 60 * 1000;
 const LEASE_DURATION_MS = 2 * 60 * 1000;
 
-function mapRegimeExitPostureToDomain(
-  posture: RegimePlanExitPosture,
-): 'exit-to-usdc' | 'exit-to-sol' {
-  return posture === 'ExitToSOL' ? 'exit-to-sol' : 'exit-to-usdc';
-}
-
 function extractAdvisoryAction(response: RegimePlanResponse): PlanAction {
   const requestedAction = response.actions.find(
     (a) => a.type === 'REQUEST_EXIT_CLMM' || a.type === 'HOLD' || a.type === 'STAND_DOWN',
@@ -44,10 +37,7 @@ function extractAdvisoryAction(response: RegimePlanResponse): PlanAction {
     return { kind: 'HOLD' };
   }
   if (requestedAction.type === 'REQUEST_EXIT_CLMM') {
-    const exitIntent = requestedAction.exitIntent?.posture
-      ? mapRegimeExitPostureToDomain(requestedAction.exitIntent.posture)
-      : undefined;
-    return { kind: 'REQUEST_EXIT_CLMM', ...(exitIntent && { exitIntent }) };
+    return { kind: 'REQUEST_EXIT_CLMM' };
   }
   return { kind: requestedAction.type };
 }

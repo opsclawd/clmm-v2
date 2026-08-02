@@ -48,7 +48,6 @@ function createAdvisoryReadyPlanResponse(): RegimePlanResponse {
       {
         type: 'REQUEST_EXIT_CLMM',
         reasonCode: 'BREACH_LIKELY',
-        exitIntent: { posture: 'ExitToUSDC' },
       },
     ],
     constraints: {

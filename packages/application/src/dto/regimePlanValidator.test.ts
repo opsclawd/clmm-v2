@@ -112,16 +112,20 @@ describe('regimePlanValidator', () => {
     expect(parseRegimeExecutionResult(missingExecField)).toBeNull();
   });
 
-  it('rejects a request-exit plan without canonical exit intent', () => {
-    const noExitIntent = deepClone(requestExitFixture) as MutableFixture;
-    const actions1 = noExitIntent['actions'] as Array<Record<string, unknown>>;
-    delete actions1[0]!['exitIntent'];
-    expect(parseRegimePlanResponse(noExitIntent)).toBeNull();
+  it('accepts a request-exit plan without remote exit intent', () => {
+    const parsed = parseRegimePlanResponse(requestExitFixture);
+    expect(parsed).not.toBeNull();
+    expect(parsed?.actions[0]).toEqual({
+      type: 'REQUEST_EXIT_CLMM',
+      reasonCode: 'OUT_OF_RANGE_DOWNTREND',
+    });
+  });
 
-    const invalidExitIntent = deepClone(requestExitFixture) as MutableFixture;
-    const actions2 = invalidExitIntent['actions'] as Array<Record<string, unknown>>;
-    actions2[0]!['exitIntent'] = { posture: 'InvalidPosture' };
-    expect(parseRegimePlanResponse(invalidExitIntent)).toBeNull();
+  it('rejects fabricated remote exit intent on request-exit actions', () => {
+    const withExitIntent = deepClone(requestExitFixture) as MutableFixture;
+    const actions = withExitIntent['actions'] as Array<Record<string, unknown>>;
+    actions[0]!['exitIntent'] = { posture: 'ExitToUSDC' };
+    expect(parseRegimePlanResponse(withExitIntent)).toBeNull();
   });
 
   it('does not admit inline candles regime state or portfolio allocations', () => {

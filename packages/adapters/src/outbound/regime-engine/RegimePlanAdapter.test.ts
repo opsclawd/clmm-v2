@@ -51,6 +51,7 @@ const VALID_EXECUTION_RESULT: RegimeExecutionResult = {
 };
 
 import productionRedactedFixture from '../../../../../schemas/regime-engine/position-plan.v1/fixtures/valid/production-response-redacted.json';
+import requestExitFixture from '../../../../../schemas/regime-engine/position-plan.v1/fixtures/valid/request-exit.json';
 
 describe('RegimePlanAdapter', () => {
   let obs: ReturnType<typeof createFakeObservability>;
@@ -66,6 +67,17 @@ describe('RegimePlanAdapter', () => {
   });
 
   describe('requestPositionPlan', () => {
+    it('returns ok for a canonical request-exit response without exitIntent', async () => {
+      vi.mocked(fetch).mockResolvedValue(
+        new Response(JSON.stringify(requestExitFixture), { status: 200 }),
+      );
+
+      const adapter = new RegimePlanAdapter('https://regime.example.com', 'test-token', obs.port);
+      const result = await adapter.requestPositionPlan(VALID_PLAN_REQUEST);
+
+      expect(result).toEqual({ kind: 'ok', response: requestExitFixture });
+    });
+
     it('returns ok for the redacted production response', async () => {
       vi.mocked(fetch).mockResolvedValue(
         new Response(JSON.stringify(productionRedactedFixture), { status: 200 }),

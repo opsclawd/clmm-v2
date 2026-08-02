@@ -1,15 +1,8 @@
 export type RegimePlanActionType = 'HOLD' | 'STAND_DOWN' | 'REQUEST_EXIT_CLMM';
 
-export type RegimePlanExitPosture = 'ExitToUSDC' | 'ExitToSOL';
-
-export type RegimePlanExitIntent = {
-  posture: RegimePlanExitPosture;
-};
-
 export type RegimePlanAction = {
   type: RegimePlanActionType;
   reasonCode: string;
-  exitIntent?: RegimePlanExitIntent;
 };
 
 export type RegimePlanScope = {

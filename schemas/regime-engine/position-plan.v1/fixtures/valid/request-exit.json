@@ -18,10 +18,7 @@
   "actions": [
     {
       "type": "REQUEST_EXIT_CLMM",
-      "reasonCode": "OUT_OF_RANGE_DOWNTREND",
-      "exitIntent": {
-        "posture": "ExitToUSDC"
-      }
+      "reasonCode": "OUT_OF_RANGE_DOWNTREND"
     }
   ],
   "constraints": {

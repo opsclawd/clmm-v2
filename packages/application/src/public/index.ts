@@ -55,8 +55,6 @@ export type {
   PoolFinancialMetricsDto,
   PositionListFinancialMetricsDto,
   RegimePlanActionType,
-  RegimePlanExitPosture,
-  RegimePlanExitIntent,
   RegimePlanAction,
   RegimePlanScope,
   RegimePlanConstraints,
