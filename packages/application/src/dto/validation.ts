@@ -6,6 +6,7 @@ import type {
   UnclaimedFeesMetricDto,
   PoolTvlMetricDto,
   PoolFees24hMetricDto,
+  TokenAmountValue,
 } from './index.js';
 
 const DAY_MS = 86_400_000;
@@ -27,6 +28,34 @@ function isUnixMs(value: unknown): value is number {
 
 function hasSource(value: unknown): value is string {
   return typeof value === 'string' && value.trim().length > 0;
+}
+
+function isTokenAmountValue(value: unknown): value is TokenAmountValue {
+  if (!isRecord(value)) {
+    return false;
+  }
+
+  const decimals = value['decimals'];
+
+  return (
+    typeof value['raw'] === 'string' &&
+    typeof value['symbol'] === 'string' &&
+    (decimals === null ||
+      (typeof decimals === 'number' && Number.isInteger(decimals) && decimals >= 0)) &&
+    isNonNegativeFinite(value['usdValue'])
+  );
+}
+
+function isPositionAmounts(value: unknown): boolean {
+  if (!isRecord(value)) {
+    return false;
+  }
+
+  return (
+    isTokenAmountValue(value['amountA']) &&
+    isTokenAmountValue(value['amountB']) &&
+    isNonNegativeFinite(value['totalUsd'])
+  );
 }
 
 export function isRecord(value: unknown): value is Record<string, unknown> {
@@ -66,6 +95,7 @@ export function isPositionDetailDto(value: unknown): value is PositionDetailDto 
 
   const breachDirection = value['breachDirection'];
   const currentPrice = value['currentPrice'];
+  const positionAmounts = value['positionAmounts'];
 
   const baseValid =
     isPositionSummaryRecord(value) &&
@@ -76,7 +106,8 @@ export function isPositionDetailDto(value: unknown): value is PositionDetailDto 
       (isRecord(breachDirection) &&
         VALID_BREACH_DIRECTIONS.includes(
           breachDirection['kind'] as NonNullable<PositionDetailDto['breachDirection']>['kind'],
-        )));
+        ))) &&
+    (positionAmounts === undefined || isPositionAmounts(positionAmounts));
 
   if (!baseValid) {
     return false;

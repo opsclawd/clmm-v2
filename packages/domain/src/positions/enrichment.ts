@@ -67,26 +67,54 @@ export function tokenAmountToUsd(amount: bigint, decimals: number, usdPrice: num
   return parseFloat(`${resultWhole}.${remStr}`);
 }
 
+function calculateLiquidityAmountsForInterval(
+  liquidity: bigint,
+  sqrtPriceX64: bigint,
+  tickLower: number,
+  tickUpper: number,
+): { amountA: bigint; amountB: bigint } {
+  if (sqrtPriceX64 === 0n || liquidity === 0n) return { amountA: 0n, amountB: 0n };
+
+  const sqrtPrice = Number(sqrtPriceX64) / 2 ** 64;
+  const sqrtPriceLower = Math.pow(1.0001, tickLower / 2);
+  const sqrtPriceUpper = Math.pow(1.0001, tickUpper / 2);
+  const liquidityNumber = Number(liquidity);
+
+  const rawAmountA =
+    sqrtPrice <= sqrtPriceLower
+      ? liquidityNumber * (1 / sqrtPriceLower - 1 / sqrtPriceUpper)
+      : sqrtPrice < sqrtPriceUpper
+        ? liquidityNumber * (1 / sqrtPrice - 1 / sqrtPriceUpper)
+        : 0;
+  const rawAmountB =
+    sqrtPrice >= sqrtPriceUpper
+      ? liquidityNumber * (sqrtPriceUpper - sqrtPriceLower)
+      : sqrtPrice > sqrtPriceLower
+        ? liquidityNumber * (sqrtPrice - sqrtPriceLower)
+        : 0;
+
+  return {
+    amountA: BigInt(Math.max(0, Math.floor(rawAmountA))),
+    amountB: BigInt(Math.max(0, Math.floor(rawAmountB))),
+  };
+}
+
+export function calculatePositionAmounts(
+  liquidity: bigint,
+  sqrtPriceX64: bigint,
+  tickLower: number,
+  tickUpper: number,
+): { amountA: bigint; amountB: bigint } {
+  return calculateLiquidityAmountsForInterval(liquidity, sqrtPriceX64, tickLower, tickUpper);
+}
+
 export function calculateInRangeReserves(
   liquidity: bigint,
   sqrtPriceX64: bigint,
   tickCurrentIndex: number,
   tickSpacing: number,
 ): { amountA: bigint; amountB: bigint } {
-  if (sqrtPriceX64 === 0n || liquidity === 0n) return { amountA: 0n, amountB: 0n };
-
   const tickLower = Math.floor(tickCurrentIndex / tickSpacing) * tickSpacing;
   const tickUpper = tickLower + tickSpacing;
-  const sqrtPrice = Number(sqrtPriceX64) / 2 ** 64;
-  const sqrtPriceLower = Math.pow(1.0001, tickLower / 2);
-  const sqrtPriceUpper = Math.pow(1.0001, tickUpper / 2);
-  const liquidityNumber = Number(liquidity);
-
-  const amountA = liquidityNumber * (1 / sqrtPrice - 1 / sqrtPriceUpper);
-  const amountB = liquidityNumber * (sqrtPrice - sqrtPriceLower);
-
-  return {
-    amountA: BigInt(Math.max(0, Math.floor(amountA))),
-    amountB: BigInt(Math.max(0, Math.floor(amountB))),
-  };
+  return calculateLiquidityAmountsForInterval(liquidity, sqrtPriceX64, tickLower, tickUpper);
 }

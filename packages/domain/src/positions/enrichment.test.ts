@@ -1,6 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import {
   calculateInRangeReserves,
+  calculatePositionAmounts,
   priceFromSqrtPrice,
   tickToPrice,
   rangeDistancePercent,
@@ -103,6 +104,38 @@ describe('calculateInRangeReserves', () => {
 
   it('returns zero reserves when liquidity is 0n', () => {
     expect(calculateInRangeReserves(0n, 18_476_281_010_653_904_896n, 32, 64)).toEqual({
+      amountA: 0n,
+      amountB: 0n,
+    });
+  });
+});
+
+describe('calculatePositionAmounts', () => {
+  it('returns only token A below the position range', () => {
+    expect(
+      calculatePositionAmounts(1_000_000_000_000n, 18_329_067_761_203_533_824n, -64, 64),
+    ).toEqual({ amountA: 6_399_690_942n, amountB: 0n });
+  });
+
+  it('returns both token amounts inside the position range', () => {
+    expect(calculatePositionAmounts(1_000_000_000_000n, 2n ** 64n, -64, 64)).toEqual({
+      amountA: 3_194_725_978n,
+      amountB: 3_194_725_978n,
+    });
+  });
+
+  it('returns only token B above the position range', () => {
+    expect(
+      calculatePositionAmounts(1_000_000_000_000n, 18_565_175_891_880_419_328n, -64, 64),
+    ).toEqual({ amountA: 0n, amountB: 6_399_690_942n });
+  });
+
+  it('returns zero position amounts for zero liquidity or square-root price', () => {
+    expect(calculatePositionAmounts(0n, 2n ** 64n, -64, 64)).toEqual({
+      amountA: 0n,
+      amountB: 0n,
+    });
+    expect(calculatePositionAmounts(1_000_000n, 0n, -64, 64)).toEqual({
       amountA: 0n,
       amountB: 0n,
     });
