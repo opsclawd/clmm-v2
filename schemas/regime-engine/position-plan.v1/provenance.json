@@ -9,12 +9,12 @@
     {
       "sourcePath": "src/contract/v1/types.ts",
       "localPath": "schemas/regime-engine/position-plan.v1/schema.json",
-      "sha256": "811a82f30422d543c44ccff7bd1d38910dbbfc7128001f973731bee349e14b1d"
+      "sha256": "a7dc452c4bc471d9c3865b7ce5e97cdfd8b9218f9c34e426e0401704d5739708"
     },
     {
       "sourcePath": "src/contract/v1/types.ts",
       "localPath": "schemas/regime-engine/position-plan.v1/schema.sha256",
-      "sha256": "68916d6ad5fbd2cd19de7ace7090d3e570fb18047f8721f42bf954515cd4f876"
+      "sha256": "967df2179350252a549f2713532766e076c3dbcfef43b424891ea0d3b71c3dff"
     },
     {
       "sourcePath": "src/contract/v1/types.ts",
