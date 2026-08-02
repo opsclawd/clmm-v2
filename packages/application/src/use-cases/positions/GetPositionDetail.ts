@@ -6,6 +6,7 @@ import {
   rangeDistancePercent,
   tokenAmountToUsd,
   formatFeeRateLabel,
+  calculateInRangeReserves,
 } from '@clmm/domain';
 import { buildPositionDisplayBounds } from './buildPositionDisplayBounds.js';
 
@@ -63,6 +64,20 @@ export async function getPositionDetail(params: {
 
   const priceA = priceMap.get(poolData.tokenPair.mintA);
   const priceB = priceMap.get(poolData.tokenPair.mintB);
+
+  let poolDepthLabel = 'depth unavailable';
+  if (priceA && priceB) {
+    const reserves = calculateInRangeReserves(
+      poolData.liquidity,
+      poolData.sqrtPrice,
+      poolData.tickCurrentIndex,
+      poolData.tickSpacing,
+    );
+    const poolDepthUsd =
+      tokenAmountToUsd(reserves.amountA, decimalsA, priceA.usdValue) +
+      tokenAmountToUsd(reserves.amountB, decimalsB, priceB.usdValue);
+    poolDepthLabel = `$${(poolDepthUsd / 1_000_000).toFixed(1)}M pool depth`;
+  }
 
   const feeOwedA: TokenAmountValue = {
     raw: fees.feeOwedA.toString(),
@@ -138,7 +153,7 @@ export async function getPositionDetail(params: {
     },
     positionLiquidity: positionLiquidity.toString(),
     poolLiquidity: poolData.liquidity.toString(),
-    poolDepthLabel: 'depth unavailable',
+    poolDepthLabel,
   };
 
   return { kind: 'found', position, detailDto };

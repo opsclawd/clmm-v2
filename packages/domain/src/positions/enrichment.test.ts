@@ -1,5 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import {
+  calculateInRangeReserves,
   priceFromSqrtPrice,
   tickToPrice,
   rangeDistancePercent,
@@ -70,6 +71,41 @@ describe('tickToPrice', () => {
     const fromTick = tickToPrice(tickIndex, 9, 9);
     const fromSqrt = priceFromSqrtPrice(sqrtPriceX64, 9, 9);
     expect(Math.abs(fromTick - fromSqrt) / fromTick).toBeLessThan(0.02);
+  });
+});
+
+describe('calculateInRangeReserves', () => {
+  it('calculates both reserves for a price inside the current tick bucket', () => {
+    expect(
+      calculateInRangeReserves(1_000_000_000_000n, 18_476_281_010_653_904_896n, 32, 64),
+    ).toEqual({ amountA: 1_596_085_163n, amountB: 1_601_200_560n });
+  });
+
+  it('uses floor division to select the active bucket for negative ticks', () => {
+    expect(
+      calculateInRangeReserves(1_000_000_000_000n, 18_358_416_274_770_382_848n, -96, 64),
+    ).toEqual({ amountA: 1_606_332_351n, amountB: 1_590_986_108n });
+  });
+
+  it('clamps boundary rounding artifacts to zero', () => {
+    expect(calculateInRangeReserves(1_000_000_000_000n, 2n ** 64n, 0, 64)).toEqual({
+      amountA: 3_194_725_978n,
+      amountB: 0n,
+    });
+  });
+
+  it('returns zero reserves when sqrtPriceX64 is 0n', () => {
+    expect(calculateInRangeReserves(1_000_000_000_000n, 0n, 0, 64)).toEqual({
+      amountA: 0n,
+      amountB: 0n,
+    });
+  });
+
+  it('returns zero reserves when liquidity is 0n', () => {
+    expect(calculateInRangeReserves(0n, 18_476_281_010_653_904_896n, 32, 64)).toEqual({
+      amountA: 0n,
+      amountB: 0n,
+    });
   });
 });
 

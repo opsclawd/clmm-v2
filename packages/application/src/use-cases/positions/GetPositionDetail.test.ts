@@ -16,10 +16,18 @@ import type { PricePort } from '@clmm/application';
 
 describe('GetPositionDetail', () => {
   it('returns enriched detail with fees and USD values', async () => {
+    const poolData = {
+      ...FIXTURE_POOL_DATA,
+      sqrtPrice: 2n ** 64n,
+      tickCurrentIndex: 0,
+      tickSpacing: 64,
+      liquidity: 1_000_000_000_000_000n,
+    };
+    const positionDetail = { ...FIXTURE_POSITION_DETAIL, poolData };
     const positionReadPort = new FakeSupportedPositionReadPort(
       [FIXTURE_POSITION_IN_RANGE],
-      { [FIXTURE_POSITION_IN_RANGE.poolId]: FIXTURE_POOL_DATA },
-      FIXTURE_POSITION_DETAIL,
+      { [FIXTURE_POSITION_IN_RANGE.poolId]: poolData },
+      positionDetail,
     );
     const pricePort = new FakePricePort([FIXTURE_SOL_PRICE_QUOTE, FIXTURE_USDC_PRICE_QUOTE]);
 
@@ -35,7 +43,27 @@ describe('GetPositionDetail', () => {
       expect(result.detailDto.tokenPairLabel).toContain('SOL');
       expect(result.detailDto.unclaimedFees).toBeDefined();
       expect(result.detailDto.unclaimedFees.totalUsd).toBeGreaterThan(0);
-      expect(result.detailDto.poolDepthLabel).toBeDefined();
+      expect(result.detailDto.poolDepthLabel).toBe('$0.5M pool depth');
+    }
+  });
+
+  it('returns depth unavailable when either pool token price is missing', async () => {
+    for (const quotes of [[FIXTURE_SOL_PRICE_QUOTE], [FIXTURE_USDC_PRICE_QUOTE]]) {
+      const result = await getPositionDetail({
+        walletId: FIXTURE_WALLET_ID,
+        positionId: FIXTURE_POSITION_ID,
+        positionReadPort: new FakeSupportedPositionReadPort(
+          [FIXTURE_POSITION_IN_RANGE],
+          { [FIXTURE_POSITION_IN_RANGE.poolId]: FIXTURE_POOL_DATA },
+          FIXTURE_POSITION_DETAIL,
+        ),
+        pricePort: new FakePricePort(quotes),
+      });
+
+      expect(result.kind).toBe('found');
+      if (result.kind === 'found') {
+        expect(result.detailDto.poolDepthLabel).toBe('depth unavailable');
+      }
     }
   });
 
@@ -151,5 +179,34 @@ describe('GetPositionDetail', () => {
     });
 
     expect(result.kind).toBe('not-found');
+  });
+
+  it('keeps pool depth independent of the user position range state', async () => {
+    const position = {
+      ...FIXTURE_POSITION_IN_RANGE,
+      rangeState: { kind: 'below-range' as const, currentPrice: -1 },
+    };
+    const poolData = {
+      ...FIXTURE_POOL_DATA,
+      sqrtPrice: 2n ** 64n,
+      tickCurrentIndex: 0,
+      tickSpacing: 64,
+      liquidity: 1_000_000_000_000_000n,
+    };
+    const result = await getPositionDetail({
+      walletId: FIXTURE_WALLET_ID,
+      positionId: FIXTURE_POSITION_ID,
+      positionReadPort: new FakeSupportedPositionReadPort(
+        [position],
+        { [position.poolId]: poolData },
+        { ...FIXTURE_POSITION_DETAIL, position, poolData },
+      ),
+      pricePort: new FakePricePort([FIXTURE_SOL_PRICE_QUOTE, FIXTURE_USDC_PRICE_QUOTE]),
+    });
+
+    expect(result.kind).toBe('found');
+    if (result.kind === 'found') {
+      expect(result.detailDto.poolDepthLabel).toBe('$0.5M pool depth');
+    }
   });
 });

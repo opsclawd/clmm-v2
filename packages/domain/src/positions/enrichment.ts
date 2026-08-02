@@ -66,3 +66,27 @@ export function tokenAmountToUsd(amount: bigint, decimals: number, usdPrice: num
   // but that is JS Number's limit and is acceptable for USD display.
   return parseFloat(`${resultWhole}.${remStr}`);
 }
+
+export function calculateInRangeReserves(
+  liquidity: bigint,
+  sqrtPriceX64: bigint,
+  tickCurrentIndex: number,
+  tickSpacing: number,
+): { amountA: bigint; amountB: bigint } {
+  if (sqrtPriceX64 === 0n || liquidity === 0n) return { amountA: 0n, amountB: 0n };
+
+  const tickLower = Math.floor(tickCurrentIndex / tickSpacing) * tickSpacing;
+  const tickUpper = tickLower + tickSpacing;
+  const sqrtPrice = Number(sqrtPriceX64) / 2 ** 64;
+  const sqrtPriceLower = Math.pow(1.0001, tickLower / 2);
+  const sqrtPriceUpper = Math.pow(1.0001, tickUpper / 2);
+  const liquidityNumber = Number(liquidity);
+
+  const amountA = liquidityNumber * (1 / sqrtPrice - 1 / sqrtPriceUpper);
+  const amountB = liquidityNumber * (sqrtPrice - sqrtPriceLower);
+
+  return {
+    amountA: BigInt(Math.max(0, Math.floor(amountA))),
+    amountB: BigInt(Math.max(0, Math.floor(amountB))),
+  };
+}
