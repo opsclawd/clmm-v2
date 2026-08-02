@@ -6,6 +6,7 @@ import {
 } from './regimePlanValidator.js';
 import holdFixture from '../../../../schemas/regime-engine/position-plan.v1/fixtures/valid/hold.json' with { type: 'json' };
 import requestExitFixture from '../../../../schemas/regime-engine/position-plan.v1/fixtures/valid/request-exit.json' with { type: 'json' };
+import productionRedactedFixture from '../../../../schemas/regime-engine/position-plan.v1/fixtures/valid/production-response-redacted.json' with { type: 'json' };
 import successFixture from '../../../../schemas/regime-engine/execution-result.v1/fixtures/valid/success.json' with { type: 'json' };
 import inRangeRequestFixture from '../../../../schemas/regime-engine/plan-request.v1/fixtures/valid/in-range.json' with { type: 'json' };
 import breachQualifiedRequestFixture from '../../../../schemas/regime-engine/plan-request.v1/fixtures/valid/breach-qualified.json' with { type: 'json' };
@@ -17,6 +18,48 @@ function deepClone<T>(obj: T): T {
 type MutableFixture = Record<string, unknown>;
 
 describe('regimePlanValidator', () => {
+  it('accepts the redacted production response without modification', () => {
+    expect(parseRegimePlanResponse(productionRedactedFixture)).not.toBeNull();
+  });
+
+  it('rejects a response missing a required production sub-shape', () => {
+    const missingTargets = deepClone(productionRedactedFixture) as MutableFixture;
+    delete missingTargets['targets'];
+    expect(parseRegimePlanResponse(missingTargets)).toBeNull();
+
+    const missingNextRegime = deepClone(productionRedactedFixture) as MutableFixture;
+    delete missingNextRegime['nextRegimeState'];
+    expect(parseRegimePlanResponse(missingNextRegime)).toBeNull();
+
+    const missingTelemetry = deepClone(productionRedactedFixture) as MutableFixture;
+    delete missingTelemetry['telemetry'];
+    expect(parseRegimePlanResponse(missingTelemetry)).toBeNull();
+
+    const missingMarketData = deepClone(productionRedactedFixture) as MutableFixture;
+    delete missingMarketData['marketData'];
+    expect(parseRegimePlanResponse(missingMarketData)).toBeNull();
+  });
+
+  it('rejects malformed nested production sub-shapes', () => {
+    const malformedTargets = deepClone(productionRedactedFixture) as MutableFixture;
+    malformedTargets['targets'] = { solBps: 'invalid-type' };
+    expect(parseRegimePlanResponse(malformedTargets)).toBeNull();
+
+    const malformedNextRegime = deepClone(productionRedactedFixture) as MutableFixture;
+    malformedNextRegime['nextRegimeState'] = { current: 'INVALID_REGIME' };
+    expect(parseRegimePlanResponse(malformedNextRegime)).toBeNull();
+
+    const malformedMarketData = deepClone(productionRedactedFixture) as MutableFixture;
+    malformedMarketData['marketData'] = { source: '' };
+    expect(parseRegimePlanResponse(malformedMarketData)).toBeNull();
+  });
+
+  it('rejects the legacy expiresAtUnixMs response shape', () => {
+    const legacyResponse = deepClone(holdFixture) as MutableFixture;
+    legacyResponse['expiresAtUnixMs'] = 1700003600000;
+    expect(parseRegimePlanResponse(legacyResponse)).toBeNull();
+  });
+
   it('accepts the shared schemaVersion 1.0 for plan-request and position-plan contracts', () => {
     expect(parseRegimePlanResponse(holdFixture)).not.toBeNull();
     expect(parseRegimePlanRequest(inRangeRequestFixture)).not.toBeNull();
@@ -113,13 +156,6 @@ describe('regimePlanValidator', () => {
     const missingPortfolio = deepClone(inRangeRequestFixture) as MutableFixture;
     delete missingPortfolio['portfolio'];
     expect(parseRegimePlanRequest(missingPortfolio)).toBeNull();
-  });
-
-  it('rejects invalid expiry ordering where expiresAtUnixMs < asOfUnixMs', () => {
-    const invalidExpiry = deepClone(holdFixture) as MutableFixture;
-    invalidExpiry['asOfUnixMs'] = 1700000000000;
-    invalidExpiry['expiresAtUnixMs'] = 1690000000000;
-    expect(parseRegimePlanResponse(invalidExpiry)).toBeNull();
   });
 
   it('rejects invalid hashes', () => {
