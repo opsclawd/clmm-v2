@@ -177,10 +177,7 @@ export function applyPlanLifecycleTransition(
               kind: 'regime-plan',
               planId: plan.planId,
               canonicalHash: plan.canonicalHash,
-              canonicalExitIntent:
-                advisoryAction.kind === 'REQUEST_EXIT_CLMM' && advisoryAction.exitIntent
-                  ? advisoryAction.exitIntent
-                  : 'exit-to-usdc',
+              canonicalExitIntent: 'exit-to-usdc',
             };
       const newState: PlanLifecycleState = {
         kind: 'awaiting-signature',

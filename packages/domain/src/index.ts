@@ -13,10 +13,7 @@ export {
 export type { ThresholdEvaluation } from './triggers/TriggerQualificationService.js';
 
 // Exit policy — THE CORE INVARIANT
-export {
-  applyDirectionalExitPolicy,
-  mapExitIntentPostureToPolicy,
-} from './exit-policy/DirectionalExitPolicyService.js';
+export { applyDirectionalExitPolicy } from './exit-policy/DirectionalExitPolicyService.js';
 export type { DirectionalExitPolicyResult } from './exit-policy/DirectionalExitPolicyService.js';
 
 // Execution types + factories + policies

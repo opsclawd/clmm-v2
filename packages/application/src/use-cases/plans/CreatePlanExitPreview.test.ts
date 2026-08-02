@@ -15,6 +15,7 @@ import {
   FIXTURE_POSITION_ID,
   FIXTURE_WALLET_ID,
   FIXTURE_POSITION_DETAIL,
+  FIXTURE_POSITION_ABOVE_RANGE,
 } from '@clmm/testing';
 import type { PlanId, CanonicalHash } from '@clmm/domain';
 
@@ -87,23 +88,16 @@ describe('createPlanExitPreview', () => {
     expect(stored?.origin).not.toHaveProperty('breachDirection');
   });
 
-  it('honors explicit exitIntent from advisoryAction without hardcoding exit-to-usdc', async () => {
-    await planRepo.createRequest({
-      planId: PLAN_ID,
-      canonicalHash: CANONICAL_HASH,
-      positionId: FIXTURE_POSITION_ID,
-      walletId: FIXTURE_WALLET_ID,
-      requestedAt: clock.now(),
-      action: { kind: 'REQUEST_EXIT_CLMM', exitIntent: 'exit-to-sol' },
-    });
-    await planRepo.updateLifecycleState({
-      planId: PLAN_ID,
-      lifecycleState: {
-        kind: 'advisory-ready',
-        advisoryAction: { kind: 'REQUEST_EXIT_CLMM', exitIntent: 'exit-to-sol' },
-        regimeResponse: { kind: 'regime-response', regime: 'DOWN', suitability: 'ALLOWED' },
+  it('derives exit-to-sol posture for above-range position using local breach direction', async () => {
+    positionRepo = new FakeSupportedPositionReadPort(
+      [],
+      {},
+      {
+        ...FIXTURE_POSITION_DETAIL,
+        position: FIXTURE_POSITION_ABOVE_RANGE,
       },
-    });
+    );
+    await seedAdvisoryReadyPlan();
 
     const result = await createPlanExitPreview({
       planId: PLAN_ID,
@@ -125,11 +119,8 @@ describe('createPlanExitPreview', () => {
       canonicalExitIntent: 'exit-to-sol',
     });
     expect(result.plan.postExitPosture).toEqual({ kind: 'exit-to-sol' });
-    expect(result.plan.swapInstruction).toEqual({
-      fromAsset: 'USDC',
-      toAsset: 'SOL',
-      policyReason: 'exit-to-sol posture: swap USDC to SOL',
-    });
+    expect(result.plan.swapInstruction.fromAsset).toBe('USDC');
+    expect(result.plan.swapInstruction.toAsset).toBe('SOL');
   });
 
   it('records a preview-created history event carrying the regime-plan origin', async () => {

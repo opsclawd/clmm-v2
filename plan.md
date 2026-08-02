@@ -1,463 +1,532 @@
 <!-- plan-review-required -->
 
-# Reconcile `/v1/plan` Integration Implementation Plan
+# Vendored Position Plan Schema Drift Implementation Plan
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-**Goal:** Make CLMM V2 submit authenticated, contract-valid position plans to `regime-engine` on a durable background cadence, preserve the upstream `planId`/`planHash` unchanged, and report terminal execution results against that same remote identity.
+**Goal:** Accept canonical `REQUEST_EXIT_CLMM` responses that omit `exitIntent`, while removing the fabricated remote-direction field from the application DTO and preserving domain-only ownership of directional exit policy.
 
-**Architecture:** Keep contract and orchestration types in `packages/application`, HTTP translation and pg-boss wiring in `packages/adapters`, and durable request-throttle state in PostgreSQL behind `PlanRepository`. The breach scan publishes lightweight plan-request jobs only after a successful wallet snapshot; a dedicated handler calls the application use case, whose atomic lease enforces one active request per position and whose trigger rules permit interval, range-transition, qualified-breach, and newly closed-candle refreshes. The existing directional exit policy is not touched.
+**Architecture:** Re-vendor the corrected `regime-engine` position-plan contract as one provenance-consistent bundle, align the application DTO and its only interpreting consumer (`RequestPositionPlan`) atomically with that external shape, and verify directionless advisory behavior. The transport adapter remains a pass-through validator; `RequestPositionPlan` persists a directionless `REQUEST_EXIT_CLMM` advisory, and breach direction continues to be interpreted only by `packages/domain/src/exit-policy/DirectionalExitPolicyService.ts`.
 
-**Tech Stack:** TypeScript, Vitest, NestJS, pg-boss, Drizzle ORM/PostgreSQL, AJV 2020, pnpm/Turborepo, Railway.
+**Tech Stack:** TypeScript, JSON Schema draft 2020-12, Ajv 8, Vitest, pnpm workspaces, ESLint.
 
 ---
 
 ## Goal
 
-Reconcile the existing integration rather than replace it. The completed flow must post a canonical request to `POST /v1/plan`, reject stale or incomplete local state before any network call, preserve the response identity in `position_plans`, and automatically initiate plan requests from the backend worker without delaying breach qualification or execution safety.
+Repair the vendored position-plan contract so a real response containing `actions: [{ "type": "REQUEST_EXIT_CLMM", "reasonCode": "..." }]` validates and reaches `RegimePlanAdapter` as `{ kind: "ok" }`, without accepting or deriving remote directional intent.
 
 ## Non-goals
 
-- Do not modify `packages/domain/src/exit-policy/DirectionalExitPolicyService` or re-derive breach direction/posture anywhere else.
-- Do not add UI screens or make screen-open behavior the automated cadence.
-- Do not add a general trading scheduler, multi-protocol planner, redeployment flow, or autonomous execution.
-- Do not add backend signing authority, custody, on-chain receipts, attestations, proofs, or claim verification.
-- Do not hard-code a guessed upstream `PlanRequest.config` shape or fabricate unavailable portfolio/autopilot values.
-- Do not publish a nonexistent npm contracts package. Upstream contracts are vendored from a pinned `opsclawd/regime-engine` commit.
-- Do not modify `regime-engine` source from this worktree. Its authentication patch and request-contract publication are companion work and deployment prerequisites.
-- Do not treat a local unit test as proof of the production acceptance criterion; the final release gate includes authenticated live traffic and correlated logs in both services.
+- Do not change the lower-bound/upper-bound directional mapping or move it out of `packages/domain/src/exit-policy/DirectionalExitPolicyService.ts`.
+- Do not modify Orca, Jupiter, wallet-signing, execution, UI, or Expo code.
+- Do not add a compatibility shim for upstream `exitIntent`; after this change it is an unknown action property and remains invalid under `additionalProperties: false`.
+- Do not add `expiresAtUnixMs`; the current request-exit fixture already omits it, and `legacy-expires-at.json` must remain invalid.
+- Do not change `schemas/regime-engine/plan-request.v1/` or `schemas/regime-engine/execution-result.v1/` unless the upstream audit finds concrete drift. Such a finding is a stop condition requiring a separately scoped contract update.
+- Do not modify `PlanAction` in `packages/domain/src/regime/PositionPlan.ts`; its optional internal `exitIntent` is a domain lifecycle concern, not part of the remote DTO.
+- Do not claim a production deployment or live-container check from unit tests. The adapter regression reproduces the live payload shape locally; the post-deployment diagnostic remains an operational release check requiring the existing private environment and credentials.
 
-## Assumptions and external prerequisites
+## Assumptions
 
-1. The companion `regime-engine` change publishes a JSON Schema plus valid/invalid fixtures at `contracts/plan-request/v1/`, protects `POST /v1/plan` with the `X-CLMM-Internal-Token` shared secret, and deploys before CLMM V2 enables automated requests. The upstream secret is named `CLMM_INTERNAL_TOKEN`; its value equals CLMM V2's existing `REGIME_ENGINE_INTERNAL_TOKEN` deployment secret.
-2. The current checked-in response and execution-result schemas remain authoritative until refreshed from the same upstream commit. The issue's claim that the execution-result endpoint expects schema version `"1.0"` conflicts with the vendored `execution-result.v1` schema; Task 1 resolves that from upstream artifacts instead of guessing.
-3. `PositionDetail.principalTokenAmounts` and `PoolData.tokenPair` are the source for `solUnits` and `usdcUnits`; `currentPrice` values SOL in USDC, so `navUsd = solUnits * currentPrice + usdcUnits`. A missing principal quote, missing decimals, non-finite value, or non-SOL/USDC pair is a fail-closed `portfolio-unavailable` outcome.
-4. `activeClmm` is the count of currently supported positions for the wallet. `stopouts24h` counts qualified-breach terminal exits in the wallet's off-chain history during `[now - 24h, now]`. `redeploys24h` is always zero because redeployment is outside this product. `strikeCount`, cooldown, and stand-down values come from durable planner state; absence means the schema-defined neutral values only if upstream documents those values as neutral.
-5. A newly closed one-hour candle is represented by `floor(now / 3_600_000) * 3_600_000 - 3_600_000`. This is a refresh signal, not a claim that CLMM owns candle ingestion.
-6. The minimum refresh interval is 15 minutes and the in-flight lease is 2 minutes. Both are named constants in application code and may only become configuration after evidence shows an operational need.
+- The upstream `regime-engine` repository will expose a corrected, merged `contracts/position-plan/v1/` directory whose `PlanAction` agrees with `src/contract/v1/types.ts` and has no `exitIntent`.
+- `issue-comments.md` is empty and adds no requirements.
+- The audit of the pinned plan-request and execution-result contracts is read-only because their current top-level shapes and fixtures contain no `exitIntent`, `PlanExitIntent`, or equivalent conditional direction requirement.
+- The current dirty changes to `design.md` and `issue.md` belong to the user and must not be staged or altered.
 
 ## Affected files
 
-**Vendored contracts**
+Files to modify or delete:
 
-- `schemas/regime-engine/plan-request.v1/schema.json`
-- `schemas/regime-engine/plan-request.v1/schema.sha256`
-- `schemas/regime-engine/plan-request.v1/provenance.json`
-- `schemas/regime-engine/plan-request.v1/fixtures/valid/in-range.json`
-- `schemas/regime-engine/plan-request.v1/fixtures/valid/breach-qualified.json`
-- `schemas/regime-engine/plan-request.v1/fixtures/invalid/missing-portfolio.json`
-- `schemas/regime-engine/plan-request.v1/fixtures/invalid/missing-autopilot-state.json`
-- `schemas/regime-engine/plan-request.v1/fixtures/invalid/missing-config.json`
 - `schemas/regime-engine/position-plan.v1/schema.json`
 - `schemas/regime-engine/position-plan.v1/schema.sha256`
 - `schemas/regime-engine/position-plan.v1/provenance.json`
-- `schemas/regime-engine/position-plan.v1/fixtures/valid/hold.json`
 - `schemas/regime-engine/position-plan.v1/fixtures/valid/request-exit.json`
-- `schemas/regime-engine/position-plan.v1/fixtures/invalid/unsupported-action.json`
-- `schemas/regime-engine/position-plan.v1/fixtures/invalid/missing-exit-intent.json`
-- `schemas/regime-engine/position-plan.v1/fixtures/invalid/inline-candles-and-portfolio.json`
-- `schemas/regime-engine/execution-result.v1/schema.json`
-- `schemas/regime-engine/execution-result.v1/schema.sha256`
-- `schemas/regime-engine/execution-result.v1/provenance.json`
-- `schemas/regime-engine/execution-result.v1/fixtures/valid/success.json`
-- `schemas/regime-engine/execution-result.v1/fixtures/valid/skipped.json`
-- `schemas/regime-engine/execution-result.v1/fixtures/invalid/unsupported-status.json`
-- `schemas/regime-engine/execution-result.v1/fixtures/invalid/extra-forbidden-fields.json`
-
-**Application contracts and orchestration**
-
+- `schemas/regime-engine/position-plan.v1/fixtures/invalid/missing-exit-intent.json` (delete)
 - `packages/application/src/dto/regimePlan.ts`
-- `packages/application/src/dto/regimePlanValidator.ts`
-- `packages/application/src/dto/regimePlanValidator.test.ts`
-- `packages/application/src/dto/regimePlanContract.test.ts`
-- `packages/application/src/ports/index.ts`
-- `packages/application/src/use-cases/plans/buildRegimePlanRequest.ts`
-- `packages/application/src/use-cases/plans/buildRegimePlanRequest.test.ts`
+- `packages/application/src/dto/index.ts`
+- `packages/application/src/public/index.ts`
 - `packages/application/src/use-cases/plans/RequestPositionPlan.ts`
-- `packages/application/src/use-cases/plans/RequestPositionPlan.test.ts`
-- `packages/application/src/use-cases/plans/RecordPlanDecision.test.ts`
-- `packages/application/src/use-cases/plans/SyncPlanExecutionResults.ts`
-- `packages/application/src/use-cases/plans/SyncPlanExecutionResults.test.ts`
-- `packages/application/src/use-cases/triggers/ScanPositionsForBreaches.ts`
-- `packages/application/src/use-cases/triggers/ScanPositionsForBreaches.test.ts`
-
-**Adapters, persistence, and worker wiring**
-
-- `packages/adapters/src/outbound/regime-engine/RegimePlanAdapter.ts`
-- `packages/adapters/src/outbound/regime-engine/RegimePlanAdapter.test.ts`
-- `packages/adapters/src/outbound/storage/schema/position-plan-request-state.ts`
-- `packages/adapters/src/outbound/storage/schema/index.ts`
-- `packages/adapters/src/outbound/storage/PlanStorageAdapter.ts`
-- `packages/adapters/src/outbound/storage/PlanStorageAdapter.test.ts`
-- `packages/adapters/src/outbound/storage/schema/__tests__/schema-snapshot.test.ts`
-- `packages/adapters/drizzle/0005_position_plan_request_state.sql`
-- `packages/adapters/drizzle/meta/_journal.json`
-- `packages/adapters/drizzle/meta/0005_snapshot.json`
-- `packages/adapters/src/composition/RegimePlanRequestConfig.ts`
-- `packages/adapters/src/composition/RegimePlanRequestConfig.test.ts`
-- `packages/adapters/src/composition/AdaptersModule.ts`
-- `packages/adapters/src/inbound/http/tokens.ts`
-- `packages/adapters/src/inbound/http/AppModule.ts`
-- `packages/adapters/src/inbound/http/PlanController.ts`
 - `packages/adapters/src/inbound/http/PlanController.test.ts`
-- `packages/adapters/src/inbound/jobs/tokens.ts`
-- `packages/adapters/src/inbound/jobs/BreachScanJobHandler.ts`
-- `packages/adapters/src/inbound/jobs/BreachScanJobHandler.test.ts`
-- `packages/adapters/src/inbound/jobs/PositionPlanRequestJobHandler.ts`
-- `packages/adapters/src/inbound/jobs/PositionPlanRequestJobHandler.test.ts`
-- `packages/adapters/src/inbound/jobs/WorkerModule.ts`
-- `packages/adapters/src/inbound/jobs/WorkerModule.test.ts`
-- `packages/adapters/src/inbound/jobs/WorkerLifecycle.ts`
-- `packages/adapters/src/inbound/jobs/WorkerLifecycle.test.ts`
+- `packages/application/src/dto/regimePlanContract.test.ts`
+- `packages/application/src/dto/regimePlanValidator.test.ts`
+- `packages/adapters/src/outbound/regime-engine/RegimePlanAdapter.test.ts`
+- `packages/application/src/use-cases/plans/RequestPositionPlan.test.ts`
 
-**Testing support and end-to-end scenarios**
+Read-only references:
 
-- `packages/testing/src/fakes/FakePlanRepository.ts`
+- `design.md`
+- `issue.md`
+- `schemas/regime-engine/plan-request.v1/schema.json`
+- `schemas/regime-engine/plan-request.v1/provenance.json`
+- `schemas/regime-engine/execution-result.v1/schema.json`
+- `schemas/regime-engine/execution-result.v1/provenance.json`
+- `packages/application/src/dto/regimePlanValidator.ts`
+- `packages/application/src/ports/index.ts`
+- `packages/adapters/src/outbound/regime-engine/RegimePlanAdapter.ts`
+- `packages/adapters/src/inbound/http/PlanController.ts`
 - `packages/testing/src/fakes/FakeRegimePlanPort.ts`
-- `packages/testing/src/scenarios/PositionPlanLifecycle.test.ts`
+- `packages/domain/src/regime/PositionPlan.ts`
+- `packages/domain/src/exit-policy/DirectionalExitPolicyService.ts`
 
 ## Behavioral invariants
 
-1. **Contract authority:** Only a request accepted by the vendored `plan-request.v1` schema may cross the adapter boundary. Missing `portfolio`, `autopilotState`, or `config` fails locally without a fetch.
-2. **Endpoint and authentication:** Every plan request targets `/v1/plan` and every plan/result write carries `X-CLMM-Internal-Token`; 401/403 is permanent, while network/timeout/5xx remains retryable-degraded.
-3. **Fresh financial state:** If position age is greater than five minutes, principal inventory is unavailable, token identity is ambiguous, or numeric conversion is non-finite, no plan request is sent.
-4. **Remote identity:** For an accepted response, local `PositionPlan.planId` equals `response.planId` and local `canonicalHash` equals `response.planHash`. A local ID generator never supplies either value.
-5. **Result correlation:** Every execution-result payload uses the persisted remote `planId` and `planHash` unchanged, including all retries after restart.
-6. **One active request:** When position `P` has an unexpired lease, all concurrent claims for `P` are suppressed; claims for other positions remain independent.
-7. **Refresh transitions:** A claim is granted when there is no prior state, the minimum interval elapsed, range state changed, a breach became qualified, the qualified breach identity changed, a new one-hour candle closed, or an abandoned lease expired. Otherwise it is suppressed.
-8. **Failure throttling:** A transport failure clears the active lease but preserves `lastAttemptAt` and the consumed signal markers, so ordinary observations cannot immediately spam the endpoint; later interval or genuinely newer signals can retry.
-9. **Stale suppression precedes lease acquisition:** Stale snapshots never consume a cadence signal or lease.
-10. **Background isolation:** A successful wallet scan enqueues one plan-request job per open supported position. Enqueue or execution failure is logged per position and does not block trigger qualification, abandonment handling, execution, or scanning of other positions.
-11. **Directional precedence:** A qualified lower or upper breach continues to supersede advisory output exactly as today; no task maps breach direction to target assets outside `DirectionalExitPolicyService`.
+1. **Canonical request-exit acceptance:** Given an otherwise valid position-plan response whose action is `REQUEST_EXIT_CLMM` and has only `type` and `reasonCode`, validation succeeds and `RegimePlanAdapter.requestPositionPlan` returns `{ kind: "ok" }`.
+2. **No remote direction field:** Given an otherwise valid position-plan response whose action includes `exitIntent`, validation fails because `PlanAction.additionalProperties` remains `false`; no compatibility path silently consumes it.
+3. **Directionless application mapping:** Given a validated remote `REQUEST_EXIT_CLMM`, `RequestPositionPlan` creates and accepts a domain advisory action equal to `{ kind: "REQUEST_EXIT_CLMM" }`, with no posture inferred from regime, targets, token order, or reason code.
+4. **Unaffected action mapping:** Given `HOLD` or `STAND_DOWN`, `RequestPositionPlan` continues to persist the matching domain action kind.
+5. **Directional ownership:** Lower- and upper-bound mapping remains unchanged and exclusively implemented by `DirectionalExitPolicyService`; no adapter or application code introduced by this work maps a response to `ExitToUSDC` or `ExitToSOL`.
+6. **Vendored bundle integrity:** Every retained asset listed in position-plan `provenance.json` hashes to the recorded SHA-256; the deleted invalid fixture is removed from both disk and provenance; `schema.sha256` equals the SHA-256 of `schema.json`.
+7. **Sibling-contract stability:** The plan-request and execution-result schemas continue to match the same audited upstream contract commit and are not edited when their declarations show no equivalent fabricated direction field.
 
-## Task 1: Pin the canonical request, response, and result contracts
+## Task 1: Re-vendor canonical position-plan contract, narrow application DTO, and update mapper
 
 **Files:**
 
-- Create: `schemas/regime-engine/plan-request.v1/schema.json`
-- Create: `schemas/regime-engine/plan-request.v1/schema.sha256`
-- Create: `schemas/regime-engine/plan-request.v1/provenance.json`
-- Create: `schemas/regime-engine/plan-request.v1/fixtures/valid/in-range.json`
-- Create: `schemas/regime-engine/plan-request.v1/fixtures/valid/breach-qualified.json`
-- Create: `schemas/regime-engine/plan-request.v1/fixtures/invalid/missing-portfolio.json`
-- Create: `schemas/regime-engine/plan-request.v1/fixtures/invalid/missing-autopilot-state.json`
-- Create: `schemas/regime-engine/plan-request.v1/fixtures/invalid/missing-config.json`
-- Refresh from the same pinned commit: `schemas/regime-engine/position-plan.v1/**`
-- Refresh from the same pinned commit: `schemas/regime-engine/execution-result.v1/**`
-- Modify: `packages/application/src/dto/regimePlanContract.test.ts`
+- Modify: `schemas/regime-engine/position-plan.v1/schema.json` (`$defs.PlanAction` and removal of `$defs.PlanExitIntent`)
+- Modify: `schemas/regime-engine/position-plan.v1/schema.sha256`
+- Modify: `schemas/regime-engine/position-plan.v1/provenance.json` (commit and hashes for the corrected bundle)
+- Modify: `schemas/regime-engine/position-plan.v1/fixtures/valid/request-exit.json` (`actions[0]` only)
+- Delete: `schemas/regime-engine/position-plan.v1/fixtures/invalid/missing-exit-intent.json`
+- Modify: `packages/application/src/dto/regimePlan.ts` (remove `RegimePlanExitPosture`, `RegimePlanExitIntent`, narrow `RegimePlanAction`)
+- Modify: `packages/application/src/dto/index.ts` (remove deleted type re-exports)
+- Modify: `packages/application/src/public/index.ts` (remove deleted type re-exports)
+- Modify: `packages/application/src/use-cases/plans/RequestPositionPlan.ts` (remove `mapRegimeExitPostureToDomain` and map `REQUEST_EXIT_CLMM` directly)
+- Modify: `packages/adapters/src/inbound/http/PlanController.test.ts` (remove fabricated `exitIntent` from mock response)
+- Modify: `packages/application/src/dto/regimePlanContract.test.ts` (position-plan imports and position-plan fixture assertions only)
+- Modify: `packages/application/src/dto/regimePlanValidator.test.ts` (replace the request-exit intent case only)
+- Modify: `packages/adapters/src/outbound/regime-engine/RegimePlanAdapter.test.ts` (`requestPositionPlan` describe block only)
+- Read: `schemas/regime-engine/plan-request.v1/schema.json`
+- Read: `schemas/regime-engine/plan-request.v1/provenance.json`
+- Read: `schemas/regime-engine/execution-result.v1/schema.json`
+- Read: `schemas/regime-engine/execution-result.v1/provenance.json`
+- Read: `packages/application/src/dto/regimePlanValidator.ts`
+- Read: `packages/adapters/src/outbound/regime-engine/RegimePlanAdapter.ts`
+- Read: `packages/adapters/src/inbound/http/PlanController.ts`
+- Read: `packages/testing/src/fakes/FakeRegimePlanPort.ts`
 
-- [ ] Add failing contract tests named `accepts every canonical plan-request valid fixture`, `rejects every canonical plan-request invalid fixture`, and `pins all regime plan contracts to one upstream commit`.
-- [ ] In the companion upstream PR, first publish `contracts/plan-request/v1/` with the schema and fixtures and protect `/v1/plan`. Pin the merged commit, then vendor request, response, and result artifacts using the established provenance layout. Record the repository, exact commit, source path, local path, and sha256 for every asset.
-- [ ] Make the contract test compile all three schemas with strict AJV 2020 and deep-clone every fixture before validation. Assert schema-version constants directly from the schemas so the `"1.0"` versus `execution-result.v1` conflict is resolved by evidence.
-- [ ] Confirm request fixtures require `portfolio`, `autopilotState`, and `config`, and that market values admit `source: "geckoterminal"`, `network: "solana"`, and the selected one-hour timeframe. Do not edit a vendored schema to fit local code.
-- [ ] If upstream fixture names differ, preserve upstream bytes but map them to the explicit local filenames above in `provenance.json`; the provenance hashes must cover the renamed local copies.
-- [ ] Commit as `chore(contracts): vendor regime plan request contract`.
+**Exported signature changes:**
 
-**Acceptance and scoped verification:**
+- Remove exported `RegimePlanExitPosture`.
+- Remove exported `RegimePlanExitIntent`.
+- Breakingly narrow exported `RegimePlanAction` to `{ type: RegimePlanActionType; reasonCode: string }`.
+- Consequently narrow `RegimePlanResponse.actions` through its `RegimePlanAction[]` member.
 
-```bash
-pnpm --filter @clmm/application exec vitest run src/dto/regimePlanContract.test.ts
-pnpm --filter @clmm/application exec eslint src/dto/regimePlanContract.test.ts --ext .ts
-git diff --check -- schemas/regime-engine/plan-request.v1 schemas/regime-engine/position-plan.v1 schemas/regime-engine/execution-result.v1 packages/application/src/dto/regimePlanContract.test.ts
-```
+**Invariants to test first:**
 
-Expected: canonical valid fixtures pass, canonical invalid fixtures fail, all three provenance files identify one upstream commit, and no npm contracts dependency is introduced.
+- `accepts a request-exit plan without remote exit intent`
+- `rejects fabricated remote exit intent on request-exit actions`
+- `returns ok for a canonical request-exit response without exitIntent`
+- `verifies that all vendored asset sha256 checksums match provenance.json`
 
-## Task 2: Correct the plan transport endpoint without changing failure semantics
+- [ ] **Step 1: Verify the upstream source before changing local artifacts.**
+
+  Inspect the corrected, merged upstream commit, not an unmerged branch or the live response alone. At that one commit, compare:
+  - `src/contract/v1/types.ts` `PlanAction`, `PlanRequest`, and `ExecutionResult` declarations;
+  - `contracts/position-plan/v1/`, `contracts/plan-request/v1/`, and `contracts/execution-result/v1/` schemas and fixtures.
+
+  Continue only when `contracts/position-plan/v1/` itself has no `exitIntent` or `PlanExitIntent` and its `REQUEST_EXIT_CLMM` fixture omits the field. Record that exact commit in all three provenance files only if all three contract directories were sourced from it; otherwise update only position-plan provenance and remove the cross-contract same-commit assertion in favor of explicit per-contract pins. If the contract directory still disagrees with `src/contract/v1/types.ts`, stop and fix/publish the upstream contract first—do not hand-edit a file while claiming it was copied unchanged.
+
+  Audit result expected from the design and current local evidence: plan-request and execution-result contain no fabricated directional member and require no local edits.
+
+- [ ] **Step 2: Re-vendor the corrected position-plan bundle.**
+
+  Copy the corrected upstream assets from the verified commit into the existing local layout. The resulting `PlanAction` definition must be:
+
+  ```json
+  "PlanAction": {
+    "type": "object",
+    "required": ["type", "reasonCode"],
+    "additionalProperties": false,
+    "properties": {
+      "type": {
+        "type": "string",
+        "enum": ["HOLD", "STAND_DOWN", "REQUEST_EXIT_CLMM"]
+      },
+      "reasonCode": {
+        "type": "string",
+        "minLength": 1
+      }
+    }
+  }
+  ```
+
+  There must be no `allOf`/`if`/`then` condition under `PlanAction` and no `PlanExitIntent` definition. Delete `fixtures/invalid/missing-exit-intent.json`.
+
+  Regenerate `schema.sha256` from the exact bytes of `schema.json`. Update `provenance.json` with the verified upstream commit, copy time, retained upstream source paths, and freshly computed hashes for every position-plan asset. Remove the deleted fixture's provenance entry. Do not alter the hashes of unchanged assets unless their bytes were actually re-vendored from the corrected commit.
+
+- [ ] **Step 3: Narrow application DTO and update re-exports.**
+
+  In `packages/application/src/dto/regimePlan.ts`, delete `RegimePlanExitPosture` and `RegimePlanExitIntent`, and define:
+
+  ```ts
+  export type RegimePlanAction = {
+    type: RegimePlanActionType;
+    reasonCode: string;
+  };
+  ```
+
+  Remove `RegimePlanExitPosture` and `RegimePlanExitIntent` from the re-export blocks in `packages/application/src/dto/index.ts` and `packages/application/src/public/index.ts`.
+
+- [ ] **Step 4: Update application mapper and test mocks.**
+
+  In `packages/application/src/use-cases/plans/RequestPositionPlan.ts`, remove the `RegimePlanExitPosture` import and delete `mapRegimeExitPostureToDomain`. Update `extractAdvisoryAction`:
+
+  ```ts
+  if (requestedAction.type === 'REQUEST_EXIT_CLMM') {
+    return { kind: 'REQUEST_EXIT_CLMM' };
+  }
+  ```
+
+  In `packages/adapters/src/inbound/http/PlanController.test.ts`, update `createAdvisoryReadyPlanResponse()` to remove `exitIntent: { posture: 'ExitToUSDC' }` so mock payload creation matches the narrowed `RegimePlanAction` DTO.
+
+- [ ] **Step 5: Write schema validator and adapter parser tests.**
+
+  Change `request-exit.json` fixture so its action is:
+
+  ```json
+  {
+    "type": "REQUEST_EXIT_CLMM",
+    "reasonCode": "OUT_OF_RANGE_DOWNTREND"
+  }
+  ```
+
+  In `regimePlanValidator.test.ts`, replace `rejects a request-exit plan without canonical exit intent` with:
+
+  ```ts
+  it('accepts a request-exit plan without remote exit intent', () => {
+    const parsed = parseRegimePlanResponse(requestExitFixture);
+    expect(parsed).not.toBeNull();
+    expect(parsed?.actions[0]).toEqual({
+      type: 'REQUEST_EXIT_CLMM',
+      reasonCode: 'OUT_OF_RANGE_DOWNTREND',
+    });
+  });
+
+  it('rejects fabricated remote exit intent on request-exit actions', () => {
+    const withExitIntent = deepClone(requestExitFixture) as MutableFixture;
+    const actions = withExitIntent['actions'] as Array<Record<string, unknown>>;
+    actions[0]!['exitIntent'] = { posture: 'ExitToUSDC' };
+    expect(parseRegimePlanResponse(withExitIntent)).toBeNull();
+  });
+  ```
+
+  In `regimePlanContract.test.ts`, remove `missing-exit-intent.json` from `rejects every canonical position-plan invalid fixture`.
+
+  In `RegimePlanAdapter.test.ts`, add inside `describe('requestPositionPlan')`:
+
+  ```ts
+  it('returns ok for a canonical request-exit response without exitIntent', async () => {
+    vi.mocked(fetch).mockResolvedValue(
+      new Response(JSON.stringify(requestExitFixture), { status: 200 }),
+    );
+
+    const adapter = new RegimePlanAdapter('https://regime.example.com', 'test-token', obs.port);
+    const result = await adapter.requestPositionPlan(VALID_PLAN_REQUEST);
+
+    expect(result).toEqual({ kind: 'ok', response: requestExitFixture });
+  });
+  ```
+
+- [ ] **Step 6: Run Task 1 verification checks.**
+
+  Run:
+
+  ```bash
+  pnpm --filter @clmm/application exec vitest run src/dto/regimePlanContract.test.ts src/dto/regimePlanValidator.test.ts
+  pnpm --filter @clmm/adapters exec vitest run src/outbound/regime-engine/RegimePlanAdapter.test.ts src/inbound/http/PlanController.test.ts
+  pnpm --filter @clmm/application exec eslint src/dto/regimePlan.ts src/dto/index.ts src/public/index.ts src/use-cases/plans/RequestPositionPlan.ts src/dto/regimePlanContract.test.ts src/dto/regimePlanValidator.test.ts --ext .ts
+  pnpm --filter @clmm/adapters exec eslint src/outbound/regime-engine/RegimePlanAdapter.test.ts src/inbound/http/PlanController.test.ts --ext .ts
+  pnpm -r typecheck
+  git diff --check -- schemas/regime-engine/position-plan.v1 packages/application/src/dto packages/application/src/public packages/application/src/use-cases/plans/RequestPositionPlan.ts packages/adapters/src/outbound/regime-engine/RegimePlanAdapter.test.ts packages/adapters/src/inbound/http/PlanController.test.ts
+  ```
+
+  Expected: schema validation, adapter success path, controller mock response, application typechecks, and workspace typechecks pass completely cleanly.
+
+- [ ] **Step 7: Commit Task 1.**
+
+  ```bash
+  git add schemas/regime-engine/position-plan.v1 packages/application/src/dto packages/application/src/public/index.ts packages/application/src/use-cases/plans/RequestPositionPlan.ts packages/adapters/src/outbound/regime-engine/RegimePlanAdapter.test.ts packages/adapters/src/inbound/http/PlanController.test.ts
+  git commit -m "fix(contracts): accept canonical request exit plans and narrow application DTO"
+  ```
+
+  Confirm `design.md` and `issue.md` are not staged.
+
+## Task 2: Verify directionless advisory persistence and domain exit policy invariants in use-case tests
 
 **Files:**
 
-- Modify: `packages/adapters/src/outbound/regime-engine/RegimePlanAdapter.ts`
-- Modify: `packages/adapters/src/outbound/regime-engine/RegimePlanAdapter.test.ts`
-
-- [ ] Change the existing transport test first so `posts the exact canonical position-plan request` expects `https://regime.example.com/v1/plan` and still asserts `POST`, JSON content type, and `X-CLMM-Internal-Token`.
-- [ ] Change only the plan URL construction from `/v1/position-plan` to `/v1/plan`. Keep timeout, error-envelope parsing, and status classification unchanged.
-- [ ] Add a trailing-slash case proving `https://regime.example.com/` resolves to exactly one slash before `v1/plan`.
-- [ ] Preserve the execution-result path `/v1/execution-result` and its authentication assertion.
-- [ ] Commit as `fix(adapters): target regime v1 plan endpoint`.
-
-**Acceptance and scoped verification:**
-
-```bash
-pnpm --filter @clmm/adapters exec vitest run src/outbound/regime-engine/RegimePlanAdapter.test.ts
-pnpm --filter @clmm/adapters exec eslint src/outbound/regime-engine/RegimePlanAdapter.ts src/outbound/regime-engine/RegimePlanAdapter.test.ts --ext .ts
-git diff --check -- packages/adapters/src/outbound/regime-engine/RegimePlanAdapter.ts packages/adapters/src/outbound/regime-engine/RegimePlanAdapter.test.ts
-```
-
-Expected: the focused adapter suite passes with `/v1/plan`; auth, timeout, 4xx, and 5xx classifications are unchanged.
-
-## Task 3: Build a contract-valid request and persist upstream identity
-
-**Files:**
-
-- Modify: `packages/application/src/dto/regimePlan.ts`
-- Modify: `packages/application/src/dto/regimePlanValidator.ts`
-- Modify: `packages/application/src/dto/regimePlanValidator.test.ts`
-- Modify: `packages/application/src/dto/regimePlanContract.test.ts`
-- Modify: `packages/application/src/ports/index.ts`
-- Create: `packages/application/src/use-cases/plans/buildRegimePlanRequest.ts`
-- Create: `packages/application/src/use-cases/plans/buildRegimePlanRequest.test.ts`
-- Modify: `packages/application/src/use-cases/plans/RequestPositionPlan.ts`
 - Modify: `packages/application/src/use-cases/plans/RequestPositionPlan.test.ts`
-- Modify: `packages/adapters/src/outbound/storage/PlanStorageAdapter.ts`
-- Modify: `packages/adapters/src/outbound/storage/PlanStorageAdapter.test.ts`
-- Create: `packages/adapters/src/composition/RegimePlanRequestConfig.ts`
-- Create: `packages/adapters/src/composition/RegimePlanRequestConfig.test.ts`
-- Modify: `packages/adapters/src/composition/AdaptersModule.ts`
-- Modify: `packages/adapters/src/inbound/http/tokens.ts`
-- Modify: `packages/adapters/src/inbound/http/AppModule.ts`
-- Modify: `packages/adapters/src/inbound/http/PlanController.ts`
-- Modify: `packages/adapters/src/inbound/http/PlanController.test.ts`
-- Modify: `packages/adapters/src/inbound/jobs/tokens.ts`
-- Modify: `packages/adapters/src/inbound/jobs/WorkerModule.ts`
-- Modify: `packages/adapters/src/inbound/jobs/WorkerModule.test.ts`
-- Modify: `packages/adapters/src/outbound/regime-engine/RegimePlanAdapter.ts`
-- Modify: `packages/adapters/src/outbound/regime-engine/RegimePlanAdapter.test.ts`
-- Modify: `packages/testing/src/fakes/FakeRegimePlanPort.ts`
-- Modify: `packages/testing/src/fakes/FakePlanRepository.ts`
-- Modify: `packages/testing/src/scenarios/PositionPlanLifecycle.test.ts`
+- Read: `packages/domain/src/exit-policy/DirectionalExitPolicyService.ts`
+- Read: `packages/domain/src/regime/PositionPlan.ts`
 
-- [ ] Mirror the exact required request structure from `schemas/regime-engine/plan-request.v1/schema.json` in `RegimePlanRequest`. Add request validation alongside response/result validation and export a fail-closed `parseRegimePlanRequest(value): RegimePlanRequest | null`.
-- [ ] Write the new builder tests first with these exact names: `maps SOL and USDC principal units regardless of pool token order`, `computes navUsd from principal units and current SOL price`, `uses geckoterminal solana one-hour market identity`, `derives autopilot counters only from authoritative local history`, `uses zero redeploys because redeployment is unsupported`, `rejects missing principal inventory`, `rejects unknown token pairs`, and `rejects configuration that fails the vendored schema`.
-- [ ] Implement `buildRegimePlanRequest` as a pure application helper. Convert bigint principal amounts using token decimals, identify SOL/USDC by symbols and known mints rather than token order, reject unsafe numeric values, count only last-24-hour qualified-breach terminal history, calculate the latest closed one-hour candle, and validate the finished object before returning it.
-- [ ] Add `resolveRegimePlanRequestConfig` at composition time. Parse the exact schema-owned config fields from `REGIME_PLAN_CONFIG_JSON`; return a discriminated `configured | missing | invalid` result without defaults. Register the resolved value under one shared `REGIME_PLAN_REQUEST_CONFIG` token in both HTTP and worker composition.
-- [ ] Update `requestPositionPlan` to receive `ExecutionHistoryRepository` and the resolved config, load `PositionDetail`, supported-position count, actionable triggers, and wallet history, and return `unavailable` with `portfolio-unavailable` or `config-unavailable` before transport when authoritative inputs are missing.
-- [ ] Keep stale-state rejection before expensive reads and before transport. Keep qualified breach precedence unchanged.
-- [ ] Replace `idGenerator.generateId()` and the local fingerprint cast: call `planRepository.createRequest` with `response.planId` as `PlanId` and `response.planHash` as `CanonicalHash`; continue storing the local snapshot fingerprint only as diagnostic request metadata.
-- [ ] On exact remote replay, return the just-validated upstream response rather than casting `PositionPlan` to `RegimePlanResponse`. On local conflict, report the upstream plan ID and do not accept the response into a different row.
-- [ ] Order `PlanStorageAdapter.getCurrentPlan(positionId)` by `requestedAt` descending (with `planId` as a deterministic tie-breaker) before `limit(1)`, and make the shared fake select the same latest plan. This prevents automated refreshes from returning an arbitrary historical row.
-- [ ] Update every existing caller in the same task: `PlanController`, the application tests, and the testing scenario. Update `FakeRegimePlanPort` fixtures and the production `RegimePlanAdapter` declaration/diagnostics to consume the reconciled request type in this task; keep transport behavior from Task 2 unchanged.
-- [ ] Name identity tests `persists response planId and planHash unchanged`, `does not generate a local plan identity`, and `returns the validated remote response for an exact replay`.
-- [ ] Commit as `feat(plans): reconcile request contract and remote identity`.
+**Invariants to test first:**
 
-**Acceptance and scoped verification:**
+- `persists request-exit advisory without remote directional intent`
+- `maps hold and stand-down actions without changing their kinds`
+- `does not derive exit posture outside DirectionalExitPolicyService`
 
-```bash
-pnpm --filter @clmm/application exec vitest run src/dto/regimePlanValidator.test.ts src/dto/regimePlanContract.test.ts src/use-cases/plans/buildRegimePlanRequest.test.ts src/use-cases/plans/RequestPositionPlan.test.ts
-pnpm --filter @clmm/adapters exec vitest run src/composition/RegimePlanRequestConfig.test.ts src/outbound/regime-engine/RegimePlanAdapter.test.ts src/inbound/http/PlanController.test.ts src/inbound/jobs/WorkerModule.test.ts
-pnpm --filter @clmm/adapters exec vitest run src/outbound/storage/PlanStorageAdapter.test.ts
-pnpm --filter @clmm/testing exec vitest run src/scenarios/PositionPlanLifecycle.test.ts
-pnpm --filter @clmm/application exec eslint src/dto/regimePlan.ts src/dto/regimePlanValidator.ts src/dto/regimePlanValidator.test.ts src/dto/regimePlanContract.test.ts src/ports/index.ts src/use-cases/plans/buildRegimePlanRequest.ts src/use-cases/plans/buildRegimePlanRequest.test.ts src/use-cases/plans/RequestPositionPlan.ts src/use-cases/plans/RequestPositionPlan.test.ts --ext .ts
-pnpm --filter @clmm/adapters exec eslint src/composition/RegimePlanRequestConfig.ts src/composition/RegimePlanRequestConfig.test.ts src/composition/AdaptersModule.ts src/inbound/http/tokens.ts src/inbound/http/AppModule.ts src/inbound/http/PlanController.ts src/inbound/http/PlanController.test.ts src/inbound/jobs/tokens.ts src/inbound/jobs/WorkerModule.ts src/inbound/jobs/WorkerModule.test.ts src/outbound/regime-engine/RegimePlanAdapter.ts src/outbound/regime-engine/RegimePlanAdapter.test.ts src/outbound/storage/PlanStorageAdapter.ts src/outbound/storage/PlanStorageAdapter.test.ts --ext .ts
-git diff --check -- packages/application/src/dto/regimePlan.ts packages/application/src/dto/regimePlanValidator.ts packages/application/src/dto/regimePlanValidator.test.ts packages/application/src/dto/regimePlanContract.test.ts packages/application/src/ports/index.ts packages/application/src/use-cases/plans/buildRegimePlanRequest.ts packages/application/src/use-cases/plans/buildRegimePlanRequest.test.ts packages/application/src/use-cases/plans/RequestPositionPlan.ts packages/application/src/use-cases/plans/RequestPositionPlan.test.ts packages/adapters/src/composition/RegimePlanRequestConfig.ts packages/adapters/src/composition/RegimePlanRequestConfig.test.ts packages/adapters/src/composition/AdaptersModule.ts packages/adapters/src/inbound/http/tokens.ts packages/adapters/src/inbound/http/AppModule.ts packages/adapters/src/inbound/http/PlanController.ts packages/adapters/src/inbound/http/PlanController.test.ts packages/adapters/src/inbound/jobs/tokens.ts packages/adapters/src/inbound/jobs/WorkerModule.ts packages/adapters/src/inbound/jobs/WorkerModule.test.ts packages/adapters/src/outbound/regime-engine/RegimePlanAdapter.ts packages/adapters/src/outbound/regime-engine/RegimePlanAdapter.test.ts packages/adapters/src/outbound/storage/PlanStorageAdapter.ts packages/adapters/src/outbound/storage/PlanStorageAdapter.test.ts packages/testing/src/fakes/FakeRegimePlanPort.ts packages/testing/src/fakes/FakePlanRepository.ts packages/testing/src/scenarios/PositionPlanLifecycle.test.ts
-```
+- [ ] **Step 1: Update FakePlanRepository.acceptResponse to preserve supplied advisoryAction.**
 
-Expected: the request validates against the vendored schema, unsafe portfolio/config inputs cause no fetch, and stored/request-returned identity exactly matches upstream.
+  In `packages/application/src/use-cases/plans/RequestPositionPlan.test.ts`, update `FakePlanRepository.acceptResponse` parameter signature to accept `advisoryAction: PlanAction`, and set `advisoryAction: params.advisoryAction` instead of hardcoding `{ kind: 'HOLD' }`:
 
-## Task 4: Prove execution-result correlation against the upstream contract
+  ```ts
+  async acceptResponse(params: {
+    planId: PlanId;
+    regimeResponse: { kind: string; regime: string; suitability: string };
+    advisoryAction: PlanAction;
+    respondedAt: ClockTimestamp;
+    asOfAt: ClockTimestamp;
+    expiresAt: ClockTimestamp;
+  }): Promise<{ kind: 'accepted' } | { kind: 'conflict-detected' }> {
+    const plan = Array.from(this._plans.values()).find((p) => p.planId === params.planId);
+    if (!plan) return { kind: 'conflict-detected' };
+    plan.respondedAt = params.respondedAt;
+    plan.asOfAt = params.asOfAt;
+    plan.expiresAt = params.expiresAt;
+    plan.lifecycleStateJson = {
+      kind: 'advisory-ready',
+      advisoryAction: params.advisoryAction,
+      regimeResponse: {
+        kind: 'regime-response',
+        regime: params.regimeResponse.regime as 'UP' | 'DOWN' | 'CHOP',
+        suitability: params.regimeResponse.suitability as
+          | 'ALLOWED'
+          | 'CAUTION'
+          | 'BLOCKED'
+          | 'UNKNOWN',
+      },
+    };
+    return { kind: 'accepted' };
+  }
+  ```
 
-**Files:**
+- [ ] **Step 2: Implement test case for directionless request-exit advisory persistence.**
 
-- Modify: `packages/application/src/ports/index.ts`
-- Modify: `packages/application/src/use-cases/plans/SyncPlanExecutionResults.ts`
-- Modify: `packages/application/src/use-cases/plans/SyncPlanExecutionResults.test.ts`
-- Modify: `packages/application/src/dto/regimePlan.ts`
-- Modify: `packages/application/src/dto/regimePlanValidator.ts`
-- Modify: `packages/application/src/dto/regimePlanValidator.test.ts`
-- Modify: `packages/adapters/src/outbound/regime-engine/RegimePlanAdapter.ts`
-- Modify: `packages/adapters/src/outbound/regime-engine/RegimePlanAdapter.test.ts`
-- Modify: `packages/testing/src/fakes/FakeRegimePlanPort.ts`
-- Modify: `packages/testing/src/scenarios/PositionPlanLifecycle.test.ts`
-- Read only: `schemas/regime-engine/execution-result.v1/schema.json`
-- Read only: `schemas/regime-engine/execution-result.v1/fixtures/valid/success.json`
-- Read only: `schemas/regime-engine/execution-result.v1/fixtures/valid/skipped.json`
+  Add this test inside `describe('RequestPositionPlan')`:
 
-- [ ] Add tests first named `reports the persisted remote planId and planHash unchanged`, `validates the built result before transport`, `preserves remote identity across retries`, and `fails the outbox row permanently when the persisted payload cannot form a canonical result`.
-- [ ] Build the result from persisted `PlanResultClaim` data only. Require `canonicalHash`, `positionId`, decision kind, and stored action kind; do not substitute empty strings or default a missing decision to `executed`.
-- [ ] Validate with `parseRegimeExecutionResult` before calling the port. A malformed persisted payload is a permanent local rejection recorded through `failDelivery`, not a retryable network outcome.
-- [ ] Align `schemaVersion`, status, and reason-code mapping to the refreshed vendored contract. Preserve the existing retry loop, cap, idempotency key, and continue-after-one-row behavior.
-- [ ] Add an adapter-side preflight guard so a direct invalid `reportExecutionResult` call returns `permanent: schema-invalid` without fetch.
-- [ ] Update `FakeRegimePlanPort` and `PositionPlanLifecycle.test.ts` to construct, mock, and assert `RegimeExecutionResult` using the reconciled schema version and payload shape.
-- [ ] Commit as `fix(plans): preserve execution result correlation identity`.
+  ```ts
+  it('persists request-exit advisory without remote directional intent', async () => {
+    const position = makeInRangePosition(FIXTURE_POSITION_ID, FIXTURE_WALLET_ID);
+    positionRead.setPosition(position);
+    positionRead.setDetail(makeFixtureDetail(position));
+    regimePort.setResponse({
+      kind: 'ok',
+      response: {
+        ...VALID_UPSTREAM_RESPONSE,
+        actions: [
+          {
+            type: 'REQUEST_EXIT_CLMM',
+            reasonCode: 'POSITION_RANGE_BREACH_QUALIFIED',
+          },
+        ],
+      },
+    });
 
-**Behavioral invariants and named tests:**
+    await requestPositionPlan({
+      walletId: FIXTURE_WALLET_ID,
+      positionId: FIXTURE_POSITION_ID,
+      positionReadPort: positionRead,
+      triggerRepository: triggerRepo,
+      planRepository: planRepo,
+      regimePlanPort: regimePort,
+      executionHistoryRepository: historyRepo,
+      config: CONFIGURED_CONFIG,
+      clock,
+      observability,
+    });
 
-- Valid persisted result + transport OK -> complete delivery once: `reports the persisted remote planId and planHash unchanged`.
-- Retryable transport failure + attempt below cap -> reschedule with the same plan identity and idempotency key: `preserves remote identity across retries`.
-- Invalid persisted result -> mark permanent failure and continue claiming later rows: `fails the outbox row permanently when the persisted payload cannot form a canonical result`.
-- One permanently rejected row does not stop the do/while sweep: retain `processes multiple due results even if one fails permanently`.
+    expect(
+      planRepo.getStoredPlan(VALID_UPSTREAM_RESPONSE.planId as PlanId)?.lifecycleStateJson,
+    ).toMatchObject({
+      kind: 'advisory-ready',
+      advisoryAction: { kind: 'REQUEST_EXIT_CLMM' },
+    });
+  });
+  ```
 
-**Acceptance and scoped verification:**
+- [ ] **Step 3: Implement test case for unchanged HOLD and STAND_DOWN mapping.**
 
-```bash
-pnpm --filter @clmm/application exec vitest run src/use-cases/plans/SyncPlanExecutionResults.test.ts src/dto/regimePlanValidator.test.ts
-pnpm --filter @clmm/adapters exec vitest run src/outbound/regime-engine/RegimePlanAdapter.test.ts
-pnpm --filter @clmm/testing exec vitest run src/scenarios/PositionPlanLifecycle.test.ts
-pnpm --filter @clmm/application exec eslint src/use-cases/plans/SyncPlanExecutionResults.ts src/use-cases/plans/SyncPlanExecutionResults.test.ts src/dto/regimePlan.ts src/dto/regimePlanValidator.ts src/dto/regimePlanValidator.test.ts --ext .ts
-pnpm --filter @clmm/adapters exec eslint src/outbound/regime-engine/RegimePlanAdapter.ts src/outbound/regime-engine/RegimePlanAdapter.test.ts --ext .ts
-pnpm --filter @clmm/testing exec eslint src/fakes/FakeRegimePlanPort.ts src/scenarios/PositionPlanLifecycle.test.ts --ext .ts
-git diff --check -- packages/application/src/ports/index.ts packages/application/src/use-cases/plans/SyncPlanExecutionResults.ts packages/application/src/use-cases/plans/SyncPlanExecutionResults.test.ts packages/application/src/dto/regimePlan.ts packages/application/src/dto/regimePlanValidator.ts packages/application/src/dto/regimePlanValidator.test.ts packages/adapters/src/outbound/regime-engine/RegimePlanAdapter.ts packages/adapters/src/outbound/regime-engine/RegimePlanAdapter.test.ts packages/testing/src/fakes/FakeRegimePlanPort.ts packages/testing/src/scenarios/PositionPlanLifecycle.test.ts
-```
+  Add this test inside `describe('RequestPositionPlan')`:
 
-## Task 5: Add an atomic per-position request lease and refresh state
+  ```ts
+  it('maps hold and stand-down actions without changing their kinds', async () => {
+    const position = makeInRangePosition(FIXTURE_POSITION_ID, FIXTURE_WALLET_ID);
+    positionRead.setPosition(position);
+    positionRead.setDetail(makeFixtureDetail(position));
 
-**Files:**
+    // Test HOLD action
+    regimePort.setResponse({
+      kind: 'ok',
+      response: {
+        ...VALID_UPSTREAM_RESPONSE,
+        actions: [{ type: 'HOLD', reasonCode: 'HOLD_POLICY' }],
+      },
+    });
+    await requestPositionPlan({
+      walletId: FIXTURE_WALLET_ID,
+      positionId: FIXTURE_POSITION_ID,
+      positionReadPort: positionRead,
+      triggerRepository: triggerRepo,
+      planRepository: planRepo,
+      regimePlanPort: regimePort,
+      executionHistoryRepository: historyRepo,
+      config: CONFIGURED_CONFIG,
+      clock,
+      observability,
+    });
+    expect(
+      planRepo.getStoredPlan(VALID_UPSTREAM_RESPONSE.planId as PlanId)?.lifecycleStateJson,
+    ).toMatchObject({
+      kind: 'advisory-ready',
+      advisoryAction: { kind: 'HOLD' },
+    });
 
-- Modify: `packages/application/src/ports/index.ts`
-- Create: `packages/adapters/src/outbound/storage/schema/position-plan-request-state.ts`
-- Modify: `packages/adapters/src/outbound/storage/schema/index.ts`
-- Modify: `packages/adapters/src/outbound/storage/PlanStorageAdapter.ts`
-- Modify: `packages/adapters/src/outbound/storage/PlanStorageAdapter.test.ts`
-- Modify: `packages/testing/src/fakes/FakePlanRepository.ts`
-- Modify: `packages/application/src/use-cases/plans/RequestPositionPlan.test.ts`
-- Modify: `packages/application/src/use-cases/plans/RecordPlanDecision.test.ts`
-- Create: `packages/adapters/drizzle/0005_position_plan_request_state.sql`
-- Modify: `packages/adapters/drizzle/meta/_journal.json`
-- Create: `packages/adapters/drizzle/meta/0005_snapshot.json`
-- Modify: `packages/adapters/src/outbound/storage/schema/__tests__/schema-snapshot.test.ts`
+    // Test STAND_DOWN action with fresh plan ID
+    const standDownPlanId = 'plan_stand_down_1234' as PlanId;
+    regimePort.setResponse({
+      kind: 'ok',
+      response: {
+        ...VALID_UPSTREAM_RESPONSE,
+        planId: standDownPlanId,
+        actions: [{ type: 'STAND_DOWN', reasonCode: 'STAND_DOWN_POLICY' }],
+      },
+    });
+    await requestPositionPlan({
+      walletId: FIXTURE_WALLET_ID,
+      positionId: makePositionId('test-position-2'),
+      positionReadPort: positionRead,
+      triggerRepository: triggerRepo,
+      planRepository: planRepo,
+      regimePlanPort: regimePort,
+      executionHistoryRepository: historyRepo,
+      config: CONFIGURED_CONFIG,
+      clock,
+      observability,
+    });
+    expect(planRepo.getStoredPlan(standDownPlanId)?.lifecycleStateJson).toMatchObject({
+      kind: 'advisory-ready',
+      advisoryAction: { kind: 'STAND_DOWN' },
+    });
+  });
+  ```
 
-- [ ] Add `position_plan_request_state` keyed by `position_id` with `lease_token`, `lease_until`, `last_attempt_at`, `last_range_state`, `last_breach_qualified_at`, `last_closed_candle_at`, and `updated_at`. Add checks for valid range-state values and non-negative timestamps.
-- [ ] Extend `PlanRepository` with `claimPlanRequest(params)` and `finishPlanRequest(params)`. `claimPlanRequest` returns `claimed` with an opaque lease token or `suppressed` with one of `active-request | minimum-interval`; `finishPlanRequest` requires the matching token and records `succeeded | failed` while clearing the lease.
-- [ ] Implement both new methods in `PlanStorageAdapter`, the shared `FakePlanRepository`, and the concrete `PlanRepository` fakes in `RequestPositionPlan.test.ts` and `RecordPlanDecision.test.ts` in this same task. Use one PostgreSQL transaction with row locking/upsert so two worker processes cannot both claim the same position.
-- [ ] Write tests first named `claims the first request for a position`, `suppresses a concurrent request while the lease is active`, `claims independent positions concurrently`, `reclaims an expired lease`, `bypasses interval on range-state change`, `bypasses interval when a breach becomes qualified`, `bypasses interval for a different qualified breach`, `bypasses interval for a newly closed candle`, `suppresses an unchanged observation inside the interval`, `retains lastAttemptAt after failed completion`, and `rejects completion with a stale lease token`.
-- [ ] Generate and inspect the Drizzle snapshot so the existing schema-snapshot guard sees the new table. The SQL migration must create only this table, its checks, and the lease/due indexes; it must not rewrite earlier migrations.
-- [ ] Commit as `feat(storage): add plan request cadence lease`.
+- [ ] **Step 4: Implement test case proving directional exit posture is not derived outside DirectionalExitPolicyService.**
 
-**Behavioral invariants and named tests:**
+  Add this test inside `describe('RequestPositionPlan')`:
 
-- No row -> `claimed`; unexpired lease -> `suppressed: active-request`; expired lease -> `claimed` with a new token.
-- Same state inside 15 minutes -> `suppressed: minimum-interval`.
-- Different range state, newly qualified/different breach timestamp, or newer closed candle -> `claimed` even inside the interval, unless another lease is active.
-- `finishPlanRequest` with the current token -> lease cleared and outcome recorded; stale token -> no mutation.
+  ```ts
+  it('does not derive exit posture outside DirectionalExitPolicyService', async () => {
+    const position = makeInRangePosition(FIXTURE_POSITION_ID, FIXTURE_WALLET_ID);
+    positionRead.setPosition(position);
+    positionRead.setDetail(makeFixtureDetail(position));
 
-**Acceptance and scoped verification:**
+    regimePort.setResponse({
+      kind: 'ok',
+      response: {
+        ...VALID_UPSTREAM_RESPONSE,
+        regime: 'DOWN',
+        targets: { solBps: 0, usdcBps: 10000, allowClmm: true },
+        actions: [
+          {
+            type: 'REQUEST_EXIT_CLMM',
+            reasonCode: 'OUT_OF_RANGE_DOWNTREND',
+          },
+        ],
+      },
+    });
 
-```bash
-pnpm --filter @clmm/adapters exec vitest run src/outbound/storage/PlanStorageAdapter.test.ts src/outbound/storage/schema/__tests__/schema-snapshot.test.ts
-pnpm --filter @clmm/application exec vitest run src/use-cases/plans/RequestPositionPlan.test.ts src/use-cases/plans/RecordPlanDecision.test.ts
-pnpm --filter @clmm/adapters exec eslint src/outbound/storage/schema/position-plan-request-state.ts src/outbound/storage/schema/index.ts src/outbound/storage/PlanStorageAdapter.ts src/outbound/storage/PlanStorageAdapter.test.ts src/outbound/storage/schema/__tests__/schema-snapshot.test.ts --ext .ts
-pnpm --filter @clmm/testing exec eslint src/fakes/FakePlanRepository.ts --ext .ts
-git diff --check -- packages/application/src/ports/index.ts packages/application/src/use-cases/plans/RequestPositionPlan.test.ts packages/application/src/use-cases/plans/RecordPlanDecision.test.ts packages/adapters/src/outbound/storage/schema/position-plan-request-state.ts packages/adapters/src/outbound/storage/schema/index.ts packages/adapters/src/outbound/storage/PlanStorageAdapter.ts packages/adapters/src/outbound/storage/PlanStorageAdapter.test.ts packages/adapters/src/outbound/storage/schema/__tests__/schema-snapshot.test.ts packages/adapters/drizzle/0005_position_plan_request_state.sql packages/adapters/drizzle/meta/_journal.json packages/adapters/drizzle/meta/0005_snapshot.json packages/testing/src/fakes/FakePlanRepository.ts
-```
+    await requestPositionPlan({
+      walletId: FIXTURE_WALLET_ID,
+      positionId: FIXTURE_POSITION_ID,
+      positionReadPort: positionRead,
+      triggerRepository: triggerRepo,
+      planRepository: planRepo,
+      regimePlanPort: regimePort,
+      executionHistoryRepository: historyRepo,
+      config: CONFIGURED_CONFIG,
+      clock,
+      observability,
+    });
 
-Expected: the storage and fake implementations satisfy the same lease transitions, and the latest Drizzle snapshot contains `position_plan_request_state`.
+    const storedState = planRepo.getStoredPlan(
+      VALID_UPSTREAM_RESPONSE.planId as PlanId,
+    )?.lifecycleStateJson;
+    expect(storedState).toBeDefined();
+    if (storedState?.kind === 'advisory-ready') {
+      expect(storedState.advisoryAction).toEqual({ kind: 'REQUEST_EXIT_CLMM' });
+      expect(storedState.advisoryAction).not.toHaveProperty('exitIntent');
+    }
+  });
+  ```
 
-## Task 6: Enforce cadence in the plan-request application use case
+- [ ] **Step 5: Run Task 2 verification checks.**
 
-**Files:**
+  Run:
 
-- Modify: `packages/application/src/use-cases/plans/RequestPositionPlan.ts`
-- Modify: `packages/application/src/use-cases/plans/RequestPositionPlan.test.ts`
-- Modify: `packages/adapters/src/inbound/http/PlanController.ts`
-- Modify: `packages/adapters/src/inbound/http/PlanController.test.ts`
-- Modify: `packages/testing/src/scenarios/PositionPlanLifecycle.test.ts`
+  ```bash
+  pnpm --filter @clmm/application exec vitest run src/use-cases/plans/RequestPositionPlan.test.ts
+  pnpm --filter @clmm/application exec eslint src/use-cases/plans/RequestPositionPlan.test.ts --ext .ts
+  pnpm -r typecheck
+  git diff --check -- packages/application/src/use-cases/plans/RequestPositionPlan.test.ts
+  ```
 
-- [ ] Extend `PositionPlanRequestResult` with `status: "throttled"` and reason `active-request | minimum-interval`.
-- [ ] After ownership and staleness checks but before portfolio/history/config building or transport, calculate the current range state, qualified-breach timestamp, and last closed candle; call `claimPlanRequest` with the 15-minute interval and two-minute lease.
-- [ ] If suppressed, return the typed throttled result without transport. If claimed, wrap all remaining work in `try/finally` and call `finishPlanRequest` exactly once with `succeeded` only after a validated response is persisted; all unavailable, conflict, permanent, retryable, thrown, and superseded-after-transport paths finish as `failed` unless the response was accepted.
-- [ ] Do not acquire a lease for stale or missing positions. Do not let lease cleanup replace the original result or error; cleanup failures are logged with position and lease token and rethrown only when no earlier failure exists.
-- [ ] Update `PlanController` response typing and status behavior so a manual request receives the typed throttled envelope instead of a 409. Update every direct use-case caller in the testing scenario in this same task.
-- [ ] Write the exact named tests from Behavioral Invariants 6–9 before implementation, plus `qualified breach still supersedes an accepted advisory without bypassing lease completion`.
-- [ ] Commit as `feat(plans): throttle position plan requests`.
+  Expected: all use-case tests pass; lint is clean; workspace typecheck succeeds.
 
-**Acceptance and scoped verification:**
+- [ ] **Step 6: Commit Task 2.**
 
-```bash
-pnpm --filter @clmm/application exec vitest run src/use-cases/plans/RequestPositionPlan.test.ts
-pnpm --filter @clmm/adapters exec vitest run src/inbound/http/PlanController.test.ts
-pnpm --filter @clmm/testing exec vitest run src/scenarios/PositionPlanLifecycle.test.ts
-pnpm --filter @clmm/application exec eslint src/use-cases/plans/RequestPositionPlan.ts src/use-cases/plans/RequestPositionPlan.test.ts --ext .ts
-pnpm --filter @clmm/adapters exec eslint src/inbound/http/PlanController.ts src/inbound/http/PlanController.test.ts --ext .ts
-git diff --check -- packages/application/src/use-cases/plans/RequestPositionPlan.ts packages/application/src/use-cases/plans/RequestPositionPlan.test.ts packages/adapters/src/inbound/http/PlanController.ts packages/adapters/src/inbound/http/PlanController.test.ts packages/testing/src/scenarios/PositionPlanLifecycle.test.ts
-```
+  ```bash
+  git add packages/application/src/use-cases/plans/RequestPositionPlan.test.ts
+  git commit -m "test(plans): verify directionless advisory persistence and domain mapping invariants"
+  ```
 
-## Task 7: Enqueue and process plan requests after successful position scans
-
-**Files:**
-
-- Modify: `packages/application/src/use-cases/triggers/ScanPositionsForBreaches.ts`
-- Modify: `packages/application/src/use-cases/triggers/ScanPositionsForBreaches.test.ts`
-- Modify: `packages/adapters/src/inbound/jobs/BreachScanJobHandler.ts`
-- Modify: `packages/adapters/src/inbound/jobs/BreachScanJobHandler.test.ts`
-- Create: `packages/adapters/src/inbound/jobs/PositionPlanRequestJobHandler.ts`
-- Create: `packages/adapters/src/inbound/jobs/PositionPlanRequestJobHandler.test.ts`
-- Modify: `packages/adapters/src/inbound/jobs/WorkerModule.ts`
-- Modify: `packages/adapters/src/inbound/jobs/WorkerModule.test.ts`
-- Modify: `packages/adapters/src/inbound/jobs/WorkerLifecycle.ts`
-- Modify: `packages/adapters/src/inbound/jobs/WorkerLifecycle.test.ts`
-
-- [ ] Extend `ScanResult` with `observedPositions`, containing the position IDs from the one successful `listSupportedPositions` snapshot. Test that both in-range and out-of-range open supported positions appear, while a failed wallet scan returns no jobs.
-- [ ] After all qualification and abandonment work for a wallet is enqueued/processed, enqueue `request-position-plan` for each observed position with only `walletId` and `positionId`. Catch and log plan-job enqueue failures per position; do not fail or delay already completed breach work or `markScanned`.
-- [ ] Create `PositionPlanRequestJobHandler` that injects the existing position, trigger, plan, regime, history, clock, observability, and request-config dependencies and calls `requestPositionPlan`. Log the typed terminal status without throwing for expected `throttled`, `stale`, `unavailable`, `degraded`, `conflict`, or `superseded` results; rethrow unexpected exceptions so pg-boss retry plus the durable lease recovery path applies.
-- [ ] Register/create/work the new queue in `WorkerModule` and `WorkerLifecycle`. It is event-enqueued by the existing five-minute breach scan and must not receive a second cron schedule.
-- [ ] Add tests named `enqueues one plan request for every successfully observed open position`, `enqueues in-range positions even when no trigger job exists`, `plan enqueue failure does not suppress trigger qualification`, `handler passes wallet and position to RequestPositionPlan`, `handler treats typed degradation as a completed job`, `handler rethrows unexpected errors for pg-boss retry`, and `worker registers request-position-plan without scheduling a second cron`.
-- [ ] Commit as `feat(worker): request plans after position observations`.
-
-**Behavioral invariants and named tests:**
-
-- Successful snapshot with N open supported positions -> N plan jobs, independent of breach count.
-- Snapshot failure -> zero plan jobs for that wallet, log, continue other wallets.
-- Trigger/abandonment path completes before plan enqueue; plan enqueue failure never retracts those effects.
-- Expected application outcome -> job completes; unexpected throw -> job fails for pg-boss retry.
-
-**Acceptance and scoped verification:**
-
-```bash
-pnpm --filter @clmm/application exec vitest run src/use-cases/triggers/ScanPositionsForBreaches.test.ts
-pnpm --filter @clmm/adapters exec vitest run src/inbound/jobs/BreachScanJobHandler.test.ts src/inbound/jobs/PositionPlanRequestJobHandler.test.ts src/inbound/jobs/WorkerModule.test.ts src/inbound/jobs/WorkerLifecycle.test.ts
-pnpm --filter @clmm/application exec eslint src/use-cases/triggers/ScanPositionsForBreaches.ts src/use-cases/triggers/ScanPositionsForBreaches.test.ts --ext .ts
-pnpm --filter @clmm/adapters exec eslint src/inbound/jobs/BreachScanJobHandler.ts src/inbound/jobs/BreachScanJobHandler.test.ts src/inbound/jobs/PositionPlanRequestJobHandler.ts src/inbound/jobs/PositionPlanRequestJobHandler.test.ts src/inbound/jobs/WorkerModule.ts src/inbound/jobs/WorkerModule.test.ts src/inbound/jobs/WorkerLifecycle.ts src/inbound/jobs/WorkerLifecycle.test.ts --ext .ts
-git diff --check -- packages/application/src/use-cases/triggers/ScanPositionsForBreaches.ts packages/application/src/use-cases/triggers/ScanPositionsForBreaches.test.ts packages/adapters/src/inbound/jobs/BreachScanJobHandler.ts packages/adapters/src/inbound/jobs/BreachScanJobHandler.test.ts packages/adapters/src/inbound/jobs/PositionPlanRequestJobHandler.ts packages/adapters/src/inbound/jobs/PositionPlanRequestJobHandler.test.ts packages/adapters/src/inbound/jobs/WorkerModule.ts packages/adapters/src/inbound/jobs/WorkerModule.test.ts packages/adapters/src/inbound/jobs/WorkerLifecycle.ts packages/adapters/src/inbound/jobs/WorkerLifecycle.test.ts
-```
+  Confirm `design.md` and `issue.md` are not staged.
 
 ## Tests to add or update
 
-- Contract fixtures: canonical plan request valid/invalid coverage and shared provenance commit.
-- Request builder: token-order-independent portfolio math, authoritative autopilot derivation, config validation, and fail-closed incomplete state.
-- Request use case: stale suppression, full request shape, upstream identity preservation, exact replay, conflicts, qualified-breach precedence, lease acquisition/suppression/recovery, and failure throttling.
-- Transport adapter: corrected `/v1/plan` URL, shared-secret header, strict response/result validation, and existing failure classifications.
-- Storage: atomic first/concurrent/expired lease behavior, signal bypasses, stale-token completion, migration/schema snapshot.
-- Execution result sweep: unchanged remote identity and idempotency across restart/retry, invalid persisted payload rejection, and continue-after-failure.
-- Background jobs: every open observed position enqueued, non-blocking relationship to breach work, typed outcomes, retry on unexpected exceptions, and queue registration without another cron.
-- Existing test files over 500 lines are changed only inside implementation-bearing tasks whose primary purpose is production behavior. No standalone oversized test-update task is planned.
+- Update `packages/application/src/dto/regimePlanValidator.test.ts` to accept missing remote `exitIntent` and reject the removed field when present.
+- Update `packages/application/src/dto/regimePlanContract.test.ts` to stop treating `missing-exit-intent.json` as canonical invalid input and to retain bundle-hash verification.
+- Update `packages/adapters/src/outbound/regime-engine/RegimePlanAdapter.test.ts` with the live-response-shaped `REQUEST_EXIT_CLMM` success case.
+- Update `packages/adapters/src/inbound/http/PlanController.test.ts` mock response to omit fabricated `exitIntent`.
+- Update `packages/application/src/use-cases/plans/RequestPositionPlan.test.ts` so `FakePlanRepository.acceptResponse` preserves `advisoryAction`, and add tests for directionless advisory persistence, HOLD/STAND_DOWN preservation, and absence of exit posture derivation.
+- Retain existing tests for legacy `expiresAtUnixMs`, unsupported actions, extra fields, `HOLD`, `STAND_DOWN`, qualified-trigger precedence, and lease completion.
 
 ## Validation commands
 
-Run each task's focused commands as its acceptance criteria. After all implementation tasks complete, the dedicated validation phase runs the repository-required broad gates:
+These are acceptance commands attached to the implementation tasks above; the orchestrator's validate phase may additionally run the repository-wide suite after all tasks complete.
 
 ```bash
-pnpm build
-pnpm typecheck
-pnpm lint
-pnpm boundaries
-pnpm test
+pnpm --filter @clmm/application exec vitest run src/dto/regimePlanContract.test.ts src/dto/regimePlanValidator.test.ts src/use-cases/plans/RequestPositionPlan.test.ts
+pnpm --filter @clmm/adapters exec vitest run src/outbound/regime-engine/RegimePlanAdapter.test.ts src/inbound/http/PlanController.test.ts
+pnpm --filter @clmm/application exec eslint src/dto/regimePlan.ts src/dto/index.ts src/public/index.ts src/dto/regimePlanContract.test.ts src/dto/regimePlanValidator.test.ts src/use-cases/plans/RequestPositionPlan.ts src/use-cases/plans/RequestPositionPlan.test.ts --ext .ts
+pnpm --filter @clmm/adapters exec eslint src/outbound/regime-engine/RegimePlanAdapter.test.ts src/inbound/http/PlanController.test.ts --ext .ts
+pnpm -r typecheck
+git diff --check -- schemas/regime-engine/position-plan.v1 packages/application/src/dto packages/application/src/public/index.ts packages/application/src/use-cases/plans/RequestPositionPlan.ts packages/application/src/use-cases/plans/RequestPositionPlan.test.ts packages/adapters/src/outbound/regime-engine/RegimePlanAdapter.test.ts packages/adapters/src/inbound/http/PlanController.test.ts
 ```
 
-Before production rollout, verify the cross-repo/deployment prerequisites and live correlation:
-
-```bash
-railway logs --service clmm-worker --environment production --json
-railway logs --service regime-engine --environment production --json
-```
-
-The operator must observe, for one known open position, a worker plan-job completion and a corresponding authenticated `/v1/plan` 200 entry with the same position ID, then complete a safe signed test flow and confirm `/v1/execution-result` carries the exact returned `planId` and `planHash`. A request without `X-CLMM-Internal-Token` must receive 401 or 403. Logs must be inspected without printing the token or portfolio values into the plan/PR.
+Expected: all focused tests, lint checks, workspace typechecks, provenance checksum assertions, and diff checks pass. After deployment, repeat the existing private breach-qualified diagnostic and require `RegimePlanAdapter` to report `{ "kind": "ok" }` for a response action containing only `type` and `reasonCode`; operational credentials and service mutation are outside this repository implementation plan.
 
 ## Risk areas
 
-- **Financial-state fabrication:** Principal inventory, token orientation, or autopilot counters can be wrong while still type-correct. The builder must reject ambiguity and use canonical token identity plus finite-number checks.
-- **Upstream contract drift:** The local response schema is already vendored, but the request schema is absent. Contract publication and a single pinned commit are release blockers.
-- **Cross-repo partial rollout:** Deploying CLMM requests before upstream auth/contract support yields 400/401/404 traffic; deploying upstream auth with mismatched secrets yields permanent failures. Deploy upstream first, verify auth, then enable CLMM worker config.
-- **Lease deadlock or request spam:** A permanent lease can halt planning; clearing all state on failure can spam it. Lease expiry plus retained `lastAttemptAt` provides bounded recovery.
-- **Signal consumption races:** Range change, breach qualification, and candle closure may occur while another request is active. The state row must compare incoming markers atomically and the next observation must still see any marker newer than the last completed/attempted claim.
-- **Current-plan lookup:** `getCurrentPlan` currently does not explicitly order multiple rows. Identity work must ensure tests cover the newest plan selection before automated refresh can create multiple plans for one position; if this requires a repository query correction, include it in Task 3's `PlanStorageAdapter` scope before proceeding.
-- **Result audit-trail corruption:** Empty-string fallbacks currently permit malformed correlation. Task 4 makes missing identity a permanent local failure rather than emitting a misleading result.
-- **Breach latency:** Network calls must stay in the separate plan job. Never await `regime-engine` from `BreachScanJobHandler` or `ScanPositionsForBreaches`.
-- **Large existing tests:** `RequestPositionPlan.test.ts`, `RegimePlanAdapter.test.ts`, `PlanStorageAdapter.test.ts`, and `PositionPlanLifecycle.test.ts` are large. Keep additions within the named behavior groups and avoid unrelated rewrites.
+- **False provenance:** Editing `schema.json` or fixtures without a corrected upstream contract commit would make `provenance.json` untruthful. This is the highest process risk and is an explicit stop condition.
+- **Breaking exported API:** Removing two exported types and narrowing `RegimePlanAction` can break downstream consumers. Both barrels, the only interpreter, and mock payload fixtures (`PlanController.test.ts`) must change in Task 1, followed by workspace-wide typecheck.
+- **Stateful lifecycle mapping:** `RequestPositionPlan` writes the mapped action into requested/advisory-ready lifecycle state. A hard-coded test fake could conceal a regression, so `FakePlanRepository.acceptResponse` must preserve the actual `advisoryAction`.
+- **Directional invariant leakage:** It would be tempting to infer posture from `targets`, `regime`, reason text, or token ordering. Any such inference outside `DirectionalExitPolicyService` is release-blocking.
+- **Over-relaxing validation:** Removing the requirement must not make arbitrary `exitIntent` objects legal. Keeping `PlanAction.additionalProperties: false` makes the canonical contract strict.
+- **Stale sibling contracts:** The read-only audit may reveal drift in plan-request or execution-result. Bundling an unplanned fix into this issue would obscure provenance and test scope.
+- **Production verification limits:** Unit and adapter tests reproduce the payload shape but do not prove a deployed private service was updated; the live check must occur only in the authorized operational environment.
 
 ## Stop conditions
 
-Abort the affected task instead of guessing or broadening scope when any of these occurs:
+- Stop if no corrected, merged upstream `contracts/position-plan/v1/` commit exists. Fix and publish the owning `regime-engine` contract first; do not create locally derived artifacts under copied-contract provenance.
+- Stop if the corrected contract still defines `exitIntent`, `PlanExitIntent`, or a conditional requirement that disagrees with `src/contract/v1/types.ts`.
+- Stop if the plan-request or execution-result audit finds a substantive mismatch. Record the evidence and create a separately scoped contract task instead of silently expanding this plan.
+- Stop if removing the remote intent reveals a consumer that cannot proceed without deriving direction outside `DirectionalExitPolicyService`; that is an architectural issue requiring explicit direction from the user.
+- Stop if any proposed implementation changes the release-blocker mapping: lower breach must remain SOL→USDC/ExitToUSDC and upper breach must remain USDC→SOL/ExitToSOL.
+- Stop if `pnpm -r typecheck` exposes additional consumers that require source changes not listed in Task 1 or Task 2; update the plan/manifest before editing them.
+- Stop if the existing user changes to `design.md` or `issue.md` overlap staging or would be committed.
 
-- `regime-engine` does not publish a canonical `contracts/plan-request/v1/` schema and fixtures, or the published contract cannot represent the issue's required portfolio/autopilot/config data.
-- The refreshed upstream execution-result schema disagrees with the deployed `/v1/execution-result` handler. Resolve that in `regime-engine` before changing CLMM's payload to one side arbitrarily.
-- Upstream cannot enforce `X-CLMM-Internal-Token` before automated CLMM traffic is enabled.
-- `portfolio`, `autopilotState`, or config semantics require data CLMM V2 does not own (for example wallet-wide balances or redeploy history). Add an explicit upstream/local source-of-truth decision; do not substitute zeros except for schema-documented neutral values and the explicitly unsupported redeploy count.
-- Persisting upstream `planId` or 64-hex `planHash` requires destructive conversion of existing rows. Stop and design a reviewed migration/backfill rather than rewriting identities in place.
-- Atomic one-active-request behavior cannot be implemented with the existing PostgreSQL transaction boundary or would require an in-memory mutex. The guarantee must survive multiple workers and restarts.
-- The proposed plan job adds latency to breach qualification, signature, submission, or reconciliation paths. Restore queue isolation before continuing.
-- Any implementation starts mapping lower/upper breach direction to swap assets outside `packages/domain/src/exit-policy/DirectionalExitPolicyService`.
-- Production validation access, a known safe open position, or correlated logs are unavailable. Local checks may pass, but the acceptance criterion remains unverified and the rollout must not be called complete.
+## Self-review
 
-## Plan risk classification
-
-This plan contains an explicit lease/recovery state machine, retry paths, PostgreSQL writes, outbound authenticated API calls, and a production rollout dependency. The first-line `<!-- plan-review-required -->` marker is therefore required.
+- **Spec coverage:** Both fabricated schema members, the request-exit fixture, obsolete invalid fixture/test, DTO exports, mapper, adapter success path, controller test mock payload, provenance integrity, sibling-contract audit, use-case invariant tests, and operational live-check limitation are covered.
+- **Placeholder scan:** The plan contains no deferred implementation markers; the upstream commit is intentionally resolved and verified at implementation time because the design does not provide a corrected commit SHA, and absence of one is a stop condition.
+- **Type consistency:** `RegimePlanAction` has exactly `type` and `reasonCode`; the internal domain action remains `{ kind: 'REQUEST_EXIT_CLMM'; exitIntent?: ExitIntentPosture }`; the application mapper produces the valid directionless subset.

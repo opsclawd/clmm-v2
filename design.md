@@ -1,57 +1,52 @@
-# Design Document: Reconcile /v1/plan Integration
+# Design Document: Fix Vendored Position Plan Schema Drift
 
-## The Problem and Why It Matters
+## 1. The Problem and Why It Matters
 
-The CLMM V2 exit assistant requires an automated integration with the `regime-engine` to request position plans and report execution results. Currently, the integration is fundamentally broken due to several mismatches:
+The `regime-engine` API validates positions and returns action plans (e.g., `STAND_DOWN`, `REQUEST_EXIT_CLMM`). The client-side application uses a vendored JSON schema (`schemas/regime-engine/position-plan.v1/schema.json`) to validate the API response payload.
 
-- The endpoint path is incorrect (`/v1/position-plan` instead of `/v1/plan`).
-- The request contract is mismatched (missing `portfolio`, `autopilotState`, and `config` fields).
-- The `regime-engine`'s `/v1/plan` endpoint lacks authentication.
-- The authoritative `planId` and `planHash` from `regime-engine` are discarded in favor of locally generated IDs.
-- The `RequestPositionPlan` use case is not invoked on an automated background cadence.
+Currently, the vendored schema incorrectly dictates that any `REQUEST_EXIT_CLMM` action must include an `exitIntent` field. However, the authoritative `regime-engine` contract does not produce an `exitIntent` field—instead, the directional intent (ExitToUSDC vs ExitToSOL) is meant to be derived client-side within the `DirectionalExitPolicyService` domain layer based on the breached boundary.
 
-Without fixing these defects, the application cannot successfully request automated exit plans or report their results, rendering the core non-custodial LP exit assistant non-functional and resulting in 404s, schema validation errors, or a corrupted audit trail.
+Because of this schema drift, valid `REQUEST_EXIT_CLMM` responses are rejected by the client-side `regimePlanValidator`, resulting in legitimate out-of-range positions failing to be processed. This completely blocks the primary product feature of CLMM V2 (assisting users in unwinding breached positions).
 
-## Key Design Decisions and Trade-offs
+## 2. Key Design Decisions and Trade-Offs
 
-1. **Contract Reconciliation for Missing Fields:**
-   - _Trade-off:_ We need to provide `portfolio`, `autopilotState`, and `config` to `regime-engine`. Deriving these locally requires extending the local domain models and read ports. Hardcoding or mocking them is dangerous for a financial application.
-   - _Decision:_ We will extend the `RegimePlanRequest` DTO and the `RequestPositionPlan` use case to populate these fields correctly using the existing `PositionDetail` and trigger repository state.
+- **Source of Truth for Directionality**: A core invariant of this application is that directional intent mapping (lower bound = exit to USDC, upper bound = exit to SOL) lives _only_ in `DirectionalExitPolicyService`. We must completely strip any pretense that the remote API provides this data.
+- **DTO Synchronization**: Removing `exitIntent` from the JSON schema necessitates removing it from the `RegimePlanAction` DTO in the application layer. This cleanly separates the external HTTP contract (DTO) from the internal domain model (`PositionPlan.ts`), which defines `exitIntent` as an optional field on `PlanAction` to be populated later by the domain.
+- **Test Alignment**: The validation test asserting that `exitIntent` must be present is actively harmful because it enforces fabricated behavior. We will remove this test and the corresponding invalid fixture entirely rather than adding compatibility shims.
 
-2. **Preserving Plan Identity:**
-   - _Trade-off:_ `RequestPositionPlan` currently generates a local `planId`. Using the remote `planId` requires ensuring it conforms to local storage constraints and doesn't break optimistic UI assumptions.
-   - _Decision:_ We will use `response.planId` and `response.planHash` returned by `regime-engine` as the authoritative identifiers end-to-end, removing the local `idGenerator.generateId()` call for plans.
+## 3. Proposed Approach and Rationale
 
-3. **Background Invocation Cadence:**
-   - _Trade-off:_ Polling on a strict timer (cron) can lead to unnecessary API calls, while purely event-driven invocation can spam the endpoint if observations are frequent.
-   - _Decision:_ We will trigger `RequestPositionPlan` reactively after a successful position observation, but implement explicit throttling (e.g., minimum refresh interval), bypassing the throttle only on range-state changes or qualified breaches.
+1. **Schema Update**: Remove the `exitIntent` property, the `PlanExitIntent` `$defs` block, and the `allOf`/`if`/`then` conditional requirement block from `schemas/regime-engine/position-plan.v1/schema.json`.
+2. **DTO Update**: Remove `RegimePlanExitIntent` and the `exitIntent` field from the `RegimePlanAction` type in `packages/application/src/dto/regimePlan.ts`. Update any mappers that blindly copy this field from the DTO to the domain entity.
+3. **Fixture Correction**:
+   - Update `schemas/regime-engine/position-plan.v1/fixtures/valid/request-exit.json` to remove the `exitIntent` block. (Note: The issue mentioned dropping a stale `expiresAtUnixMs` here, but analysis shows it is already absent from this file).
+   - Delete `schemas/regime-engine/position-plan.v1/fixtures/invalid/missing-exit-intent.json` since a missing `exitIntent` is the correct behavior.
+4. **Test Correction**: Remove the `rejects a request-exit plan without canonical exit intent` block from `packages/application/src/dto/regimePlanValidator.test.ts`.
+5. **Drift Audit**: Review `execution-result.v1` and `plan-request.v1` schemas to ensure they do not have similar fabricated fields. (Spot-checking shows they are clean and do not include `exitIntent` or similar unbacked requirements).
 
-## Proposed Approach and Rationale
+## 4. Assumptions Made
 
-1. **Contract Updates:**
-   - Update `packages/application/src/dto/regimePlan.ts` to include the missing fields (`portfolio`, `autopilotState`, `config`) required by `regime-engine`'s actual `PlanRequest`.
-   - Update the `market.source` from `'clmm'` to `'geckoterminal'` or `'solana'` to match `regime-engine`'s ingestion format.
-2. **Endpoint and Auth Fixes:**
-   - Fix the endpoint path in `RegimePlanAdapter.ts` to `/v1/plan`.
-   - The adapter already sends `X-CLMM-Internal-Token`. We will file a companion PR/issue in `regime-engine` to enforce `requireSharedSecret` for this token on the backend.
-3. **Identity Preservation:**
-   - Modify `RequestPositionPlan.ts` to extract and store `response.planId` and `response.planHash` instead of generating local ones.
-   - Ensure `SyncPlanExecutionResults.ts` accurately maps these values back to `regime-engine`'s `execution-result.v1` schema.
-4. **Invocation Cadence:**
-   - Introduce a throttled background task or event listener that observes position updates and conditionally calls `RequestPositionPlan`.
+- The `regime-engine` API will never send `exitIntent`, and any downstream code in the client that requires it must derive it using `DirectionalExitPolicyService`.
+- The instruction to drop `expiresAtUnixMs` from `request-exit.json` is a no-op because the field is already absent from the fixture on the current branch.
+- Modifying the DTO (`packages/application/src/dto/regimePlan.ts`) is the correct interpretation of fixing the schema, as the DTO must accurately reflect the validated schema shape.
+- `execution-result.v1` and `plan-request.v1` schemas are assumed to be drift-free as they do not mention `exitIntent` and align with their expected contract types.
 
-## Assumptions
+## 5. Scope
 
-- We assume that `portfolio`, `autopilotState`, and `config` data can be accurately derived from the existing `positionReadPort` and `triggerRepository` without requiring new external APIs.
-- We assume that the `planId` string format returned by `regime-engine` is compatible with the local database schema for `PlanId`.
-- We assume that adding authentication to the `regime-engine` is handled in the `opsclawd/regime-engine` repository, but tracked as part of this epic's completion criteria.
+**In Scope:**
 
-## Scope
+- Modifications to `schemas/regime-engine/position-plan.v1/schema.json` and its associated valid/invalid fixtures.
+- Updates to `packages/application/src/dto/regimePlanValidator.test.ts` to reflect the relaxed constraint.
+- Updates to `packages/application/src/dto/regimePlan.ts` to remove the fabricated field from the type signature.
+- Auditing sibling schemas for similar drift.
 
-- **In Scope:** Modifying `clmm-v2` application DTOs, `RegimePlanAdapter`, `RequestPositionPlan` use case, and `SyncPlanExecutionResults` use case. Setting up the throttled background cadence for plan requests. Fixing the `market.source` value.
-- **Out of Scope:** Making direct changes to `regime-engine` backend code within this repository (companion issue required). Modifying the core directional mapping logic (`DirectionalExitPolicyService`). Building UI screens.
+**Out of Scope:**
 
-## Risks and Concerns Identified
+- Modifying `DirectionalExitPolicyService` or any code that performs the actual exit operation (which is assumed to be working properly).
+- Introducing any new fields to `regime-engine` schemas.
+- Adding backwards compatibility shims for `exitIntent`.
 
-- **Execution Result Schema Match:** While fixing `position-plan.v1`, we must verify `execution-result.v1` in `SyncPlanExecutionResults.ts` maps `decisionKind` correctly to `status` and `reasonCode` expected by `regime-engine`. Any mismatch here will silently corrupt the audit trail.
-- **Throttling Edge Cases:** The request fingerprint currently includes `observedAtUnixMs`, meaning it changes on every observation. We must ensure the new throttling logic doesn't rely solely on fingerprint changes, otherwise it will still spam the endpoint.
+## 6. Risks and Concerns
+
+- **Type Mapping Breakages**: Removing `exitIntent` from the DTO may cause TypeScript compiler errors in files that map the DTO to the domain `PlanAction` type (e.g., `parseRegimePlanResponse` consumers) if they assume it's always present. These will need to be fixed to ensure the domain's `exitIntent` is left undefined during the initial mapping.
+- **UI/Adapter Reliance**: There is a risk that UI components or presentation logic might be checking for `exitIntent` too early in the lifecycle (before `DirectionalExitPolicyService` derives it). If this happens, fixing the schema might expose runtime errors in the UI, requiring further adjustments to how the UI sources the directional intent.
