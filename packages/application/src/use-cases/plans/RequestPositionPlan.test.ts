@@ -24,6 +24,7 @@ import type {
   PoolData,
   ExitTrigger,
   PositionPlan,
+  PlanAction,
   PlanLifecycleState,
   CanonicalHash,
   HistoryEvent,
@@ -302,6 +303,7 @@ class FakePlanRepository implements PlanRepository {
   async acceptResponse(params: {
     planId: PlanId;
     regimeResponse: { kind: string; regime: string; suitability: string };
+    advisoryAction: PlanAction;
     respondedAt: ClockTimestamp;
     asOfAt: ClockTimestamp;
     expiresAt: ClockTimestamp;
@@ -313,7 +315,7 @@ class FakePlanRepository implements PlanRepository {
     plan.expiresAt = params.expiresAt;
     plan.lifecycleStateJson = {
       kind: 'advisory-ready',
-      advisoryAction: { kind: 'HOLD' },
+      advisoryAction: params.advisoryAction,
       regimeResponse: {
         kind: 'regime-response',
         regime: params.regimeResponse.regime as 'UP' | 'DOWN' | 'CHOP',
@@ -1136,5 +1138,146 @@ describe('RequestPositionPlan', () => {
       expect(planRepo.finishedCalls).toHaveLength(1);
       expect(planRepo.finishedCalls[0]?.outcome).toBe('succeeded');
     });
+  });
+
+  it('persists request-exit advisory without remote directional intent', async () => {
+    const position = makeInRangePosition(FIXTURE_POSITION_ID, FIXTURE_WALLET_ID);
+    positionRead.setPosition(position);
+    positionRead.setDetail(makeFixtureDetail(position));
+    regimePort.setResponse({
+      kind: 'ok',
+      response: {
+        ...VALID_UPSTREAM_RESPONSE,
+        actions: [
+          {
+            type: 'REQUEST_EXIT_CLMM',
+            reasonCode: 'POSITION_RANGE_BREACH_QUALIFIED',
+          },
+        ],
+      },
+    });
+
+    await requestPositionPlan({
+      walletId: FIXTURE_WALLET_ID,
+      positionId: FIXTURE_POSITION_ID,
+      positionReadPort: positionRead,
+      triggerRepository: triggerRepo,
+      planRepository: planRepo,
+      regimePlanPort: regimePort,
+      executionHistoryRepository: historyRepo,
+      config: CONFIGURED_CONFIG,
+      clock,
+      observability,
+    });
+
+    expect(
+      planRepo.getStoredPlan(VALID_UPSTREAM_RESPONSE.planId as PlanId)?.lifecycleStateJson,
+    ).toMatchObject({
+      kind: 'advisory-ready',
+      advisoryAction: { kind: 'REQUEST_EXIT_CLMM' },
+    });
+  });
+
+  it('maps hold and stand-down actions without changing their kinds', async () => {
+    const position = makeInRangePosition(FIXTURE_POSITION_ID, FIXTURE_WALLET_ID);
+    positionRead.setPosition(position);
+    positionRead.setDetail(makeFixtureDetail(position));
+
+    // Test HOLD action
+    regimePort.setResponse({
+      kind: 'ok',
+      response: {
+        ...VALID_UPSTREAM_RESPONSE,
+        actions: [{ type: 'HOLD', reasonCode: 'HOLD_POLICY' }],
+      },
+    });
+    await requestPositionPlan({
+      walletId: FIXTURE_WALLET_ID,
+      positionId: FIXTURE_POSITION_ID,
+      positionReadPort: positionRead,
+      triggerRepository: triggerRepo,
+      planRepository: planRepo,
+      regimePlanPort: regimePort,
+      executionHistoryRepository: historyRepo,
+      config: CONFIGURED_CONFIG,
+      clock,
+      observability,
+    });
+    expect(
+      planRepo.getStoredPlan(VALID_UPSTREAM_RESPONSE.planId as PlanId)?.lifecycleStateJson,
+    ).toMatchObject({
+      kind: 'advisory-ready',
+      advisoryAction: { kind: 'HOLD' },
+    });
+
+    // Test STAND_DOWN action with fresh plan ID
+    const standDownPlanId = 'plan_stand_down_1234' as PlanId;
+    regimePort.setResponse({
+      kind: 'ok',
+      response: {
+        ...VALID_UPSTREAM_RESPONSE,
+        planId: standDownPlanId,
+        actions: [{ type: 'STAND_DOWN', reasonCode: 'STAND_DOWN_POLICY' }],
+      },
+    });
+    await requestPositionPlan({
+      walletId: FIXTURE_WALLET_ID,
+      positionId: makePositionId('test-position-2'),
+      positionReadPort: positionRead,
+      triggerRepository: triggerRepo,
+      planRepository: planRepo,
+      regimePlanPort: regimePort,
+      executionHistoryRepository: historyRepo,
+      config: CONFIGURED_CONFIG,
+      clock,
+      observability,
+    });
+    expect(planRepo.getStoredPlan(standDownPlanId)?.lifecycleStateJson).toMatchObject({
+      kind: 'advisory-ready',
+      advisoryAction: { kind: 'STAND_DOWN' },
+    });
+  });
+
+  it('does not derive exit posture outside DirectionalExitPolicyService', async () => {
+    const position = makeInRangePosition(FIXTURE_POSITION_ID, FIXTURE_WALLET_ID);
+    positionRead.setPosition(position);
+    positionRead.setDetail(makeFixtureDetail(position));
+
+    regimePort.setResponse({
+      kind: 'ok',
+      response: {
+        ...VALID_UPSTREAM_RESPONSE,
+        regime: 'DOWN',
+        targets: { solBps: 0, usdcBps: 10000, allowClmm: true },
+        actions: [
+          {
+            type: 'REQUEST_EXIT_CLMM',
+            reasonCode: 'OUT_OF_RANGE_DOWNTREND',
+          },
+        ],
+      },
+    });
+
+    await requestPositionPlan({
+      walletId: FIXTURE_WALLET_ID,
+      positionId: FIXTURE_POSITION_ID,
+      positionReadPort: positionRead,
+      triggerRepository: triggerRepo,
+      planRepository: planRepo,
+      regimePlanPort: regimePort,
+      executionHistoryRepository: historyRepo,
+      config: CONFIGURED_CONFIG,
+      clock,
+      observability,
+    });
+
+    const storedState = planRepo.getStoredPlan(
+      VALID_UPSTREAM_RESPONSE.planId as PlanId,
+    )?.lifecycleStateJson;
+    expect(storedState).toBeDefined();
+    if (storedState?.kind === 'advisory-ready') {
+      expect(storedState.advisoryAction).toEqual({ kind: 'REQUEST_EXIT_CLMM' });
+      expect(storedState.advisoryAction).not.toHaveProperty('exitIntent');
+    }
   });
 });
