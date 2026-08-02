@@ -1,52 +1,47 @@
-# Design Document: Fix Vendored Position Plan Schema Drift
+# Design Document: Fix `observedAtUnixMs` > `asOfUnixMs` Validation Error
 
-## 1. The Problem and Why It Matters
+## The Problem and Why It Matters
 
-The `regime-engine` API validates positions and returns action plans (e.g., `STAND_DOWN`, `REQUEST_EXIT_CLMM`). The client-side application uses a vendored JSON schema (`schemas/regime-engine/position-plan.v1/schema.json`) to validate the API response payload.
+When `RequestPositionPlan` builds a plan request for a breach-qualified position, it passes a timestamp (`now`) captured at the start of the function as `asOfUnixMs`. However, the request also includes an `observedAtUnixMs` timestamp derived from `positionDetail.position.lastObservedAt`, which is fetched via `getPositionDetail` (an RPC round-trip) _after_ `now` was captured.
 
-Currently, the vendored schema incorrectly dictates that any `REQUEST_EXIT_CLMM` action must include an `exitIntent` field. However, the authoritative `regime-engine` contract does not produce an `exitIntent` field—instead, the directional intent (ExitToUSDC vs ExitToSOL) is meant to be derived client-side within the `DirectionalExitPolicyService` domain layer based on the breached boundary.
+Because the RPC call takes real wall-clock time, `observedAtUnixMs` (stamped after the RPC completes) is chronologically later than `asOfUnixMs` (stamped before the RPC began). This violates a fundamental schema validation invariant in `regime-engine`, causing the engine to permanently reject these requests. This failure prevents the automated exit mechanism from unwinding positions that move out of range, defeating the core functionality of the worker.
 
-Because of this schema drift, valid `REQUEST_EXIT_CLMM` responses are rejected by the client-side `regimePlanValidator`, resulting in legitimate out-of-range positions failing to be processed. This completely blocks the primary product feature of CLMM V2 (assisting users in unwinding breached positions).
+## Key Design Decisions and Trade-offs Considered
 
-## 2. Key Design Decisions and Trade-Offs
+1. **Recapture Timestamp (Proposed) vs. Mock Timestamp in Adapter:**
+   - _Option A:_ Modify the Solana read adapter to return a timestamp that is constrained by the orchestration layer's `now`. Trade-off: Violates the reality that the position was actually observed at a later point in time; tightly couples adapter logic to application-layer validation constraints.
+   - _Option B (Recommended):_ Capture a fresh `clock.now()` immediately before calling `buildRegimePlanRequest` and use it as `asOfUnixMs`. Trade-off: Introduces two distinct time variables in `RequestPositionPlan.ts`, but accurately represents the real timeline of operations.
 
-- **Source of Truth for Directionality**: A core invariant of this application is that directional intent mapping (lower bound = exit to USDC, upper bound = exit to SOL) lives _only_ in `DirectionalExitPolicyService`. We must completely strip any pretense that the remote API provides this data.
-- **DTO Synchronization**: Removing `exitIntent` from the JSON schema necessitates removing it from the `RegimePlanAction` DTO in the application layer. This cleanly separates the external HTTP contract (DTO) from the internal domain model (`PositionPlan.ts`), which defines `exitIntent` as an optional field on `PlanAction` to be populated later by the domain.
-- **Test Alignment**: The validation test asserting that `exitIntent` must be present is actively harmful because it enforces fabricated behavior. We will remove this test and the corresponding invalid fixture entirely rather than adding compatibility shims.
+2. **Isolating the Fresh Timestamp:**
+   - The initial `now` timestamp is used for staleness checks and throttling logic (e.g., `claimPlanRequest`). Modifying these to use the later timestamp could introduce bugs in lease management. The fresh timestamp should be strictly scoped to building the regime plan request and recording its lifecycle events.
 
-## 3. Proposed Approach and Rationale
+## Proposed Approach with Rationale
 
-1. **Schema Update**: Remove the `exitIntent` property, the `PlanExitIntent` `$defs` block, and the `allOf`/`if`/`then` conditional requirement block from `schemas/regime-engine/position-plan.v1/schema.json`.
-2. **DTO Update**: Remove `RegimePlanExitIntent` and the `exitIntent` field from the `RegimePlanAction` type in `packages/application/src/dto/regimePlan.ts`. Update any mappers that blindly copy this field from the DTO to the domain entity.
-3. **Fixture Correction**:
-   - Update `schemas/regime-engine/position-plan.v1/fixtures/valid/request-exit.json` to remove the `exitIntent` block. (Note: The issue mentioned dropping a stale `expiresAtUnixMs` here, but analysis shows it is already absent from this file).
-   - Delete `schemas/regime-engine/position-plan.v1/fixtures/invalid/missing-exit-intent.json` since a missing `exitIntent` is the correct behavior.
-4. **Test Correction**: Remove the `rejects a request-exit plan without canonical exit intent` block from `packages/application/src/dto/regimePlanValidator.test.ts`.
-5. **Drift Audit**: Review `execution-result.v1` and `plan-request.v1` schemas to ensure they do not have similar fabricated fields. (Spot-checking shows they are clean and do not include `exitIntent` or similar unbacked requirements).
+The proposed fix is to capture a new timestamp (`const requestAsOfNow = clock.now();`) immediately after `positionReadPort.getPositionDetail(...)` resolves and before `buildRegimePlanRequest` is called. This new timestamp will be passed as `asOfUnixMs` to `buildRegimePlanRequest`.
 
-## 4. Assumptions Made
+**Rationale:**
 
-- The `regime-engine` API will never send `exitIntent`, and any downstream code in the client that requires it must derive it using `DirectionalExitPolicyService`.
-- The instruction to drop `expiresAtUnixMs` from `request-exit.json` is a no-op because the field is already absent from the fixture on the current branch.
-- Modifying the DTO (`packages/application/src/dto/regimePlan.ts`) is the correct interpretation of fixing the schema, as the DTO must accurately reflect the validated schema shape.
-- `execution-result.v1` and `plan-request.v1` schemas are assumed to be drift-free as they do not mention `exitIntent` and align with their expected contract types.
+- It respects the invariant `observedAtUnixMs <= asOfUnixMs` because `asOfUnixMs` is sampled _after_ the `lastObservedAt` timestamp is generated by the adapter.
+- It preserves the original `now` for staleness checks and lease claims, which correctly apply to the beginning of the orchestration cycle.
+- The change is localized, minimizing risk to the rest of the file.
 
-## 5. Scope
+## Assumptions Made
 
-**In Scope:**
+- We assume `clock.now()`'s resolution and monotonic nature are sufficient to ensure that the time captured after the `getPositionDetail` promise resolves is strictly greater than or equal to the timestamp taken inside the adapter.
+- We assume the existing uses of `now` prior to `executeWork` (for staleness checks, throttling, and computing `closedCandleAt`) remain perfectly correct and should explicitly not be changed.
+- We assume that `requestedAt`, `respondedAt`, `asOfAt`, and `expiresAt` timestamps generated for the `planRepository` should either continue using the response timestamps or the fresh `requestAsOfNow` instead of the original `now` where applicable, although passing the fresh timestamp into `buildRegimePlanRequest` is the primary schema fix.
 
-- Modifications to `schemas/regime-engine/position-plan.v1/schema.json` and its associated valid/invalid fixtures.
-- Updates to `packages/application/src/dto/regimePlanValidator.test.ts` to reflect the relaxed constraint.
-- Updates to `packages/application/src/dto/regimePlan.ts` to remove the fabricated field from the type signature.
-- Auditing sibling schemas for similar drift.
+## Scope
 
-**Out of Scope:**
+- **In Scope:**
+  - Modifying `RequestPositionPlan.ts` to capture a second timestamp and passing it as `asOfUnixMs` to `buildRegimePlanRequest`.
+  - Updating related tests (e.g., adding a regression test asserting `asOfUnixMs >= observedAtUnixMs` when `getPositionDetail` takes non-zero time).
+- **Out of Scope:**
+  - Refactoring position read adapters.
+  - Altering the validation schema logic in `regime-engine`.
+  - Modifying the initial staleness check logic or lease claiming timestamps in `RequestPositionPlan.ts`.
 
-- Modifying `DirectionalExitPolicyService` or any code that performs the actual exit operation (which is assumed to be working properly).
-- Introducing any new fields to `regime-engine` schemas.
-- Adding backwards compatibility shims for `exitIntent`.
+## Risks and Concerns Identified
 
-## 6. Risks and Concerns
-
-- **Type Mapping Breakages**: Removing `exitIntent` from the DTO may cause TypeScript compiler errors in files that map the DTO to the domain `PlanAction` type (e.g., `parseRegimePlanResponse` consumers) if they assume it's always present. These will need to be fixed to ensure the domain's `exitIntent` is left undefined during the initial mapping.
-- **UI/Adapter Reliance**: There is a risk that UI components or presentation logic might be checking for `exitIntent` too early in the lifecycle (before `DirectionalExitPolicyService` derives it). If this happens, fixing the schema might expose runtime errors in the UI, requiring further adjustments to how the UI sources the directional intent.
+- **Clock Sync / Flakiness in Tests:** If the adapter uses a direct `Date.now()` while the orchestration layer relies on an injected `clock.now()`, there could be a discrepancy if mock clocks are improperly synchronized during testing. We must ensure the regression test uses a clock mechanism that advances correctly across simulated async RPC delays to reliably pass `asOfUnixMs >= observedAtUnixMs`.
+- **Variable Naming Confusion:** Having two variables for current time in the same function could lead to future regressions if a developer uses the wrong one. We should name them clearly (e.g. keeping `now` for the start time and using `requestAsOfNow` for the inner block).

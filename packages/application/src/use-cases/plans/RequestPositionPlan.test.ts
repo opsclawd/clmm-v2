@@ -224,6 +224,12 @@ class FakeTriggerRepository implements TriggerRepository {
 }
 
 class FakeExecutionHistoryRepository implements ExecutionHistoryRepository {
+  private _events: readonly HistoryEvent[] = [];
+
+  setEvents(events: readonly HistoryEvent[]): void {
+    this._events = events;
+  }
+
   async appendEvent(_event: HistoryEvent): Promise<void> {}
   async recordWalletPositionOwnership(
     _walletId: WalletId,
@@ -231,7 +237,7 @@ class FakeExecutionHistoryRepository implements ExecutionHistoryRepository {
     _observedAt: number,
   ): Promise<void> {}
   async getWalletHistory(_walletId: WalletId): Promise<readonly HistoryEvent[]> {
-    return [];
+    return this._events;
   }
   async getTimeline(positionId: PositionId): Promise<HistoryTimeline> {
     return { positionId, events: [] };
@@ -714,6 +720,65 @@ describe('RequestPositionPlan', () => {
       expect(request.asOfUnixMs).toBe(1_000_131);
       expect(request.asOfUnixMs).toBeGreaterThanOrEqual(request.position.observedAtUnixMs);
       expect(planRepo.claimedCalls[0]?.now).toBe(1_000_000);
+    });
+
+    it('synchronizes asOfUnixMs with the latest remote evidence from walletHistory when local clock drifts behind', async () => {
+      const position = makeBelowRangePosition(FIXTURE_POSITION_ID, FIXTURE_WALLET_ID);
+      positionRead.setPosition(position);
+      positionRead.setDetail(makeFixtureDetail(position));
+      historyRepo.setEvents([
+        {
+          eventId: 'evt-1',
+          positionId: FIXTURE_POSITION_ID,
+          eventType: 'confirmed',
+          occurredAt: makeClockTimestamp(1_005_000),
+          origin: { kind: 'qualified-breach', breachDirection: LOWER_BOUND_BREACH },
+        },
+      ]);
+
+      await requestPositionPlan({
+        walletId: FIXTURE_WALLET_ID,
+        positionId: FIXTURE_POSITION_ID,
+        positionReadPort: positionRead,
+        triggerRepository: triggerRepo,
+        planRepository: planRepo,
+        regimePlanPort: regimePort,
+        executionHistoryRepository: historyRepo,
+        config: CONFIGURED_CONFIG,
+        clock,
+        observability,
+      });
+
+      const request = regimePort.getRequests()[0]!;
+      expect(request.asOfUnixMs).toBe(1_005_000);
+    });
+
+    it('computes snapshot fingerprint using positionDetail position rather than initial position read', async () => {
+      const initialPosition = makeInRangePosition(FIXTURE_POSITION_ID, FIXTURE_WALLET_ID);
+      const updatedDetailPosition = {
+        ...initialPosition,
+        rangeState: { kind: 'in-range' as const, currentPrice: 165 },
+      };
+      positionRead.setPosition(initialPosition);
+      positionRead.setDetail(makeFixtureDetail(updatedDetailPosition));
+
+      const result = await requestPositionPlan({
+        walletId: FIXTURE_WALLET_ID,
+        positionId: FIXTURE_POSITION_ID,
+        positionReadPort: positionRead,
+        triggerRepository: triggerRepo,
+        planRepository: planRepo,
+        regimePlanPort: regimePort,
+        executionHistoryRepository: historyRepo,
+        config: CONFIGURED_CONFIG,
+        clock,
+        observability,
+      });
+
+      expect(result.status).toBe('ok');
+      if (result.status === 'ok' && 'fingerprint' in result) {
+        expect(result.fingerprint).toContain('165');
+      }
     });
   });
 

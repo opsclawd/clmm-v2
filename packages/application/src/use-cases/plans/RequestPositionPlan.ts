@@ -199,12 +199,21 @@ export async function requestPositionPlan(params: {
       const supportedPositions = await positionReadPort.listSupportedPositions(walletId);
       const walletHistory = await executionHistoryRepository.getWalletHistory(walletId);
       const existingPlan = await planRepository.getCurrentPlan(positionId);
-      const requestAsOfNow = clock.now();
+
+      const maxHistoryOccurredAt = walletHistory.reduce(
+        (max, e) => (e.occurredAt > max ? e.occurredAt : max),
+        0,
+      );
+      const asOfUnixMs = Math.max(
+        now,
+        positionDetail.position.lastObservedAt,
+        maxHistoryOccurredAt,
+      );
 
       const request = buildRegimePlanRequest({
         positionDetail,
         config: config.config,
-        asOfUnixMs: requestAsOfNow,
+        asOfUnixMs,
         supportedPositionsCount: supportedPositions.length,
         qualifiedTrigger: qualifiedTrigger ?? null,
         walletHistory,
@@ -217,20 +226,22 @@ export async function requestPositionPlan(params: {
         return { status: 'unavailable', reason: 'portfolio-unavailable' };
       }
 
+      const detailPosition = positionDetail.position;
+      const detailRangeStateKind = detailPosition.rangeState.kind;
       const currentPrice =
-        position.rangeState.kind === 'in-range' ||
-        position.rangeState.kind === 'below-range' ||
-        position.rangeState.kind === 'above-range'
-          ? position.rangeState.currentPrice
+        detailPosition.rangeState.kind === 'in-range' ||
+        detailPosition.rangeState.kind === 'below-range' ||
+        detailPosition.rangeState.kind === 'above-range'
+          ? detailPosition.rangeState.currentPrice
           : 0;
 
       const fingerprint = computeFingerprint({
-        positionId: position.positionId,
-        lowerBoundPrice: position.bounds.lowerBound,
-        upperBoundPrice: position.bounds.upperBound,
+        positionId: detailPosition.positionId,
+        lowerBoundPrice: detailPosition.bounds.lowerBound,
+        upperBoundPrice: detailPosition.bounds.upperBound,
         currentPrice,
-        rangeState: rangeStateKind,
-        observedAt: position.lastObservedAt,
+        rangeState: detailRangeStateKind,
+        observedAt: detailPosition.lastObservedAt,
       });
 
       const transportResult = await regimePlanPort.requestPositionPlan(request);
