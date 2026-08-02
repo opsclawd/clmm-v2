@@ -120,6 +120,26 @@ describe('fetchCurrentPlan', () => {
     expect((error as Error).message).toBe('Could not load current plan for this position');
   });
 
+  it('accepts a REQUEST_EXIT_CLMM advisory without exitIntent', async () => {
+    env.EXPO_PUBLIC_BFF_BASE_URL = 'https://bff.example.test';
+    const plan = {
+      planId: 'plan-1',
+      canonicalHash: 'hash-1',
+      positionId: 'position-1',
+      state: {
+        kind: 'advisory-ready',
+        advisoryAction: { kind: 'REQUEST_EXIT_CLMM' },
+        regimeResponse: { regime: 'CHOP', suitability: 'ALLOWED' },
+      },
+    };
+    globalThis.fetch = vi.fn().mockResolvedValue({
+      ok: true,
+      json: () => Promise.resolve(plan),
+    }) as typeof fetch;
+
+    await expect(fetchCurrentPlan('wallet-1', 'position-1')).resolves.toEqual(plan);
+  });
+
   it('accepts an exit-previewed plan carrying preview freshness', async () => {
     env.EXPO_PUBLIC_BFF_BASE_URL = 'https://bff.example.test';
 
@@ -130,7 +150,7 @@ describe('fetchCurrentPlan', () => {
       state: {
         kind: 'exit-previewed',
         previewId: 'preview-123',
-        advisoryAction: { kind: 'REQUEST_EXIT_CLMM', exitIntent: { posture: 'ExitToUSDC' } },
+        advisoryAction: { kind: 'REQUEST_EXIT_CLMM' },
         preview: { freshness: { kind: 'stale' } },
       },
     };
@@ -161,7 +181,7 @@ describe('fetchCurrentPlan', () => {
           state: {
             kind: 'exit-previewed',
             previewId: 'preview-123',
-            advisoryAction: { kind: 'REQUEST_EXIT_CLMM', exitIntent: { posture: 'ExitToUSDC' } },
+            advisoryAction: { kind: 'REQUEST_EXIT_CLMM' },
           },
         }),
     }) as typeof fetch;

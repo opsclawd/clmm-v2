@@ -95,14 +95,14 @@ describe('PositionPlanViewModel', () => {
   });
 
   describe('renders request-exit as preview then explicit approval', () => {
-    it('shows requesting-exit status with preview capability', () => {
+    it('derives lower-bound requesting exit posture through the domain policy', () => {
       const plan: CurrentPlanDto = {
         planId: 'plan-1',
         canonicalHash: 'hash-1',
         positionId: 'Position1111111111111111111111111111111111',
         state: {
           kind: 'advisory-ready',
-          advisoryAction: { kind: 'REQUEST_EXIT_CLMM', exitIntent: { posture: 'ExitToUSDC' } },
+          advisoryAction: { kind: 'REQUEST_EXIT_CLMM' },
           regimeResponse: { regime: 'DOWN', suitability: 'ALLOWED' },
         },
       };
@@ -116,7 +116,7 @@ describe('PositionPlanViewModel', () => {
       expect(vm.showBreachControls).toBe(false);
     });
 
-    it('transitions to preview-ready after preview is created', () => {
+    it('derives upper-bound preview posture through the domain policy', () => {
       const plan: CurrentPlanDto = {
         planId: 'plan-1',
         canonicalHash: 'hash-1',
@@ -124,7 +124,7 @@ describe('PositionPlanViewModel', () => {
         state: {
           kind: 'exit-previewed',
           previewId: 'preview-123',
-          advisoryAction: { kind: 'REQUEST_EXIT_CLMM', exitIntent: { posture: 'ExitToSOL' } },
+          advisoryAction: { kind: 'REQUEST_EXIT_CLMM' },
           preview: { freshness: { kind: 'fresh' } },
         },
       };
@@ -134,7 +134,48 @@ describe('PositionPlanViewModel', () => {
       expect(vm.status).toBe('preview-ready');
       if (vm.status !== 'preview-ready') return;
       expect(vm.previewId).toBe('preview-123');
+      expect(vm.exitPosture).toBe('ExitToSOL');
       expect(vm.canApprove).toBe(true);
+    });
+
+    it('derives awaiting-signature posture through the domain policy', () => {
+      const plan: CurrentPlanDto = {
+        planId: 'plan-1',
+        canonicalHash: 'hash-1',
+        positionId: 'Position1111111111111111111111111111111111',
+        state: {
+          kind: 'awaiting-signature',
+          advisoryAction: { kind: 'REQUEST_EXIT_CLMM' },
+        },
+      };
+
+      const vm = buildPositionPlanViewModel(plan, makeBreachDirectionLower());
+
+      expect(vm.status).toBe('awaiting-signature');
+      if (vm.status !== 'awaiting-signature') return;
+      expect(vm.exitPosture).toBe('ExitToUSDC');
+      expect(vm.showBreachControls).toBe(false);
+    });
+
+    it('derives submitted posture through the domain policy', () => {
+      const plan: CurrentPlanDto = {
+        planId: 'plan-1',
+        canonicalHash: 'hash-1',
+        positionId: 'Position1111111111111111111111111111111111',
+        state: {
+          kind: 'submitted',
+          attemptId: 'attempt-1',
+          advisoryAction: { kind: 'REQUEST_EXIT_CLMM' },
+        },
+      };
+
+      const vm = buildPositionPlanViewModel(plan, makeBreachDirectionLower());
+
+      expect(vm.status).toBe('in-flight');
+      if (vm.status !== 'in-flight') return;
+      expect(vm.attemptId).toBe('attempt-1');
+      expect(vm.exitPosture).toBe('ExitToUSDC');
+      expect(vm.showBreachControls).toBe(false);
     });
 
     it('requires explicit approval after preview, not automatic submit', () => {
@@ -145,7 +186,7 @@ describe('PositionPlanViewModel', () => {
         state: {
           kind: 'exit-previewed',
           previewId: 'preview-123',
-          advisoryAction: { kind: 'REQUEST_EXIT_CLMM', exitIntent: { posture: 'ExitToUSDC' } },
+          advisoryAction: { kind: 'REQUEST_EXIT_CLMM' },
           preview: { freshness: { kind: 'fresh' } },
         },
       };
@@ -159,6 +200,58 @@ describe('PositionPlanViewModel', () => {
   });
 
   describe('disables stale expired superseded and conflicting plans', () => {
+    it('returns unavailable when an exit state has no breach direction', () => {
+      const planWithoutExitIntent: CurrentPlanDto = {
+        planId: 'plan-1',
+        canonicalHash: 'hash-1',
+        positionId: 'Position1111111111111111111111111111111111',
+        state: {
+          kind: 'advisory-ready',
+          advisoryAction: { kind: 'REQUEST_EXIT_CLMM' },
+          regimeResponse: { regime: 'DOWN', suitability: 'ALLOWED' },
+        },
+      };
+
+      const vm = buildPositionPlanViewModel(planWithoutExitIntent, undefined);
+
+      expect(vm).toEqual({
+        status: 'unavailable',
+        unavailableReason: 'Exit posture unavailable without breach direction',
+      });
+    });
+
+    it('keeps stale and expired previews non-executable without deriving posture', () => {
+      const stalePlan: CurrentPlanDto = {
+        planId: 'plan-1',
+        canonicalHash: 'hash-1',
+        positionId: 'Position1111111111111111111111111111111111',
+        state: {
+          kind: 'exit-previewed',
+          previewId: 'preview-1',
+          advisoryAction: { kind: 'REQUEST_EXIT_CLMM' },
+          preview: { freshness: { kind: 'stale' } },
+        },
+      };
+
+      const expiredPlan: CurrentPlanDto = {
+        planId: 'plan-1',
+        canonicalHash: 'hash-1',
+        positionId: 'Position1111111111111111111111111111111111',
+        state: {
+          kind: 'exit-previewed',
+          previewId: 'preview-1',
+          advisoryAction: { kind: 'REQUEST_EXIT_CLMM' },
+          preview: { freshness: { kind: 'expired' } },
+        },
+      };
+
+      const vmStale = buildPositionPlanViewModel(stalePlan, undefined);
+      expect(vmStale.status).toBe('stale');
+
+      const vmExpired = buildPositionPlanViewModel(expiredPlan, undefined);
+      expect(vmExpired.status).toBe('stale');
+    });
+
     it('marks conflict state as non-executable', () => {
       const plan: CurrentPlanDto = {
         planId: 'plan-1',
@@ -225,7 +318,7 @@ describe('PositionPlanViewModel', () => {
         state: {
           kind: 'exit-previewed',
           previewId: 'preview-1',
-          advisoryAction: { kind: 'REQUEST_EXIT_CLMM', exitIntent: { posture: 'ExitToUSDC' } },
+          advisoryAction: { kind: 'REQUEST_EXIT_CLMM' },
           preview: { freshness: { kind: 'stale' } },
         },
       };
@@ -244,7 +337,7 @@ describe('PositionPlanViewModel', () => {
         state: {
           kind: 'exit-previewed',
           previewId: 'preview-1',
-          advisoryAction: { kind: 'REQUEST_EXIT_CLMM', exitIntent: { posture: 'ExitToUSDC' } },
+          advisoryAction: { kind: 'REQUEST_EXIT_CLMM' },
           preview: { freshness: { kind: 'expired' } },
         },
       };
@@ -272,7 +365,7 @@ describe('PositionPlanViewModel', () => {
         state: {
           kind: 'submitted',
           attemptId: 'attempt-1',
-          advisoryAction: { kind: 'REQUEST_EXIT_CLMM', exitIntent: { posture: 'ExitToUSDC' } },
+          advisoryAction: { kind: 'REQUEST_EXIT_CLMM' },
         },
       };
 
@@ -290,7 +383,7 @@ describe('PositionPlanViewModel', () => {
         positionId: 'Position1111111111111111111111111111111111',
         state: {
           kind: 'awaiting-signature',
-          advisoryAction: { kind: 'REQUEST_EXIT_CLMM', exitIntent: { posture: 'ExitToSOL' } },
+          advisoryAction: { kind: 'REQUEST_EXIT_CLMM' },
         },
       };
 
@@ -311,7 +404,7 @@ describe('PositionPlanViewModel', () => {
         state: {
           kind: 'exit-previewed',
           previewId: 'preview-1',
-          advisoryAction: { kind: 'REQUEST_EXIT_CLMM', exitIntent: { posture: 'ExitToUSDC' } },
+          advisoryAction: { kind: 'REQUEST_EXIT_CLMM' },
           preview: { freshness: { kind: 'fresh' } },
         },
       };
@@ -331,7 +424,7 @@ describe('PositionPlanViewModel', () => {
         state: {
           kind: 'awaiting-signature',
           attemptId: 'attempt-1',
-          advisoryAction: { kind: 'REQUEST_EXIT_CLMM', exitIntent: { posture: 'ExitToUSDC' } },
+          advisoryAction: { kind: 'REQUEST_EXIT_CLMM' },
         },
       };
 

@@ -1,7 +1,7 @@
-export type PlanAction =
-  | { kind: 'HOLD' }
-  | { kind: 'STAND_DOWN' }
-  | { kind: 'REQUEST_EXIT_CLMM'; exitIntent: { posture: 'ExitToUSDC' | 'ExitToSOL' } };
+import type { BreachDirection } from '@clmm/application/public';
+import { applyDirectionalExitPolicy } from '@clmm/application/public';
+
+export type PlanAction = { kind: 'HOLD' } | { kind: 'STAND_DOWN' } | { kind: 'REQUEST_EXIT_CLMM' };
 
 export type PlanLifecycleState =
   | { kind: 'requested' }
@@ -101,21 +101,27 @@ export type PositionPlanViewModel =
       showBreachControls: boolean;
     };
 
-function getAdvisoryPosture(
-  action:
-    | { kind: 'HOLD' }
-    | { kind: 'STAND_DOWN' }
-    | { kind: 'REQUEST_EXIT_CLMM'; exitIntent: { posture: 'ExitToUSDC' | 'ExitToSOL' } },
-): 'ExitToUSDC' | 'ExitToSOL' {
-  if (action.kind === 'REQUEST_EXIT_CLMM') {
-    return action.exitIntent.posture;
+function resolveExitPosture(
+  breachDirection: BreachDirection | undefined,
+): 'ExitToUSDC' | 'ExitToSOL' | undefined {
+  if (breachDirection == null) return undefined;
+
+  const posture = applyDirectionalExitPolicy(breachDirection).postExitPosture;
+  switch (posture.kind) {
+    case 'exit-to-usdc':
+      return 'ExitToUSDC';
+    case 'exit-to-sol':
+      return 'ExitToSOL';
+    default: {
+      const _exhaustive: never = posture;
+      throw new Error(`Unhandled PostExitAssetPosture: ${JSON.stringify(_exhaustive)}`);
+    }
   }
-  return 'ExitToUSDC';
 }
 
 export function buildPositionPlanViewModel(
   plan: CurrentPlanDto,
-  breachDirection?: { kind: 'lower-bound-breach' } | { kind: 'upper-bound-breach' },
+  breachDirection?: BreachDirection,
 ): PositionPlanViewModel {
   if (plan === null) {
     return { status: 'unavailable' };
@@ -144,7 +150,13 @@ export function buildPositionPlanViewModel(
       }
 
       if (action.kind === 'REQUEST_EXIT_CLMM') {
-        const exitPosture = getAdvisoryPosture(action);
+        const exitPosture = resolveExitPosture(breachDirection);
+        if (exitPosture === undefined) {
+          return {
+            status: 'unavailable',
+            unavailableReason: 'Exit posture unavailable without breach direction',
+          };
+        }
         return {
           status: 'requesting-exit',
           exitPosture,
@@ -158,8 +170,6 @@ export function buildPositionPlanViewModel(
     }
 
     case 'exit-previewed': {
-      const action = plan.state.advisoryAction;
-      const exitPosture = getAdvisoryPosture(action);
       const freshnessKind = plan.state.preview.freshness.kind;
 
       if (freshnessKind === 'stale') {
@@ -178,6 +188,14 @@ export function buildPositionPlanViewModel(
         };
       }
 
+      const exitPosture = resolveExitPosture(breachDirection);
+      if (exitPosture === undefined) {
+        return {
+          status: 'unavailable',
+          unavailableReason: 'Exit posture unavailable without breach direction',
+        };
+      }
+
       return {
         status: 'preview-ready',
         previewId: plan.state.previewId,
@@ -188,8 +206,13 @@ export function buildPositionPlanViewModel(
     }
 
     case 'awaiting-signature': {
-      const action = plan.state.advisoryAction;
-      const exitPosture = getAdvisoryPosture(action);
+      const exitPosture = resolveExitPosture(breachDirection);
+      if (exitPosture === undefined) {
+        return {
+          status: 'unavailable',
+          unavailableReason: 'Exit posture unavailable without breach direction',
+        };
+      }
       return {
         status: 'awaiting-signature',
         exitPosture,
@@ -198,8 +221,13 @@ export function buildPositionPlanViewModel(
     }
 
     case 'submitted': {
-      const action = plan.state.advisoryAction;
-      const exitPosture = getAdvisoryPosture(action);
+      const exitPosture = resolveExitPosture(breachDirection);
+      if (exitPosture === undefined) {
+        return {
+          status: 'unavailable',
+          unavailableReason: 'Exit posture unavailable without breach direction',
+        };
+      }
       return {
         status: 'in-flight',
         attemptId: plan.state.attemptId ?? 'unknown',
