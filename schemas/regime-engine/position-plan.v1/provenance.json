@@ -8,12 +8,12 @@
     {
       "sourcePath": "contracts/position-plan/v1/position-plan.schema.json",
       "localPath": "schemas/regime-engine/position-plan.v1/schema.json",
-      "sha256": "a7dc452c4bc471d9c3865b7ce5e97cdfd8b9218f9c34e426e0401704d5739708"
+      "sha256": "acea64f0f154465e68ac901ead770492734f2c808a4e50e11f1c8fb42076e445"
     },
     {
       "sourcePath": "contracts/position-plan/v1/schema.sha256",
       "localPath": "schemas/regime-engine/position-plan.v1/schema.sha256",
-      "sha256": "967df2179350252a549f2713532766e076c3dbcfef43b424891ea0d3b71c3dff"
+      "sha256": "64fb79f35be22ee966a7efc06203c6b1ddf92edaa3aae77cd61d98d3d4f6086f"
     },
     {
       "sourcePath": "contracts/position-plan/v1/fixtures/valid/hold.json",
@@ -23,7 +23,7 @@
     {
       "sourcePath": "contracts/position-plan/v1/fixtures/valid/request-exit.json",
       "localPath": "schemas/regime-engine/position-plan.v1/fixtures/valid/request-exit.json",
-      "sha256": "fc89fe725124de4c4f38adb647dfa19b1b9170a886bc8497ee7d5bb2c6368cac"
+      "sha256": "2784b8d8083b836a2f26f6cf389c421298f7e1329e05c31db44ed97999fc8efa"
     },
     {
       "sourcePath": "contracts/position-plan/v1/fixtures/valid/production-response-redacted.json",
@@ -34,11 +34,6 @@
       "sourcePath": "contracts/position-plan/v1/fixtures/invalid/unsupported-action.json",
       "localPath": "schemas/regime-engine/position-plan.v1/fixtures/invalid/unsupported-action.json",
       "sha256": "3573190c0ca83da88646b82b97a6d39179dfe2577b4c20dec2d9195f7b7933de"
-    },
-    {
-      "sourcePath": "contracts/position-plan/v1/fixtures/invalid/missing-exit-intent.json",
-      "localPath": "schemas/regime-engine/position-plan.v1/fixtures/invalid/missing-exit-intent.json",
-      "sha256": "cdbb3dc0b87737692119de74e226c3c72e8c7c6c8f32180b7b1d12184215fa72"
     },
     {
       "sourcePath": "contracts/position-plan/v1/fixtures/invalid/inline-candles-and-portfolio.json",

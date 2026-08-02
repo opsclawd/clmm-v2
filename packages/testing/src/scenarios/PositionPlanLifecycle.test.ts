@@ -114,7 +114,6 @@ describe('PositionPlanLifecycle Scenarios', () => {
   async function seedAdvisoryReadyPlan(
     env: ReturnType<typeof buildEnvironment>,
     planIdStr = 'plan-1',
-    exitIntent: 'exit-to-usdc' | 'exit-to-sol' = 'exit-to-usdc',
   ) {
     const planId = planIdStr as PlanId;
     const canonicalHash =
@@ -125,13 +124,13 @@ describe('PositionPlanLifecycle Scenarios', () => {
       positionId: env.positionId,
       walletId: env.walletId,
       requestedAt: env.clock.now(),
-      action: { kind: 'REQUEST_EXIT_CLMM', exitIntent },
+      action: { kind: 'REQUEST_EXIT_CLMM' },
     });
     await env.planRepository.updateLifecycleState({
       planId,
       lifecycleState: {
         kind: 'advisory-ready',
-        advisoryAction: { kind: 'REQUEST_EXIT_CLMM', exitIntent },
+        advisoryAction: { kind: 'REQUEST_EXIT_CLMM' },
         regimeResponse: { kind: 'regime-response', regime: 'DOWN', suitability: 'ALLOWED' },
       },
     });

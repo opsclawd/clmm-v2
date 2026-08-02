@@ -15,7 +15,7 @@ export type { ThresholdEvaluation } from './triggers/TriggerQualificationService
 // Exit policy — THE CORE INVARIANT
 export {
   applyDirectionalExitPolicy,
-  mapExitIntentPostureToPolicy,
+  inferBreachDirectionFromRangeState,
 } from './exit-policy/DirectionalExitPolicyService.js';
 export type { DirectionalExitPolicyResult } from './exit-policy/DirectionalExitPolicyService.js';
 

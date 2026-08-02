@@ -10,7 +10,7 @@ import type {
   BreachEpisodeId,
   ClockTimestamp,
 } from '@clmm/domain';
-import { LOWER_BOUND_BREACH, UPPER_BOUND_BREACH, makeClockTimestamp } from '@clmm/domain';
+import { inferBreachDirectionFromRangeState, makeClockTimestamp } from '@clmm/domain';
 
 export type BreachObservationResult = {
   positionId: PositionId;
@@ -60,8 +60,7 @@ export async function scanPositionsForBreaches(params: {
       continue;
     }
 
-    const direction: BreachDirection =
-      rangeKind === 'below-range' ? LOWER_BOUND_BREACH : UPPER_BOUND_BREACH;
+    const direction: BreachDirection = inferBreachDirectionFromRangeState(position.rangeState);
     const transition = await episodeRepo.recordOutOfRange(position.positionId, direction, now);
 
     if (transition.kind === 'episode-reversed') {

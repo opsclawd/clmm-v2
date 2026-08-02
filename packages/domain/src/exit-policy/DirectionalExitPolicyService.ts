@@ -11,15 +11,31 @@
  */
 
 import type { BreachDirection, PostExitAssetPosture } from '../shared/index.js';
-import { EXIT_TO_USDC, EXIT_TO_SOL } from '../shared/index.js';
+import {
+  EXIT_TO_USDC,
+  EXIT_TO_SOL,
+  LOWER_BOUND_BREACH,
+  UPPER_BOUND_BREACH,
+} from '../shared/index.js';
 import type { ExecutionStep, SwapInstruction } from '../execution/index.js';
-import type { ExitIntentPosture } from '../regime/PositionPlan.js';
+
+import type { RangeState } from '../positions/index.js';
 
 export type DirectionalExitPolicyResult = {
   readonly postExitPosture: PostExitAssetPosture;
   readonly swapInstruction: SwapInstruction;
   readonly executionStepSkeleton: readonly ExecutionStep[];
 };
+
+export function inferBreachDirectionFromRangeState(
+  rangeState: RangeState | RangeState['kind'],
+): BreachDirection {
+  const kind = typeof rangeState === 'string' ? rangeState : rangeState.kind;
+  if (kind === 'above-range') {
+    return UPPER_BOUND_BREACH;
+  }
+  return LOWER_BOUND_BREACH;
+}
 
 export function applyDirectionalExitPolicy(
   direction: BreachDirection,
@@ -65,46 +81,6 @@ export function applyDirectionalExitPolicy(
     default: {
       const _exhaustive: never = direction;
       throw new Error(`Unhandled BreachDirection: ${JSON.stringify(_exhaustive)}`);
-    }
-  }
-}
-
-export function mapExitIntentPostureToPolicy(
-  intent: ExitIntentPosture,
-): DirectionalExitPolicyResult {
-  switch (intent) {
-    case 'exit-to-usdc': {
-      const swapInstruction: SwapInstruction = {
-        fromAsset: 'SOL',
-        toAsset: 'USDC',
-        policyReason: 'exit-to-usdc posture: swap SOL to USDC',
-      };
-      return {
-        postExitPosture: EXIT_TO_USDC,
-        swapInstruction,
-        executionStepSkeleton: [
-          { kind: 'remove-liquidity' },
-          { kind: 'collect-fees' },
-          { kind: 'swap-assets', instruction: swapInstruction },
-        ],
-      };
-    }
-
-    case 'exit-to-sol': {
-      const swapInstruction: SwapInstruction = {
-        fromAsset: 'USDC',
-        toAsset: 'SOL',
-        policyReason: 'exit-to-sol posture: swap USDC to SOL',
-      };
-      return {
-        postExitPosture: EXIT_TO_SOL,
-        swapInstruction,
-        executionStepSkeleton: [
-          { kind: 'remove-liquidity' },
-          { kind: 'collect-fees' },
-          { kind: 'swap-assets', instruction: swapInstruction },
-        ],
-      };
     }
   }
 }

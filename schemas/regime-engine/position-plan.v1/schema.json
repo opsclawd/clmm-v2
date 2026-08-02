@@ -292,36 +292,6 @@
         "reasonCode": {
           "type": "string",
           "minLength": 1
-        },
-        "exitIntent": {
-          "$ref": "#/$defs/PlanExitIntent"
-        }
-      },
-      "allOf": [
-        {
-          "if": {
-            "properties": {
-              "type": { "const": "REQUEST_EXIT_CLMM" }
-            },
-            "required": ["type"]
-          },
-          "then": {
-            "properties": {
-              "exitIntent": { "$ref": "#/$defs/PlanExitIntent" }
-            },
-            "required": ["exitIntent"]
-          }
-        }
-      ]
-    },
-    "PlanExitIntent": {
-      "type": "object",
-      "required": ["posture"],
-      "additionalProperties": false,
-      "properties": {
-        "posture": {
-          "type": "string",
-          "enum": ["ExitToUSDC", "ExitToSOL"]
         }
       }
     }

@@ -10,12 +10,10 @@ export type RegimeResponse = {
   readonly suitability: 'ALLOWED' | 'CAUTION' | 'BLOCKED' | 'UNKNOWN';
 };
 
-export type ExitIntentPosture = 'exit-to-usdc' | 'exit-to-sol';
-
 export type PlanAction =
   | { readonly kind: 'HOLD' }
   | { readonly kind: 'STAND_DOWN' }
-  | { readonly kind: 'REQUEST_EXIT_CLMM'; readonly exitIntent?: ExitIntentPosture };
+  | { readonly kind: 'REQUEST_EXIT_CLMM' };
 
 export type NonExecutedOutcome =
   | { readonly kind: 'acknowledged' }

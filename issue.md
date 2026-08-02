@@ -1,51 +1,62 @@
-# Reconcile /v1/plan integration: wrong endpoint, wrong contract, no auto-invocation, discarded plan identity
+# Vendored position-plan.v1 schema requires fabricated exitIntent field, blocking real REQUEST_EXIT_CLMM plans
 
-## Correction
+## Summary
 
-The original version of this issue was wrong to frame this as "investigate whether an integration exists." It already substantially exists — I missed it in the first pass by only grepping for "regime-engine"/"policyinsight"/"railway.app", not "plan". Confirmed on `origin/main`:
+Position-scoped plan requests for the actual breach-qualified exit case (`REQUEST_EXIT_CLMM`) are still rejected client-side after #119/PR #120, due to a second, independent vendoring-drift bug in the same schema: `schemas/regime-engine/position-plan.v1/schema.json` requires a fabricated `exitIntent` field on `REQUEST_EXIT_CLMM` actions that does not exist anywhere in `regime-engine`'s real contract.
 
-- `packages/adapters/src/outbound/regime-engine/RegimePlanAdapter.ts` implements `RegimePlanPort`
-- `packages/application/src/use-cases/plans/RequestPositionPlan.ts`
-- `packages/application/src/use-cases/plans/SyncPlanExecutionResults.ts`
-- `packages/adapters/src/inbound/http/PlanController.ts` — a BFF route `POST /plans/:walletId/:positionId/request`
-- `packages/adapters/src/inbound/jobs/PlanResultSweepHandler.ts`
-- `schemas/regime-engine/position-plan.v1/` — a full local contract with fixtures
+This means the #116 → #118 → #119/#120 fix chain resolved the routine/no-op plan path (`STAND_DOWN`, confirmed live via in-container diagnostic returning `{"kind":"ok", ...}`), but the one scenario the whole plan-submission feature exists for — a position actually breaching its range and needing `REQUEST_EXIT_CLMM` — is still silently dropped by `parseRegimePlanResponse`.
 
-**But nothing calls the BFF route.** It only exists to be invoked (by the app, on a schedule, or otherwise) and currently isn't. That's why `regime-engine` has zero recorded `/v1/plan` (or in this case `/v1/position-plan`) requests ever, per a 30-day production log search.
+## Evidence
 
-The real task is reconciliation and automated invocation, not building from scratch.
+Live diagnostic run inside the deployed `clmm-worker` container (position `57DoQihsbyFy53R5DbcvoCbJDdscuNhd37GvxNX6nhqF`, wallet `EHu1D4EkjM3pQpQxTioFR2e2gAARFRx76wkZUYbPtXsg`), POSTing a real `breachQualified: true` request directly to `regime-engine`'s `/v1/plan`, on top of the current deployed/merged fix (PR #120, commit `a0f9c59`):
 
-## Verified, real defects (not hypothetical)
+`regime-engine` returns HTTP 200 with:
 
-**1. Endpoint mismatch — first real call would 404.**
-`RegimePlanAdapter.ts`: `new URL(\`${baseUrl}/v1/position-plan\`)`. `regime-engine`'s `routes.ts`registers`app.post("/v1/plan", ...)`. Different paths.
+```json
+{ "type": "REQUEST_EXIT_CLMM", "reasonCode": "POSITION_RANGE_BREACH_QUALIFIED" }
+```
 
-**2. Contract mismatch — even at the right URL, this would fail schema validation.**
-`clmm-v2`'s `RegimePlanRequest` (`packages/application/src/dto/regimePlan.ts`): `schemaVersion: 'position-plan.v1'`, body is just `market` + `position`.
-`regime-engine`'s actual `PlanRequest` (`src/contract/v1/types.ts`): requires `schemaVersion`, `market`, `position`, **`portfolio` (navUsd/solUnits/usdcUnits)**, **`autopilotState` (activeClmm/stopouts24h/redeploys24h/cooldownUntilUnixMs/standDownUntilUnixMs/strikeCount)**, optional `regimeState`, and **`config`**. None of the portfolio/autopilotState/config fields exist in `clmm-v2`'s request today.
+No `exitIntent` field — because `regime-engine`'s authoritative type does not have one. From `regime-engine`'s `src/contract/v1/types.ts`:
 
-Response shapes differ too — `clmm-v2`'s local `RegimePlanRequest`/response types need to be reconciled against `regime-engine`'s actual `PlanResponse`, not assumed compatible.
+```ts
+export interface PlanAction {
+  type: PlanActionType;
+  reasonCode: string;
+}
+```
 
-**3. `/v1/plan` has no authentication on the `regime-engine` side**, despite `RegimePlanAdapter` already sending `X-CLMM-Internal-Token`. Confirmed: `evidenceIngest.ts` calls `requireSharedSecret(request.headers, "X-Evidence-Ingest-Token", "EVIDENCE_INGEST_TOKEN")`; `plan.ts` has no equivalent call anywhere. This is a live, unauthenticated, position/portfolio-data-accepting production endpoint. File/fix on the `regime-engine` side as part of this reconciliation.
+There is no `exitIntent`/`PlanExitIntent` type anywhere in `regime-engine`'s contract.
 
-**4. Plan identity appears to be discarded rather than preserved** — needs verification during implementation, but the pattern to check for: does `clmm-v2` persist `regime-engine`'s returned `PlanResponse.planId`/`planHash` as the authoritative remote identity, or does it generate a new local plan ID / locally-computed hash instead? If the latter, execution-result reporting and plan-ledger lookups on the `regime-engine` side will never correlate correctly. Preserve `planId`/`planHash` unchanged; a separate local lifecycle ID can coexist but must not replace them.
+But `clmm-v2`'s vendored schema (`schemas/regime-engine/position-plan.v1/schema.json`, `$defs.PlanAction`) has:
 
-**5. Execution-result contract likely has the same class of mismatch** as the plan contract — check `SyncPlanExecutionResults.ts` / the execution-result client against `regime-engine`'s actual `POST /v1/execution-result` (schema `"1.0"`) before assuming compatibility. If it's also mismatched, file as a companion issue rather than silently shipping plan submission with a broken result-reporting leg — that produces a half-working audit trail that's worse than not having one, because it looks complete.
+```json
+"allOf": [
+  {
+    "if": { "properties": { "type": { "const": "REQUEST_EXIT_CLMM" } }, "required": ["type"] },
+    "then": { "properties": { "exitIntent": { "$ref": "#/$defs/PlanExitIntent" } }, "required": ["exitIntent"] }
+  }
+]
+```
 
-**6. Market feed selector needs to match what `regime-engine` actually ingests**, not the name of whichever service produced the position snapshot — verify the `source`/`network` values sent match what `geckoCollector.ts` stores candles under (`geckoterminal`/`solana` per `regime-engine` #79), not e.g. `clmm`.
+This causes `validatePlanResponse` to fail, so `parseRegimePlanResponse` returns `null`, and `RegimePlanAdapter` reports `{"kind":"permanent","reason":"schema-invalid"}` even though `regime-engine` answered correctly.
 
-## Scope
+The fixture `schemas/regime-engine/position-plan.v1/fixtures/valid/request-exit.json` also encodes this fabricated field (and a stale `expiresAtUnixMs` that #120 already removed from `required` elsewhere), and `packages/application/src/dto/regimePlanValidator.test.ts` has a test (`rejects a request-exit plan without canonical exit intent`) asserting the fabricated requirement as correct behavior.
 
-1. Reconcile the request/response contract against `regime-engine`'s real `/v1/plan` (source of truth — position-scoped synthesis in `regime-engine` #79 already consumes those exact `PlanRequest`/`PlanResponse` types). Define where `portfolio`, `autopilotState`, and `config` values come from in `clmm-v2`.
-2. Fix the endpoint path.
-3. Wire `RequestPositionPlan` into a real background cadence — not only-on-screen-open. Suggested: after a successful position observation, one active request per position, a minimum refresh interval, immediate refresh on range-state change or a qualified breach, refresh on a new closed market candle, no delay introduced to breach qualification or execution safety, suppressed when the position snapshot is stale. Note: the request fingerprint includes `observedAtUnixMs`, so every observation currently produces a "different" plan request even with nothing material changed — throttle explicitly rather than let this drive request volume.
-4. Preserve `regime-engine`'s `planId`/`planHash` as the authoritative remote identity end-to-end.
-5. Verify (and if needed, fix as a companion issue) the execution-result reporting leg's contract compatibility.
-6. Add auth (`requireSharedSecret`-equivalent) to `regime-engine`'s `/v1/plan` handler, matching the token `RegimePlanAdapter` already sends.
+## Root cause
+
+Same bug class as #119: the vendored `position-plan.v1` schema was never generated from `regime-engine`'s real contract and includes an invented field/requirement that doesn't exist in the live API.
+
+## Fix
+
+- Remove the `exitIntent` property, `PlanExitIntent` `$defs` entry, and the conditional `allOf`/`if`/`then` block entirely from `schemas/regime-engine/position-plan.v1/schema.json`.
+- Update `schemas/regime-engine/position-plan.v1/fixtures/valid/request-exit.json` to match a real `REQUEST_EXIT_CLMM` response shape (drop `exitIntent`, drop stale `expiresAtUnixMs`).
+- Update/remove the now-incorrect `missing-exit-intent.json` invalid fixture and the `rejects a request-exit plan without canonical exit intent` test in `packages/application/src/dto/regimePlanValidator.test.ts` (same treatment as #117/#118: delete the test asserting fabricated behavior, don't add a compatibility shim).
+- Per #119's acceptance criteria point 4 (not yet done): also audit `schemas/regime-engine/execution-result.v1/schema.json` and `schemas/regime-engine/plan-request.v1/schema.json` against `regime-engine`'s real `src/contract/v1/types.ts` for the same class of drift, since two independent instances of it have now been found in `position-plan.v1` alone.
 
 ## Acceptance criteria
 
-- `clmm-v2` calls the correctly-pathed, correctly-shaped `/v1/plan` for open positions on a real background cadence, verified live against production `regime-engine` logs (not just unit tests).
-- The endpoint requires and validates the internal token.
-- `regime-engine`'s returned `planId`/`planHash` are persisted unchanged and used, unmodified, in subsequent execution-result reporting.
-- Execution-result reporting is confirmed contract-compatible (or fixed as part of this work).
+- [ ] `exitIntent`/`PlanExitIntent` removed from `position-plan.v1/schema.json`.
+- [ ] Fixtures updated to match real `regime-engine` response shapes (no fabricated fields).
+- [ ] Validator tests updated to reflect the real contract, not invented requirements.
+- [ ] `execution-result.v1` and `plan-request.v1` schemas spot-checked against `regime-engine`'s `src/contract/v1/types.ts` for equivalent drift.
+- [ ] Live-verified: a real breach-qualified position produces a `{"kind":"ok"}` `RegimePlanAdapter` result with a `REQUEST_EXIT_CLMM` action, not just `STAND_DOWN`/`HOLD`.

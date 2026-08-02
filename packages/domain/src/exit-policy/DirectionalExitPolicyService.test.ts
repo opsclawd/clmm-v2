@@ -1,5 +1,8 @@
 import { describe, it, expect } from 'vitest';
-import { applyDirectionalExitPolicy } from './DirectionalExitPolicyService.js';
+import {
+  applyDirectionalExitPolicy,
+  inferBreachDirectionFromRangeState,
+} from './DirectionalExitPolicyService.js';
 import { LOWER_BOUND_BREACH, UPPER_BOUND_BREACH, type BreachDirection } from '../shared/index.js';
 
 describe('DirectionalExitPolicyService', () => {
@@ -108,5 +111,27 @@ describe('upper breach still exits to SOL', () => {
     expect(result.postExitPosture.kind).toBe('exit-to-sol');
     expect(result.swapInstruction.fromAsset).toBe('USDC');
     expect(result.swapInstruction.toAsset).toBe('SOL');
+  });
+});
+
+describe('inferBreachDirectionFromRangeState', () => {
+  it('maps above-range to upper-bound breach', () => {
+    expect(inferBreachDirectionFromRangeState({ kind: 'above-range', currentPrice: 200 })).toEqual(
+      UPPER_BOUND_BREACH,
+    );
+    expect(inferBreachDirectionFromRangeState('above-range')).toEqual(UPPER_BOUND_BREACH);
+  });
+
+  it('maps below-range to lower-bound breach', () => {
+    expect(inferBreachDirectionFromRangeState({ kind: 'below-range', currentPrice: 100 })).toEqual(
+      LOWER_BOUND_BREACH,
+    );
+    expect(inferBreachDirectionFromRangeState('below-range')).toEqual(LOWER_BOUND_BREACH);
+  });
+
+  it('defaults in-range state to lower-bound breach', () => {
+    expect(inferBreachDirectionFromRangeState({ kind: 'in-range', currentPrice: 150 })).toEqual(
+      LOWER_BOUND_BREACH,
+    );
   });
 });

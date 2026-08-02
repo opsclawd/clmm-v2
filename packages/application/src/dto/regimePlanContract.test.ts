@@ -12,7 +12,6 @@ import holdFixture from '../../../../schemas/regime-engine/position-plan.v1/fixt
 import requestExitFixture from '../../../../schemas/regime-engine/position-plan.v1/fixtures/valid/request-exit.json' with { type: 'json' };
 import productionResponseFixture from '../../../../schemas/regime-engine/position-plan.v1/fixtures/valid/production-response-redacted.json' with { type: 'json' };
 import unsupportedActionFixture from '../../../../schemas/regime-engine/position-plan.v1/fixtures/invalid/unsupported-action.json' with { type: 'json' };
-import missingExitIntentFixture from '../../../../schemas/regime-engine/position-plan.v1/fixtures/invalid/missing-exit-intent.json' with { type: 'json' };
 import inlineCandlesFixture from '../../../../schemas/regime-engine/position-plan.v1/fixtures/invalid/inline-candles-and-portfolio.json' with { type: 'json' };
 import legacyExpiresAtFixture from '../../../../schemas/regime-engine/position-plan.v1/fixtures/invalid/legacy-expires-at.json' with { type: 'json' };
 
@@ -58,7 +57,6 @@ describe('Regime plan contract schema validation', () => {
 
   it('rejects every canonical position-plan invalid fixture', () => {
     expect(validatePositionPlan(deepClone(unsupportedActionFixture))).toBe(false);
-    expect(validatePositionPlan(deepClone(missingExitIntentFixture))).toBe(false);
     expect(validatePositionPlan(deepClone(inlineCandlesFixture))).toBe(false);
   });
 

@@ -7,11 +7,19 @@ import type {
   ClockPort,
   IdGeneratorPort,
 } from '../../ports/index.js';
-import type { WalletId, PositionId, PlanId, ExecutionPreview, ExecutionOrigin } from '@clmm/domain';
+import type {
+  WalletId,
+  PositionId,
+  PlanId,
+  ExecutionPreview,
+  ExecutionOrigin,
+  BreachDirection,
+} from '@clmm/domain';
 import {
   evaluatePreviewFreshness,
   applyPlanLifecycleTransition,
-  mapExitIntentPostureToPolicy,
+  applyDirectionalExitPolicy,
+  inferBreachDirectionFromRangeState,
 } from '@clmm/domain';
 
 export class PlanNotEligibleForExitPreviewError extends Error {
@@ -99,8 +107,10 @@ export async function createPlanExitPreview(params: {
     }
   }
 
-  const intent = advisoryAction.exitIntent ?? 'exit-to-usdc';
-  const policy = mapExitIntentPostureToPolicy(intent);
+  const direction: BreachDirection = inferBreachDirectionFromRangeState(
+    position.position.rangeState,
+  );
+  const policy = applyDirectionalExitPolicy(direction);
 
   const executionPlan: import('@clmm/domain').ExecutionPlan = {
     steps: policy.executionStepSkeleton,

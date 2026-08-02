@@ -443,8 +443,6 @@ export type PositionListFinancialMetricsDto = {
 
 export type {
   RegimePlanActionType,
-  RegimePlanExitPosture,
-  RegimePlanExitIntent,
   RegimePlanAction,
   RegimePlanScope,
   RegimePlanConstraints,
