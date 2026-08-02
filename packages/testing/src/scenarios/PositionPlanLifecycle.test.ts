@@ -180,7 +180,6 @@ describe('PositionPlanLifecycle Scenarios', () => {
       schemaVersion: '1.0',
       planHash: 'a1b2c3d4e5f60123456789abcdef0123456789abcdef0123456789abcdef0123',
       asOfUnixMs: 1000,
-      expiresAtUnixMs: 60000,
       scope: {
         kind: 'position',
         positionId: env.positionId,
@@ -188,13 +187,48 @@ describe('PositionPlanLifecycle Scenarios', () => {
         symbol: 'SOL/USDC',
       },
       regime: 'UP',
+      targets: {
+        solBps: 5000,
+        usdcBps: 5000,
+        allowClmm: true,
+      },
       actions: [{ type: 'HOLD', reasonCode: 'HOLD_POLICY' }],
       constraints: {
         cooldownUntilUnixMs: 0,
         standDownUntilUnixMs: 0,
         notes: [],
       },
+      nextRegimeState: {
+        current: 'UP',
+        barsInRegime: 12,
+        pending: null,
+        pendingBars: 0,
+      },
       reasons: [{ code: 'HOLD_POLICY', severity: 'INFO', message: 'Hold' }],
+      telemetry: {
+        realizedVolShort: 0.05,
+      },
+      marketData: {
+        source: 'pyth',
+        network: 'solana-mainnet',
+        poolAddress: 'fake-pool',
+        requestedTimeframe: '15m',
+        sourceTimeframe: '15m',
+        candleCount: 100,
+        sourceCandleCount: 100,
+        freshness: {
+          generatedAtIso: '2026-08-01T20:00:00.000Z',
+          lastCandleOpenUnixMs: 1700000000000,
+          lastCandleOpenIso: '2026-08-01T19:45:00.000Z',
+          lastCandleCloseUnixMs: 1700000900000,
+          lastCandleCloseIso: '2026-08-01T20:00:00.000Z',
+          ageSeconds: 5,
+          softStale: false,
+          hardStale: false,
+          softStaleSeconds: 300,
+          hardStaleSeconds: 900,
+        },
+      },
     });
 
     const trigger: ExitTrigger = {

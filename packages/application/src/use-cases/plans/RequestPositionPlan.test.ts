@@ -256,6 +256,10 @@ type StoredPlan = {
 class FakePlanRepository implements PlanRepository {
   private _plans: Map<string, StoredPlan> = new Map();
 
+  getStoredPlan(planId: PlanId): StoredPlan | undefined {
+    return this._plans.get(planId);
+  }
+
   async createRequest(params: {
     planId: PlanId;
     canonicalHash: CanonicalHash;
@@ -480,7 +484,6 @@ const VALID_UPSTREAM_RESPONSE: RegimePlanResponse = {
   planId: 'plan_upstream_9999',
   planHash: 'a1b2c3d4e5f60123456789abcdef0123456789abcdef0123456789abcdef0123',
   asOfUnixMs: 1_000_000,
-  expiresAtUnixMs: 1_000_000 + 3600000,
   scope: {
     kind: 'position',
     positionId: FIXTURE_POSITION_ID,
@@ -488,9 +491,44 @@ const VALID_UPSTREAM_RESPONSE: RegimePlanResponse = {
     symbol: 'SOL/USDC',
   },
   regime: 'UP',
+  targets: {
+    solBps: 5000,
+    usdcBps: 5000,
+    allowClmm: true,
+  },
   actions: [{ type: 'HOLD', reasonCode: 'HOLD_POLICY' }],
   constraints: { cooldownUntilUnixMs: 0, standDownUntilUnixMs: 0, notes: [] },
+  nextRegimeState: {
+    current: 'UP',
+    barsInRegime: 12,
+    pending: null,
+    pendingBars: 0,
+  },
   reasons: [{ code: 'HOLD_POLICY', severity: 'INFO', message: 'Hold' }],
+  telemetry: {
+    realizedVolShort: 0.05,
+  },
+  marketData: {
+    source: 'pyth',
+    network: 'solana-mainnet',
+    poolAddress: 'test-pool-1',
+    requestedTimeframe: '15m',
+    sourceTimeframe: '15m',
+    candleCount: 100,
+    sourceCandleCount: 100,
+    freshness: {
+      generatedAtIso: '2026-08-01T20:00:00.000Z',
+      lastCandleOpenUnixMs: 1000000,
+      lastCandleOpenIso: '2026-08-01T19:45:00.000Z',
+      lastCandleCloseUnixMs: 1000900,
+      lastCandleCloseIso: '2026-08-01T20:00:00.000Z',
+      ageSeconds: 5,
+      softStale: false,
+      hardStale: false,
+      softStaleSeconds: 300,
+      hardStaleSeconds: 900,
+    },
+  },
 };
 
 class FakeRegimePlanPort implements RegimePlanPort {
@@ -640,6 +678,29 @@ describe('RequestPositionPlan', () => {
   });
 
   describe('upstream identity persistence', () => {
+    it('persists a local expiry one candle interval after the upstream as-of time', async () => {
+      const position = makeInRangePosition(FIXTURE_POSITION_ID, FIXTURE_WALLET_ID);
+      positionRead.setPosition(position);
+      positionRead.setDetail(makeFixtureDetail(position));
+
+      await requestPositionPlan({
+        walletId: FIXTURE_WALLET_ID,
+        positionId: FIXTURE_POSITION_ID,
+        positionReadPort: positionRead,
+        triggerRepository: triggerRepo,
+        planRepository: planRepo,
+        regimePlanPort: regimePort,
+        executionHistoryRepository: historyRepo,
+        config: CONFIGURED_CONFIG,
+        clock,
+        observability,
+      });
+
+      expect(planRepo.getStoredPlan(VALID_UPSTREAM_RESPONSE.planId as PlanId)?.expiresAt).toBe(
+        VALID_UPSTREAM_RESPONSE.asOfUnixMs + 60 * 60 * 1000,
+      );
+    });
+
     it('persists response planId and planHash unchanged', async () => {
       const position = makeInRangePosition(FIXTURE_POSITION_ID, FIXTURE_WALLET_ID);
       positionRead.setPosition(position);

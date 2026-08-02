@@ -32,7 +32,6 @@ function createAdvisoryReadyPlanResponse(): RegimePlanResponse {
     planId: 'regime-plan-id',
     planHash: 'abc123',
     asOfUnixMs: Date.now(),
-    expiresAtUnixMs: Date.now() + 3600000,
     scope: {
       kind: 'position',
       positionId: TEST_POSITION,
@@ -40,6 +39,11 @@ function createAdvisoryReadyPlanResponse(): RegimePlanResponse {
       symbol: 'SOL/USDC',
     },
     regime: 'UP',
+    targets: {
+      solBps: 5000,
+      usdcBps: 5000,
+      allowClmm: true,
+    },
     actions: [
       {
         type: 'REQUEST_EXIT_CLMM',
@@ -52,7 +56,37 @@ function createAdvisoryReadyPlanResponse(): RegimePlanResponse {
       standDownUntilUnixMs: 0,
       notes: [],
     },
+    nextRegimeState: {
+      current: 'UP',
+      barsInRegime: 12,
+      pending: null,
+      pendingBars: 0,
+    },
     reasons: [{ code: 'BREACH_LIKELY', severity: 'WARN', message: 'Breach likely' }],
+    telemetry: {
+      realizedVolShort: 0.05,
+    },
+    marketData: {
+      source: 'pyth',
+      network: 'solana-mainnet',
+      poolAddress: TEST_POOL,
+      requestedTimeframe: '15m',
+      sourceTimeframe: '15m',
+      candleCount: 100,
+      sourceCandleCount: 100,
+      freshness: {
+        generatedAtIso: '2026-08-01T20:00:00.000Z',
+        lastCandleOpenUnixMs: 1700000000000,
+        lastCandleOpenIso: '2026-08-01T19:45:00.000Z',
+        lastCandleCloseUnixMs: 1700000900000,
+        lastCandleCloseIso: '2026-08-01T20:00:00.000Z',
+        ageSeconds: 5,
+        softStale: false,
+        hardStale: false,
+        softStaleSeconds: 300,
+        hardStaleSeconds: 900,
+      },
+    },
   };
 }
 

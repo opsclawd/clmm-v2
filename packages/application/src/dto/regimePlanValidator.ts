@@ -23,9 +23,6 @@ export function parseRegimePlanResponse(value: unknown): RegimePlanResponse | nu
   if (!validatePlanResponse(value)) {
     return null;
   }
-  if (value.expiresAtUnixMs < value.asOfUnixMs) {
-    return null;
-  }
   return value;
 }
 

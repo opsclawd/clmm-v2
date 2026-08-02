@@ -50,6 +50,8 @@ const VALID_EXECUTION_RESULT: RegimeExecutionResult = {
   },
 };
 
+import productionRedactedFixture from '../../../../../schemas/regime-engine/position-plan.v1/fixtures/valid/production-response-redacted.json';
+
 describe('RegimePlanAdapter', () => {
   let obs: ReturnType<typeof createFakeObservability>;
 
@@ -64,24 +66,20 @@ describe('RegimePlanAdapter', () => {
   });
 
   describe('requestPositionPlan', () => {
+    it('returns ok for the redacted production response', async () => {
+      vi.mocked(fetch).mockResolvedValue(
+        new Response(JSON.stringify(productionRedactedFixture), { status: 200 }),
+      );
+
+      const adapter = new RegimePlanAdapter('https://regime.example.com', 'test-token', obs.port);
+      const resOk = await adapter.requestPositionPlan(VALID_PLAN_REQUEST);
+      expect(resOk.kind).toBe('ok');
+      if (resOk.kind === 'ok') {
+        expect(resOk.response).toEqual(productionRedactedFixture);
+      }
+    });
     it('accepts a shared-version PlanResponse and rejects the endpoint-named version', async () => {
-      const valid10Response = {
-        schemaVersion: '1.0',
-        planId: 'plan_hold_123456789',
-        planHash: 'a1b2c3d4e5f60123456789abcdef0123456789abcdef0123456789abcdef0123',
-        asOfUnixMs: 1700000000000,
-        expiresAtUnixMs: 1700003600000,
-        scope: {
-          kind: 'position',
-          positionId: 'pos_sol_usdc_01',
-          poolAddress: 'Czfq3xZZDmsdGdUyrNLtRhGc47cXcZtLG4crryfu44zE',
-          symbol: 'SOL/USDC',
-        },
-        regime: 'UP',
-        actions: [{ type: 'HOLD', reasonCode: 'IN_RANGE_STABLE' }],
-        constraints: { cooldownUntilUnixMs: 0, standDownUntilUnixMs: 0, notes: [] },
-        reasons: [],
-      };
+      const valid10Response = productionRedactedFixture;
 
       vi.mocked(fetch).mockResolvedValue(
         new Response(JSON.stringify(valid10Response), { status: 200 }),
@@ -109,36 +107,7 @@ describe('RegimePlanAdapter', () => {
 
     it('posts the exact canonical position-plan request', async () => {
       vi.mocked(fetch).mockResolvedValue(
-        new Response(
-          JSON.stringify({
-            schemaVersion: '1.0',
-            planId: 'plan_hold_123456789',
-            planHash: 'a1b2c3d4e5f60123456789abcdef0123456789abcdef0123456789abcdef0123',
-            asOfUnixMs: 1700000000000,
-            expiresAtUnixMs: 1700003600000,
-            scope: {
-              kind: 'position',
-              positionId: 'pos_sol_usdc_01',
-              poolAddress: 'Czfq3xZZDmsdGdUyrNLtRhGc47cXcZtLG4crryfu44zE',
-              symbol: 'SOL/USDC',
-            },
-            regime: 'UP',
-            actions: [{ type: 'HOLD', reasonCode: 'IN_RANGE_STABLE' }],
-            constraints: {
-              cooldownUntilUnixMs: 0,
-              standDownUntilUnixMs: 0,
-              notes: ['Position in optimal range'],
-            },
-            reasons: [
-              {
-                code: 'IN_RANGE_STABLE',
-                severity: 'INFO',
-                message: 'Position is operating safely within bounds.',
-              },
-            ],
-          }),
-          { status: 200 },
-        ),
+        new Response(JSON.stringify(productionRedactedFixture), { status: 200 }),
       );
 
       const adapter = new RegimePlanAdapter('https://regime.example.com', 'test-token', obs.port);
@@ -169,26 +138,7 @@ describe('RegimePlanAdapter', () => {
 
     it('authenticates both write endpoints', async () => {
       vi.mocked(fetch).mockResolvedValue(
-        new Response(
-          JSON.stringify({
-            schemaVersion: '1.0',
-            planId: 'plan_hold_123456789',
-            planHash: 'a1b2c3d4e5f60123456789abcdef0123456789abcdef0123456789abcdef0123',
-            asOfUnixMs: 1700000000000,
-            expiresAtUnixMs: 1700003600000,
-            scope: {
-              kind: 'position',
-              positionId: 'pos_sol_usdc_01',
-              poolAddress: 'Czfq3xZZDmsdGdUyrNLtRhGc47cXcZtLG4crryfu44zE',
-              symbol: 'SOL/USDC',
-            },
-            regime: 'UP',
-            actions: [{ type: 'HOLD', reasonCode: 'IN_RANGE_STABLE' }],
-            constraints: { cooldownUntilUnixMs: 0, standDownUntilUnixMs: 0, notes: [] },
-            reasons: [],
-          }),
-          { status: 200 },
-        ),
+        new Response(JSON.stringify(productionRedactedFixture), { status: 200 }),
       );
 
       const adapter = new RegimePlanAdapter('https://regime.example.com', 'secret-token', obs.port);
@@ -403,26 +353,7 @@ describe('RegimePlanAdapter', () => {
 
     it('strips trailing slash from baseUrl', async () => {
       vi.mocked(fetch).mockResolvedValue(
-        new Response(
-          JSON.stringify({
-            schemaVersion: '1.0',
-            planId: 'plan_hold_123456789',
-            planHash: 'a1b2c3d4e5f60123456789abcdef0123456789abcdef0123456789abcdef0123',
-            asOfUnixMs: 1700000000000,
-            expiresAtUnixMs: 1700003600000,
-            scope: {
-              kind: 'position',
-              positionId: 'pos_sol_usdc_01',
-              poolAddress: 'Czfq3xZZDmsdGdUyrNLtRhGc47cXcZtLG4crryfu44zE',
-              symbol: 'SOL/USDC',
-            },
-            regime: 'UP',
-            actions: [{ type: 'HOLD', reasonCode: 'IN_RANGE_STABLE' }],
-            constraints: { cooldownUntilUnixMs: 0, standDownUntilUnixMs: 0, notes: [] },
-            reasons: [],
-          }),
-          { status: 200 },
-        ),
+        new Response(JSON.stringify(productionRedactedFixture), { status: 200 }),
       );
 
       const adapter = new RegimePlanAdapter('https://regime.example.com/', 'test-token', obs.port);
@@ -479,26 +410,7 @@ describe('RegimePlanAdapter', () => {
 
     it('logs bounded metadata without secrets', async () => {
       vi.mocked(fetch).mockResolvedValue(
-        new Response(
-          JSON.stringify({
-            schemaVersion: '1.0',
-            planId: 'plan_hold_123456789',
-            planHash: 'a1b2c3d4e5f60123456789abcdef0123456789abcdef0123456789abcdef0123',
-            asOfUnixMs: 1700000000000,
-            expiresAtUnixMs: 1700003600000,
-            scope: {
-              kind: 'position',
-              positionId: 'pos_sol_usdc_01',
-              poolAddress: 'Czfq3xZZDmsdGdUyrNLtRhGc47cXcZtLG4crryfu44zE',
-              symbol: 'SOL/USDC',
-            },
-            regime: 'UP',
-            actions: [{ type: 'HOLD', reasonCode: 'IN_RANGE_STABLE' }],
-            constraints: { cooldownUntilUnixMs: 0, standDownUntilUnixMs: 0, notes: [] },
-            reasons: [],
-          }),
-          { status: 200 },
-        ),
+        new Response(JSON.stringify(productionRedactedFixture), { status: 200 }),
       );
 
       const adapter = new RegimePlanAdapter('https://regime.example.com', 'secret-token', obs.port);
@@ -506,7 +418,7 @@ describe('RegimePlanAdapter', () => {
 
       const logEntry = obs.logs.find((l) => l.message.includes('succeeded'));
       expect(logEntry).toBeDefined();
-      expect(logEntry!.context!['planId']).toBe('plan_hold_123456789');
+      expect(logEntry!.context!['planId']).toBe(productionRedactedFixture.planId);
       expect(logEntry!.context!['positionId']).toBe('pos_sol_usdc_01');
       expect(logEntry!.context!['statusClass']).toBe('ok');
       expect(logEntry!.context!['durationMs']).toBeGreaterThanOrEqual(0);

@@ -115,17 +115,61 @@ export type RegimePlanRequest = {
   config: RegimePlanRequestConfig;
 };
 
+export type RegimePlanTargets = {
+  solBps: number;
+  usdcBps: number;
+  allowClmm: boolean;
+};
+
+export type RegimePlanNextRegimeState = {
+  current: 'UP' | 'DOWN' | 'CHOP';
+  barsInRegime: number;
+  pending: 'UP' | 'DOWN' | 'CHOP' | null;
+  pendingBars: number;
+};
+
+export type RegimePlanTelemetry = Record<string, number | string | boolean>;
+
+export type RegimeCurrentFreshness = {
+  generatedAtIso: string;
+  lastCandleOpenUnixMs: number;
+  lastCandleOpenIso: string;
+  lastCandleCloseUnixMs: number;
+  lastCandleCloseIso: string;
+  ageSeconds: number;
+  softStale: boolean;
+  hardStale: boolean;
+  softStaleSeconds: number;
+  hardStaleSeconds: number;
+};
+
+export type RegimePlanMarketData = {
+  source: string;
+  network: string;
+  poolAddress: string;
+  requestedTimeframe: '15m' | '1h';
+  sourceTimeframe: string;
+  candleCount: number;
+  sourceCandleCount: number;
+  freshness: RegimeCurrentFreshness;
+  derivedTimeframe?: string;
+  aggregationVersion?: string;
+};
+
 export type RegimePlanResponse = {
   schemaVersion: '1.0';
   planId: string;
   planHash: string;
   asOfUnixMs: number;
-  expiresAtUnixMs: number;
   scope: RegimePlanScope;
   regime: 'UP' | 'DOWN' | 'CHOP';
+  targets: RegimePlanTargets;
   actions: RegimePlanAction[];
   constraints: RegimePlanConstraints;
+  nextRegimeState: RegimePlanNextRegimeState;
   reasons: RegimePlanReason[];
+  telemetry: RegimePlanTelemetry;
+  marketData: RegimePlanMarketData;
 };
 
 export type RegimeExecutionResultStatus = 'SUCCESS' | 'FAILED' | 'SKIPPED';

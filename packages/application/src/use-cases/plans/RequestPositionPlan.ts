@@ -297,7 +297,7 @@ export async function requestPositionPlan(params: {
           advisoryAction: advisoryActionFromResponse,
           respondedAt: makeClockTimestamp(response.asOfUnixMs),
           asOfAt: makeClockTimestamp(response.asOfUnixMs),
-          expiresAt: makeClockTimestamp(response.expiresAtUnixMs),
+          expiresAt: makeClockTimestamp(response.asOfUnixMs + CANDLE_INTERVAL_MS),
         });
 
         leaseOutcome = 'succeeded';
