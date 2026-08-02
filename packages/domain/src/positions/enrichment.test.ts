@@ -93,6 +93,20 @@ describe('calculateInRangeReserves', () => {
       amountB: 0n,
     });
   });
+
+  it('returns zero reserves when sqrtPriceX64 is 0n', () => {
+    expect(calculateInRangeReserves(1_000_000_000_000n, 0n, 0, 64)).toEqual({
+      amountA: 0n,
+      amountB: 0n,
+    });
+  });
+
+  it('returns zero reserves when liquidity is 0n', () => {
+    expect(calculateInRangeReserves(0n, 18_476_281_010_653_904_896n, 32, 64)).toEqual({
+      amountA: 0n,
+      amountB: 0n,
+    });
+  });
 });
 
 describe('rangeDistancePercent', () => {

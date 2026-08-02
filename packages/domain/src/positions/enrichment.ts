@@ -73,6 +73,8 @@ export function calculateInRangeReserves(
   tickCurrentIndex: number,
   tickSpacing: number,
 ): { amountA: bigint; amountB: bigint } {
+  if (sqrtPriceX64 === 0n || liquidity === 0n) return { amountA: 0n, amountB: 0n };
+
   const tickLower = Math.floor(tickCurrentIndex / tickSpacing) * tickSpacing;
   const tickUpper = tickLower + tickSpacing;
   const sqrtPrice = Number(sqrtPriceX64) / 2 ** 64;
