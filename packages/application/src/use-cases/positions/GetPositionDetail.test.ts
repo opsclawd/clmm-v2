@@ -209,4 +209,132 @@ describe('GetPositionDetail', () => {
       expect(result.detailDto.poolDepthLabel).toBe('$0.5M pool depth');
     }
   });
+
+  it('adds calculated position amounts with a complete USD valuation', async () => {
+    const position = {
+      ...FIXTURE_POSITION_IN_RANGE,
+      bounds: { lowerBound: -64, upperBound: 64 },
+      rangeState: { kind: 'in-range' as const, currentPrice: 0 },
+    };
+    const poolData = {
+      ...FIXTURE_POOL_DATA,
+      sqrtPrice: 2n ** 64n,
+    };
+    const positionDetail = {
+      ...FIXTURE_POSITION_DETAIL,
+      position,
+      poolData,
+      positionLiquidity: 5_000_000_000n,
+    };
+    const positionReadPort = new FakeSupportedPositionReadPort(
+      [position],
+      { [position.poolId]: poolData },
+      positionDetail,
+    );
+    const pricePort = new FakePricePort([FIXTURE_SOL_PRICE_QUOTE, FIXTURE_USDC_PRICE_QUOTE]);
+
+    const result = await getPositionDetail({
+      walletId: FIXTURE_WALLET_ID,
+      positionId: FIXTURE_POSITION_ID,
+      positionReadPort,
+      pricePort,
+    });
+
+    expect(result.kind).toBe('found');
+    if (result.kind === 'found') {
+      expect(result.detailDto.positionAmounts).toMatchObject({
+        amountA: { raw: '15973629', decimals: 9, symbol: 'SOL' },
+        amountB: { raw: '15973629', decimals: 6, symbol: 'USDC' },
+      });
+      expect(result.detailDto.positionAmounts?.totalUsd).toBeGreaterThan(0);
+    }
+  });
+
+  it('keeps token composition when one required USD quote is missing', async () => {
+    const position = {
+      ...FIXTURE_POSITION_IN_RANGE,
+      bounds: { lowerBound: -64, upperBound: 64 },
+      rangeState: { kind: 'in-range' as const, currentPrice: 0 },
+    };
+    const poolData = {
+      ...FIXTURE_POOL_DATA,
+      sqrtPrice: 2n ** 64n,
+    };
+    const positionDetail = {
+      ...FIXTURE_POSITION_DETAIL,
+      position,
+      poolData,
+      positionLiquidity: 5_000_000_000n,
+    };
+    const positionReadPort = new FakeSupportedPositionReadPort(
+      [position],
+      { [position.poolId]: poolData },
+      positionDetail,
+    );
+    const pricePort = new FakePricePort([FIXTURE_SOL_PRICE_QUOTE]);
+
+    const result = await getPositionDetail({
+      walletId: FIXTURE_WALLET_ID,
+      positionId: FIXTURE_POSITION_ID,
+      positionReadPort,
+      pricePort,
+    });
+
+    expect(result.kind).toBe('found');
+    if (result.kind === 'found') {
+      expect(result.detailDto.positionAmounts).toMatchObject({
+        amountA: { raw: '15973629', decimals: 9, symbol: 'SOL' },
+        amountB: { raw: '15973629', decimals: 6, symbol: 'USDC' },
+      });
+      expect(result.detailDto.positionAmounts?.amountA.usdValue).toBeGreaterThan(0);
+      expect(result.detailDto.positionAmounts?.amountB.usdValue).toBe(0);
+      expect(result.detailDto.positionAmounts?.totalUsd).toBe(0);
+    }
+  });
+
+  it('keeps token composition when price fetching fails', async () => {
+    const position = {
+      ...FIXTURE_POSITION_IN_RANGE,
+      bounds: { lowerBound: -64, upperBound: 64 },
+      rangeState: { kind: 'in-range' as const, currentPrice: 0 },
+    };
+    const poolData = {
+      ...FIXTURE_POOL_DATA,
+      sqrtPrice: 2n ** 64n,
+    };
+    const positionDetail = {
+      ...FIXTURE_POSITION_DETAIL,
+      position,
+      poolData,
+      positionLiquidity: 5_000_000_000n,
+    };
+    const positionReadPort = new FakeSupportedPositionReadPort(
+      [position],
+      { [position.poolId]: poolData },
+      positionDetail,
+    );
+    const pricePort: PricePort = {
+      getPrices: async () => {
+        throw new Error('price unavailable');
+      },
+    };
+
+    const result = await getPositionDetail({
+      walletId: FIXTURE_WALLET_ID,
+      positionId: FIXTURE_POSITION_ID,
+      positionReadPort,
+      pricePort,
+    });
+
+    expect(result.kind).toBe('found');
+    if (result.kind === 'found') {
+      expect(result.detailDto.unclaimedFees.totalUsd).toBe(0);
+      expect(result.detailDto.poolDepthLabel).toBe('depth unavailable');
+      expect(result.detailDto.positionAmounts).toMatchObject({
+        amountA: { raw: '15973629', decimals: 9, symbol: 'SOL', usdValue: 0 },
+        amountB: { raw: '15973629', decimals: 6, symbol: 'USDC', usdValue: 0 },
+        totalUsd: 0,
+      });
+    }
+  });
 });

@@ -7,6 +7,7 @@ import {
   tokenAmountToUsd,
   formatFeeRateLabel,
   calculateInRangeReserves,
+  calculatePositionAmounts,
 } from '@clmm/domain';
 import { buildPositionDisplayBounds } from './buildPositionDisplayBounds.js';
 
@@ -79,6 +80,33 @@ export async function getPositionDetail(params: {
     poolDepthLabel = `$${(poolDepthUsd / 1_000_000).toFixed(1)}M pool depth`;
   }
 
+  const amounts = calculatePositionAmounts(
+    positionLiquidity,
+    poolData.sqrtPrice,
+    position.bounds.lowerBound,
+    position.bounds.upperBound,
+  );
+
+  const positionAmountA: TokenAmountValue = {
+    raw: amounts.amountA.toString(),
+    decimals: decimalsA,
+    symbol: poolData.tokenPair.symbolA,
+    usdValue: priceA ? tokenAmountToUsd(amounts.amountA, decimalsA, priceA.usdValue) : 0,
+  };
+  const positionAmountB: TokenAmountValue = {
+    raw: amounts.amountB.toString(),
+    decimals: decimalsB,
+    symbol: poolData.tokenPair.symbolB,
+    usdValue: priceB ? tokenAmountToUsd(amounts.amountB, decimalsB, priceB.usdValue) : 0,
+  };
+  const hasCompletePositionPrices =
+    (amounts.amountA === 0n || priceA !== undefined) &&
+    (amounts.amountB === 0n || priceB !== undefined);
+
+  const positionAmountsTotalUsd = hasCompletePositionPrices
+    ? positionAmountA.usdValue + positionAmountB.usdValue
+    : 0;
+
   const feeOwedA: TokenAmountValue = {
     raw: fees.feeOwedA.toString(),
     decimals: decimalsA,
@@ -142,6 +170,11 @@ export async function getPositionDetail(params: {
     hasActionableTrigger: false,
     monitoringStatus: position.monitoringReadiness.kind,
     sqrtPrice: poolData.sqrtPrice.toString(),
+    positionAmounts: {
+      amountA: positionAmountA,
+      amountB: positionAmountB,
+      totalUsd: positionAmountsTotalUsd,
+    },
     unclaimedFees: {
       feeOwedA,
       feeOwedB,
