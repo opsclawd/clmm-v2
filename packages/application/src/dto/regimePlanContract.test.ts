@@ -98,10 +98,11 @@ describe('Regime plan contract schema validation', () => {
     expect(executionResultProvenance.commit).toBe(planRequestProvenance.commit);
   });
 
-  it('pins the derived position-plan schema to the authoritative TypeScript declaration', () => {
+  it('pins position-plan schema to the canonical vendored contract', () => {
     expect(positionPlanProvenance.commit).toBe('fbdec486b4e744aee5c65c378eed5a113f0da68c');
-    expect(positionPlanProvenance.schemaPath).toBe('src/contract/v1/types.ts');
-    expect(positionPlanProvenance.derivation).toBe('typescript-to-json-schema');
+    expect(positionPlanProvenance.schemaPath).toBe(
+      'contracts/position-plan/v1/position-plan.schema.json',
+    );
   });
 
   it('keeps execution-result.v1 aligned with the pinned ExecutionResult declaration', () => {
