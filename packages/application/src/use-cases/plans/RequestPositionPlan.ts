@@ -199,11 +199,12 @@ export async function requestPositionPlan(params: {
       const supportedPositions = await positionReadPort.listSupportedPositions(walletId);
       const walletHistory = await executionHistoryRepository.getWalletHistory(walletId);
       const existingPlan = await planRepository.getCurrentPlan(positionId);
+      const requestAsOfNow = clock.now();
 
       const request = buildRegimePlanRequest({
         positionDetail,
         config: config.config,
-        asOfUnixMs: now,
+        asOfUnixMs: requestAsOfNow,
         supportedPositionsCount: supportedPositions.length,
         qualifiedTrigger: qualifiedTrigger ?? null,
         walletHistory,

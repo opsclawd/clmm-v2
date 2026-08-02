@@ -161,6 +161,7 @@ class FakeSupportedPositionReadPort implements SupportedPositionReadPort {
   private _position: LiquidityPosition | null = null;
   private _detail: PositionDetail | null = null;
   private _poolData: PoolData | null = null;
+  private _beforeGetPositionDetail: (() => void) | null = null;
 
   setPosition(position: LiquidityPosition | null): void {
     this._position = position;
@@ -172,6 +173,10 @@ class FakeSupportedPositionReadPort implements SupportedPositionReadPort {
 
   setPoolData(poolData: PoolData | null): void {
     this._poolData = poolData;
+  }
+
+  setBeforeGetPositionDetail(hook: (() => void) | null): void {
+    this._beforeGetPositionDetail = hook;
   }
 
   async listSupportedPositions(_walletId: WalletId): Promise<LiquidityPosition[]> {
@@ -189,6 +194,7 @@ class FakeSupportedPositionReadPort implements SupportedPositionReadPort {
     _walletId: WalletId,
     _positionId: PositionId,
   ): Promise<PositionDetail | null> {
+    this._beforeGetPositionDetail?.();
     return this._detail;
   }
 
@@ -676,6 +682,38 @@ describe('RequestPositionPlan', () => {
       expect(req.market.symbol).toBe('SOL/USDC');
       expect(req.market.poolAddress).toBe(FIXTURE_POOL_ID);
       expect(req.market.timeframe).toBe('1h');
+    });
+
+    it('uses a post-detail timestamp for the request while preserving the claim-time timestamp', async () => {
+      const position = makeBelowRangePosition(FIXTURE_POSITION_ID, FIXTURE_WALLET_ID);
+      const detailPosition = {
+        ...position,
+        lastObservedAt: makeClockTimestamp(1_000_131),
+      };
+      positionRead.setPosition(position);
+      positionRead.setDetail(makeFixtureDetail(detailPosition));
+      positionRead.setBeforeGetPositionDetail(() => clock.advance(131));
+      triggerRepo.setTriggers([makeLowerTrigger(FIXTURE_POSITION_ID)]);
+
+      await requestPositionPlan({
+        walletId: FIXTURE_WALLET_ID,
+        positionId: FIXTURE_POSITION_ID,
+        positionReadPort: positionRead,
+        triggerRepository: triggerRepo,
+        planRepository: planRepo,
+        regimePlanPort: regimePort,
+        executionHistoryRepository: historyRepo,
+        config: CONFIGURED_CONFIG,
+        clock,
+        observability,
+      });
+
+      const request = regimePort.getRequests()[0]!;
+      expect(request.position.breachQualified).toBe(true);
+      expect(request.position.observedAtUnixMs).toBe(1_000_131);
+      expect(request.asOfUnixMs).toBe(1_000_131);
+      expect(request.asOfUnixMs).toBeGreaterThanOrEqual(request.position.observedAtUnixMs);
+      expect(planRepo.claimedCalls[0]?.now).toBe(1_000_000);
     });
   });
 
