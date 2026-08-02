@@ -3,7 +3,6 @@
   "planId": "plan_exit_987654321",
   "planHash": "f9e8d7c6b5a40123456789abcdef0123456789abcdef0123456789abcdef0123",
   "asOfUnixMs": 1700000000000,
-  "expiresAtUnixMs": 1700003600000,
   "scope": {
     "kind": "position",
     "positionId": "pos_sol_usdc_02",
@@ -11,6 +10,11 @@
     "symbol": "SOL/USDC"
   },
   "regime": "DOWN",
+  "targets": {
+    "solBps": 0,
+    "usdcBps": 10000,
+    "allowClmm": false
+  },
   "actions": [
     {
       "type": "REQUEST_EXIT_CLMM",
@@ -25,11 +29,45 @@
     "standDownUntilUnixMs": 0,
     "notes": ["Downtrend risk detected"]
   },
+  "nextRegimeState": {
+    "current": "DOWN",
+    "barsInRegime": 5,
+    "pending": null,
+    "pendingBars": 0
+  },
   "reasons": [
     {
       "code": "OUT_OF_RANGE_DOWNTREND",
       "severity": "WARN",
       "message": "Market crossed lower bound in downtrend."
     }
-  ]
+  ],
+  "telemetry": {
+    "realizedVolShort": 0.08,
+    "realizedVolLong": 0.04,
+    "volRatio": 2.0,
+    "trendStrength": -0.9,
+    "compression": 0.05
+  },
+  "marketData": {
+    "source": "pyth",
+    "network": "solana-mainnet",
+    "poolAddress": "Czfq3xZZDmsdGdUyrNLtRhGc47cXcZtLG4crryfu44zE",
+    "requestedTimeframe": "15m",
+    "sourceTimeframe": "15m",
+    "candleCount": 100,
+    "sourceCandleCount": 100,
+    "freshness": {
+      "generatedAtIso": "2026-08-01T20:00:00.000Z",
+      "lastCandleOpenUnixMs": 1700000000000,
+      "lastCandleOpenIso": "2026-08-01T19:45:00.000Z",
+      "lastCandleCloseUnixMs": 1700000900000,
+      "lastCandleCloseIso": "2026-08-01T20:00:00.000Z",
+      "ageSeconds": 5,
+      "softStale": false,
+      "hardStale": false,
+      "softStaleSeconds": 300,
+      "hardStaleSeconds": 900
+    }
+  }
 }

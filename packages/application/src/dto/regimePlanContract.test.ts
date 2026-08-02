@@ -10,9 +10,11 @@ import planRequestProvenance from '../../../../schemas/regime-engine/plan-reques
 
 import holdFixture from '../../../../schemas/regime-engine/position-plan.v1/fixtures/valid/hold.json' with { type: 'json' };
 import requestExitFixture from '../../../../schemas/regime-engine/position-plan.v1/fixtures/valid/request-exit.json' with { type: 'json' };
+import productionResponseFixture from '../../../../schemas/regime-engine/position-plan.v1/fixtures/valid/production-response-redacted.json' with { type: 'json' };
 import unsupportedActionFixture from '../../../../schemas/regime-engine/position-plan.v1/fixtures/invalid/unsupported-action.json' with { type: 'json' };
 import missingExitIntentFixture from '../../../../schemas/regime-engine/position-plan.v1/fixtures/invalid/missing-exit-intent.json' with { type: 'json' };
 import inlineCandlesFixture from '../../../../schemas/regime-engine/position-plan.v1/fixtures/invalid/inline-candles-and-portfolio.json' with { type: 'json' };
+import legacyExpiresAtFixture from '../../../../schemas/regime-engine/position-plan.v1/fixtures/invalid/legacy-expires-at.json' with { type: 'json' };
 
 import successFixture from '../../../../schemas/regime-engine/execution-result.v1/fixtures/valid/success.json' with { type: 'json' };
 import skippedFixture from '../../../../schemas/regime-engine/execution-result.v1/fixtures/valid/skipped.json' with { type: 'json' };
@@ -50,10 +52,18 @@ describe('Regime plan contract schema validation', () => {
     expect(validatePositionPlan(deepClone(requestExitFixture))).toBe(true);
   });
 
+  it('accepts the redacted production position-plan response unchanged', () => {
+    expect(validatePositionPlan(deepClone(productionResponseFixture))).toBe(true);
+  });
+
   it('rejects every canonical position-plan invalid fixture', () => {
     expect(validatePositionPlan(deepClone(unsupportedActionFixture))).toBe(false);
     expect(validatePositionPlan(deepClone(missingExitIntentFixture))).toBe(false);
     expect(validatePositionPlan(deepClone(inlineCandlesFixture))).toBe(false);
+  });
+
+  it('rejects the legacy expiresAtUnixMs position-plan shape', () => {
+    expect(validatePositionPlan(deepClone(legacyExpiresAtFixture))).toBe(false);
   });
 
   it('accepts every canonical execution-result valid fixture', () => {
@@ -86,6 +96,53 @@ describe('Regime plan contract schema validation', () => {
     expect(planRequestProvenance.commit.length).toBeGreaterThan(0);
     expect(positionPlanProvenance.commit).toBe(planRequestProvenance.commit);
     expect(executionResultProvenance.commit).toBe(planRequestProvenance.commit);
+  });
+
+  it('pins the derived position-plan schema to the authoritative TypeScript declaration', () => {
+    expect(positionPlanProvenance.commit).toBe('fbdec486b4e744aee5c65c378eed5a113f0da68c');
+    expect(positionPlanProvenance.schemaPath).toBe('src/contract/v1/types.ts');
+    expect(positionPlanProvenance.derivation).toBe('typescript-to-json-schema');
+  });
+
+  it('keeps execution-result.v1 aligned with the pinned ExecutionResult declaration', () => {
+    expect(Object.keys(executionResultSchema.properties).sort()).toEqual([
+      'attemptId',
+      'completedAtUnixMs',
+      'costs',
+      'idempotencyKey',
+      'planHash',
+      'planId',
+      'positionId',
+      'reasonCode',
+      'requestedAction',
+      'schemaVersion',
+      'status',
+      'txSignature',
+    ]);
+    expect([...executionResultSchema.required].sort()).toEqual([
+      'completedAtUnixMs',
+      'idempotencyKey',
+      'planHash',
+      'planId',
+      'positionId',
+      'reasonCode',
+      'requestedAction',
+      'schemaVersion',
+      'status',
+    ]);
+    expect(executionResultSchema.properties.requestedAction.enum).toEqual([
+      'HOLD',
+      'STAND_DOWN',
+      'REQUEST_EXIT_CLMM',
+    ]);
+    expect(executionResultSchema.properties.status.enum).toEqual(['SUCCESS', 'FAILED', 'SKIPPED']);
+    expect(Object.keys(executionResultSchema.properties.costs.properties).sort()).toEqual([
+      'priorityFeesUsd',
+      'slippageUsd',
+      'txFeesUsd',
+    ]);
+    expect(executionResultSchema.additionalProperties).toBe(false);
+    expect(executionResultSchema.properties.costs.additionalProperties).toBe(false);
   });
 
   it('verifies that all vendored asset sha256 checksums match provenance.json', async () => {

@@ -8,12 +8,15 @@
     "planId",
     "planHash",
     "asOfUnixMs",
-    "expiresAtUnixMs",
     "scope",
     "regime",
+    "targets",
     "actions",
     "constraints",
-    "reasons"
+    "nextRegimeState",
+    "reasons",
+    "telemetry",
+    "marketData"
   ],
   "additionalProperties": false,
   "properties": {
@@ -30,10 +33,6 @@
       "pattern": "^[a-f0-9]{64}$"
     },
     "asOfUnixMs": {
-      "type": "integer",
-      "minimum": 0
-    },
-    "expiresAtUnixMs": {
       "type": "integer",
       "minimum": 0
     },
@@ -64,6 +63,9 @@
       "type": "string",
       "enum": ["UP", "DOWN", "CHOP"]
     },
+    "targets": {
+      "$ref": "#/$defs/PlanTargets"
+    },
     "actions": {
       "type": "array",
       "minItems": 1,
@@ -92,6 +94,9 @@
         }
       }
     },
+    "nextRegimeState": {
+      "$ref": "#/$defs/RegimeState"
+    },
     "reasons": {
       "type": "array",
       "items": {
@@ -112,9 +117,169 @@
           }
         }
       }
+    },
+    "telemetry": {
+      "$ref": "#/$defs/PlanTelemetry"
+    },
+    "marketData": {
+      "$ref": "#/$defs/PlanMarketData"
     }
   },
   "$defs": {
+    "PlanTargets": {
+      "type": "object",
+      "required": ["solBps", "usdcBps", "allowClmm"],
+      "additionalProperties": false,
+      "properties": {
+        "solBps": {
+          "type": "number"
+        },
+        "usdcBps": {
+          "type": "number"
+        },
+        "allowClmm": {
+          "type": "boolean"
+        }
+      }
+    },
+    "RegimeState": {
+      "type": "object",
+      "required": ["current", "barsInRegime", "pending", "pendingBars"],
+      "additionalProperties": false,
+      "properties": {
+        "current": {
+          "type": "string",
+          "enum": ["UP", "DOWN", "CHOP"]
+        },
+        "barsInRegime": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "pending": {
+          "anyOf": [
+            {
+              "type": "string",
+              "enum": ["UP", "DOWN", "CHOP"]
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "pendingBars": {
+          "type": "integer",
+          "minimum": 0
+        }
+      }
+    },
+    "PlanTelemetry": {
+      "type": "object",
+      "additionalProperties": {
+        "anyOf": [{ "type": "number" }, { "type": "string" }, { "type": "boolean" }]
+      }
+    },
+    "PlanMarketData": {
+      "type": "object",
+      "required": [
+        "source",
+        "network",
+        "poolAddress",
+        "requestedTimeframe",
+        "sourceTimeframe",
+        "candleCount",
+        "sourceCandleCount",
+        "freshness"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "source": {
+          "type": "string",
+          "minLength": 1
+        },
+        "network": {
+          "type": "string",
+          "minLength": 1
+        },
+        "poolAddress": {
+          "type": "string",
+          "minLength": 1
+        },
+        "requestedTimeframe": {
+          "type": "string",
+          "enum": ["15m", "1h"]
+        },
+        "sourceTimeframe": {
+          "type": "string"
+        },
+        "candleCount": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "sourceCandleCount": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "freshness": {
+          "$ref": "#/$defs/RegimeCurrentFreshness"
+        },
+        "derivedTimeframe": {
+          "type": "string"
+        },
+        "aggregationVersion": {
+          "type": "string"
+        }
+      }
+    },
+    "RegimeCurrentFreshness": {
+      "type": "object",
+      "required": [
+        "generatedAtIso",
+        "lastCandleOpenUnixMs",
+        "lastCandleOpenIso",
+        "lastCandleCloseUnixMs",
+        "lastCandleCloseIso",
+        "ageSeconds",
+        "softStale",
+        "hardStale",
+        "softStaleSeconds",
+        "hardStaleSeconds"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "generatedAtIso": {
+          "type": "string"
+        },
+        "lastCandleOpenUnixMs": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "lastCandleOpenIso": {
+          "type": "string"
+        },
+        "lastCandleCloseUnixMs": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "lastCandleCloseIso": {
+          "type": "string"
+        },
+        "ageSeconds": {
+          "type": "number"
+        },
+        "softStale": {
+          "type": "boolean"
+        },
+        "hardStale": {
+          "type": "boolean"
+        },
+        "softStaleSeconds": {
+          "type": "number"
+        },
+        "hardStaleSeconds": {
+          "type": "number"
+        }
+      }
+    },
     "PlanAction": {
       "type": "object",
       "required": ["type", "reasonCode"],

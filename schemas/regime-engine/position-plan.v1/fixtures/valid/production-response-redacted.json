@@ -1,6 +1,6 @@
 {
   "schemaVersion": "1.0",
-  "planId": "plan_invalid_02",
+  "planId": "plan_prod_redacted_01",
   "planHash": "a1b2c3d4e5f60123456789abcdef0123456789abcdef0123456789abcdef0123",
   "asOfUnixMs": 1700000000000,
   "scope": {
@@ -9,36 +9,42 @@
     "poolAddress": "Czfq3xZZDmsdGdUyrNLtRhGc47cXcZtLG4crryfu44zE",
     "symbol": "SOL/USDC"
   },
-  "regime": "DOWN",
+  "regime": "UP",
   "targets": {
-    "solBps": 0,
-    "usdcBps": 10000,
-    "allowClmm": false
+    "solBps": 5000,
+    "usdcBps": 5000,
+    "allowClmm": true
   },
   "actions": [
     {
-      "type": "REQUEST_EXIT_CLMM",
-      "reasonCode": "BREACH_RISK"
+      "type": "HOLD",
+      "reasonCode": "IN_RANGE_STABLE"
     }
   ],
   "constraints": {
     "cooldownUntilUnixMs": 0,
     "standDownUntilUnixMs": 0,
-    "notes": []
+    "notes": ["Position in optimal range"]
   },
   "nextRegimeState": {
-    "current": "DOWN",
-    "barsInRegime": 5,
+    "current": "UP",
+    "barsInRegime": 12,
     "pending": null,
     "pendingBars": 0
   },
-  "reasons": [],
+  "reasons": [
+    {
+      "code": "IN_RANGE_STABLE",
+      "severity": "INFO",
+      "message": "Position is operating safely within bounds."
+    }
+  ],
   "telemetry": {
-    "realizedVolShort": 0.08,
+    "realizedVolShort": 0.05,
     "realizedVolLong": 0.04,
-    "volRatio": 2.0,
-    "trendStrength": -0.9,
-    "compression": 0.05
+    "volRatio": 1.25,
+    "trendStrength": 0.8,
+    "compression": 0.1
   },
   "marketData": {
     "source": "pyth",
