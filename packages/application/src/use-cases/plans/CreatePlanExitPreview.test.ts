@@ -88,7 +88,7 @@ describe('createPlanExitPreview', () => {
     expect(stored?.origin).not.toHaveProperty('breachDirection');
   });
 
-  it('derives exit-to-sol posture for above-range position using local breach direction', async () => {
+  it('derives exit-to-sol posture for above-range position using domain breach direction mapping', async () => {
     positionRepo = new FakeSupportedPositionReadPort(
       [],
       {},

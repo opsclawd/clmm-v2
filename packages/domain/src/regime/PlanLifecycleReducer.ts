@@ -24,17 +24,6 @@ export type { ClockTimestamp };
 
 export { makePlanId, makeCanonicalHash, makePositionPlan } from './PositionPlan.js';
 
-function isExecutableState(state: PlanLifecycleState): boolean {
-  switch (state.kind) {
-    case 'exit-previewed':
-    case 'awaiting-signature':
-    case 'submitted':
-      return true;
-    default:
-      return false;
-  }
-}
-
 function isTerminalState(state: PlanLifecycleState): boolean {
   switch (state.kind) {
     case 'reported':
@@ -159,26 +148,15 @@ export function applyPlanLifecycleTransition(
     }
 
     case 'request-signature': {
-      if (!isExecutableState(currentState)) {
+      if (
+        currentState.kind !== 'exit-previewed' &&
+        currentState.kind !== 'awaiting-signature' &&
+        currentState.kind !== 'submitted'
+      ) {
         throw new Error(`Invalid transition: ${currentState.kind} + ${event.kind}`);
       }
-      const advisoryAction: PlanAction =
-        currentState.kind === 'exit-previewed' ||
-        currentState.kind === 'awaiting-signature' ||
-        currentState.kind === 'submitted'
-          ? currentState.advisoryAction
-          : { kind: 'REQUEST_EXIT_CLMM' };
-      const executionOrigin: ExecutionOrigin =
-        currentState.kind === 'exit-previewed' ||
-        currentState.kind === 'awaiting-signature' ||
-        currentState.kind === 'submitted'
-          ? currentState.executionOrigin
-          : {
-              kind: 'regime-plan',
-              planId: plan.planId,
-              canonicalHash: plan.canonicalHash,
-              canonicalExitIntent: 'exit-to-usdc',
-            };
+      const advisoryAction: PlanAction = currentState.advisoryAction;
+      const executionOrigin: ExecutionOrigin = currentState.executionOrigin;
       const newState: PlanLifecycleState = {
         kind: 'awaiting-signature',
         advisoryAction,

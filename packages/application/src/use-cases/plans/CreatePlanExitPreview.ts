@@ -19,8 +19,7 @@ import {
   evaluatePreviewFreshness,
   applyPlanLifecycleTransition,
   applyDirectionalExitPolicy,
-  LOWER_BOUND_BREACH,
-  UPPER_BOUND_BREACH,
+  inferBreachDirectionFromRangeState,
 } from '@clmm/domain';
 
 export class PlanNotEligibleForExitPreviewError extends Error {
@@ -108,8 +107,9 @@ export async function createPlanExitPreview(params: {
     }
   }
 
-  const direction: BreachDirection =
-    position.position.rangeState.kind === 'above-range' ? UPPER_BOUND_BREACH : LOWER_BOUND_BREACH;
+  const direction: BreachDirection = inferBreachDirectionFromRangeState(
+    position.position.rangeState,
+  );
   const policy = applyDirectionalExitPolicy(direction);
 
   const executionPlan: import('@clmm/domain').ExecutionPlan = {
