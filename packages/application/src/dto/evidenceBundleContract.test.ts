@@ -10,18 +10,21 @@ import evidenceBundleProvenance from '../../../../schemas/regime-engine/evidence
 import contextualValidFixture from '../../../../schemas/regime-engine/evidence-bundle.v1/fixtures/valid/contextual.json' with { type: 'json' };
 import deterministicOnlyValidFixture from '../../../../schemas/regime-engine/evidence-bundle.v1/fixtures/valid/deterministic-only.json' with { type: 'json' };
 
-import noncanonicalTimestampInvalidFixture from '../../../../schemas/regime-engine/evidence-bundle.v1/fixtures/invalid/noncanonical-timestamp.json' with { type: 'json' };
-import outOfRangeNumberInvalidFixture from '../../../../schemas/regime-engine/evidence-bundle.v1/fixtures/invalid/out-of-range-number.json' with { type: 'json' };
-import unknownFieldInvalidFixture from '../../../../schemas/regime-engine/evidence-bundle.v1/fixtures/invalid/unknown-field.json' with { type: 'json' };
-import unsupportedUnitInvalidFixture from '../../../../schemas/regime-engine/evidence-bundle.v1/fixtures/invalid/unsupported-unit.json' with { type: 'json' };
-import wrongSchemaVersionInvalidFixture from '../../../../schemas/regime-engine/evidence-bundle.v1/fixtures/invalid/wrong-schema-version.json' with { type: 'json' };
+import malformedContextualFamilyFixture from '../../../../schemas/regime-engine/evidence-bundle.v1/fixtures/invalid/malformed-contextual-family.json' with { type: 'json' };
+import noncanonicalTimestampFixture from '../../../../schemas/regime-engine/evidence-bundle.v1/fixtures/invalid/noncanonical-timestamp.json' with { type: 'json' };
+import outOfRangeNumberFixture from '../../../../schemas/regime-engine/evidence-bundle.v1/fixtures/invalid/out-of-range-number.json' with { type: 'json' };
+import unknownFieldFixture from '../../../../schemas/regime-engine/evidence-bundle.v1/fixtures/invalid/unknown-field.json' with { type: 'json' };
+import unsupportedUnitFixture from '../../../../schemas/regime-engine/evidence-bundle.v1/fixtures/invalid/unsupported-unit.json' with { type: 'json' };
+import wrongSchemaVersionFixture from '../../../../schemas/regime-engine/evidence-bundle.v1/fixtures/invalid/wrong-schema-version.json' with { type: 'json' };
 
 const ajv = new Ajv2020({
-  strict: false,
+  strict: true,
   coerceTypes: false,
   useDefaults: false,
   removeAdditional: false,
 });
+
+ajv.addKeyword('finite');
 
 const validateEvidenceBundle = ajv.compile(evidenceBundleSchema);
 
@@ -46,22 +49,33 @@ describe('Evidence bundle contract schema validation', () => {
     }
   });
 
-  it('accepts every canonical evidence-bundle valid fixture', () => {
-    expect(validateEvidenceBundle(deepClone(contextualValidFixture))).toBe(true);
-    expect(validateEvidenceBundle(deepClone(deterministicOnlyValidFixture))).toBe(true);
-  });
-
-  it('rejects structurally invalid evidence-bundle fixtures', () => {
-    const structuralInvalidFixtures = [
-      { name: 'noncanonical-timestamp', fixture: noncanonicalTimestampInvalidFixture },
-      { name: 'out-of-range-number', fixture: outOfRangeNumberInvalidFixture },
-      { name: 'unknown-field', fixture: unknownFieldInvalidFixture },
-      { name: 'unsupported-unit', fixture: unsupportedUnitInvalidFixture },
-      { name: 'wrong-schema-version', fixture: wrongSchemaVersionInvalidFixture },
+  it('accepts every canonical valid evidence fixture without mutation', () => {
+    const validFixtures = [
+      { name: 'contextual', fixture: contextualValidFixture },
+      { name: 'deterministic-only', fixture: deterministicOnlyValidFixture },
     ];
 
-    for (const { name, fixture } of structuralInvalidFixtures) {
-      const isValid = validateEvidenceBundle(deepClone(fixture));
+    for (const { name, fixture } of validFixtures) {
+      const cloned = deepClone(fixture);
+      const isValid = validateEvidenceBundle(cloned);
+      expect(isValid, `Fixture ${name} should pass validation`).toBe(true);
+      expect(cloned, `Fixture ${name} should not be mutated`).toEqual(fixture);
+    }
+  });
+
+  it('rejects every canonical invalid evidence fixture', () => {
+    const invalidFixtures = [
+      { name: 'malformed-contextual-family', fixture: malformedContextualFamilyFixture },
+      { name: 'noncanonical-timestamp', fixture: noncanonicalTimestampFixture },
+      { name: 'out-of-range-number', fixture: outOfRangeNumberFixture },
+      { name: 'unknown-field', fixture: unknownFieldFixture },
+      { name: 'unsupported-unit', fixture: unsupportedUnitFixture },
+      { name: 'wrong-schema-version', fixture: wrongSchemaVersionFixture },
+    ];
+
+    for (const { name, fixture } of invalidFixtures) {
+      const cloned = deepClone(fixture);
+      const isValid = validateEvidenceBundle(cloned);
       expect(isValid, `Fixture ${name} should have failed schema validation`).toBe(false);
     }
   });
