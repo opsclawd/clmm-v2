@@ -72,7 +72,7 @@ describe('PolicyInsightsSection', () => {
     expect(container.firstChild).toBeNull();
   });
 
-  it('renders title, action, posture, range bias, sensitivity, percent, risk, confidence, data quality, and reasoning', () => {
+  it('renders title, action, posture, range bias, sensitivity, percent, risk, confidence, and data quality', () => {
     render(
       <PolicyInsightsSection
         policyInsight={fixture()}
@@ -97,11 +97,7 @@ describe('PolicyInsightsSection', () => {
     expect(screen.getByText('Normal risk')).toBeTruthy();
     expect(screen.getByText('75% confidence')).toBeTruthy();
     expect(screen.getByText('Complete data')).toBeTruthy();
-    expect(
-      screen.getByText(
-        'Market regime is UP with bullish fundamental signals. No position-specific triggers present.',
-      ),
-    ).toBeTruthy();
+    expect(screen.getByText(/Market conditions are trending upward\./)).toBeTruthy();
   });
 
   it('renders a stale warning line when freshness.status is STALE', () => {
@@ -448,7 +444,7 @@ describe('PolicyInsightsSection', () => {
       />,
     );
     expect(screen.getByText('Partial evidence coverage')).toBeTruthy();
-    expect(screen.getByText('Evidence stale input')).toBeTruthy();
+    expect(screen.getByText(/Some supporting data may be out of date\./)).toBeTruthy();
     expect(screen.queryByText(/free-form/i)).toBeNull();
   });
 
@@ -542,6 +538,92 @@ describe('PolicyInsightsSection', () => {
     expect(screen.queryByText(/Support\/resistance evidence conflicts/i)).toBeNull();
   });
 
+  it('renders plain-language why bullets, fixed advisory notice, and synthesis action as separate regions', () => {
+    const onViewSynthesis = vi.fn();
+    render(
+      <PolicyInsightsSection
+        policyInsight={fixture()}
+        isLoading={false}
+        isError={false}
+        isEnabled
+        unavailableReason={null}
+        now={NOW}
+        onViewSynthesis={onViewSynthesis}
+      />,
+    );
+
+    expect(screen.getByTestId('policy-insights-summary')).toBeTruthy();
+    expect(screen.getByText(/Market conditions are trending upward\./)).toBeTruthy();
+    expect(screen.getByTestId('policy-insights-advisory-notice')).toBeTruthy();
+    expect(
+      screen.getByText(
+        'Advisory policy context only. Nothing is signed or applied; deterministic stop-loss monitoring continues independently.',
+      ),
+    ).toBeTruthy();
+    expect(screen.getByRole('button', { name: 'Why this recommendation' })).toBeTruthy();
+  });
+
+  it('does not render raw reasoning enum codes identifiers or warning messages in the default card', () => {
+    render(
+      <PolicyInsightsSection
+        policyInsight={fixture({
+          reasoning: 'ADVISORY_ONLY | IDENTIFIER: mco-sol-secret | CONTEXTUAL_EVIDENCE_VOTE',
+          warnings: [
+            { code: 'EVIDENCE_CONFLICTED_FAMILY', message: 'private upstream diagnostic' },
+          ],
+        })}
+        isLoading={false}
+        isError={false}
+        isEnabled
+        unavailableReason={null}
+        now={NOW}
+      />,
+    );
+
+    expect(screen.getByText(/Some supporting data sources disagreed\./)).toBeTruthy();
+    expect(screen.queryByText(/ADVISORY_ONLY|IDENTIFIER|CONTEXTUAL_EVIDENCE_VOTE/)).toBeNull();
+    expect(screen.queryByText(/private upstream diagnostic/)).toBeNull();
+  });
+
+  it('renders a genuine missing-family warning in plain language', () => {
+    render(
+      <PolicyInsightsSection
+        policyInsight={fixture({
+          warnings: [{ code: 'EVIDENCE_MISSING_FAMILY', message: 'Family deterministic missing' }],
+        })}
+        isLoading={false}
+        isError={false}
+        isEnabled
+        unavailableReason={null}
+        now={NOW}
+      />,
+    );
+
+    expect(
+      screen.getByText(/Some position or market data wasn't available for this recommendation\./),
+    ).toBeTruthy();
+    expect(screen.queryByText(/EVIDENCE_MISSING_FAMILY|Family deterministic/)).toBeNull();
+  });
+
+  it('renders canonical warning-bearing PolicyInsight output without technical details', () => {
+    render(
+      <PolicyInsightsSection
+        policyInsight={canonicalCurrentPosition as PolicyInsightBlock}
+        isLoading={false}
+        isError={false}
+        isEnabled
+        unavailableReason={null}
+        now={NOW}
+      />,
+    );
+
+    expect(screen.getByText(/Some supporting data sources disagreed\./)).toBeTruthy();
+    expect(screen.queryByText(/EVIDENCE_CONFLICTED_FAMILY|abcd1234|src111111|locator/i)).toBeNull();
+    expect(
+      screen.queryByText('Upper position bound breached. Current price exceeds resistance level.'),
+    ).toBeNull();
+  });
+
   it('shows why this recommendation only for a canonical insight with a callback', () => {
     const onViewSynthesis = vi.fn();
     render(
@@ -555,7 +637,7 @@ describe('PolicyInsightsSection', () => {
         onViewSynthesis={onViewSynthesis}
       />,
     );
-    expect(screen.getByText('Why this recommendation')).toBeTruthy();
+    expect(screen.getByRole('button', { name: 'Why this recommendation' })).toBeTruthy();
 
     cleanup();
     render(
@@ -568,7 +650,7 @@ describe('PolicyInsightsSection', () => {
         now={NOW}
       />,
     );
-    expect(screen.queryByText('Why this recommendation')).toBeNull();
+    expect(screen.queryByRole('button', { name: 'Why this recommendation' })).toBeNull();
   });
 
   it('invokes synthesis navigation without changing recommendation content', () => {
@@ -585,11 +667,13 @@ describe('PolicyInsightsSection', () => {
       />,
     );
 
-    const button = screen.getByText('Why this recommendation');
+    const button = screen.getByRole('button', { name: 'Why this recommendation' });
     fireEvent.click(button);
 
     expect(onViewSynthesis).toHaveBeenCalledTimes(1);
     expect(screen.getByTestId('policy-insights-card')).toBeTruthy();
+    expect(screen.getByTestId('policy-insights-summary')).toBeTruthy();
+    expect(screen.getByTestId('policy-insights-advisory-notice')).toBeTruthy();
     expect(screen.getByText('Hold')).toBeTruthy();
     expect(screen.getByTestId('policy-insights-freshness')).toBeTruthy();
     expect(

@@ -144,9 +144,6 @@ export function PolicyInsightsSection({
       >
         PolicyInsights
       </Text>
-      <Text style={{ color: colors.textSecondary, fontSize: typography.fontSize.xs, marginTop: 2 }}>
-        {vm.subtitle}
-      </Text>
       <Text
         testID="policy-insights-action"
         accessibilityLabel={`Action: ${vm.actionLabel}`}
@@ -273,18 +270,82 @@ export function PolicyInsightsSection({
       >
         {vm.dataQualityLabel}
       </Text>
-      {vm.warningLabels.length > 0 ? (
-        <View style={{ marginTop: 4 }}>
-          {vm.warningLabels.slice(0, 3).map((label, index) => (
-            <Text
-              key={index}
-              style={{ color: colors.warn, fontSize: typography.fontSize.xs, marginTop: 2 }}
-            >
-              {label}
-            </Text>
-          ))}
-        </View>
+      <View
+        testID="policy-insights-summary"
+        accessibilityLabel={`Why: ${vm.summaryBullets.join(' ')}`}
+        style={{ marginTop: 10 }}
+      >
+        <Text
+          style={{
+            color: colors.textPrimary,
+            fontSize: typography.fontSize.sm,
+            fontWeight: typography.fontWeight.semibold,
+          }}
+        >
+          Why
+        </Text>
+        {vm.summaryBullets.map((bullet) => (
+          <Text
+            key={bullet}
+            style={{ color: colors.textBody, fontSize: typography.fontSize.sm, marginTop: 4 }}
+          >
+            • {bullet}
+          </Text>
+        ))}
+      </View>
+      {onViewSynthesis != null ? (
+        <Pressable
+          accessibilityRole="button"
+          accessibilityLabel="Why this recommendation"
+          onPress={onViewSynthesis}
+          style={{
+            alignSelf: 'flex-start',
+            marginTop: 8,
+            paddingVertical: 6,
+            paddingHorizontal: 10,
+            borderRadius: 6,
+            borderWidth: 1,
+            borderColor: colors.borderMedium,
+          }}
+        >
+          <Text
+            style={{
+              color: colors.accent,
+              fontSize: typography.fontSize.sm,
+              fontWeight: typography.fontWeight.medium,
+            }}
+          >
+            Why this recommendation
+          </Text>
+        </Pressable>
       ) : null}
+      <View
+        testID="policy-insights-advisory-notice"
+        accessibilityLabel={`Advisory notice. ${vm.subtitle}`}
+        style={{
+          marginTop: 10,
+          padding: 10,
+          borderRadius: 6,
+          backgroundColor: colors.surfaceRecessed,
+          borderWidth: 1,
+          borderColor: colors.borderSubtle,
+        }}
+      >
+        <Text
+          style={{
+            color: colors.textTertiary,
+            fontSize: typography.fontSize.xs,
+            fontWeight: typography.fontWeight.medium,
+          }}
+        >
+          Advisory notice
+        </Text>
+        <Text
+          style={{ color: colors.textSecondary, fontSize: typography.fontSize.xs, marginTop: 2 }}
+        >
+          {vm.subtitle}
+        </Text>
+      </View>
       <Text
         testID="policy-insights-as-of"
         accessibilityLabel={`As of ${vm.asOfLabel}`}
@@ -299,13 +360,6 @@ export function PolicyInsightsSection({
       >
         Expires {vm.expiresLabel}
       </Text>
-      {vm.reasoning ? (
-        <Text
-          style={{ color: colors.textSecondary, fontSize: typography.fontSize.sm, marginTop: 4 }}
-        >
-          {vm.reasoning}
-        </Text>
-      ) : null}
       {isError ? (
         <Text
           testID="policy-insights-degraded"
@@ -313,23 +367,6 @@ export function PolicyInsightsSection({
         >
           Refresh failed — showing last available policy insight.
         </Text>
-      ) : null}
-      {onViewSynthesis != null ? (
-        <Pressable
-          accessibilityRole="button"
-          accessibilityLabel="Why this recommendation"
-          onPress={onViewSynthesis}
-          style={{ marginTop: 8 }}
-        >
-          <Text
-            style={{
-              color: colors.textSecondary,
-              fontSize: typography.fontSize.xs,
-            }}
-          >
-            Why this recommendation
-          </Text>
-        </Pressable>
       ) : null}
     </View>
   );

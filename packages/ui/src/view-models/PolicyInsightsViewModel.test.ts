@@ -356,6 +356,79 @@ describe('buildPolicyInsightsViewModel', () => {
   });
 
   describe('warning and reason code handling', () => {
+    it('prioritizes mapped warnings, excludes advisory-only, deduplicates copy, and caps summary bullets at three', () => {
+      const vm = buildPolicyInsightsViewModel(
+        fixture({
+          warnings: [
+            { code: 'EVIDENCE_CONFLICTED_FAMILY', message: 'IDENTIFIER: hidden-1' },
+            { code: 'EVIDENCE_STALE_INPUT', message: 'IDENTIFIER: hidden-2' },
+            { code: 'NO_ELIGIBLE_PRICE_LEVELS', message: 'IDENTIFIER: hidden-3' },
+          ],
+          reasonCodes: ['ADVISORY_ONLY', 'NO_ELIGIBLE_PRICE_LEVELS', 'MARKET_REGIME_UP'],
+        }),
+        NOW,
+      );
+
+      expect(vm.summaryBullets).toEqual([
+        'Some supporting data sources disagreed.',
+        'Some supporting data may be out of date.',
+        'No usable support or resistance levels were available.',
+      ]);
+    });
+
+    it('maps EVIDENCE_MISSING_FAMILY to plain-language availability copy', () => {
+      const vm = buildPolicyInsightsViewModel(
+        fixture({
+          warnings: [{ code: 'EVIDENCE_MISSING_FAMILY', message: 'Family deterministic missing' }],
+          reasonCodes: ['ADVISORY_ONLY'],
+        }),
+        NOW,
+      );
+
+      expect(vm.summaryBullets).toEqual([
+        "Some position or market data wasn't available for this recommendation.",
+      ]);
+    });
+
+    it('does not derive summary bullets from raw reasoning or identifiers', () => {
+      const first = buildPolicyInsightsViewModel(
+        fixture({
+          warnings: [],
+          reasonCodes: ['MARKET_REGIME_CHOP'],
+          reasoning: 'IDENTIFIER: mco-sol-secret | CONTEXTUAL_EVIDENCE_VOTE',
+        }),
+        NOW,
+      );
+      const second = buildPolicyInsightsViewModel(
+        fixture({
+          warnings: [],
+          reasonCodes: ['MARKET_REGIME_CHOP'],
+          reasoning: 'Completely different prose and values',
+        }),
+        NOW,
+      );
+
+      expect(first.summaryBullets).toEqual(['Market conditions are choppy.']);
+      expect(second.summaryBullets).toEqual(first.summaryBullets);
+      expect(first.summaryBullets.join(' ')).not.toMatch(/IDENTIFIER|CONTEXTUAL_EVIDENCE_VOTE/);
+    });
+
+    it('returns one generic bullet when only advisory-only or unknown runtime codes remain', () => {
+      const advisoryOnly = buildPolicyInsightsViewModel(
+        fixture({ warnings: [], reasonCodes: ['ADVISORY_ONLY'] }),
+        NOW,
+      );
+      const runtimeUnknown = buildPolicyInsightsViewModel(
+        fixture({ reasonCodes: ['FUTURE_INTERNAL_CODE' as never] }),
+        NOW,
+      );
+
+      expect(advisoryOnly.summaryBullets).toEqual([
+        'This recommendation reflects the latest available market and position context.',
+      ]);
+      expect(runtimeUnknown.summaryBullets).toEqual(advisoryOnly.summaryBullets);
+    });
+
     it('maps deduplicates and bounds warning and reason-code copy', () => {
       const vm = buildPolicyInsightsViewModel(
         fixture({
