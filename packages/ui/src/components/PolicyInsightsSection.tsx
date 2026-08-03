@@ -1,4 +1,4 @@
-import { View, Text, ActivityIndicator } from 'react-native';
+import { View, Text, ActivityIndicator, Pressable } from 'react-native';
 import {
   type PolicyInsightBlock,
   type PolicyInsightsUnavailableReason,
@@ -13,6 +13,7 @@ type Props = {
   isEnabled: boolean;
   unavailableReason?: PolicyInsightsUnavailableReason | null;
   now: number;
+  onViewSynthesis?: () => void;
 };
 
 const cardStyle = {
@@ -60,6 +61,7 @@ export function PolicyInsightsSection({
   isEnabled,
   unavailableReason,
   now,
+  onViewSynthesis,
 }: Props): JSX.Element | null {
   if (!isEnabled) return null;
 
@@ -311,6 +313,23 @@ export function PolicyInsightsSection({
         >
           Refresh failed — showing last available policy insight.
         </Text>
+      ) : null}
+      {onViewSynthesis != null ? (
+        <Pressable
+          accessibilityRole="button"
+          accessibilityLabel="Why this recommendation"
+          onPress={onViewSynthesis}
+          style={{ marginTop: 8 }}
+        >
+          <Text
+            style={{
+              color: colors.textSecondary,
+              fontSize: typography.fontSize.xs,
+            }}
+          >
+            Why this recommendation
+          </Text>
+        </Pressable>
       ) : null}
     </View>
   );
