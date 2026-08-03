@@ -64,6 +64,7 @@ type Props = {
   financialMetrics?: PositionListFinancialMetricsDto | undefined;
   onViewEvidence?: (() => void) | undefined;
   evidenceEnabled?: boolean | undefined;
+  onViewSynthesis?: (() => void) | undefined;
 };
 
 export function PositionsListScreen({
@@ -101,6 +102,7 @@ export function PositionsListScreen({
   financialMetrics,
   onViewEvidence,
   evidenceEnabled,
+  onViewSynthesis,
 }: Props): JSX.Element {
   const isConnected = walletAddress != null && walletAddress.length > 0;
   const hasPositions = (positions?.length ?? 0) > 0;
@@ -146,6 +148,7 @@ export function PositionsListScreen({
           financialMetrics={financialMetrics}
           onViewEvidence={onViewEvidence}
           evidenceEnabled={evidenceEnabled}
+          onViewSynthesis={onViewSynthesis}
         />
       ) : (
         <EmptyState />
@@ -293,6 +296,7 @@ function ConnectedPositionsList({
   financialMetrics,
   onViewEvidence,
   evidenceEnabled,
+  onViewSynthesis,
 }: {
   observability: PositionsListObservability;
   positions: PositionSummaryDto[];
@@ -329,6 +333,7 @@ function ConnectedPositionsList({
   financialMetrics?: PositionListFinancialMetricsDto | undefined;
   onViewEvidence?: (() => void) | undefined;
   evidenceEnabled?: boolean | undefined;
+  onViewSynthesis?: (() => void) | undefined;
 }) {
   const viewModel = buildPositionListViewModel(
     positions,
@@ -381,6 +386,7 @@ function ConnectedPositionsList({
             isEnabled={policyInsightsEnabled ?? false}
             unavailableReason={policyInsightsUnavailableReason ?? null}
             now={now ?? Date.now()}
+            {...(onViewSynthesis != null ? { onViewSynthesis } : {})}
           />
           {evidenceEnabled && onViewEvidence ? (
             <View style={{ marginHorizontal: 16, marginTop: 14, marginBottom: 16 }}>
