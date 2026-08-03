@@ -60,7 +60,30 @@ export class CurrentEvidenceAdapter implements EvidenceReadPort {
           return { kind: 'upstream-error' };
         }
 
-        const block = parseEvidenceBundle(body);
+        if (
+          typeof body !== 'object' ||
+          body === null ||
+          !('items' in body) ||
+          !Array.isArray((body as Record<string, unknown>)['items']) ||
+          ((body as Record<string, unknown>)['items'] as unknown[]).length === 0
+        ) {
+          this.observability.log('warn', 'Evidence response missing envelope items');
+          return { kind: 'malformed' };
+        }
+
+        const items = (body as Record<string, unknown>)['items'] as Record<string, unknown>[];
+        const item = items[0];
+        if (
+          !item ||
+          !('bundle' in item) ||
+          typeof item['bundle'] !== 'object' ||
+          item['bundle'] === null
+        ) {
+          this.observability.log('warn', 'Evidence response missing envelope item bundle');
+          return { kind: 'malformed' };
+        }
+
+        const block = parseEvidenceBundle(item['bundle']);
         if (!block) {
           this.observability.log('warn', 'Evidence response failed shape validation');
           return { kind: 'malformed' };

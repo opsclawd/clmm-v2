@@ -23,6 +23,13 @@ function createFakeObservability() {
   return { logs, port };
 }
 
+function wrapInEnvelope(bundle: unknown) {
+  return {
+    schemaVersion: 'envelope.v1',
+    items: [{ bundle }],
+  };
+}
+
 describe('CurrentEvidenceAdapter', () => {
   let obs: ReturnType<typeof createFakeObservability>;
 
@@ -37,7 +44,7 @@ describe('CurrentEvidenceAdapter', () => {
 
   it('returns the validated bundle from a realistic 200 response', async () => {
     vi.mocked(fetch).mockResolvedValue(
-      new Response(JSON.stringify(canonicalEvidenceContextual), { status: 200 }),
+      new Response(JSON.stringify(wrapInEnvelope(canonicalEvidenceContextual)), { status: 200 }),
     );
     const adapter = new CurrentEvidenceAdapter(
       'https://regime.example.com',
@@ -53,7 +60,7 @@ describe('CurrentEvidenceAdapter', () => {
 
   it('returns a deterministic-only bundle from a realistic 200 response', async () => {
     vi.mocked(fetch).mockResolvedValue(
-      new Response(JSON.stringify(canonicalEvidenceDeterministic), { status: 200 }),
+      new Response(JSON.stringify(wrapInEnvelope(canonicalEvidenceDeterministic)), { status: 200 }),
     );
     const adapter = new CurrentEvidenceAdapter(
       'https://regime.example.com',
@@ -71,8 +78,13 @@ describe('CurrentEvidenceAdapter', () => {
     const cases: Array<[string, unknown]> = [
       ['non-object body', null],
       ['array body', []],
-      ['missing required fields', { pair: 'SOL/USDC' }],
-      ['invalid schema version', { ...canonicalEvidenceContextual, schemaVersion: 'invalid' }],
+      ['missing items array', { schemaVersion: 'envelope.v1' }],
+      ['empty items array', { schemaVersion: 'envelope.v1', items: [] }],
+      ['missing bundle in item', { schemaVersion: 'envelope.v1', items: [{}] }],
+      [
+        'invalid bundle inside envelope',
+        wrapInEnvelope({ ...canonicalEvidenceContextual, schemaVersion: 'invalid' }),
+      ],
     ];
 
     for (const [_case, body] of cases) {
@@ -89,7 +101,7 @@ describe('CurrentEvidenceAdapter', () => {
 
   it('hits /v1/evidence/sol-usdc/current with exact header and no query params', async () => {
     vi.mocked(fetch).mockResolvedValue(
-      new Response(JSON.stringify(canonicalEvidenceContextual), { status: 200 }),
+      new Response(JSON.stringify(wrapInEnvelope(canonicalEvidenceContextual)), { status: 200 }),
     );
     const adapter = new CurrentEvidenceAdapter(
       'https://regime.example.com',
@@ -108,7 +120,7 @@ describe('CurrentEvidenceAdapter', () => {
 
   it('strips trailing slashes from baseUrl', async () => {
     vi.mocked(fetch).mockResolvedValue(
-      new Response(JSON.stringify(canonicalEvidenceContextual), { status: 200 }),
+      new Response(JSON.stringify(wrapInEnvelope(canonicalEvidenceContextual)), { status: 200 }),
     );
     const adapter = new CurrentEvidenceAdapter(
       'https://regime.example.com///',
