@@ -23,6 +23,13 @@ function createFakeObservability() {
   return { logs, port };
 }
 
+function wrapInEnvelope(bundle: unknown) {
+  return {
+    schemaVersion: 'envelope.v1',
+    items: [{ bundle }],
+  };
+}
+
 describe('CurrentEvidenceAdapter', () => {
   let obs: ReturnType<typeof createFakeObservability>;
 
@@ -35,9 +42,9 @@ describe('CurrentEvidenceAdapter', () => {
     vi.restoreAllMocks();
   });
 
-  it('returns block for 200 canonical evidence', async () => {
+  it('returns the validated bundle from a realistic 200 response', async () => {
     vi.mocked(fetch).mockResolvedValue(
-      new Response(JSON.stringify(canonicalEvidenceContextual), { status: 200 }),
+      new Response(JSON.stringify(wrapInEnvelope(canonicalEvidenceContextual)), { status: 200 }),
     );
     const adapter = new CurrentEvidenceAdapter(
       'https://regime.example.com',
@@ -47,15 +54,13 @@ describe('CurrentEvidenceAdapter', () => {
 
     const result = await adapter.fetchCurrent();
 
-    expect(result.kind).toBe('block');
-    if (result.kind !== 'block') return;
-    expect(result.block).toEqual(canonicalEvidenceContextual);
+    expect(result).toEqual({ kind: 'block', block: canonicalEvidenceContextual });
     expect(fetch).toHaveBeenCalledTimes(1);
   });
 
-  it('returns block for 200 deterministic-only canonical evidence', async () => {
+  it('returns a deterministic-only bundle from a realistic 200 response', async () => {
     vi.mocked(fetch).mockResolvedValue(
-      new Response(JSON.stringify(canonicalEvidenceDeterministic), { status: 200 }),
+      new Response(JSON.stringify(wrapInEnvelope(canonicalEvidenceDeterministic)), { status: 200 }),
     );
     const adapter = new CurrentEvidenceAdapter(
       'https://regime.example.com',
@@ -65,15 +70,38 @@ describe('CurrentEvidenceAdapter', () => {
 
     const result = await adapter.fetchCurrent();
 
-    expect(result.kind).toBe('block');
-    if (result.kind !== 'block') return;
-    expect(result.block).toEqual(canonicalEvidenceDeterministic);
+    expect(result).toEqual({ kind: 'block', block: canonicalEvidenceDeterministic });
     expect(fetch).toHaveBeenCalledTimes(1);
+  });
+
+  it('maps malformed 200 responses or invalid bundles to malformed', async () => {
+    const cases: Array<[string, unknown]> = [
+      ['non-object body', null],
+      ['array body', []],
+      ['missing items array', { schemaVersion: 'envelope.v1' }],
+      ['empty items array', { schemaVersion: 'envelope.v1', items: [] }],
+      ['missing bundle in item', { schemaVersion: 'envelope.v1', items: [{}] }],
+      [
+        'invalid bundle inside envelope',
+        wrapInEnvelope({ ...canonicalEvidenceContextual, schemaVersion: 'invalid' }),
+      ],
+    ];
+
+    for (const [_case, body] of cases) {
+      vi.mocked(fetch).mockResolvedValue(new Response(JSON.stringify(body), { status: 200 }));
+      const adapter = new CurrentEvidenceAdapter(
+        'https://regime.example.com',
+        'test-token',
+        obs.port,
+      );
+
+      await expect(adapter.fetchCurrent(), _case).resolves.toEqual({ kind: 'malformed' });
+    }
   });
 
   it('hits /v1/evidence/sol-usdc/current with exact header and no query params', async () => {
     vi.mocked(fetch).mockResolvedValue(
-      new Response(JSON.stringify(canonicalEvidenceContextual), { status: 200 }),
+      new Response(JSON.stringify(wrapInEnvelope(canonicalEvidenceContextual)), { status: 200 }),
     );
     const adapter = new CurrentEvidenceAdapter(
       'https://regime.example.com',
@@ -92,7 +120,7 @@ describe('CurrentEvidenceAdapter', () => {
 
   it('strips trailing slashes from baseUrl', async () => {
     vi.mocked(fetch).mockResolvedValue(
-      new Response(JSON.stringify(canonicalEvidenceContextual), { status: 200 }),
+      new Response(JSON.stringify(wrapInEnvelope(canonicalEvidenceContextual)), { status: 200 }),
     );
     const adapter = new CurrentEvidenceAdapter(
       'https://regime.example.com///',
@@ -160,15 +188,6 @@ describe('CurrentEvidenceAdapter', () => {
     vi.mocked(fetch).mockResolvedValueOnce(new Response('{invalid-json', { status: 200 }));
     const resUnparseable = await adapter.fetchCurrent();
     expect(resUnparseable.kind).toBe('upstream-error');
-    expect(fetch).toHaveBeenCalledTimes(1);
-    vi.mocked(fetch).mockClear();
-
-    // Schema invalid JSON 200 test
-    vi.mocked(fetch).mockResolvedValueOnce(
-      new Response(JSON.stringify({ pair: 'SOL/USDC' }), { status: 200 }),
-    );
-    const resSchemaInvalid = await adapter.fetchCurrent();
-    expect(resSchemaInvalid.kind).toBe('malformed');
     expect(fetch).toHaveBeenCalledTimes(1);
     vi.mocked(fetch).mockClear();
 
