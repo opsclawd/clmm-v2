@@ -79,4 +79,21 @@ describe('app shell wallet dependency guard', () => {
     expect(routeSource).toContain('positionCardObservability');
     expect(routeSource).toContain('observability={positionCardObservability}');
   });
+
+  it('loads evidence only from the evidence route', () => {
+    const routeSource = readText('../app/evidence.tsx');
+
+    expect(routeSource).toContain("import { EvidenceScreen } from '@clmm/ui'");
+    expect(routeSource).toContain('fetchCurrentEvidence');
+    expect(routeSource).toContain("from '../src/api/evidence'");
+    expect(routeSource).toContain('useQuery');
+    expect(routeSource).toContain("queryKey: ['evidence-current', 'SOL/USDC']");
+    expect(routeSource).toContain('fetchCurrentEvidence(signal)');
+    expect(routeSource).toContain('retry: false');
+    expect(routeSource).toContain('staleTime: 5 * 60 * 1000');
+    expect(routeSource).toContain('refetchOnWindowFocus: false');
+    expect(routeSource).toContain('refetchOnMount: true');
+    expect(routeSource).toContain('<EvidenceScreen');
+    expect(routeSource).not.toContain("from '@clmm/adapters'");
+  });
 });
