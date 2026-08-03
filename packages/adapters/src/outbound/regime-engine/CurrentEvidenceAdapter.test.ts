@@ -23,16 +23,6 @@ function createFakeObservability() {
   return { logs, port };
 }
 
-function createEvidenceEnvelope(items: unknown[]) {
-  return {
-    schemaVersion: 'evidence-bundle.v1',
-    pair: 'SOL/USDC',
-    scope: { kind: 'pair' },
-    queriedAt: '2026-08-03T15:59:17.755Z',
-    items,
-  };
-}
-
 describe('CurrentEvidenceAdapter', () => {
   let obs: ReturnType<typeof createFakeObservability>;
 
@@ -45,17 +35,9 @@ describe('CurrentEvidenceAdapter', () => {
     vi.restoreAllMocks();
   });
 
-  it('returns the first validated bundle from a realistic 200 response envelope', async () => {
+  it('returns the validated bundle from a realistic 200 response', async () => {
     vi.mocked(fetch).mockResolvedValue(
-      new Response(
-        JSON.stringify(
-          createEvidenceEnvelope([
-            { bundle: canonicalEvidenceContextual },
-            { bundle: canonicalEvidenceDeterministic },
-          ]),
-        ),
-        { status: 200 },
-      ),
+      new Response(JSON.stringify(canonicalEvidenceContextual), { status: 200 }),
     );
     const adapter = new CurrentEvidenceAdapter(
       'https://regime.example.com',
@@ -69,12 +51,9 @@ describe('CurrentEvidenceAdapter', () => {
     expect(fetch).toHaveBeenCalledTimes(1);
   });
 
-  it('returns a deterministic-only bundle from a realistic 200 response envelope', async () => {
+  it('returns a deterministic-only bundle from a realistic 200 response', async () => {
     vi.mocked(fetch).mockResolvedValue(
-      new Response(
-        JSON.stringify(createEvidenceEnvelope([{ bundle: canonicalEvidenceDeterministic }])),
-        { status: 200 },
-      ),
+      new Response(JSON.stringify(canonicalEvidenceDeterministic), { status: 200 }),
     );
     const adapter = new CurrentEvidenceAdapter(
       'https://regime.example.com',
@@ -88,28 +67,12 @@ describe('CurrentEvidenceAdapter', () => {
     expect(fetch).toHaveBeenCalledTimes(1);
   });
 
-  it('maps an empty 200 items array to not-found', async () => {
-    vi.mocked(fetch).mockResolvedValue(
-      new Response(JSON.stringify(createEvidenceEnvelope([])), { status: 200 }),
-    );
-    const adapter = new CurrentEvidenceAdapter(
-      'https://regime.example.com',
-      'test-token',
-      obs.port,
-    );
-
-    await expect(adapter.fetchCurrent()).resolves.toEqual({ kind: 'not-found' });
-  });
-
-  it('maps malformed 200 response envelopes or invalid nested bundles to malformed', async () => {
+  it('maps malformed 200 responses or invalid bundles to malformed', async () => {
     const cases: Array<[string, unknown]> = [
       ['non-object body', null],
       ['array body', []],
-      ['missing items', { pair: 'SOL/USDC' }],
-      ['non-array items', { ...createEvidenceEnvelope([]), items: {} }],
-      ['non-object first item', createEvidenceEnvelope([null])],
-      ['missing bundle', createEvidenceEnvelope([{}])],
-      ['invalid nested bundle', createEvidenceEnvelope([{ bundle: { pair: 'SOL/USDC' } }])],
+      ['missing required fields', { pair: 'SOL/USDC' }],
+      ['invalid schema version', { ...canonicalEvidenceContextual, schemaVersion: 'invalid' }],
     ];
 
     for (const [_case, body] of cases) {
@@ -126,10 +89,7 @@ describe('CurrentEvidenceAdapter', () => {
 
   it('hits /v1/evidence/sol-usdc/current with exact header and no query params', async () => {
     vi.mocked(fetch).mockResolvedValue(
-      new Response(
-        JSON.stringify(createEvidenceEnvelope([{ bundle: canonicalEvidenceContextual }])),
-        { status: 200 },
-      ),
+      new Response(JSON.stringify(canonicalEvidenceContextual), { status: 200 }),
     );
     const adapter = new CurrentEvidenceAdapter(
       'https://regime.example.com',
@@ -148,10 +108,7 @@ describe('CurrentEvidenceAdapter', () => {
 
   it('strips trailing slashes from baseUrl', async () => {
     vi.mocked(fetch).mockResolvedValue(
-      new Response(
-        JSON.stringify(createEvidenceEnvelope([{ bundle: canonicalEvidenceContextual }])),
-        { status: 200 },
-      ),
+      new Response(JSON.stringify(canonicalEvidenceContextual), { status: 200 }),
     );
     const adapter = new CurrentEvidenceAdapter(
       'https://regime.example.com///',
