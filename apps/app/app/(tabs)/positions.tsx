@@ -164,6 +164,14 @@ export default function PositionsRoute() {
           method: 'push',
         })
       }
+      evidenceEnabled={policyInsightsEnabled}
+      onViewEvidence={() =>
+        navigateRoute({
+          router,
+          path: '/evidence',
+          method: 'push',
+        })
+      }
       financialMetrics={positionsResult?.financialMetrics}
     />
   );

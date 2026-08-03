@@ -11,6 +11,8 @@ export { WalletSettingsScreen } from './screens/WalletSettingsScreen.js';
 export { WalletConnectScreen } from './screens/WalletConnectScreen.js';
 export { PrivacyPolicyScreen } from './screens/PrivacyPolicyScreen.js';
 export { SupportScreen } from './screens/SupportScreen.js';
+export { EvidenceScreen } from './screens/EvidenceScreen.js';
+export type { EvidenceScreenProps } from './screens/EvidenceScreen.js';
 
 // Components — reusable
 export { DesktopShell } from './components/DesktopShell.js';
@@ -36,6 +38,8 @@ export type { MonitoringDisplay, MonitoringTone } from './components/PositionCar
 export { RegimeSection } from './components/RegimeSection.js';
 export { PolicyInsightsSection } from './components/PolicyInsightsSection.js';
 export { PositionPlanCard } from './components/PositionPlanCard.js';
+export { EvidenceFamilyCard } from './components/EvidenceFamilyCard.js';
+export type { EvidenceFamilyCardProps } from './components/EvidenceFamilyCard.js';
 
 // Wallet connection utils
 export {
@@ -99,6 +103,14 @@ export type {
   SrThesisOverlayModel,
   SrThesisBiasTone,
 } from './view-models/SrThesesViewModel.js';
+export { buildEvidenceViewModel } from './view-models/EvidenceViewModel.js';
+export type {
+  EvidenceScreenViewModel,
+  EvidenceFamilyCardViewModel,
+  EvidenceContextualClaimViewModel,
+  EvidenceFamilyCardRowViewModel,
+  EvidenceResearchBriefViewModel,
+} from './view-models/EvidenceViewModel.js';
 
 // Presenters
 export { presentPositionDetail } from './presenters/PositionDetailPresenter.js';

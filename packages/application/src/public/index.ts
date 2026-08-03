@@ -64,10 +64,43 @@ export type {
   RegimeExecutionResultStatus,
   RegimeExecutionResultCosts,
   RegimeExecutionResult,
+  EvidenceBundle,
+  EvidenceUnavailableReason,
+  EvidenceScope,
+  EvidenceSourceIdentity,
+  EvidenceCalculator,
+  EvidenceNumericUnit,
+  EvidenceBooleanUnit,
+  EvidenceCategoryUnit,
+  DeterministicFeatureFamily,
+  DeterministicFeatureAvailableNumber,
+  DeterministicFeatureAvailableBoolean,
+  DeterministicFeatureAvailableCategory,
+  DeterministicFeatureUnavailable,
+  DeterministicFeatureInvalid,
+  DeterministicFeature,
+  EvidenceClaimDirection,
+  EvidenceProvenanceMethod,
+  SupportResistanceClaim,
+  FlowClaim,
+  DerivativesClaim,
+  EventClaim,
+  NewsRegulatoryClaim,
+  ContextualEvidence,
+  EvidenceModelInfo,
+  ResearchBrief,
+  EvidenceSourceReference,
+  CoverageStatus,
+  FamilyCoverage,
+  BundleWarning,
+  QualityLevel,
+  BundleAssessment,
+  BundleProvenance,
 } from '../dto/index.js';
 
 export { parsePolicyInsightBlock } from '../dto/policyInsightValidator.js';
 export { parseRegimePlanResponse, parseRegimeExecutionResult } from '../dto/regimePlanValidator.js';
+export { parseEvidenceBundle } from '../dto/evidenceBundleValidator.js';
 
 // Port types needed by UI (capability + permission state)
 export type { PlatformCapabilityState } from '../ports/index.js';

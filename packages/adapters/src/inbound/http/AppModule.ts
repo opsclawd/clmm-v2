@@ -29,11 +29,13 @@ import { CurrentSrLevelsAdapter } from '../../outbound/regime-engine/CurrentSrLe
 import { CurrentRegimeAdapter } from '../../outbound/regime-engine/CurrentRegimeAdapter.js';
 import { CurrentSrThesesAdapter } from '../../outbound/regime-engine/CurrentSrThesesAdapter.js';
 import { CurrentPolicyInsightsAdapter } from '../../outbound/regime-engine/CurrentPolicyInsightsAdapter.js';
+import { CurrentEvidenceAdapter } from '../../outbound/regime-engine/CurrentEvidenceAdapter.js';
 import { RegimePlanAdapter } from '../../outbound/regime-engine/RegimePlanAdapter.js';
 import { PlanStorageAdapter } from '../../outbound/storage/PlanStorageAdapter.js';
 import { SrThesesController } from './SrThesesController.js';
 import { PlanController } from './PlanController.js';
 import { PolicyInsightsController } from './PolicyInsightsController.js';
+import { EvidenceController } from './EvidenceController.js';
 import { JupiterPriceAdapter } from '../../outbound/price/JupiterPriceAdapter.js';
 // InsightsApiKeyGuard is used via @UseGuards on InsightsDataController and
 // registered as a provider here for NestJS DI to resolve its dependencies.
@@ -76,6 +78,7 @@ import {
   PLAN_REPOSITORY,
   REGIME_PLAN_PORT,
   REGIME_PLAN_REQUEST_CONFIG,
+  EVIDENCE_READ_PORT,
 } from './tokens.js';
 
 // boundary: process.env values are untyped at runtime; validated via env schema at deploy
@@ -138,6 +141,11 @@ const currentPolicyInsightsAdapter = new CurrentPolicyInsightsAdapter(
   regimeEngineBaseUrl,
   telemetry,
 );
+const currentEvidenceAdapter = new CurrentEvidenceAdapter(
+  regimeEngineBaseUrl,
+  regimeEngineInternalToken,
+  telemetry,
+);
 const jupiterPrice = new JupiterPriceAdapter();
 const regimePlanAdapter = new RegimePlanAdapter(
   regimeEngineBaseUrl,
@@ -174,6 +182,7 @@ export const SR_THESES_POOL_ALLOWLIST_MAP = new Map<string, { symbol: string; so
     RegimeController,
     SrThesesController,
     PolicyInsightsController,
+    EvidenceController,
     InsightsDataController,
     AlertController,
     PreviewController,
@@ -203,6 +212,7 @@ export const SR_THESES_POOL_ALLOWLIST_MAP = new Map<string, { symbol: string; so
     { provide: SR_THESES_READ_PORT, useValue: currentSrThesesAdapter },
     { provide: SR_THESES_POOL_ALLOWLIST, useValue: SR_THESES_POOL_ALLOWLIST_MAP },
     { provide: POLICY_INSIGHTS_READ_PORT, useValue: currentPolicyInsightsAdapter },
+    { provide: EVIDENCE_READ_PORT, useValue: currentEvidenceAdapter },
     { provide: PLAN_REPOSITORY, useValue: planStorage },
     { provide: REGIME_PLAN_PORT, useValue: regimePlanAdapter },
     { provide: REGIME_PLAN_REQUEST_CONFIG, useValue: resolvedRegimePlanRequestConfig },

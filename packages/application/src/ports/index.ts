@@ -25,6 +25,7 @@ import type {
   RegimeBlock,
   SrThesesBlock,
   PolicyInsightBlock,
+  EvidenceBundle,
   RegimePlanRequest,
   RegimePlanResponse,
   RegimeExecutionResult,
@@ -337,6 +338,25 @@ export type PolicyInsightsReadResult =
 
 export interface PolicyInsightsReadPort {
   fetchCurrent(): Promise<PolicyInsightsReadResult>;
+}
+
+// --- Evidence read port (application-owned; CurrentEvidenceAdapter implements) ---
+//
+// Returned outcome is a discriminated union so callers can classify failures
+// without parsing adapter logs or HTTP details. Production code paths must
+// never throw for expected upstream unavailability. `store-unavailable` is
+// distinct from `upstream-error` because 503 is a known availability state.
+
+export type EvidenceReadResult =
+  | { kind: 'block'; block: EvidenceBundle }
+  | { kind: 'not-found' }
+  | { kind: 'store-unavailable' }
+  | { kind: 'config-error' }
+  | { kind: 'malformed' }
+  | { kind: 'upstream-error' };
+
+export interface EvidenceReadPort {
+  fetchCurrent(): Promise<EvidenceReadResult>;
 }
 
 // --- Regime plan transport port (application-owned; RegimePlanAdapter implements) ---
