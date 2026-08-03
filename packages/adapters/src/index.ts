@@ -22,3 +22,4 @@ export { TelemetryAdapter } from './outbound/observability/TelemetryAdapter';
 export { JupiterPriceAdapter } from './outbound/price/JupiterPriceAdapter';
 export { CurrentSrThesesAdapter } from './outbound/regime-engine/CurrentSrThesesAdapter';
 export { CurrentPolicyInsightsAdapter } from './outbound/regime-engine/CurrentPolicyInsightsAdapter';
+export { CurrentEvidenceAdapter } from './outbound/regime-engine/CurrentEvidenceAdapter';
