@@ -80,7 +80,7 @@ function capitalize(text: string): string {
 }
 
 function findLastCollectedTimestamp(bundle: EvidenceBundle): string {
-  let latestMs = Date.parse(bundle.asOf);
+  let latestMs = 0;
   let latestStr = bundle.asOf;
 
   for (const ref of bundle.sourceReferences) {

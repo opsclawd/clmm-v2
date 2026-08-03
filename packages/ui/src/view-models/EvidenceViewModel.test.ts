@@ -105,6 +105,38 @@ describe('buildEvidenceViewModel', () => {
     expect(vm.lastCollectedLabel).toBe('2024-01-15T10:00:00Z');
   });
 
+  it('selects latest observation timestamp when observations occur before bundle.asOf', () => {
+    const bundle = JSON.parse(JSON.stringify(contextualFixture)) as unknown as EvidenceBundle;
+    bundle.asOf = '2024-01-15T10:00:00.000Z';
+    for (const f of bundle.deterministicFeatures) {
+      if (f.observedAt) f.observedAt = '2024-01-15T09:55:00.000Z';
+    }
+    for (const s of bundle.sourceReferences) {
+      if (s.observedAt) s.observedAt = '2024-01-15T09:50:00.000Z';
+    }
+    if (bundle.contextualEvidence) {
+      const categories = [
+        bundle.contextualEvidence.supportResistance,
+        bundle.contextualEvidence.flows,
+        bundle.contextualEvidence.derivatives,
+        bundle.contextualEvidence.events,
+        bundle.contextualEvidence.newsRegulatory,
+      ];
+      for (const claims of categories) {
+        if (Array.isArray(claims)) {
+          for (const claim of claims) {
+            if (claim.observedAt) {
+              (claim as { observedAt: string }).observedAt = '2024-01-15T09:40:00.000Z';
+            }
+          }
+        }
+      }
+    }
+
+    const vm = buildEvidenceViewModel(bundle, FIXED_NOW);
+    expect(vm.lastCollectedLabel).toBe('2024-01-15T09:55:00Z');
+  });
+
   it('projects deterministic feature groups into card rows', () => {
     const bundle = contextualFixture as unknown as EvidenceBundle;
     const vm = buildEvidenceViewModel(bundle, FIXED_NOW);
