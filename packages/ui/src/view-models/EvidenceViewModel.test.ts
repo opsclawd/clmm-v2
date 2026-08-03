@@ -65,6 +65,15 @@ describe('buildEvidenceViewModel', () => {
     expect(srCard?.stale).toBe(true);
   });
 
+  it('does not mark card as stale when deterministic feature is unavailable or invalid unless expired', () => {
+    const bundle = deterministicOnlyFixture as unknown as EvidenceBundle;
+    // deterministicOnlyFixture has unavailable features, but they shouldn't mark it stale if freshUntil is future/unset
+    const vm = buildEvidenceViewModel(bundle, FIXED_NOW);
+    const pqCard = vm.cards.find((c) => c.id === 'price_quality');
+    expect(pqCard?.availability).toBe('unavailable');
+    expect(pqCard?.stale).toBe(false);
+  });
+
   it('renders contextual claims without deriving policy', () => {
     const bundle = contextualFixture as unknown as EvidenceBundle;
     const vm = buildEvidenceViewModel(bundle, FIXED_NOW);

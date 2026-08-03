@@ -1,6 +1,6 @@
 # Task Context: Task 5
 
-Title: Request plans from authoritative position state
+Title: Add the strict Expo evidence API client
 
 ## Workspace & Scope Constraints
 
@@ -10,67 +10,60 @@ Your working directory is a dedicated git worktree with the repository's complet
 
 .ai-orchestrator.local.json, if one exists, lives only in the main checkout and is intentionally not copied into your worktree — it is operator-machine-specific and not part of your task. Do not search for it or read it outside this directory. Reason about configuration using only .ai-orchestrator.json in your own working directory; treat it as the effective config for your task.
 
-Working Directory: /home/gary/.openclaw/workspace/clmm-superpowers-v2/.ai-worktrees/issue-62
+Working Directory: /home/gary/.openclaw/workspace/clmm-superpowers-v2/.ai-worktrees/issue-131
 Repository: opsclawd/clmm-v2
-Branch: ai/issue-62
-Start Commit: a992517c4f418e93c2a98914c26582bf40b2515b
+Branch: ai/issue-131
+Start Commit: cb481028648d88de06c9049de1b83b5931dcfb1b
 
 ## Task Requirements
 
 **Files:**
 
-- Create: `packages/application/src/use-cases/plans/RequestPositionPlan.ts`
-- Create: `packages/application/src/use-cases/plans/RequestPositionPlan.test.ts`
-- Modify: `packages/application/src/index.ts`
-- Modify: `packages/application/src/public/index.ts`
+- Create: `apps/app/src/api/evidence.ts`
+- Create: `apps/app/src/api/evidence.test.ts`
+- Reference only: `apps/app/src/api/http.ts`
+- Reference only: `apps/app/src/api/policyInsights.ts`
+- Reference only: `packages/application/src/public/index.ts`
+- Reference only: canonical valid Evidence fixture under `schemas/regime-engine/evidence-bundle.v1/fixtures/valid/`
 
-**Behavioral invariants:**
+**Exported API change:** Add app-local `EvidenceResponse` and `fetchCurrentEvidence(externalSignal?: AbortSignal): Promise<EvidenceResponse>`.
 
-- A missing, unsupported, stale, or ownership-mismatched position never produces an upstream request.
-- The request contains only pinned fields derived from the existing `SupportedPositionReadPort`, trigger repository, clock, and locally owned plan/execution state.
-- A qualified trigger is included when the contract supports it and always outranks the returned advisory plan.
-- Regime timeout/unavailability returns an explicit advisory-degraded result and does not mutate trigger, breach, notification, preview, or execution state.
-- An exact response replay returns the existing plan; conflicting content remains unexecuted.
-- Unknown/malformed responses are persisted only as bounded diagnostics, never as executable plans.
+- [ ] Write `accepts only a canonical BFF evidence envelope` first: valid bundle, each allowlisted unavailable reason, null bundle, non-record/array envelope, unknown reason, invalid JSON, non-2xx response, and schema-invalid nested bundle. A null bundle without a recognized reason is malformed and must throw rather than display an unexplained blank state.
+- [ ] Write `propagates external abort to the evidence request` first for already-aborted and in-flight abort signals. Assert the fetch signal aborts and the client returns the established human-readable timeout/network error without leaking raw response bodies.
+- [ ] Implement a 10,000 ms client timeout, external-signal forwarding and cleanup, one fetch of `${getBffBaseUrl()}/evidence/sol-usdc/current`, record/envelope checks, the allowlisted reason set, and nested validation through the public `parseEvidenceBundle`. Return `{ evidence, unavailableReason? }` only after validation.
+- [ ] Commit with `git commit -m "feat(app): fetch current evidence"`.
 
-**Acceptance criteria:**
+**Task validation:**
 
-- [ ] Add tests named `builds a position-scoped request from authoritative local state`, `sends no inline candles or client-authored regime state`, `rejects stale position state before calling Regime`, `keeps qualified lower breach authoritative during plan outage`, `keeps qualified upper breach authoritative over hold`, `returns advisory degraded without touching deterministic repositories`, `returns the existing plan for exact replay`, and `fails closed on conflicting replay`.
-- [ ] Compute and persist a stable authoritative-position fingerprint from the exact contract-relevant local fields so later approval can detect material changes.
-- [ ] Keep request mapping in this use case; do not duplicate RPC reads inside `RegimePlanAdapter`.
-- [ ] Return an application DTO suitable for BFF/UI display, including explicit unavailable/stale/superseded/conflict states.
+- `pnpm --filter @clmm/app exec vitest run src/api/evidence.test.ts`
+- `pnpm --filter @clmm/app exec eslint src/api/evidence.ts src/api/evidence.test.ts`
 
-**Verification:**
-
-```bash
-pnpm --filter @clmm/application test -- src/use-cases/plans/RequestPositionPlan.test.ts
-pnpm exec eslint packages/application/src/use-cases/plans/RequestPositionPlan.ts packages/application/src/use-cases/plans/RequestPositionPlan.test.ts packages/application/src/index.ts packages/application/src/public/index.ts
-git diff --check -- packages/application/src/use-cases/plans/RequestPositionPlan.ts packages/application/src/use-cases/plans/RequestPositionPlan.test.ts packages/application/src/index.ts packages/application/src/public/index.ts
-```
-
-Expected: focused tests prove position scoping, freshness, replay behavior, and strict isolation from breach monitoring.
+Expected: canonical data and all degraded envelopes are classified, malformed data is rejected, and abort cleanup passes without retries.
 
 ## Repository Targets
 
 ### Expected Files
 
-- packages/application/src/use-cases/plans/RequestPositionPlan.ts
-- packages/application/src/use-cases/plans/RequestPositionPlan.test.ts
-- packages/application/src/index.ts
+- apps/app/src/api/evidence.ts
+- apps/app/src/api/evidence.test.ts
+
+### Reference Files
+
+- apps/app/src/api/http.ts
+- apps/app/src/api/policyInsights.ts
 - packages/application/src/public/index.ts
+- schemas/regime-engine/evidence-bundle.v1/fixtures/valid/
 
 ## Validation Commands
 
 ```bash
-pnpm --filter @clmm/application test -- src/use-cases/plans/RequestPositionPlan.test.ts
-pnpm exec eslint packages/application/src/use-cases/plans/RequestPositionPlan.ts packages/application/src/use-cases/plans/RequestPositionPlan.test.ts packages/application/src/index.ts packages/application/src/public/index.ts
-git diff --check -- packages/application/src/use-cases/plans/RequestPositionPlan.ts packages/application/src/use-cases/plans/RequestPositionPlan.test.ts packages/application/src/index.ts packages/application/src/public/index.ts
+pnpm --filter @clmm/app exec vitest run src/api/evidence.test.ts
+pnpm --filter @clmm/app exec eslint src/api/evidence.ts src/api/evidence.test.ts
 ```
 
 ## Behavioral Invariants
 
 You MUST implement the following behavioral invariants as named tests first (TDD):
 
-- **stale local state blocks request**: Missing, stale, unsupported, or ownership-mismatched positions do not call Regime. (Test: `rejects stale position state before calling Regime`)
-- **plan outage cannot disable breach safety**: Advisory degradation touches no deterministic monitoring or execution repository. (Test: `returns advisory degraded without touching deterministic repositories`)
-- **qualified breach has precedence**: A qualified upper or lower breach remains authoritative over an advisory response. (Test: `keeps qualified upper breach authoritative over hold`)
+- **only canonical envelopes are accepted**: The client accepts a schema-valid bundle or a null bundle with one allowlisted reason and rejects all malformed alternatives. (Test: `accepts only a canonical BFF evidence envelope`)
+- **external abort is propagated and cleaned up**: Already-aborted and later-aborted signals abort the fetch and timeout/listener resources are always cleared. (Test: `propagates external abort to the evidence request`)

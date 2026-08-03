@@ -165,11 +165,9 @@ export function buildEvidenceViewModel(
     else if (allAvailable) availability = 'available';
     else if (allUnavailable) availability = 'unavailable';
 
-    const isFeatureStale = features.some((f) => {
-      if (f.status !== 'available') return true;
-      if (f.freshUntil && Date.parse(f.freshUntil) <= now) return true;
-      return false;
-    });
+    const isFeatureStale = features.some(
+      (f) => Boolean(f.freshUntil) && Date.parse(f.freshUntil!) <= now,
+    );
 
     const isStale = isBundleExpired || isFeatureStale;
 
