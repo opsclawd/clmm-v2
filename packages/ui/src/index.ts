@@ -13,6 +13,8 @@ export { PrivacyPolicyScreen } from './screens/PrivacyPolicyScreen.js';
 export { SupportScreen } from './screens/SupportScreen.js';
 export { EvidenceScreen } from './screens/EvidenceScreen.js';
 export type { EvidenceScreenProps } from './screens/EvidenceScreen.js';
+export { SynthesisScreen } from './screens/SynthesisScreen.js';
+export type { SynthesisScreenProps } from './screens/SynthesisScreen.js';
 
 // Components — reusable
 export { DesktopShell } from './components/DesktopShell.js';
