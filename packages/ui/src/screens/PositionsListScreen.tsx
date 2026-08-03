@@ -1,4 +1,4 @@
-import { View, Text, FlatList, ActivityIndicator } from 'react-native';
+import { View, Text, FlatList, ActivityIndicator, Pressable } from 'react-native';
 import type {
   ObservabilityPort,
   PositionSummaryDto,
@@ -62,6 +62,8 @@ type Props = {
     | null
     | undefined;
   financialMetrics?: PositionListFinancialMetricsDto | undefined;
+  onViewEvidence?: (() => void) | undefined;
+  evidenceEnabled?: boolean | undefined;
 };
 
 export function PositionsListScreen({
@@ -97,6 +99,8 @@ export function PositionsListScreen({
   policyInsightsEnabled,
   policyInsightsUnavailableReason,
   financialMetrics,
+  onViewEvidence,
+  evidenceEnabled,
 }: Props): JSX.Element {
   const isConnected = walletAddress != null && walletAddress.length > 0;
   const hasPositions = (positions?.length ?? 0) > 0;
@@ -140,6 +144,8 @@ export function PositionsListScreen({
           policyInsightsEnabled={policyInsightsEnabled}
           policyInsightsUnavailableReason={policyInsightsUnavailableReason}
           financialMetrics={financialMetrics}
+          onViewEvidence={onViewEvidence}
+          evidenceEnabled={evidenceEnabled}
         />
       ) : (
         <EmptyState />
@@ -285,6 +291,8 @@ function ConnectedPositionsList({
   policyInsightsEnabled,
   policyInsightsUnavailableReason,
   financialMetrics,
+  onViewEvidence,
+  evidenceEnabled,
 }: {
   observability: PositionsListObservability;
   positions: PositionSummaryDto[];
@@ -319,6 +327,8 @@ function ConnectedPositionsList({
     | null
     | undefined;
   financialMetrics?: PositionListFinancialMetricsDto | undefined;
+  onViewEvidence?: (() => void) | undefined;
+  evidenceEnabled?: boolean | undefined;
 }) {
   const viewModel = buildPositionListViewModel(
     positions,
@@ -372,6 +382,34 @@ function ConnectedPositionsList({
             unavailableReason={policyInsightsUnavailableReason ?? null}
             now={now ?? Date.now()}
           />
+          {evidenceEnabled && onViewEvidence ? (
+            <View style={{ marginHorizontal: 16, marginTop: 14, marginBottom: 16 }}>
+              <Pressable
+                onPress={onViewEvidence}
+                accessibilityRole="button"
+                accessibilityLabel="View evidence"
+                style={{
+                  paddingVertical: 12,
+                  paddingHorizontal: 16,
+                  backgroundColor: colors.surface,
+                  borderRadius: 8,
+                  borderWidth: 1,
+                  borderColor: colors.border,
+                  alignItems: 'center',
+                }}
+              >
+                <Text
+                  style={{
+                    color: colors.safe,
+                    fontSize: typography.fontSize.sm,
+                    fontWeight: typography.fontWeight.semibold,
+                  }}
+                >
+                  View evidence
+                </Text>
+              </Pressable>
+            </View>
+          ) : null}
         </>
       }
       renderItem={({ item }) => (
