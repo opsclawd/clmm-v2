@@ -1,6 +1,6 @@
 import React from 'react';
-import { afterEach, describe, expect, it } from 'vitest';
-import { cleanup, render, screen } from '@testing-library/react';
+import { afterEach, describe, expect, it, vi } from 'vitest';
+import { cleanup, fireEvent, render, screen } from '@testing-library/react';
 import type { PolicyInsightBlock } from '@clmm/application/public';
 import { PolicyInsightsSection } from './PolicyInsightsSection.js';
 import canonicalCurrentPair from '../../../../schemas/regime-engine/policy-insight.v1/fixtures/valid/current-pair.json';
@@ -540,5 +540,121 @@ describe('PolicyInsightsSection', () => {
     expect(screen.queryByText(/src111111/)).toBeNull();
     expect(screen.queryByText(/locator/i)).toBeNull();
     expect(screen.queryByText(/Support\/resistance evidence conflicts/i)).toBeNull();
+  });
+
+  it('shows why this recommendation only for a canonical insight with a callback', () => {
+    const onViewSynthesis = vi.fn();
+    render(
+      <PolicyInsightsSection
+        policyInsight={fixture()}
+        isLoading={false}
+        isError={false}
+        isEnabled
+        unavailableReason={null}
+        now={NOW}
+        onViewSynthesis={onViewSynthesis}
+      />,
+    );
+    expect(screen.getByText('Why this recommendation')).toBeTruthy();
+
+    cleanup();
+    render(
+      <PolicyInsightsSection
+        policyInsight={fixture()}
+        isLoading={false}
+        isError={false}
+        isEnabled
+        unavailableReason={null}
+        now={NOW}
+      />,
+    );
+    expect(screen.queryByText('Why this recommendation')).toBeNull();
+  });
+
+  it('invokes synthesis navigation without changing recommendation content', () => {
+    const onViewSynthesis = vi.fn();
+    render(
+      <PolicyInsightsSection
+        policyInsight={fixture()}
+        isLoading={false}
+        isError={false}
+        isEnabled
+        unavailableReason={null}
+        now={NOW}
+        onViewSynthesis={onViewSynthesis}
+      />,
+    );
+
+    const button = screen.getByText('Why this recommendation');
+    fireEvent.click(button);
+
+    expect(onViewSynthesis).toHaveBeenCalledTimes(1);
+    expect(screen.getByTestId('policy-insights-card')).toBeTruthy();
+    expect(screen.getByText('Hold')).toBeTruthy();
+    expect(screen.getByTestId('policy-insights-freshness')).toBeTruthy();
+    expect(
+      screen.getByText(
+        'Advisory policy context only. Nothing is signed or applied; deterministic stop-loss monitoring continues independently.',
+      ),
+    ).toBeTruthy();
+  });
+
+  it('never shows synthesis navigation in loading unavailable or disabled states', () => {
+    const onViewSynthesis = vi.fn();
+
+    render(
+      <PolicyInsightsSection
+        policyInsight={fixture()}
+        isLoading={false}
+        isError={false}
+        isEnabled={false}
+        unavailableReason={null}
+        now={NOW}
+        onViewSynthesis={onViewSynthesis}
+      />,
+    );
+    expect(screen.queryByText('Why this recommendation')).toBeNull();
+    cleanup();
+
+    render(
+      <PolicyInsightsSection
+        policyInsight={undefined}
+        isLoading={true}
+        isError={false}
+        isEnabled={true}
+        unavailableReason={null}
+        now={NOW}
+        onViewSynthesis={onViewSynthesis}
+      />,
+    );
+    expect(screen.queryByText('Why this recommendation')).toBeNull();
+    cleanup();
+
+    render(
+      <PolicyInsightsSection
+        policyInsight={fixture()}
+        isLoading={true}
+        isError={false}
+        isEnabled={true}
+        unavailableReason={null}
+        now={NOW}
+        onViewSynthesis={onViewSynthesis}
+      />,
+    );
+    expect(screen.queryByText('Why this recommendation')).toBeNull();
+    cleanup();
+
+    render(
+      <PolicyInsightsSection
+        policyInsight={null}
+        isLoading={false}
+        isError={false}
+        isEnabled={true}
+        unavailableReason="not-found"
+        now={NOW}
+        onViewSynthesis={onViewSynthesis}
+      />,
+    );
+    expect(screen.queryByText('Why this recommendation')).toBeNull();
   });
 });

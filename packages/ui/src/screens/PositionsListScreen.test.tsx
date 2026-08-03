@@ -5,7 +5,9 @@ import type {
   PositionSummaryDto,
   SrThesesBlock,
   PositionListFinancialMetricsDto,
+  PolicyInsightBlock,
 } from '@clmm/application/public';
+import canonicalCurrentPosition from '../../../../schemas/regime-engine/policy-insight.v1/fixtures/valid/current-position.json';
 import { PositionsListScreen } from './PositionsListScreen.js';
 
 afterEach(() => {
@@ -809,6 +811,71 @@ describe('PositionsListScreen', () => {
         'The policy insight service could not be reached. Position monitoring and deterministic stop-loss protection continue independently.',
       ),
     ).toBeTruthy();
+  });
+
+  it('forwards synthesis navigation for a supported canonical policy insight', () => {
+    const onViewSynthesis = vi.fn();
+    render(
+      <TestPositionsListScreen
+        walletAddress="wallet-1"
+        positions={[makePosition()]}
+        policyInsight={canonicalCurrentPosition as PolicyInsightBlock}
+        policyInsightsLoading={false}
+        policyInsightsError={false}
+        policyInsightsEnabled
+        onViewSynthesis={onViewSynthesis}
+      />,
+    );
+
+    const actionButton = screen.getByText('Why this recommendation');
+    expect(actionButton).toBeTruthy();
+    fireEvent.click(actionButton);
+    expect(onViewSynthesis).toHaveBeenCalledTimes(1);
+  });
+
+  it('omits synthesis navigation when the callback is absent', () => {
+    render(
+      <TestPositionsListScreen
+        walletAddress="wallet-1"
+        positions={[makePosition()]}
+        policyInsight={canonicalCurrentPosition as PolicyInsightBlock}
+        policyInsightsLoading={false}
+        policyInsightsError={false}
+        policyInsightsEnabled
+      />,
+    );
+
+    expect(screen.queryByText('Why this recommendation')).toBeNull();
+  });
+
+  it('does not couple synthesis navigation to the evidence footer', () => {
+    const onViewSynthesis = vi.fn();
+    const onViewEvidence = vi.fn();
+
+    render(
+      <TestPositionsListScreen
+        walletAddress="wallet-1"
+        positions={[makePosition()]}
+        policyInsight={canonicalCurrentPosition as PolicyInsightBlock}
+        policyInsightsLoading={false}
+        policyInsightsError={false}
+        policyInsightsEnabled
+        evidenceEnabled
+        onViewSynthesis={onViewSynthesis}
+        onViewEvidence={onViewEvidence}
+      />,
+    );
+
+    const synthesisButton = screen.getByText('Why this recommendation');
+    const evidenceButton = screen.getByText('View evidence');
+
+    fireEvent.click(synthesisButton);
+    expect(onViewSynthesis).toHaveBeenCalledTimes(1);
+    expect(onViewEvidence).not.toHaveBeenCalled();
+
+    fireEvent.click(evidenceButton);
+    expect(onViewEvidence).toHaveBeenCalledTimes(1);
+    expect(onViewSynthesis).toHaveBeenCalledTimes(1);
   });
 
   it('keeps loading distinct from a loaded card with unavailable prices', () => {

@@ -13,6 +13,8 @@ export { PrivacyPolicyScreen } from './screens/PrivacyPolicyScreen.js';
 export { SupportScreen } from './screens/SupportScreen.js';
 export { EvidenceScreen } from './screens/EvidenceScreen.js';
 export type { EvidenceScreenProps } from './screens/EvidenceScreen.js';
+export { SynthesisScreen } from './screens/SynthesisScreen.js';
+export type { SynthesisScreenProps } from './screens/SynthesisScreen.js';
 
 // Components — reusable
 export { DesktopShell } from './components/DesktopShell.js';
@@ -111,6 +113,13 @@ export type {
   EvidenceFamilyCardRowViewModel,
   EvidenceResearchBriefViewModel,
 } from './view-models/EvidenceViewModel.js';
+export { buildSynthesisViewModel } from './view-models/SynthesisViewModel.js';
+export type {
+  SynthesisViewModel,
+  SynthesisFamilyViewModel,
+  SynthesisFamilyId,
+  SynthesisFamilyStatus,
+} from './view-models/SynthesisViewModel.js';
 
 // Presenters
 export { presentPositionDetail } from './presenters/PositionDetailPresenter.js';

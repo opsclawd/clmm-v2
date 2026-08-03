@@ -172,6 +172,13 @@ export default function PositionsRoute() {
           method: 'push',
         })
       }
+      onViewSynthesis={() =>
+        navigateRoute({
+          router,
+          path: '/synthesis',
+          method: 'push',
+        })
+      }
       financialMetrics={positionsResult?.financialMetrics}
     />
   );
