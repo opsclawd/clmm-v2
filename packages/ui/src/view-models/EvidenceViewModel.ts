@@ -198,12 +198,13 @@ export function buildEvidenceViewModel(
   for (const fam of CONTEXTUAL_FAMILIES) {
     const rawClaims = bundle.contextualEvidence ? bundle.contextualEvidence[fam.id] : [];
     const claimsArray = Array.isArray(rawClaims) ? rawClaims : [];
+    const availability = bundle.assessment.coverage[fam.id];
 
     if (claimsArray.length === 0) {
       cards.push({
         id: fam.id,
         title: fam.title,
-        availability: 'unavailable',
+        availability,
         freshnessLabel: '—',
         stale: false,
         rows: [{ label: 'Claims', value: '—' }],
@@ -228,7 +229,7 @@ export function buildEvidenceViewModel(
     cards.push({
       id: fam.id,
       title: fam.title,
-      availability: 'available',
+      availability,
       freshnessLabel: isStale ? 'Stale' : 'Fresh',
       stale: isStale,
       rows: [{ label: 'Claims count', value: `${claimsArray.length}` }],
