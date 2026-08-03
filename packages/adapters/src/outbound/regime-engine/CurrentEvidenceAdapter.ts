@@ -3,6 +3,10 @@ import { parseEvidenceBundle } from '@clmm/application';
 
 const FETCH_TIMEOUT_MS = 2000;
 
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null && !Array.isArray(value);
+}
+
 export class CurrentEvidenceAdapter implements EvidenceReadPort {
   constructor(
     private readonly baseUrl: string | null,
@@ -59,7 +63,20 @@ export class CurrentEvidenceAdapter implements EvidenceReadPort {
           this.observability.log('warn', 'Evidence response was not valid JSON');
           return { kind: 'upstream-error' };
         }
-        const block = parseEvidenceBundle(body);
+
+        if (!isRecord(body) || !Array.isArray(body['items'])) {
+          this.observability.log('warn', 'Evidence response failed envelope validation');
+          return { kind: 'malformed' };
+        }
+
+        const items = body['items'] as unknown[];
+        if (items.length === 0) {
+          this.observability.log('warn', 'Evidence upstream returned no current items');
+          return { kind: 'not-found' };
+        }
+
+        const firstItem: unknown = items[0];
+        const block = parseEvidenceBundle(isRecord(firstItem) ? firstItem['bundle'] : undefined);
         if (!block) {
           this.observability.log('warn', 'Evidence response failed shape validation');
           return { kind: 'malformed' };
