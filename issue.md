@@ -1,66 +1,44 @@
-# Pool Depth is a hardcoded 'depth unavailable' placeholder — original calc was reverted for being mathematically wrong
+# CurrentEvidenceAdapter validates the full response wrapper instead of the nested bundle, rejecting all real evidence as 'malformed'
 
 ## Summary
 
-The position detail screen always shows "Pool Depth: depth unavailable" — this is a long-standing, deliberate placeholder (not a regression from the recent plan-submission fix chain), because the original implementation's pool-depth formula was mathematically wrong for a concentrated-liquidity pool and was reverted rather than shipped.
+`CurrentEvidenceAdapter.fetchCurrent()` validates the *entire* `regime-engine` response wrapper against the vendored `evidence-bundle.v1` schema, instead of extracting and validating the actual bundle object nested inside it. This causes the Evidence page (#131) to report `"unavailableReason": "malformed"` for every real evidence response, even when the underlying bundle is perfectly valid.
 
-## History
+## Evidence
 
-Commit `c423a5d` (2026-04-25) originally computed it as:
-
+Live response from `regime-engine`'s `/v1/evidence/sol-usdc/current?scope=pair` (now returning real data for the first time, after `sol-usdc-clmm-intelligence` issue #131's fix deployed):
+```json
+{
+  "schemaVersion": "evidence-bundle.v1",
+  "pair": "SOL/USDC",
+  "scope": { "kind": "pair" },
+  "queriedAt": "2026-08-03T15:59:17.755Z",
+  "items": [
+    { "bundle": { "asOf": "...", "pair": "SOL/USDC", "assessment": { ... }, ... } }
+  ]
+}
+```
+The vendored schema (`schemas/regime-engine/evidence-bundle.v1/schema.json`) validates the shape of a single `bundle` object (confirmed: `parseEvidenceBundle(real.items[0].bundle)` returns non-null). But `CurrentEvidenceAdapter.ts`:
 ```ts
-const poolDepthUsd = priceB
-  ? tokenAmountToUsd(poolData.liquidity, poolData.tokenPair.decimalsB, priceB.usdValue)
-  : 0;
-const poolDepthLabel =
-  poolDepthUsd > 0 ? `$${(poolDepthUsd / 1_000_000).toFixed(1)}M pool depth` : 'depth unavailable';
+const block = parseEvidenceBundle(body);
+if (!block) {
+  this.observability.log('warn', 'Evidence response failed shape validation');
+  return { kind: 'malformed' };
+}
 ```
+passes `body` — the full wrapper object with `schemaVersion`/`pair`/`scope`/`queriedAt`/`items` at the top level — directly into `parseEvidenceBundle`. Confirmed: `parseEvidenceBundle(real)` (the full wrapper) returns `null`, reproducing the exact live `"malformed"` result, while `parseEvidenceBundle(real.items[0].bundle)` succeeds.
 
-`poolData.liquidity` is Orca's raw CLMM liquidity parameter `L` (a sqrt-price-scaled abstract unit, not a token quantity). Passing it directly into `tokenAmountToUsd` as if it were a raw token-B amount is not a valid conversion for concentrated liquidity and produces a meaningless number.
-
-The very next commit, `1881bbc` (same day), reverted this to a hardcoded literal:
-
-```ts
-poolDepthLabel: 'depth unavailable',
-```
-
-in `packages/application/src/use-cases/positions/GetPositionDetail.ts:141`, without implementing a correct replacement. `poolLiquidity: poolData.liquidity.toString()` is still passed through the DTO, but nothing derives a depth label from it.
-
-## What's needed for a correct fix
-
-`PoolData` (`packages/domain/src/positions/index.ts`) already carries everything needed to compute real in-range liquidity depth without any new external integration:
-
-```ts
-export type PoolData = {
-  readonly sqrtPrice: bigint;
-  readonly tickSpacing: number;
-  readonly liquidity: bigint;
-  readonly tickCurrentIndex: number;
-  readonly tokenPair: TokenPair; // decimalsA/decimalsB
-  ...
-};
-```
-
-Standard CLMM in-range depth math, using the current active tick's bucket `[tickLower, tickUpper)` (derived from `tickCurrentIndex` and `tickSpacing`):
-
-```
-amountA = L * (1/sqrt(P) - 1/sqrt(Pb))
-amountB = L * (sqrt(P) - sqrt(Pa))
-```
-
-where `P` is the current price, and `Pa`/`Pb` are the prices at the current tick bucket's lower/upper bounds. This yields the real token reserves actively available for trading at the current price (a meaningful "depth" figure — how much can trade before price moves out of the current bucket), convertible to USD via the existing `priceA`/`priceB` already fetched in `getPositionDetail`.
-
-This is self-contained (no new external API dependency, unlike pulling TVL from GeckoTerminal or a similar source) and uses data already fetched for this exact call.
+This never surfaced during #131's development because no real pair-scope evidence bundle existed to test the live response shape against until `sol-usdc-clmm-intelligence`#131 was fixed and deployed — presumably unit tests mocked/constructed fixtures already in the wrong (bundle-only, non-wrapped) shape, matching the adapter's incorrect assumption rather than the real API's actual response envelope.
 
 ## Fix
 
-- Add a liquidity-to-in-range-reserves helper (likely alongside `priceFromSqrtPrice`/`tickToPrice` in the domain package, since it's the same class of CLMM math).
-- Use it in `GetPositionDetail.ts` to replace the hardcoded `poolDepthLabel: 'depth unavailable'` with a real computed value, falling back to `'depth unavailable'` only when price/decimals are genuinely unknown (mirroring the existing `decimalsKnown`/`priceA`/`priceB` degrade-gracefully pattern already used elsewhere in this function).
-- Add unit tests for the new helper (known L/sqrtPrice/tick-bucket inputs → known reserve amounts) and for `GetPositionDetail`'s degraded-data fallback path.
+`CurrentEvidenceAdapter.fetchCurrent()` should extract the bundle from `body.items[0].bundle` (handling the case where `items` is empty — should probably be treated the same as `not-found`, distinct from the 404 status-code path, since `/v1/evidence/sol-usdc/current` can return 200 with `items: []` in principle) before calling `parseEvidenceBundle`, not validate the raw wrapper.
+
+Also worth checking: does the `EvidenceScreen`/`EvidenceViewModel`/`EvidenceFamilyCard` code (also from #131) assume a single bundle or need to handle multiple `items`? The endpoint's shape suggests `items` could contain more than one bundle (e.g. across sources), worth confirming the intended UI behavior for that case while fixing this.
 
 ## Acceptance criteria
 
-- [ ] `poolDepthLabel` reflects a real, correctly-computed USD value for positions with known decimals and prices.
-- [ ] Falls back to `'depth unavailable'` only when decimals/price data is genuinely missing, not unconditionally.
-- [ ] New CLMM depth-math helper has unit tests against known-correct values.
-- [ ] Live-verified: the position detail screen shows a real, non-placeholder pool depth figure.
+- [ ] `CurrentEvidenceAdapter` correctly unwraps the response envelope before schema validation.
+- [ ] Regression test using a realistic full-wrapper fixture (not just a bare bundle object) asserting `fetchCurrent()` returns `{ kind: 'block', block }` for a valid real-shaped response.
+- [ ] Live-verified: the Evidence page renders real data for SOL/USDC pair scope, not "malformed."
+
