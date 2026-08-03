@@ -111,6 +111,13 @@ export type {
   EvidenceFamilyCardRowViewModel,
   EvidenceResearchBriefViewModel,
 } from './view-models/EvidenceViewModel.js';
+export { buildSynthesisViewModel } from './view-models/SynthesisViewModel.js';
+export type {
+  SynthesisViewModel,
+  SynthesisFamilyViewModel,
+  SynthesisFamilyId,
+  SynthesisFamilyStatus,
+} from './view-models/SynthesisViewModel.js';
 
 // Presenters
 export { presentPositionDetail } from './presenters/PositionDetailPresenter.js';
