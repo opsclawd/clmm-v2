@@ -37,7 +37,10 @@ export type PolicyInsightsViewModel = {
   resistancesLabel: string | null;
   levelsUnavailableLabel: string | null;
   evidenceSummary: string;
+  summaryBullets: string[];
+  /** @deprecated The default card must use summaryBullets. Kept for compatibility. */
   warningLabels: string[];
+  /** @deprecated Raw reasoning belongs on the Synthesis screen. */
   reasoning: string;
   subtitle: string;
 };
@@ -130,6 +133,48 @@ const REASON_CODE_LABELS: Record<PolicyInsightReasonCode, string> = {
   RESEARCH_BRIEF_ANALYSIS: 'Research brief analysis',
   NO_ELIGIBLE_PRICE_LEVELS: 'No eligible price levels',
 };
+
+const SUMMARY_COPY_BY_WARNING: Record<PolicyInsightWarningCode, string> = {
+  MARKET_DATA_HARD_STALE: 'Market data may be too old to rely on.',
+  EVIDENCE_STALE_INPUT: 'Some supporting data may be out of date.',
+  EVIDENCE_MISSING_FAMILY: "Some position or market data wasn't available for this recommendation.",
+  EVIDENCE_REJECTED_FAMILY: 'Some supporting data could not be used.',
+  EVIDENCE_CONFLICTED_FAMILY: 'Some supporting data sources disagreed.',
+  EVIDENCE_NO_SELECTED_RESEARCH: 'No supporting research was available for this recommendation.',
+  NO_ELIGIBLE_PRICE_LEVELS: 'No usable support or resistance levels were available.',
+};
+
+const SUMMARY_COPY_BY_REASON: Record<PolicyInsightReasonCode, string | null> = {
+  ADVISORY_ONLY: null,
+  DATA_HARD_STALE: 'The available data may be too old to rely on.',
+  DATA_INSUFFICIENT_SAMPLES: "There wasn't enough recent data to form a stronger recommendation.",
+  CLMM_BREACH_LOWER: 'The position moved below its configured range.',
+  CLMM_BREACH_UPPER: 'The position moved above its configured range.',
+  CHURN_STAND_DOWN_ACTIVE: 'The recommendation is paused to avoid repeated changes.',
+  CHURN_COOLDOWN_ACTIVE: 'A cooldown is active before another change can be recommended.',
+  MARKET_REGIME_UP: 'Market conditions are trending upward.',
+  MARKET_REGIME_DOWN: 'Market conditions are trending downward.',
+  MARKET_REGIME_CHOP: 'Market conditions are choppy.',
+  FEATURE_THRESHOLD_BREACHED: 'A monitored market condition crossed its policy threshold.',
+  CONTEXTUAL_EVIDENCE_VOTE: 'Supporting market context influenced this recommendation.',
+  RESEARCH_BRIEF_ANALYSIS: 'Recent research context influenced this recommendation.',
+  NO_ELIGIBLE_PRICE_LEVELS: 'No usable support or resistance levels were available.',
+};
+
+const DEFAULT_SUMMARY_BULLET =
+  'This recommendation reflects the latest available market and position context.';
+
+function buildSummaryBullets(block: PolicyInsightBlock): string[] {
+  const candidates: Array<string | null | undefined> = [
+    ...block.warnings.map((warning) => SUMMARY_COPY_BY_WARNING[warning.code]),
+    ...block.reasonCodes.map((code) => SUMMARY_COPY_BY_REASON[code]),
+  ];
+  const bullets = [...new Set(candidates.filter((copy): copy is string => Boolean(copy)))].slice(
+    0,
+    3,
+  );
+  return bullets.length > 0 ? bullets : [DEFAULT_SUMMARY_BULLET];
+}
 
 const LEXICAL_ZERO_PATTERN = /^0(?:\.0+)?$/;
 
@@ -284,6 +329,7 @@ export function buildPolicyInsightsViewModel(
       block.evidence.selectedBundleRefs.length,
       block.evidence.selectedSourceRefs.length,
     ),
+    summaryBullets: buildSummaryBullets(block),
     warningLabels: getWarningLabelsFromCodes([
       ...block.warnings.map((w) => w.code),
       ...block.reasonCodes,
