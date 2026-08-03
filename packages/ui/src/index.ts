@@ -99,6 +99,14 @@ export type {
   SrThesisOverlayModel,
   SrThesisBiasTone,
 } from './view-models/SrThesesViewModel.js';
+export { buildEvidenceViewModel } from './view-models/EvidenceViewModel.js';
+export type {
+  EvidenceScreenViewModel,
+  EvidenceFamilyCardViewModel,
+  EvidenceContextualClaimViewModel,
+  EvidenceFamilyCardRowViewModel,
+  EvidenceResearchBriefViewModel,
+} from './view-models/EvidenceViewModel.js';
 
 // Presenters
 export { presentPositionDetail } from './presenters/PositionDetailPresenter.js';
