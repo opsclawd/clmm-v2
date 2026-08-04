@@ -1,4 +1,9 @@
-import type { ObservabilityPort, EvidenceReadPort, EvidenceReadResult } from '@clmm/application';
+import type {
+  ObservabilityPort,
+  EvidenceReadPort,
+  EvidenceReadResult,
+  PositionEvidenceScope,
+} from '@clmm/application';
 import { parseEvidenceBundle } from '@clmm/application';
 
 const FETCH_TIMEOUT_MS = 2000;
@@ -10,7 +15,7 @@ export class CurrentEvidenceAdapter implements EvidenceReadPort {
     private readonly observability: ObservabilityPort,
   ) {}
 
-  async fetchCurrent(): Promise<EvidenceReadResult> {
+  async fetchCurrent(scope?: PositionEvidenceScope): Promise<EvidenceReadResult> {
     if (!this.baseUrl || !this.internalToken) {
       this.observability.log('warn', 'Evidence read disabled — missing baseUrl or internalToken');
       return { kind: 'config-error' };
@@ -31,6 +36,13 @@ export class CurrentEvidenceAdapter implements EvidenceReadPort {
         protocol: url.protocol,
       });
       return { kind: 'config-error' };
+    }
+
+    if (scope) {
+      url.searchParams.set('scope', 'position');
+      url.searchParams.set('walletAddress', scope.walletAddress);
+      url.searchParams.set('whirlpoolAddress', scope.whirlpoolAddress);
+      url.searchParams.set('positionId', scope.positionId);
     }
 
     const controller = new AbortController();

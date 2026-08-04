@@ -347,6 +347,12 @@ export interface PolicyInsightsReadPort {
 // never throw for expected upstream unavailability. `store-unavailable` is
 // distinct from `upstream-error` because 503 is a known availability state.
 
+export type PositionEvidenceScope = {
+  readonly walletAddress: string;
+  readonly whirlpoolAddress: string;
+  readonly positionId: string;
+};
+
 export type EvidenceReadResult =
   | { kind: 'block'; block: EvidenceBundle }
   | { kind: 'not-found' }
@@ -356,7 +362,7 @@ export type EvidenceReadResult =
   | { kind: 'upstream-error' };
 
 export interface EvidenceReadPort {
-  fetchCurrent(): Promise<EvidenceReadResult>;
+  fetchCurrent(scope?: PositionEvidenceScope): Promise<EvidenceReadResult>;
 }
 
 // --- Regime plan transport port (application-owned; RegimePlanAdapter implements) ---
