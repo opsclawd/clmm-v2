@@ -12,6 +12,7 @@ import {
   getSolUsdcInsightPoolSnapshot,
   getSolUsdcInsightPositions,
   getSolUsdcInsightBundle,
+  getSolUsdcRawEvidence,
 } from '@clmm/application';
 import type {
   SupportedPositionReadPort,
@@ -156,7 +157,10 @@ export class InsightsDataController {
 
   @Get('evidence/raw/:runId')
   async getRawEvidence(@Param('runId') runId: string) {
-    const result = await this.evidenceReadPort.getRawEvidence(runId);
+    const result = await getSolUsdcRawEvidence({
+      runId,
+      evidenceReadPort: this.evidenceReadPort,
+    });
 
     switch (result.kind) {
       case 'ok':
@@ -169,10 +173,7 @@ export class InsightsDataController {
           HttpStatus.SERVICE_UNAVAILABLE,
         );
       case 'upstream-error':
-        throw new HttpException(
-          'Upstream error fetching raw evidence',
-          result.status ?? HttpStatus.SERVICE_UNAVAILABLE,
-        );
+        throw new HttpException('Upstream error fetching raw evidence', HttpStatus.BAD_GATEWAY);
     }
   }
 

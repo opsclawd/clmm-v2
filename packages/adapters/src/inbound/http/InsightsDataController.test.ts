@@ -355,26 +355,26 @@ describe('InsightsDataController', () => {
     }
   });
 
-  it('GET raw evidence forwards an upstream HTTP failure status', async () => {
+  it('GET raw evidence maps upstream error to HTTP 502 Bad Gateway without status code bleed', async () => {
     const evidenceReadPort: EvidenceReadPort = {
       fetchCurrent: vi.fn(),
-      getRawEvidence: vi.fn().mockResolvedValue({ kind: 'upstream-error', status: 500 }),
+      getRawEvidence: vi.fn().mockResolvedValue({ kind: 'upstream-error', status: 401 }),
     };
     const controller = makeController({ evidenceReadPort });
     try {
-      await controller.getRawEvidence('run-500');
+      await controller.getRawEvidence('run-401');
       throw new Error('should have thrown');
     } catch (err) {
       expect(err).toBeInstanceOf(HttpException);
       const httpErr = err as HttpException;
-      expect(httpErr.getStatus()).toBe(HttpStatus.INTERNAL_SERVER_ERROR);
+      expect(httpErr.getStatus()).toBe(HttpStatus.BAD_GATEWAY);
       const response = JSON.stringify(httpErr.getResponse());
       expect(response).not.toContain('X-CLMM-Internal-Token');
       expect(response).not.toContain('secret');
     }
   });
 
-  it('GET raw evidence maps configuration and transport failures to HTTP 503', async () => {
+  it('GET raw evidence maps configuration failures to HTTP 503 and transport failures to HTTP 502', async () => {
     const configErrPort: EvidenceReadPort = {
       fetchCurrent: vi.fn(),
       getRawEvidence: vi.fn().mockResolvedValue({ kind: 'config-error' }),
@@ -403,7 +403,7 @@ describe('InsightsDataController', () => {
     } catch (err) {
       expect(err).toBeInstanceOf(HttpException);
       const httpErr = err as HttpException;
-      expect(httpErr.getStatus()).toBe(HttpStatus.SERVICE_UNAVAILABLE);
+      expect(httpErr.getStatus()).toBe(HttpStatus.BAD_GATEWAY);
       const response = JSON.stringify(httpErr.getResponse());
       expect(response).not.toContain('X-CLMM-Internal-Token');
       expect(response).not.toContain('secret');
