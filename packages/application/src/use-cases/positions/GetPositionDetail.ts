@@ -8,6 +8,7 @@ import {
   formatFeeRateLabel,
   calculateInRangeReserves,
   calculatePositionAmounts,
+  isSupportedPool,
 } from '@clmm/domain';
 import { buildPositionDisplayBounds } from './buildPositionDisplayBounds.js';
 
@@ -15,8 +16,6 @@ export type GetPositionDetailResult =
   | { kind: 'found'; position: LiquidityPosition; detailDto: PositionDetailDto }
   | { kind: 'not-found' }
   | { kind: 'cannot-build-supported-detail-dto' };
-
-const SOL_USDC_SUPPORTED_POOL_ID = 'Czfq3xZZDmsdGdUyrNLtRhGc47cXcZtLG4crryfu44zE';
 
 export async function getPositionDetail(params: {
   walletId: WalletId;
@@ -189,7 +188,7 @@ export async function getPositionDetail(params: {
     positionLiquidity: positionLiquidity.toString(),
     poolLiquidity: poolData.liquidity.toString(),
     poolDepthLabel,
-    evidenceEnabled: position.poolId === SOL_USDC_SUPPORTED_POOL_ID,
+    evidenceEnabled: isSupportedPool(position.poolId),
   };
 
   return { kind: 'found', position, detailDto };

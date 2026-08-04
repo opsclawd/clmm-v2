@@ -96,3 +96,9 @@ export {
   whirlpoolFeeRateToBps,
   formatFeeRateLabel,
 } from './enrichment.js';
+
+export {
+  SOL_USDC_SUPPORTED_POOL_ID,
+  SUPPORTED_POOL_IDS,
+  isSupportedPool,
+} from './supportedPools.js';

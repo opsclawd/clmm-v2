@@ -167,6 +167,9 @@ export {
   UPPER_BOUND_BREACH,
   makeClockTimestamp,
   makePositionId,
+  SOL_USDC_SUPPORTED_POOL_ID,
+  SUPPORTED_POOL_IDS,
+  isSupportedPool,
 } from '@clmm/domain';
 
 // DTO validation (needed by client-side API layer)
