@@ -2,6 +2,7 @@ import type {
   ObservabilityPort,
   EvidenceReadPort,
   EvidenceReadResult,
+  RawEvidenceReadResult,
   PositionEvidenceScope,
 } from '@clmm/application';
 import { parseEvidenceBundle } from '@clmm/application';
@@ -117,6 +118,72 @@ export class CurrentEvidenceAdapter implements EvidenceReadPort {
         status: response.status,
       });
       return { kind: 'upstream-error' };
+    } finally {
+      clearTimeout(timeout);
+    }
+  }
+
+  async getRawEvidence(runId: string): Promise<RawEvidenceReadResult> {
+    if (!this.baseUrl || !this.internalToken) {
+      this.observability.log('warn', 'Evidence read disabled — missing baseUrl or internalToken');
+      return { kind: 'config-error' };
+    }
+
+    let url: URL;
+    try {
+      url = new URL(
+        `${this.baseUrl.replace(/\/+$/, '')}/v1/evidence/sol-usdc/raw/${encodeURIComponent(runId)}`,
+      );
+    } catch {
+      this.observability.log('warn', 'Evidence base URL is malformed', {
+        baseUrl: this.baseUrl,
+      });
+      return { kind: 'config-error' };
+    }
+
+    if (url.protocol !== 'http:' && url.protocol !== 'https:') {
+      this.observability.log('warn', 'Evidence base URL uses disallowed protocol', {
+        protocol: url.protocol,
+      });
+      return { kind: 'config-error' };
+    }
+
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), FETCH_TIMEOUT_MS);
+
+    try {
+      let response: Response;
+      try {
+        response = await fetch(url.toString(), {
+          signal: controller.signal,
+          headers: {
+            'X-CLMM-Internal-Token': this.internalToken,
+          },
+        });
+      } catch (error: unknown) {
+        const message = error instanceof Error ? error.message : String(error);
+        this.observability.log('warn', 'Raw evidence fetch network error', { message });
+        return { kind: 'upstream-error' };
+      }
+
+      if (response.status === 200) {
+        try {
+          return { kind: 'ok', payload: await response.json() };
+        } catch {
+          this.observability.log('warn', 'Raw evidence response was not valid JSON');
+          return { kind: 'upstream-error' };
+        }
+      }
+
+      if (response.status === 404) {
+        this.observability.log('warn', 'Raw evidence upstream 404 not found');
+        return { kind: 'not-found' };
+      }
+
+      this.observability.log('warn', 'Raw evidence upstream non-2xx', {
+        status: response.status,
+      });
+      return { kind: 'upstream-error', status: response.status };
     } finally {
       clearTimeout(timeout);
     }

@@ -4,6 +4,7 @@ import {
   HttpException,
   HttpStatus,
   Inject,
+  NotFoundException,
   Param,
   UseGuards,
 } from '@nestjs/common';
@@ -11,6 +12,7 @@ import {
   getSolUsdcInsightPoolSnapshot,
   getSolUsdcInsightPositions,
   getSolUsdcInsightBundle,
+  getSolUsdcRawEvidence,
 } from '@clmm/application';
 import type {
   SupportedPositionReadPort,
@@ -19,6 +21,7 @@ import type {
   SrLevelsReadPort,
   ClockPort,
   SolUsdcInsightErrorDto,
+  EvidenceReadPort,
 } from '@clmm/application';
 import { makePoolId, makeWalletId } from '@clmm/domain';
 import {
@@ -28,6 +31,7 @@ import {
   SR_LEVELS_READ_PORT,
   SR_LEVELS_POOL_ALLOWLIST,
   CLOCK_PORT,
+  EVIDENCE_READ_PORT,
   // eslint-disable-next-line @typescript-eslint/no-unused-vars -- used via @Inject
   INSIGHTS_API_KEY,
 } from './tokens.js';
@@ -60,6 +64,8 @@ export class InsightsDataController {
     private readonly srLevelsAllowlist: SrLevelsAllowlist,
     @Inject(CLOCK_PORT)
     private readonly clock: ClockPort,
+    @Inject(EVIDENCE_READ_PORT)
+    private readonly evidenceReadPort: EvidenceReadPort,
   ) {
     if (this.srLevelsAllowlist.size !== EXPECTED_ALLOWLIST_SIZE_V1) {
       throw new Error(
@@ -147,6 +153,28 @@ export class InsightsDataController {
       throw this.positionDetailUnavailable(result.positionId);
     }
     return { bundle: result.bundle };
+  }
+
+  @Get('evidence/raw/:runId')
+  async getRawEvidence(@Param('runId') runId: string) {
+    const result = await getSolUsdcRawEvidence({
+      runId,
+      evidenceReadPort: this.evidenceReadPort,
+    });
+
+    switch (result.kind) {
+      case 'ok':
+        return result.payload;
+      case 'not-found':
+        throw new NotFoundException(`Raw evidence not found for runId: ${runId}`);
+      case 'config-error':
+        throw new HttpException(
+          'Raw evidence upstream is unavailable',
+          HttpStatus.SERVICE_UNAVAILABLE,
+        );
+      case 'upstream-error':
+        throw new HttpException('Upstream error fetching raw evidence', HttpStatus.BAD_GATEWAY);
+    }
   }
 
   private poolUnavailable(): HttpException {

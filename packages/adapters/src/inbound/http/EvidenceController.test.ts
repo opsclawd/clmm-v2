@@ -74,7 +74,8 @@ describe('EvidenceController', () => {
 
     for (const { result, expected } of cases) {
       const fetchCurrent = vi.fn().mockResolvedValue(result);
-      const port: EvidenceReadPort = { fetchCurrent };
+      const getRawEvidence = vi.fn();
+      const port: EvidenceReadPort = { fetchCurrent, getRawEvidence };
       const positionReadPort = makePositionReadPort();
       const controller = new EvidenceController(port, positionReadPort);
 
@@ -88,7 +89,8 @@ describe('EvidenceController', () => {
 
   it('keeps the pair evidence route unscoped', async () => {
     const fetchCurrent = vi.fn().mockResolvedValue({ kind: 'block', block: fixtureBlock() });
-    const port: EvidenceReadPort = { fetchCurrent };
+    const getRawEvidence = vi.fn();
+    const port: EvidenceReadPort = { fetchCurrent, getRawEvidence };
     const positionReadPort = makePositionReadPort();
     const controller = new EvidenceController(port, positionReadPort);
 
@@ -98,7 +100,8 @@ describe('EvidenceController', () => {
 
   it('forwards an owned position as canonical position evidence scope', async () => {
     const fetchCurrent = vi.fn().mockResolvedValue({ kind: 'block', block: fixtureBlock() });
-    const port: EvidenceReadPort = { fetchCurrent };
+    const getRawEvidence = vi.fn();
+    const port: EvidenceReadPort = { fetchCurrent, getRawEvidence };
     const getPosition = vi.fn().mockResolvedValue(positionFixture);
     const positionReadPort = makePositionReadPort({ getPosition });
     const controller = new EvidenceController(port, positionReadPort);
@@ -117,7 +120,8 @@ describe('EvidenceController', () => {
 
   it('returns 404 without fetching evidence when the wallet does not own the position', async () => {
     const fetchCurrent = vi.fn().mockResolvedValue({ kind: 'block', block: fixtureBlock() });
-    const port: EvidenceReadPort = { fetchCurrent };
+    const getRawEvidence = vi.fn();
+    const port: EvidenceReadPort = { fetchCurrent, getRawEvidence };
     const getPosition = vi.fn().mockResolvedValue(null);
     const positionReadPort = makePositionReadPort({ getPosition });
     const controller = new EvidenceController(port, positionReadPort);
