@@ -47,13 +47,14 @@ export interface EvidenceScreenViewModel {
   warnings: string[];
 }
 
-const DETERMINISTIC_FAMILIES = [
-  { id: 'market_state', title: 'Market state' },
-  { id: 'price_quality', title: 'Price quality' },
-  { id: 'clmm_economics', title: 'CLMM economics' },
-  { id: 'position_state', title: 'Position state' },
-  { id: 'liquidity', title: 'Liquidity' },
-] as const;
+const DETERMINISTIC_FAMILY_TITLES = {
+  market_state: 'Market state',
+  price_quality: 'Price quality',
+  clmm_economics: 'CLMM economics',
+  position_state: 'Position state',
+  liquidity: 'Liquidity',
+  risk: 'Risk',
+} as const;
 
 const CONTEXTUAL_FAMILIES = [
   { id: 'supportResistance', title: 'Support & resistance' },
@@ -140,25 +141,16 @@ export function buildEvidenceViewModel(
   const cards: EvidenceFamilyCardViewModel[] = [];
 
   // 1. Build deterministic family cards (in canonical order)
-  for (const fam of DETERMINISTIC_FAMILIES) {
-    const features = bundle.deterministicFeatures.filter((f) => f.family === fam.id);
+  for (const [id, title] of Object.entries(DETERMINISTIC_FAMILY_TITLES)) {
+    const features = bundle.deterministicFeatures.filter((feature) => feature.family === id);
 
     if (features.length === 0) {
-      cards.push({
-        id: fam.id,
-        title: fam.title,
-        availability: 'unavailable',
-        freshnessLabel: '—',
-        stale: false,
-        rows: [{ label: 'Status', value: '—' }],
-        claims: [],
-      });
       continue;
     }
 
-    const hasInvalid = features.some((f) => f.status === 'invalid');
-    const allAvailable = features.every((f) => f.status === 'available');
-    const allUnavailable = features.every((f) => f.status === 'unavailable');
+    const hasInvalid = features.some((feature) => feature.status === 'invalid');
+    const allAvailable = features.every((feature) => feature.status === 'available');
+    const allUnavailable = features.every((feature) => feature.status === 'unavailable');
 
     let availability: EvidenceFamilyCardViewModel['availability'] = 'partial';
     if (hasInvalid) availability = 'invalid';
@@ -166,26 +158,25 @@ export function buildEvidenceViewModel(
     else if (allUnavailable) availability = 'unavailable';
 
     const isFeatureStale = features.some(
-      (f) => Boolean(f.freshUntil) && Date.parse(f.freshUntil!) <= now,
+      (feature) => Boolean(feature.freshUntil) && Date.parse(feature.freshUntil!) <= now,
     );
-
     const isStale = isBundleExpired || isFeatureStale;
 
-    const rows: EvidenceFamilyCardRowViewModel[] = features.map((f) => {
-      if (f.status === 'available') {
-        const val = (f as { value: unknown }).value;
-        const unit = (f as { unit?: unknown }).unit;
-        if (val !== null && val !== undefined) {
-          const valStr = unit ? `${String(val)} ${String(unit)}` : `${String(val)}`;
-          return { label: f.featureId, value: valStr };
+    const rows: EvidenceFamilyCardRowViewModel[] = features.map((feature) => {
+      if (feature.status === 'available') {
+        const value = (feature as { value: unknown }).value;
+        const unit = (feature as { unit?: unknown }).unit;
+        if (value !== null && value !== undefined) {
+          const valueLabel = unit ? `${String(value)} ${String(unit)}` : `${String(value)}`;
+          return { label: feature.featureId, value: valueLabel };
         }
       }
-      return { label: f.featureId, value: '—' };
+      return { label: feature.featureId, value: '—' };
     });
 
     cards.push({
-      id: fam.id,
-      title: fam.title,
+      id,
+      title,
       availability,
       freshnessLabel: isStale ? 'Stale' : 'Fresh',
       stale: isStale,
