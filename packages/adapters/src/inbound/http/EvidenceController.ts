@@ -1,17 +1,45 @@
-import { Controller, Get, Inject } from '@nestjs/common';
-import type { EvidenceReadPort, EvidenceReadResult } from '@clmm/application';
-import { EVIDENCE_READ_PORT } from './tokens.js';
+import { Controller, Get, Inject, Param, NotFoundException } from '@nestjs/common';
+import type {
+  EvidenceReadPort,
+  EvidenceReadResult,
+  SupportedPositionReadPort,
+} from '@clmm/application';
+import { makeWalletId, makePositionId } from '@clmm/domain';
+import { EVIDENCE_READ_PORT, SUPPORTED_POSITION_READ_PORT } from './tokens.js';
 
 @Controller('evidence')
 export class EvidenceController {
   constructor(
     @Inject(EVIDENCE_READ_PORT)
     private readonly evidencePort: EvidenceReadPort,
+    @Inject(SUPPORTED_POSITION_READ_PORT)
+    private readonly positionReadPort: SupportedPositionReadPort,
   ) {}
 
   @Get('sol-usdc/current')
   async getCurrent() {
     const result = await this.evidencePort.fetchCurrent();
+    return this.mapResult(result);
+  }
+
+  @Get('sol-usdc/:walletId/:positionId/current')
+  async getCurrentForPosition(
+    @Param('walletId') walletId: string,
+    @Param('positionId') positionId: string,
+  ) {
+    const position = await this.positionReadPort.getPosition(
+      makeWalletId(walletId),
+      makePositionId(positionId),
+    );
+    if (!position) {
+      throw new NotFoundException(`Position not found: ${positionId}`);
+    }
+
+    const result = await this.evidencePort.fetchCurrent({
+      walletAddress: walletId,
+      whirlpoolAddress: position.poolId,
+      positionId,
+    });
     return this.mapResult(result);
   }
 

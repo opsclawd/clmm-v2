@@ -10,6 +10,11 @@ export type EvidenceResponse = {
   unavailableReason?: EvidenceUnavailableReason | undefined;
 };
 
+export type PositionEvidenceRequest = {
+  walletAddress: string;
+  positionId: string;
+};
+
 const FETCH_TIMEOUT_MS = 10_000;
 
 const VALID_REASONS: ReadonlySet<string> = new Set<EvidenceUnavailableReason>([
@@ -35,6 +40,7 @@ function isRecord(value: unknown): value is Record<string, unknown> {
 
 export async function fetchCurrentEvidence(
   externalSignal?: AbortSignal,
+  position?: PositionEvidenceRequest,
 ): Promise<EvidenceResponse> {
   const controller = new AbortController();
   const timeoutId = setTimeout(() => controller.abort(), FETCH_TIMEOUT_MS);
@@ -49,10 +55,15 @@ export async function fetchCurrentEvidence(
   };
   externalSignal?.addEventListener('abort', onExternalAbort, { once: true });
 
+  const path = position
+    ? `/evidence/sol-usdc/${encodeURIComponent(position.walletAddress)}/${encodeURIComponent(position.positionId)}/current`
+    : '/evidence/sol-usdc/current';
+  const requestUrl = `${getBffBaseUrl()}${path}`;
+
   try {
     let response: Response;
     try {
-      response = await fetch(`${getBffBaseUrl()}/evidence/sol-usdc/current`, {
+      response = await fetch(requestUrl, {
         signal: controller.signal,
       });
     } catch (error: unknown) {

@@ -8,6 +8,7 @@ import {
   formatFeeRateLabel,
   calculateInRangeReserves,
   calculatePositionAmounts,
+  isSupportedPool,
 } from '@clmm/domain';
 import { buildPositionDisplayBounds } from './buildPositionDisplayBounds.js';
 
@@ -187,6 +188,7 @@ export async function getPositionDetail(params: {
     positionLiquidity: positionLiquidity.toString(),
     poolLiquidity: poolData.liquidity.toString(),
     poolDepthLabel,
+    evidenceEnabled: isSupportedPool(position.poolId),
   };
 
   return { kind: 'found', position, detailDto };

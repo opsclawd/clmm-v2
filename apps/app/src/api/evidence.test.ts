@@ -30,6 +30,39 @@ describe('fetchCurrentEvidence', () => {
     vi.restoreAllMocks();
   });
 
+  it('requests the unchanged pair evidence path when position scope is omitted', async () => {
+    env.EXPO_PUBLIC_BFF_BASE_URL = 'https://bff.example.test';
+    globalThis.fetch = vi.fn().mockResolvedValue({
+      ok: true,
+      status: 200,
+      json: () => Promise.resolve({ evidence: fixtureBundle() }),
+    }) as typeof fetch;
+
+    await fetchCurrentEvidence();
+    expect(fetch).toHaveBeenCalledWith(
+      'https://bff.example.test/evidence/sol-usdc/current',
+      expect.any(Object),
+    );
+  });
+
+  it('requests the encoded position evidence path when position scope is supplied', async () => {
+    env.EXPO_PUBLIC_BFF_BASE_URL = 'https://bff.example.test';
+    globalThis.fetch = vi.fn().mockResolvedValue({
+      ok: true,
+      status: 200,
+      json: () => Promise.resolve({ evidence: fixtureBundle() }),
+    }) as typeof fetch;
+
+    await fetchCurrentEvidence(undefined, {
+      walletAddress: 'wallet/address',
+      positionId: 'position/address',
+    });
+    expect(fetch).toHaveBeenCalledWith(
+      'https://bff.example.test/evidence/sol-usdc/wallet%2Faddress/position%2Faddress/current',
+      expect.any(Object),
+    );
+  });
+
   it('accepts only a canonical BFF evidence envelope', async () => {
     env.EXPO_PUBLIC_BFF_BASE_URL = 'https://bff.example.test';
     const validBundle = fixtureBundle();

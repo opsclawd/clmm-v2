@@ -107,7 +107,8 @@ export function isPositionDetailDto(value: unknown): value is PositionDetailDto 
         VALID_BREACH_DIRECTIONS.includes(
           breachDirection['kind'] as NonNullable<PositionDetailDto['breachDirection']>['kind'],
         ))) &&
-    (positionAmounts === undefined || isPositionAmounts(positionAmounts));
+    (positionAmounts === undefined || isPositionAmounts(positionAmounts)) &&
+    (value['evidenceEnabled'] === undefined || typeof value['evidenceEnabled'] === 'boolean');
 
   if (!baseValid) {
     return false;

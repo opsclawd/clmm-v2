@@ -12,11 +12,12 @@ import type { PositionListItemViewModel } from '@clmm/ui';
 import { navigateRoute } from '../../src/platform/webNavigation';
 import { positionCardObservability } from '../../src/composition';
 
+import { isSupportedPool } from '@clmm/application/public';
+
 const SR_LEVELS_STALE_TIME_MS = 5 * 60 * 1000;
 const REGIME_STALE_TIME_MS = 5 * 60 * 1000;
 const SR_THESES_STALE_TIME_MS = 5 * 60 * 1000;
 const POLICY_INSIGHTS_STALE_TIME_MS = 5 * 60 * 1000;
-const SOL_USDC_SUPPORTED_POOL_ID = 'Czfq3xZZDmsdGdUyrNLtRhGc47cXcZtLG4crryfu44zE';
 
 function deriveUniquePool(positions: { poolId: string; tokenPairLabel: string }[] | undefined): {
   poolId: string | null;
@@ -56,7 +57,7 @@ export default function PositionsRoute() {
   const { poolId, poolLabel, isMixedPools } = deriveUniquePool(positions);
 
   const policyInsightsEnabled =
-    hasLoadedPositions && !isMixedPools && poolId === SOL_USDC_SUPPORTED_POOL_ID;
+    hasLoadedPositions && !isMixedPools && poolId !== null && isSupportedPool(poolId);
 
   const srLevelsQuery = useQuery({
     queryKey: ['sr-levels-current', poolId],

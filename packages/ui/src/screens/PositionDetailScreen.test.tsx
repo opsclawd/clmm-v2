@@ -126,6 +126,31 @@ function makeSupersededPlan(): CurrentPlanDto {
 }
 
 describe('PositionDetailScreen', () => {
+  it('shows position evidence only when enabled with a navigation handler', () => {
+    const onViewEvidence = vi.fn();
+    const { rerender } = render(
+      <PositionDetailScreen
+        position={makePosition()}
+        evidenceEnabled
+        onViewEvidence={onViewEvidence}
+      />,
+    );
+    fireEvent.click(screen.getByText('View Evidence'));
+    expect(onViewEvidence).toHaveBeenCalledTimes(1);
+
+    rerender(
+      <PositionDetailScreen
+        position={makePosition()}
+        evidenceEnabled={false}
+        onViewEvidence={onViewEvidence}
+      />,
+    );
+    expect(screen.queryByText('View Evidence')).toBeNull();
+
+    rerender(<PositionDetailScreen position={makePosition()} evidenceEnabled />);
+    expect(screen.queryByText('View Evidence')).toBeNull();
+  });
+
   it('shows the preview action from the position detail payload without a separate alert prop', () => {
     const onViewPreview = vi.fn();
 

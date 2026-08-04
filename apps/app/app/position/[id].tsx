@@ -102,6 +102,14 @@ function PositionDetailRouteBody() {
       {...(position ? { position } : {})}
       {...(plan !== undefined ? { plan } : {})}
       isPlanActionPending={isPlanActionPending}
+      evidenceEnabled={position?.evidenceEnabled ?? false}
+      onViewEvidence={() =>
+        navigateRoute({
+          router,
+          path: `/evidence?positionId=${encodeURIComponent(positionId)}`,
+          method: 'push',
+        })
+      }
       onViewPreview={(resolvedTriggerId: string) =>
         navigateRoute({
           router,

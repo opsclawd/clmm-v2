@@ -99,6 +99,46 @@ describe('CurrentEvidenceAdapter', () => {
     }
   });
 
+  it('requests pair evidence without position query parameters when scope is omitted', async () => {
+    vi.mocked(fetch).mockResolvedValue(
+      new Response(JSON.stringify(wrapInEnvelope(canonicalEvidenceContextual)), { status: 200 }),
+    );
+    const adapter = new CurrentEvidenceAdapter(
+      'https://regime.example.com',
+      'secret-internal-token',
+      obs.port,
+    );
+    await adapter.fetchCurrent();
+    expect(vi.mocked(fetch).mock.calls[0]?.[0]).toBe(
+      'https://regime.example.com/v1/evidence/sol-usdc/current',
+    );
+  });
+
+  it('requests position evidence with all four encoded scope parameters when scope is provided', async () => {
+    vi.mocked(fetch).mockResolvedValue(
+      new Response(JSON.stringify(wrapInEnvelope(canonicalEvidenceContextual)), { status: 200 }),
+    );
+    const adapter = new CurrentEvidenceAdapter(
+      'https://regime.example.com',
+      'secret-internal-token',
+      obs.port,
+    );
+    await adapter.fetchCurrent({
+      walletAddress: 'wallet-address',
+      whirlpoolAddress: 'whirlpool-address',
+      positionId: 'position-id',
+    });
+
+    const calledUrl = new URL(String(vi.mocked(fetch).mock.calls[0]?.[0]));
+    expect(calledUrl.pathname).toBe('/v1/evidence/sol-usdc/current');
+    expect(Object.fromEntries(calledUrl.searchParams)).toEqual({
+      scope: 'position',
+      walletAddress: 'wallet-address',
+      whirlpoolAddress: 'whirlpool-address',
+      positionId: 'position-id',
+    });
+  });
+
   it('hits /v1/evidence/sol-usdc/current with exact header and no query params', async () => {
     vi.mocked(fetch).mockResolvedValue(
       new Response(JSON.stringify(wrapInEnvelope(canonicalEvidenceContextual)), { status: 200 }),

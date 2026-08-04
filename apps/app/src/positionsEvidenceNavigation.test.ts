@@ -10,16 +10,29 @@ function readText(relativePath: string): string {
 }
 
 describe('positions route evidence navigation', () => {
-  it('navigates to evidence without fetching it from positions', () => {
-    const routeSource = readText('../app/(tabs)/positions.tsx');
+  it('passes evidenceEnabled flag from position DTO without owning pool allowlist logic', () => {
+    const positionDetailSource = readText('../app/position/[id].tsx');
 
-    expect(routeSource).toContain('evidenceEnabled={policyInsightsEnabled}');
-    expect(routeSource).toContain('onViewEvidence={() =>');
-    expect(routeSource).toContain('navigateRoute({');
-    expect(routeSource).toContain("path: '/evidence'");
-    expect(routeSource).toContain("method: 'push'");
+    expect(positionDetailSource).not.toContain('SOL_USDC_SUPPORTED_POOL_ID');
+    expect(positionDetailSource).toContain('evidenceEnabled={position?.evidenceEnabled ?? false}');
+  });
 
-    expect(routeSource).not.toContain('fetchCurrentEvidence');
-    expect(routeSource).not.toContain("queryKey: ['evidence-current'");
+  it('navigates from position detail with only the encoded position identifier', () => {
+    const positionDetailSource = readText('../app/position/[id].tsx');
+
+    expect(positionDetailSource).toContain('onViewEvidence={() =>');
+    expect(positionDetailSource).toContain(
+      'path: `/evidence?positionId=${encodeURIComponent(positionId)}`',
+    );
+    expect(positionDetailSource).not.toContain('walletAddress=${');
+  });
+
+  it('keeps existing pair evidence navigation unscoped', () => {
+    const positionsSource = readText('../app/(tabs)/positions.tsx');
+    const positionDetailSource = readText('../app/position/[id].tsx');
+
+    expect(positionsSource).toContain("path: '/evidence'");
+    expect(positionsSource).not.toContain('fetchCurrentEvidence');
+    expect(positionDetailSource).not.toContain('fetchCurrentEvidence');
   });
 });
