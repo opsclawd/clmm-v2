@@ -80,20 +80,37 @@ describe('app shell wallet dependency guard', () => {
     expect(routeSource).toContain('observability={positionCardObservability}');
   });
 
-  it('loads evidence only from the evidence route', () => {
+  it('loads pair and position evidence under scope-isolated query keys', () => {
     const routeSource = readText('../app/evidence.tsx');
 
     expect(routeSource).toContain("import { EvidenceScreen } from '@clmm/ui'");
     expect(routeSource).toContain('fetchCurrentEvidence');
     expect(routeSource).toContain("from '../src/api/evidence'");
-    expect(routeSource).toContain('useQuery');
-    expect(routeSource).toContain("queryKey: ['evidence-current', 'SOL/USDC']");
-    expect(routeSource).toContain('fetchCurrentEvidence(signal)');
+    expect(routeSource).toContain(
+      "['evidence-current', 'SOL/USDC', 'position', walletAddress, positionId]",
+    );
+    expect(routeSource).toContain("['evidence-current', 'SOL/USDC', 'pair']");
+    expect(routeSource).toContain('fetchCurrentEvidence(signal, positionScope)');
     expect(routeSource).toContain('retry: false');
     expect(routeSource).toContain('staleTime: 5 * 60 * 1000');
     expect(routeSource).toContain('refetchOnWindowFocus: false');
     expect(routeSource).toContain('refetchOnMount: true');
     expect(routeSource).toContain('<EvidenceScreen');
     expect(routeSource).not.toContain("from '@clmm/adapters'");
+  });
+
+  it('does not fetch pair evidence when position scope lacks a wallet', () => {
+    const routeSource = readText('../app/evidence.tsx');
+
+    expect(routeSource).toContain('enabled: positionId == null || positionScope != null');
+    expect(routeSource).toContain(
+      'positionId && walletAddress ? { walletAddress, positionId } : undefined',
+    );
+  });
+
+  it('keeps pair evidence enabled without position or wallet context', () => {
+    const routeSource = readText('../app/evidence.tsx');
+
+    expect(routeSource).toContain('enabled: positionId == null || positionScope != null');
   });
 });

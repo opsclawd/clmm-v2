@@ -1,14 +1,26 @@
-import { useRouter } from 'expo-router';
+import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useQuery } from '@tanstack/react-query';
+import { useStore } from 'zustand';
 import { EvidenceScreen } from '@clmm/ui';
 import { fetchCurrentEvidence } from '../src/api/evidence';
+import { walletSessionStore } from '../src/state/walletSessionStore';
 
 export default function EvidenceRoute() {
   const router = useRouter();
+  const params = useLocalSearchParams<{ positionId?: string | string[] }>();
+  const walletAddress = useStore(walletSessionStore, (state) => state.walletAddress);
+  const positionId =
+    typeof params.positionId === 'string' && params.positionId.length > 0
+      ? params.positionId
+      : undefined;
+  const positionScope = positionId && walletAddress ? { walletAddress, positionId } : undefined;
 
   const evidenceQuery = useQuery({
-    queryKey: ['evidence-current', 'SOL/USDC'],
-    queryFn: ({ signal }) => fetchCurrentEvidence(signal),
+    queryKey: positionId
+      ? ['evidence-current', 'SOL/USDC', 'position', walletAddress, positionId]
+      : ['evidence-current', 'SOL/USDC', 'pair'],
+    queryFn: ({ signal }) => fetchCurrentEvidence(signal, positionScope),
+    enabled: positionId == null || positionScope != null,
     staleTime: 5 * 60 * 1000,
     refetchOnWindowFocus: false,
     refetchOnMount: true,
