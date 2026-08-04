@@ -7,42 +7,114 @@ import { buildEvidenceViewModel } from './EvidenceViewModel.js';
 describe('buildEvidenceViewModel', () => {
   const FIXED_NOW = Date.parse('2024-01-15T10:30:00.000Z');
 
-  it('projects all evidence families in canonical order', () => {
-    const bundle = contextualFixture as unknown as EvidenceBundle;
+  it('renders only populated deterministic families in canonical order, including risk', () => {
+    const bundle = JSON.parse(JSON.stringify(contextualFixture)) as unknown as EvidenceBundle;
+    bundle.deterministicFeatures.push({
+      featureId: 'basis_spread_bps',
+      family: 'risk',
+      featureKind: 'number',
+      status: 'available',
+      value: 64,
+      unit: 'basis_points',
+      observedAt: '2024-01-15T10:00:00.000Z',
+      freshUntil: '2024-01-15T11:00:00.000Z',
+      confidenceBps: 9500,
+      calculator: { name: 'basis-spread', version: '1.0.0' },
+      inputLineage: ['ref-price-source'],
+      warnings: [],
+    });
+
     const vm = buildEvidenceViewModel(bundle, FIXED_NOW);
 
-    expect(vm.cards).toHaveLength(10);
-    const expectedIds = [
+    expect(vm.cards.map((card) => card.id)).toEqual([
       'market_state',
-      'price_quality',
-      'clmm_economics',
-      'position_state',
       'liquidity',
+      'risk',
       'supportResistance',
       'flows',
       'derivatives',
       'events',
       'newsRegulatory',
-    ];
-    expect(vm.cards.map((card) => card.id)).toEqual(expectedIds);
+    ]);
+    expect(vm.cards.find((card) => card.id === 'risk')).toMatchObject({
+      title: 'Risk',
+      availability: 'available',
+      rows: [{ label: 'basis_spread_bps', value: '64 basis_points' }],
+    });
   });
 
-  it('preserves unavailable families instead of dropping them', () => {
+  it('omits empty deterministic families but preserves unavailable contextual families', () => {
     const bundle = deterministicOnlyFixture as unknown as EvidenceBundle;
     const vm = buildEvidenceViewModel(bundle, FIXED_NOW);
 
-    expect(vm.cards).toHaveLength(10);
+    expect(vm.cards.map((card) => card.id)).toEqual([
+      'market_state',
+      'supportResistance',
+      'flows',
+      'derivatives',
+      'events',
+      'newsRegulatory',
+    ]);
+    expect(vm.cards.find((card) => card.id === 'clmm_economics')).toBeUndefined();
+    expect(vm.cards.find((card) => card.id === 'position_state')).toBeUndefined();
 
-    const srCard = vm.cards.find((c) => c.id === 'supportResistance');
-    expect(srCard).toBeDefined();
-    expect(srCard?.availability).toBe('unavailable');
-    expect(srCard?.claims).toEqual([]);
-    expect(srCard?.rows.some((r) => r.value === '—')).toBe(true);
+    const srCard = vm.cards.find((card) => card.id === 'supportResistance');
+    expect(srCard).toMatchObject({
+      availability: 'unavailable',
+      claims: [],
+      rows: [{ label: 'Claims', value: '—' }],
+    });
+  });
 
-    const pqCard = vm.cards.find((c) => c.id === 'price_quality');
-    expect(pqCard).toBeDefined();
-    expect(pqCard?.availability).toBe('unavailable');
-    expect(pqCard?.rows.some((r) => r.value === '—')).toBe(true);
+  it('renders a populated all-unavailable risk family as unavailable', () => {
+    const bundle = JSON.parse(
+      JSON.stringify(deterministicOnlyFixture),
+    ) as unknown as EvidenceBundle;
+    bundle.deterministicFeatures = [
+      {
+        featureId: 'oi_trend_4h',
+        family: 'risk',
+        featureKind: 'number',
+        status: 'unavailable',
+        value: null,
+        unit: null,
+        observedAt: null,
+        freshUntil: null,
+        confidenceBps: 0,
+        calculator: { name: 'oi-trend', version: '1.0.0' },
+        inputLineage: [],
+        warnings: ['source unavailable'],
+      },
+      {
+        featureId: 'funding_rate_annualized',
+        family: 'risk',
+        featureKind: 'number',
+        status: 'unavailable',
+        value: null,
+        unit: null,
+        observedAt: null,
+        freshUntil: null,
+        confidenceBps: 0,
+        calculator: { name: 'funding-rate', version: '1.0.0' },
+        inputLineage: [],
+        warnings: ['source unavailable'],
+      },
+    ];
+
+    const vm = buildEvidenceViewModel(bundle, FIXED_NOW);
+    const riskCard = vm.cards.find((card) => card.id === 'risk');
+
+    expect(riskCard).toMatchObject({
+      title: 'Risk',
+      availability: 'unavailable',
+      freshnessLabel: 'Fresh',
+      stale: false,
+      rows: [
+        { label: 'oi_trend_4h', value: '—' },
+        { label: 'funding_rate_annualized', value: '—' },
+      ],
+      claims: [],
+    });
   });
 
   it('marks stale evidence from canonical timestamps', () => {
@@ -66,12 +138,14 @@ describe('buildEvidenceViewModel', () => {
   });
 
   it('does not mark card as stale when deterministic feature is unavailable or invalid unless expired', () => {
-    const bundle = deterministicOnlyFixture as unknown as EvidenceBundle;
-    // deterministicOnlyFixture has unavailable features, but they shouldn't mark it stale if freshUntil is future/unset
+    const bundle = JSON.parse(
+      JSON.stringify(deterministicOnlyFixture),
+    ) as unknown as EvidenceBundle;
+    bundle.deterministicFeatures[0]!.status = 'unavailable';
     const vm = buildEvidenceViewModel(bundle, FIXED_NOW);
-    const pqCard = vm.cards.find((c) => c.id === 'price_quality');
-    expect(pqCard?.availability).toBe('unavailable');
-    expect(pqCard?.stale).toBe(false);
+    const msCard = vm.cards.find((c) => c.id === 'market_state');
+    expect(msCard?.availability).toBe('unavailable');
+    expect(msCard?.stale).toBe(false);
   });
 
   it('renders contextual claims without deriving policy', () => {
