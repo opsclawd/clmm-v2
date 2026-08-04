@@ -144,4 +144,71 @@ describe('EvidenceScreen', () => {
     fireEvent.click(backButton);
     expect(onBack).toHaveBeenCalledTimes(1);
   });
+
+  it('renders range location and bound distances from a position-scoped bundle', () => {
+    const bundle = JSON.parse(
+      JSON.stringify(deterministicOnlyFixture),
+    ) as unknown as EvidenceBundle;
+    bundle.scope = {
+      kind: 'position',
+      network: 'solana-mainnet',
+      walletAddress: 'wallet-address',
+      whirlpoolAddress: 'whirlpool-address',
+      positionId: 'position-address',
+    };
+    bundle.deterministicFeatures.push(
+      {
+        featureId: 'feat-range_location-15256',
+        family: 'position_state',
+        featureKind: 'number',
+        status: 'available',
+        value: 0,
+        unit: 'ratio',
+        observedAt: '2024-01-15T10:00:00.000Z',
+        freshUntil: '2024-01-15T11:00:00.000Z',
+        confidenceBps: 9500,
+        calculator: { name: 'range-location', version: '1.0.0' },
+        inputLineage: ['ref-price-source'],
+        warnings: [],
+      },
+      {
+        featureId: 'feat-distance_to_lower-15257',
+        family: 'position_state',
+        featureKind: 'number',
+        status: 'available',
+        value: -17327,
+        unit: 'count',
+        observedAt: '2024-01-15T10:00:00.000Z',
+        freshUntil: '2024-01-15T11:00:00.000Z',
+        confidenceBps: 9500,
+        calculator: { name: 'distance-to-lower', version: '1.0.0' },
+        inputLineage: ['ref-price-source'],
+        warnings: [],
+      },
+      {
+        featureId: 'feat-distance_to_upper-15258',
+        family: 'position_state',
+        featureKind: 'number',
+        status: 'available',
+        value: 24161,
+        unit: 'count',
+        observedAt: '2024-01-15T10:00:00.000Z',
+        freshUntil: '2024-01-15T11:00:00.000Z',
+        confidenceBps: 9500,
+        calculator: { name: 'distance-to-upper', version: '1.0.0' },
+        inputLineage: ['ref-price-source'],
+        warnings: [],
+      },
+    );
+
+    render(<EvidenceScreen evidence={bundle} now={FIXED_NOW} />);
+
+    expect(screen.getByText('Position state')).toBeDefined();
+    expect(screen.getByText('feat-range_location-15256')).toBeDefined();
+    expect(screen.getByText('feat-distance_to_lower-15257')).toBeDefined();
+    expect(screen.getByText('feat-distance_to_upper-15258')).toBeDefined();
+    expect(screen.getByText('0 ratio')).toBeDefined();
+    expect(screen.getByText('-17327 count')).toBeDefined();
+    expect(screen.getByText('24161 count')).toBeDefined();
+  });
 });

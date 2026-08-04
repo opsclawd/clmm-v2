@@ -17,6 +17,8 @@ type Props = {
   onPlanPreview?: (planId: string) => void;
   onPlanApprove?: (planId: string, previewId: string) => void;
   isPlanActionPending?: boolean;
+  evidenceEnabled?: boolean;
+  onViewEvidence?: () => void;
 };
 
 export function PositionDetailScreen({
@@ -27,6 +29,8 @@ export function PositionDetailScreen({
   onPlanPreview,
   onPlanApprove,
   isPlanActionPending = false,
+  evidenceEnabled,
+  onViewEvidence,
 }: Props): JSX.Element {
   if (!position) {
     return (
@@ -177,6 +181,29 @@ export function PositionDetailScreen({
               </Text>
             </TouchableOpacity>
           </View>
+        ) : null}
+
+        {evidenceEnabled && onViewEvidence ? (
+          <TouchableOpacity
+            onPress={onViewEvidence}
+            style={{
+              marginTop: 16,
+              padding: 16,
+              backgroundColor: colors.primary,
+              borderRadius: 8,
+              alignItems: 'center',
+            }}
+          >
+            <Text
+              style={{
+                color: colors.background,
+                fontSize: typography.fontSize.base,
+                fontWeight: typography.fontWeight.bold,
+              }}
+            >
+              View Evidence
+            </Text>
+          </TouchableOpacity>
         ) : null}
 
         <PositionPlanCard
