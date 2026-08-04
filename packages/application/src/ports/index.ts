@@ -361,8 +361,15 @@ export type EvidenceReadResult =
   | { kind: 'malformed' }
   | { kind: 'upstream-error' };
 
+export type RawEvidenceReadResult =
+  | { readonly kind: 'ok'; readonly payload: unknown }
+  | { readonly kind: 'not-found' }
+  | { readonly kind: 'config-error' }
+  | { readonly kind: 'upstream-error'; readonly status?: number };
+
 export interface EvidenceReadPort {
   fetchCurrent(scope?: PositionEvidenceScope): Promise<EvidenceReadResult>;
+  getRawEvidence(runId: string): Promise<RawEvidenceReadResult>;
 }
 
 // --- Regime plan transport port (application-owned; RegimePlanAdapter implements) ---
