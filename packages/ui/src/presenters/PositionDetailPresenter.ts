@@ -45,6 +45,7 @@ function normalizePositionDetailDto(
     ...(dto.triggerId ? { triggerId: dto.triggerId } : {}),
     ...(dto.breachDirection ? { breachDirection: dto.breachDirection } : {}),
     ...(dto.positionAmounts ? { positionAmounts: dto.positionAmounts } : {}),
+    ...(dto.evidenceEnabled !== undefined ? { evidenceEnabled: dto.evidenceEnabled } : {}),
   };
 }
 

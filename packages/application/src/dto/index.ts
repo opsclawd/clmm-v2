@@ -91,6 +91,7 @@ export type PositionDetailDto = PositionSummaryDto & {
     amountB: TokenAmountValue;
     totalUsd: number;
   };
+  evidenceEnabled?: boolean;
 };
 
 // Preview DTOs

@@ -10,25 +10,11 @@ function readText(relativePath: string): string {
 }
 
 describe('positions route evidence navigation', () => {
-  it('enables scoped evidence navigation for the supported position pool', () => {
+  it('passes evidenceEnabled flag from position DTO without owning pool allowlist logic', () => {
     const positionDetailSource = readText('../app/position/[id].tsx');
 
-    expect(positionDetailSource).toContain(
-      "const SOL_USDC_SUPPORTED_POOL_ID = 'Czfq3xZZDmsdGdUyrNLtRhGc47cXcZtLG4crryfu44zE';",
-    );
-    expect(positionDetailSource).toContain(
-      'const evidenceEnabled = position?.poolId === SOL_USDC_SUPPORTED_POOL_ID;',
-    );
-    expect(positionDetailSource).toContain('evidenceEnabled={evidenceEnabled}');
-  });
-
-  it('does not enable evidence navigation for an unsupported position pool', () => {
-    const positionDetailSource = readText('../app/position/[id].tsx');
-
-    expect(positionDetailSource).toContain(
-      'const evidenceEnabled = position?.poolId === SOL_USDC_SUPPORTED_POOL_ID;',
-    );
-    expect(positionDetailSource).toContain('evidenceEnabled={evidenceEnabled}');
+    expect(positionDetailSource).not.toContain('SOL_USDC_SUPPORTED_POOL_ID');
+    expect(positionDetailSource).toContain('evidenceEnabled={position?.evidenceEnabled ?? false}');
   });
 
   it('navigates from position detail with only the encoded position identifier', () => {

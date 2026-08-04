@@ -14,8 +14,6 @@ import { navigateRoute } from '../../src/platform/webNavigation';
 import { walletSessionStore } from '../../src/state/walletSessionStore';
 import { RequireWallet } from '../../src/wallet-boot/RequireWallet';
 
-const SOL_USDC_SUPPORTED_POOL_ID = 'Czfq3xZZDmsdGdUyrNLtRhGc47cXcZtLG4crryfu44zE';
-
 export default function PositionDetailRoute() {
   return (
     <RequireWallet>
@@ -98,14 +96,13 @@ function PositionDetailRouteBody() {
   const plan = planQuery.data;
   const isPlanActionPending =
     acknowledgeMutation.isPending || previewMutation.isPending || approveMutation.isPending;
-  const evidenceEnabled = position?.poolId === SOL_USDC_SUPPORTED_POOL_ID;
 
   return (
     <PositionDetailScreen
       {...(position ? { position } : {})}
       {...(plan !== undefined ? { plan } : {})}
       isPlanActionPending={isPlanActionPending}
-      evidenceEnabled={evidenceEnabled}
+      evidenceEnabled={position?.evidenceEnabled ?? false}
       onViewEvidence={() =>
         navigateRoute({
           router,

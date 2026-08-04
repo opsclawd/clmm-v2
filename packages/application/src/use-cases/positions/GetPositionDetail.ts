@@ -16,6 +16,8 @@ export type GetPositionDetailResult =
   | { kind: 'not-found' }
   | { kind: 'cannot-build-supported-detail-dto' };
 
+const SOL_USDC_SUPPORTED_POOL_ID = 'Czfq3xZZDmsdGdUyrNLtRhGc47cXcZtLG4crryfu44zE';
+
 export async function getPositionDetail(params: {
   walletId: WalletId;
   positionId: PositionId;
@@ -187,6 +189,7 @@ export async function getPositionDetail(params: {
     positionLiquidity: positionLiquidity.toString(),
     poolLiquidity: poolData.liquidity.toString(),
     poolDepthLabel,
+    evidenceEnabled: position.poolId === SOL_USDC_SUPPORTED_POOL_ID,
   };
 
   return { kind: 'found', position, detailDto };

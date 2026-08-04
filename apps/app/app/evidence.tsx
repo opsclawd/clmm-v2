@@ -5,14 +5,29 @@ import { EvidenceScreen } from '@clmm/ui';
 import { fetchCurrentEvidence } from '../src/api/evidence';
 import { walletSessionStore } from '../src/state/walletSessionStore';
 
+import { RequireWallet } from '../src/wallet-boot/RequireWallet';
+
 export default function EvidenceRoute() {
-  const router = useRouter();
   const params = useLocalSearchParams<{ positionId?: string | string[] }>();
-  const walletAddress = useStore(walletSessionStore, (state) => state.walletAddress);
   const positionId =
     typeof params.positionId === 'string' && params.positionId.length > 0
       ? params.positionId
       : undefined;
+
+  if (positionId) {
+    return (
+      <RequireWallet>
+        <EvidenceRouteBody positionId={positionId} />
+      </RequireWallet>
+    );
+  }
+
+  return <EvidenceRouteBody />;
+}
+
+function EvidenceRouteBody({ positionId }: { positionId?: string }) {
+  const router = useRouter();
+  const walletAddress = useStore(walletSessionStore, (state) => state.walletAddress);
   const positionScope = positionId && walletAddress ? { walletAddress, positionId } : undefined;
 
   const evidenceQuery = useQuery({

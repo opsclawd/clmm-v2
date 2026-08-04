@@ -17,7 +17,7 @@ type Props = {
   onPlanPreview?: (planId: string) => void;
   onPlanApprove?: (planId: string, previewId: string) => void;
   isPlanActionPending?: boolean;
-  evidenceEnabled?: boolean;
+  evidenceEnabled?: boolean | undefined;
   onViewEvidence?: () => void;
 };
 
