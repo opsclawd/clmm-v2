@@ -22,7 +22,6 @@ import type {
   TriggerRepository,
   PricePort,
   ClockPort,
-  EvidenceReadPort,
 } from '@clmm/application';
 import type { PositionDetail } from '@clmm/domain';
 
@@ -55,11 +54,6 @@ function detailFor(positionIdStr: string, poolIdStr: string): PositionDetail {
 
 const sampleSrPort: SrLevelsReadPort = { fetchCurrent: vi.fn().mockResolvedValue(null) };
 
-const sampleEvidencePort: EvidenceReadPort = {
-  fetchCurrent: vi.fn().mockResolvedValue(null),
-  getRawEvidence: vi.fn().mockResolvedValue({ kind: 'not-found' }),
-};
-
 const samplePort = (positions: ReturnType<typeof positionInPool>[]) =>
   ({
     listSupportedPositions: async () => positions,
@@ -78,7 +72,6 @@ function makeController(overrides?: {
   pricePort?: PricePort;
   srLevelsReadPort?: SrLevelsReadPort;
   allowlist?: Map<string, { symbol: string; source: string }>;
-  evidenceReadPort?: EvidenceReadPort;
 }) {
   return new InsightsDataController(
     overrides?.positionReadPort ?? samplePort(overrides?.positions ?? []),
@@ -87,7 +80,6 @@ function makeController(overrides?: {
     overrides?.srLevelsReadPort ?? sampleSrPort,
     overrides?.allowlist ?? ALLOWLIST,
     fixedClock,
-    overrides?.evidenceReadPort ?? sampleEvidencePort,
   );
 }
 
@@ -102,7 +94,6 @@ describe('InsightsDataController', () => {
           sampleSrPort,
           new Map(),
           fixedClock,
-          sampleEvidencePort,
         ),
     ).toThrow(/exactly 1 allowlist entry/);
   });
@@ -304,109 +295,6 @@ describe('InsightsDataController', () => {
         code: 'invalid_wallet_id',
         retryable: false,
       });
-    }
-  });
-
-  it('GET raw evidence returns the exact successful payload without an envelope', async () => {
-    const payload = { schema: 'v1', runId: 'run-123', telemetry: { nested: true } };
-    const getRawEvidence = vi.fn().mockResolvedValue({ kind: 'ok', payload });
-    const evidenceReadPort: EvidenceReadPort = {
-      fetchCurrent: vi.fn(),
-      getRawEvidence,
-    };
-    const controller = makeController({ evidenceReadPort });
-    const result = await controller.getRawEvidence('run-123');
-    expect(result).toBe(payload);
-  });
-
-  it('GET raw evidence delegates the runId exactly once through EvidenceReadPort', async () => {
-    const getRawEvidence = vi.fn().mockResolvedValue({ kind: 'ok', payload: { ok: true } });
-    const evidenceReadPort: EvidenceReadPort = {
-      fetchCurrent: vi.fn(),
-      getRawEvidence,
-    };
-    const controller = makeController({ evidenceReadPort });
-    await controller.getRawEvidence('run-123');
-    expect(getRawEvidence).toHaveBeenCalledTimes(1);
-    expect(getRawEvidence).toHaveBeenCalledWith('run-123');
-  });
-
-  it('GET raw evidence remains covered by InsightsApiKeyGuard', () => {
-    const guards = (Reflect.getMetadata('__guards__', InsightsDataController) as unknown[]) ?? [];
-    expect(guards).toContain(InsightsApiKeyGuard);
-  });
-
-  it('GET raw evidence forwards not-found as HTTP 404', async () => {
-    const evidenceReadPort: EvidenceReadPort = {
-      fetchCurrent: vi.fn(),
-      getRawEvidence: vi.fn().mockResolvedValue({ kind: 'not-found' }),
-    };
-    const controller = makeController({ evidenceReadPort });
-    try {
-      await controller.getRawEvidence('run-missing');
-      throw new Error('should have thrown');
-    } catch (err) {
-      expect(err).toBeInstanceOf(HttpException);
-      const httpErr = err as HttpException;
-      expect(httpErr.getStatus()).toBe(HttpStatus.NOT_FOUND);
-      const response = JSON.stringify(httpErr.getResponse());
-      expect(response).not.toContain('X-CLMM-Internal-Token');
-      expect(response).not.toContain('secret');
-    }
-  });
-
-  it('GET raw evidence maps upstream error to HTTP 502 Bad Gateway without status code bleed', async () => {
-    const evidenceReadPort: EvidenceReadPort = {
-      fetchCurrent: vi.fn(),
-      getRawEvidence: vi.fn().mockResolvedValue({ kind: 'upstream-error', status: 401 }),
-    };
-    const controller = makeController({ evidenceReadPort });
-    try {
-      await controller.getRawEvidence('run-401');
-      throw new Error('should have thrown');
-    } catch (err) {
-      expect(err).toBeInstanceOf(HttpException);
-      const httpErr = err as HttpException;
-      expect(httpErr.getStatus()).toBe(HttpStatus.BAD_GATEWAY);
-      const response = JSON.stringify(httpErr.getResponse());
-      expect(response).not.toContain('X-CLMM-Internal-Token');
-      expect(response).not.toContain('secret');
-    }
-  });
-
-  it('GET raw evidence maps configuration failures to HTTP 503 and transport failures to HTTP 502', async () => {
-    const configErrPort: EvidenceReadPort = {
-      fetchCurrent: vi.fn(),
-      getRawEvidence: vi.fn().mockResolvedValue({ kind: 'config-error' }),
-    };
-    const controller1 = makeController({ evidenceReadPort: configErrPort });
-    try {
-      await controller1.getRawEvidence('run-config');
-      throw new Error('should have thrown');
-    } catch (err) {
-      expect(err).toBeInstanceOf(HttpException);
-      const httpErr = err as HttpException;
-      expect(httpErr.getStatus()).toBe(HttpStatus.SERVICE_UNAVAILABLE);
-      const response = JSON.stringify(httpErr.getResponse());
-      expect(response).not.toContain('X-CLMM-Internal-Token');
-      expect(response).not.toContain('secret');
-    }
-
-    const transportErrPort: EvidenceReadPort = {
-      fetchCurrent: vi.fn(),
-      getRawEvidence: vi.fn().mockResolvedValue({ kind: 'upstream-error' }),
-    };
-    const controller2 = makeController({ evidenceReadPort: transportErrPort });
-    try {
-      await controller2.getRawEvidence('run-transport');
-      throw new Error('should have thrown');
-    } catch (err) {
-      expect(err).toBeInstanceOf(HttpException);
-      const httpErr = err as HttpException;
-      expect(httpErr.getStatus()).toBe(HttpStatus.BAD_GATEWAY);
-      const response = JSON.stringify(httpErr.getResponse());
-      expect(response).not.toContain('X-CLMM-Internal-Token');
-      expect(response).not.toContain('secret');
     }
   });
 });

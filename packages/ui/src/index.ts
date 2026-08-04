@@ -42,6 +42,8 @@ export { PolicyInsightsSection } from './components/PolicyInsightsSection.js';
 export { PositionPlanCard } from './components/PositionPlanCard.js';
 export { EvidenceFamilyCard } from './components/EvidenceFamilyCard.js';
 export type { EvidenceFamilyCardProps } from './components/EvidenceFamilyCard.js';
+export { RawTelemetryAccordion } from './components/RawTelemetryAccordion.js';
+export type { RawTelemetryAccordionProps } from './components/RawTelemetryAccordion.js';
 
 // Wallet connection utils
 export {

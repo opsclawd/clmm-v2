@@ -211,4 +211,61 @@ describe('EvidenceScreen', () => {
     expect(screen.getByText('-17327 count')).toBeDefined();
     expect(screen.getByText('24161 count')).toBeDefined();
   });
+
+  it('renders the raw telemetry slot after all evidence family cards in the canonical state', () => {
+    const bundle = JSON.parse(
+      JSON.stringify(deterministicOnlyFixture),
+    ) as unknown as EvidenceBundle;
+    const rawTelemetrySlot = <div data-testid="raw-telemetry-slot">raw telemetry</div>;
+    render(
+      <EvidenceScreen evidence={bundle} now={FIXED_NOW} rawTelemetrySlot={rawTelemetrySlot} />,
+    );
+
+    const slot = screen.getByTestId('raw-telemetry-slot');
+    const familyCards = screen.getAllByTestId(/^evidence-family-card-/);
+    expect(familyCards.length).toBeGreaterThan(0);
+    expect(
+      (familyCards.at(-1)?.compareDocumentPosition(slot) ?? 0) & Node.DOCUMENT_POSITION_FOLLOWING,
+    ).toBeTruthy();
+  });
+
+  it('does not render a raw telemetry slot in loading error or unavailable screen states', () => {
+    const rawTelemetrySlot = <div data-testid="raw-telemetry-slot">raw telemetry</div>;
+
+    // Loading state
+    const { rerender } = render(
+      <EvidenceScreen
+        isLoading={true}
+        evidence={null}
+        now={FIXED_NOW}
+        rawTelemetrySlot={rawTelemetrySlot}
+      />,
+    );
+    expect(screen.queryByTestId('raw-telemetry-slot')).toBeNull();
+
+    // Transport error state
+    rerender(
+      <EvidenceScreen
+        isLoading={false}
+        isError={true}
+        evidence={null}
+        now={FIXED_NOW}
+        rawTelemetrySlot={rawTelemetrySlot}
+      />,
+    );
+    expect(screen.queryByTestId('raw-telemetry-slot')).toBeNull();
+
+    // Unavailable state
+    rerender(
+      <EvidenceScreen
+        isLoading={false}
+        isError={false}
+        unavailableReason="not-found"
+        evidence={null}
+        now={FIXED_NOW}
+        rawTelemetrySlot={rawTelemetrySlot}
+      />,
+    );
+    expect(screen.queryByTestId('raw-telemetry-slot')).toBeNull();
+  });
 });

@@ -110,3 +110,31 @@ export async function fetchCurrentEvidence(
     externalSignal?.removeEventListener('abort', onExternalAbort);
   }
 }
+
+export async function fetchRawEvidence(
+  runId: string,
+  externalSignal?: AbortSignal,
+): Promise<unknown> {
+  const requestUrl = `${getBffBaseUrl()}/evidence/sol-usdc/raw/${encodeURIComponent(runId)}`;
+  let response: Response;
+
+  try {
+    response = await fetch(requestUrl, externalSignal ? { signal: externalSignal } : {});
+  } catch (error: unknown) {
+    if (isAbortError(error)) {
+      throw new Error('Could not load raw evidence: request aborted');
+    }
+    throw new Error('Could not load raw evidence: network error');
+  }
+
+  if (response.status === 404) return null;
+  if (!response.ok) {
+    throw new Error(`Could not load raw evidence: HTTP ${response.status}`);
+  }
+
+  try {
+    return (await response.json()) as unknown;
+  } catch {
+    throw new Error('Could not load raw evidence: response body was not valid JSON');
+  }
+}
