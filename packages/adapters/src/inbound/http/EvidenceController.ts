@@ -1,4 +1,13 @@
-import { Controller, Get, Inject, Param, NotFoundException } from '@nestjs/common';
+import {
+  Controller,
+  Get,
+  HttpException,
+  HttpStatus,
+  Inject,
+  Param,
+  NotFoundException,
+} from '@nestjs/common';
+import { getSolUsdcRawEvidence } from '@clmm/application';
 import type {
   EvidenceReadPort,
   EvidenceReadResult,
@@ -41,6 +50,28 @@ export class EvidenceController {
       positionId,
     });
     return this.mapResult(result);
+  }
+
+  @Get('sol-usdc/raw/:runId')
+  async getRawEvidence(@Param('runId') runId: string) {
+    const result = await getSolUsdcRawEvidence({
+      runId,
+      evidenceReadPort: this.evidencePort,
+    });
+
+    switch (result.kind) {
+      case 'ok':
+        return result.payload;
+      case 'not-found':
+        throw new NotFoundException(`Raw evidence not found for runId: ${runId}`);
+      case 'config-error':
+        throw new HttpException(
+          'Raw evidence upstream is unavailable',
+          HttpStatus.SERVICE_UNAVAILABLE,
+        );
+      case 'upstream-error':
+        throw new HttpException('Upstream error fetching raw evidence', HttpStatus.BAD_GATEWAY);
+    }
   }
 
   private mapResult(result: EvidenceReadResult) {

@@ -240,7 +240,7 @@ describe('fetchRawEvidence', () => {
 
     await expect(fetchRawEvidence('run/with space')).resolves.toBe(payload);
     expect(fetch).toHaveBeenCalledWith(
-      'https://bff.example.test/insights/sol-usdc/evidence/raw/run%2Fwith%20space',
+      'https://bff.example.test/evidence/sol-usdc/raw/run%2Fwith%20space',
       {},
     );
   });
@@ -312,9 +312,8 @@ describe('fetchRawEvidence', () => {
       'Could not load raw evidence: request aborted',
     );
 
-    expect(fetch).toHaveBeenCalledWith(
-      'https://bff.example.test/insights/sol-usdc/evidence/raw/run-123',
-      { signal: controller.signal },
-    );
+    expect(fetch).toHaveBeenCalledWith('https://bff.example.test/evidence/sol-usdc/raw/run-123', {
+      signal: controller.signal,
+    });
   });
 });

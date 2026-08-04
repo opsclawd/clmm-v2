@@ -146,4 +146,34 @@ describe('RawTelemetryContainer', () => {
     expect(screen.getByText('Raw telemetry could not be loaded.')).toBeDefined();
     expect(fetchRawEvidenceMock).toHaveBeenCalledTimes(1);
   });
+
+  it('does not replace cached data with a loading spinner during background refetch', async () => {
+    const fetchRawEvidenceMock = vi.mocked(fetchRawEvidence);
+    let resolveRefetch: ((value: unknown) => void) | undefined;
+    fetchRawEvidenceMock.mockResolvedValueOnce({ slot: 42 }).mockImplementationOnce(
+      () =>
+        new Promise((resolve) => {
+          resolveRefetch = resolve;
+        }),
+    );
+
+    render(
+      <QueryClientProvider client={queryClient}>
+        <RawTelemetryContainer runId="run-123" />
+      </QueryClientProvider>,
+    );
+
+    fireEvent.click(screen.getByTestId('raw-telemetry-toggle'));
+    await waitFor(() => expect(screen.getByTestId('raw-telemetry-json')).toBeDefined());
+
+    void queryClient.invalidateQueries({ queryKey: ['raw-telemetry', 'run-123'] });
+
+    expect(screen.queryByTestId('raw-telemetry-loading')).toBeNull();
+    expect(screen.getByTestId('raw-telemetry-json').textContent).toContain('"slot": 42');
+
+    resolveRefetch?.({ slot: 43 });
+    await waitFor(() =>
+      expect(screen.getByTestId('raw-telemetry-json').textContent).toContain('"slot": 43'),
+    );
+  });
 });

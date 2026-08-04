@@ -16,7 +16,7 @@ export function RawTelemetryContainer({ runId }: { readonly runId: string }): Re
     <RawTelemetryAccordion
       isExpanded={isExpanded}
       onToggle={() => setIsExpanded((current) => !current)}
-      isLoading={isExpanded && rawTelemetryQuery.isFetching}
+      isLoading={isExpanded && rawTelemetryQuery.isLoading}
       isError={isExpanded && rawTelemetryQuery.isError}
       data={rawTelemetryQuery.data ?? null}
     />

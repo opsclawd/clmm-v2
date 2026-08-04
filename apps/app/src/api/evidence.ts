@@ -115,7 +115,7 @@ export async function fetchRawEvidence(
   runId: string,
   externalSignal?: AbortSignal,
 ): Promise<unknown> {
-  const requestUrl = `${getBffBaseUrl()}/insights/sol-usdc/evidence/raw/${encodeURIComponent(runId)}`;
+  const requestUrl = `${getBffBaseUrl()}/evidence/sol-usdc/raw/${encodeURIComponent(runId)}`;
   let response: Response;
 
   try {
