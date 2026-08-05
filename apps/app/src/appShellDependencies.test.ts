@@ -113,14 +113,4 @@ describe('app shell wallet dependency guard', () => {
 
     expect(routeSource).toContain('enabled: positionId == null || positionScope != null');
   });
-
-  it('wires the current evidence runId into a keyed raw telemetry slot', () => {
-    const routeSource = readText('../app/evidence.tsx');
-
-    expect(routeSource).toContain('RawTelemetryContainer');
-    expect(routeSource).toContain('rawTelemetrySlot=');
-    expect(routeSource).toContain('key={evidence.runId}');
-    expect(routeSource).toContain('runId={evidence.runId}');
-    expect(routeSource).not.toContain("from '@clmm/adapters'");
-  });
 });

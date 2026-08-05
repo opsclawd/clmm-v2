@@ -13,7 +13,6 @@ export interface EvidenceScreenProps {
   now: number;
   pair?: string;
   onBack?: () => void;
-  rawTelemetrySlot?: React.ReactNode;
 }
 
 function unavailableCopy(reason: EvidenceUnavailableReason): string {
@@ -41,7 +40,6 @@ export function EvidenceScreen({
   now,
   pair,
   onBack,
-  rawTelemetrySlot,
 }: EvidenceScreenProps): JSX.Element {
   // 1. Loading state (when loading and no evidence loaded yet)
   if (isLoading && evidence == null) {
@@ -445,7 +443,6 @@ export function EvidenceScreen({
           <EvidenceFamilyCard key={card.id} card={card} />
         ))}
       </View>
-      {rawTelemetrySlot}
     </ScrollView>
   );
 }
