@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { fetchCurrentEvidence, fetchRawEvidence } from './evidence.js';
+import { fetchCurrentEvidence } from './evidence.js';
 import canonicalEvidenceFixture from '../../../../schemas/regime-engine/evidence-bundle.v1/fixtures/valid/deterministic-only.json';
 
 type ExpoPublicEnv = NodeJS.ProcessEnv & {
@@ -218,102 +218,5 @@ describe('fetchCurrentEvidence', () => {
     expect(inFlightError).toBeInstanceOf(Error);
     expect((inFlightError as Error).message).toContain('request timed out');
     expect(inFlightSignal?.aborted).toBe(true);
-  });
-});
-
-describe('fetchRawEvidence', () => {
-  afterEach(() => {
-    globalThis.fetch = ORIGINAL_FETCH;
-    restoreBffBaseUrl();
-    vi.unstubAllGlobals();
-    vi.restoreAllMocks();
-  });
-
-  it('requests the encoded raw evidence endpoint and returns its JSON payload unchanged', async () => {
-    env.EXPO_PUBLIC_BFF_BASE_URL = 'https://bff.example.test';
-    const payload = { schema: 'v1', runId: 'run/with space', telemetry: { nested: true } };
-    globalThis.fetch = vi.fn().mockResolvedValue({
-      ok: true,
-      status: 200,
-      json: () => Promise.resolve(payload),
-    }) as typeof fetch;
-
-    await expect(fetchRawEvidence('run/with space')).resolves.toBe(payload);
-    expect(fetch).toHaveBeenCalledWith(
-      'https://bff.example.test/evidence/sol-usdc/raw/run%2Fwith%20space',
-      {},
-    );
-  });
-
-  it('returns null when raw evidence is not found', async () => {
-    env.EXPO_PUBLIC_BFF_BASE_URL = 'https://bff.example.test';
-    globalThis.fetch = vi.fn().mockResolvedValue({
-      ok: false,
-      status: 404,
-      statusText: 'Not Found',
-    }) as typeof fetch;
-
-    await expect(fetchRawEvidence('run-123')).resolves.toBeNull();
-  });
-
-  it('returns null when the raw evidence endpoint succeeds with JSON null', async () => {
-    env.EXPO_PUBLIC_BFF_BASE_URL = 'https://bff.example.test';
-    globalThis.fetch = vi.fn().mockResolvedValue({
-      ok: true,
-      status: 200,
-      json: () => Promise.resolve(null),
-    }) as typeof fetch;
-
-    await expect(fetchRawEvidence('run-123')).resolves.toBeNull();
-  });
-
-  it('rejects non-404 HTTP failures and malformed JSON', async () => {
-    env.EXPO_PUBLIC_BFF_BASE_URL = 'https://bff.example.test';
-
-    globalThis.fetch = vi.fn().mockResolvedValue({
-      ok: false,
-      status: 502,
-      statusText: 'Bad Gateway',
-    }) as typeof fetch;
-
-    await expect(fetchRawEvidence('run-123')).rejects.toThrow(
-      'Could not load raw evidence: HTTP 502',
-    );
-
-    globalThis.fetch = vi.fn().mockResolvedValue({
-      ok: true,
-      status: 200,
-      json: () => Promise.reject(new SyntaxError('Unexpected token')),
-    }) as typeof fetch;
-
-    await expect(fetchRawEvidence('run-123')).rejects.toThrow(
-      'Could not load raw evidence: response body was not valid JSON',
-    );
-  });
-
-  it('passes the caller abort signal to the raw evidence request', async () => {
-    env.EXPO_PUBLIC_BFF_BASE_URL = 'https://bff.example.test';
-    const controller = new AbortController();
-
-    globalThis.fetch = vi.fn().mockImplementation((_url: string, init?: RequestInit) => {
-      if (init?.signal?.aborted) {
-        const err = new DOMException('The operation was aborted', 'AbortError');
-        return Promise.reject(err);
-      }
-      return Promise.resolve({
-        ok: true,
-        status: 200,
-        json: () => Promise.resolve({ success: true }),
-      });
-    }) as typeof fetch;
-
-    controller.abort();
-    await expect(fetchRawEvidence('run-123', controller.signal)).rejects.toThrow(
-      'Could not load raw evidence: request aborted',
-    );
-
-    expect(fetch).toHaveBeenCalledWith('https://bff.example.test/evidence/sol-usdc/raw/run-123', {
-      signal: controller.signal,
-    });
   });
 });

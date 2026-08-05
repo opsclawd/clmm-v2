@@ -4,7 +4,6 @@ import { useStore } from 'zustand';
 import { EvidenceScreen } from '@clmm/ui';
 import { fetchCurrentEvidence } from '../src/api/evidence';
 import { walletSessionStore } from '../src/state/walletSessionStore';
-import { RawTelemetryContainer } from '../src/evidence/RawTelemetryContainer';
 
 import { RequireWallet } from '../src/wallet-boot/RequireWallet';
 
@@ -54,9 +53,6 @@ function EvidenceRouteBody({ positionId }: { positionId?: string }) {
       now={Date.now()}
       pair="SOL/USDC"
       onBack={() => router.back()}
-      rawTelemetrySlot={
-        evidence ? <RawTelemetryContainer key={evidence.runId} runId={evidence.runId} /> : null
-      }
     />
   );
 }

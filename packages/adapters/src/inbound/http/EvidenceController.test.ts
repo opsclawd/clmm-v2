@@ -1,5 +1,5 @@
 import { describe, it, expect, vi } from 'vitest';
-import { HttpException, HttpStatus, NotFoundException } from '@nestjs/common';
+import { NotFoundException } from '@nestjs/common';
 import { EvidenceController } from './EvidenceController.js';
 import type {
   EvidenceReadPort,
@@ -74,8 +74,7 @@ describe('EvidenceController', () => {
 
     for (const { result, expected } of cases) {
       const fetchCurrent = vi.fn().mockResolvedValue(result);
-      const getRawEvidence = vi.fn();
-      const port: EvidenceReadPort = { fetchCurrent, getRawEvidence };
+      const port: EvidenceReadPort = { fetchCurrent };
       const positionReadPort = makePositionReadPort();
       const controller = new EvidenceController(port, positionReadPort);
 
@@ -89,8 +88,7 @@ describe('EvidenceController', () => {
 
   it('keeps the pair evidence route unscoped', async () => {
     const fetchCurrent = vi.fn().mockResolvedValue({ kind: 'block', block: fixtureBlock() });
-    const getRawEvidence = vi.fn();
-    const port: EvidenceReadPort = { fetchCurrent, getRawEvidence };
+    const port: EvidenceReadPort = { fetchCurrent };
     const positionReadPort = makePositionReadPort();
     const controller = new EvidenceController(port, positionReadPort);
 
@@ -100,8 +98,7 @@ describe('EvidenceController', () => {
 
   it('forwards an owned position as canonical position evidence scope', async () => {
     const fetchCurrent = vi.fn().mockResolvedValue({ kind: 'block', block: fixtureBlock() });
-    const getRawEvidence = vi.fn();
-    const port: EvidenceReadPort = { fetchCurrent, getRawEvidence };
+    const port: EvidenceReadPort = { fetchCurrent };
     const getPosition = vi.fn().mockResolvedValue(positionFixture);
     const positionReadPort = makePositionReadPort({ getPosition });
     const controller = new EvidenceController(port, positionReadPort);
@@ -120,8 +117,7 @@ describe('EvidenceController', () => {
 
   it('returns 404 without fetching evidence when the wallet does not own the position', async () => {
     const fetchCurrent = vi.fn().mockResolvedValue({ kind: 'block', block: fixtureBlock() });
-    const getRawEvidence = vi.fn();
-    const port: EvidenceReadPort = { fetchCurrent, getRawEvidence };
+    const port: EvidenceReadPort = { fetchCurrent };
     const getPosition = vi.fn().mockResolvedValue(null);
     const positionReadPort = makePositionReadPort({ getPosition });
     const controller = new EvidenceController(port, positionReadPort);
@@ -130,86 +126,5 @@ describe('EvidenceController', () => {
       NotFoundException,
     );
     expect(fetchCurrent).not.toHaveBeenCalled();
-  });
-
-  it('GET raw evidence returns the exact successful payload without an envelope', async () => {
-    const payload = { schema: 'v1', runId: 'run-123', telemetry: { nested: true } };
-    const getRawEvidence = vi.fn().mockResolvedValue({ kind: 'ok', payload });
-    const port: EvidenceReadPort = {
-      fetchCurrent: vi.fn(),
-      getRawEvidence,
-    };
-    const controller = new EvidenceController(port, makePositionReadPort());
-    const result = await controller.getRawEvidence('run-123');
-    expect(result).toBe(payload);
-  });
-
-  it('GET raw evidence delegates the runId exactly once through EvidenceReadPort', async () => {
-    const getRawEvidence = vi.fn().mockResolvedValue({ kind: 'ok', payload: { ok: true } });
-    const port: EvidenceReadPort = {
-      fetchCurrent: vi.fn(),
-      getRawEvidence,
-    };
-    const controller = new EvidenceController(port, makePositionReadPort());
-    await controller.getRawEvidence('run-123');
-    expect(getRawEvidence).toHaveBeenCalledTimes(1);
-    expect(getRawEvidence).toHaveBeenCalledWith('run-123');
-  });
-
-  it('GET raw evidence forwards not-found as HTTP 404', async () => {
-    const port: EvidenceReadPort = {
-      fetchCurrent: vi.fn(),
-      getRawEvidence: vi.fn().mockResolvedValue({ kind: 'not-found' }),
-    };
-    const controller = new EvidenceController(port, makePositionReadPort());
-    try {
-      await controller.getRawEvidence('run-missing');
-      throw new Error('should have thrown');
-    } catch (err) {
-      expect(err).toBeInstanceOf(HttpException);
-      const httpErr = err as HttpException;
-      expect(httpErr.getStatus()).toBe(HttpStatus.NOT_FOUND);
-      const response = JSON.stringify(httpErr.getResponse());
-      expect(response).not.toContain('X-CLMM-Internal-Token');
-      expect(response).not.toContain('secret');
-    }
-  });
-
-  it('GET raw evidence maps upstream error to HTTP 502 Bad Gateway without status code bleed', async () => {
-    const port: EvidenceReadPort = {
-      fetchCurrent: vi.fn(),
-      getRawEvidence: vi.fn().mockResolvedValue({ kind: 'upstream-error', status: 401 }),
-    };
-    const controller = new EvidenceController(port, makePositionReadPort());
-    try {
-      await controller.getRawEvidence('run-401');
-      throw new Error('should have thrown');
-    } catch (err) {
-      expect(err).toBeInstanceOf(HttpException);
-      const httpErr = err as HttpException;
-      expect(httpErr.getStatus()).toBe(HttpStatus.BAD_GATEWAY);
-      const response = JSON.stringify(httpErr.getResponse());
-      expect(response).not.toContain('X-CLMM-Internal-Token');
-      expect(response).not.toContain('secret');
-    }
-  });
-
-  it('GET raw evidence maps configuration failures to HTTP 503 and transport failures to HTTP 502', async () => {
-    const configErrPort: EvidenceReadPort = {
-      fetchCurrent: vi.fn(),
-      getRawEvidence: vi.fn().mockResolvedValue({ kind: 'config-error' }),
-    };
-    const controller1 = new EvidenceController(configErrPort, makePositionReadPort());
-    try {
-      await controller1.getRawEvidence('run-config');
-      throw new Error('should have thrown');
-    } catch (err) {
-      expect(err).toBeInstanceOf(HttpException);
-      const httpErr = err as HttpException;
-      expect(httpErr.getStatus()).toBe(HttpStatus.SERVICE_UNAVAILABLE);
-      const response = JSON.stringify(httpErr.getResponse());
-      expect(response).not.toContain('X-CLMM-Internal-Token');
-      expect(response).not.toContain('secret');
-    }
   });
 });
