@@ -411,6 +411,7 @@ export function EvidenceScreen({
       {/* Warnings */}
       {vm.warnings.length > 0 ? (
         <View
+          testID="evidence-general-warnings"
           style={{
             padding: 12,
             backgroundColor: colors.surface,
@@ -428,7 +429,7 @@ export function EvidenceScreen({
               fontWeight: typography.fontWeight.semibold,
             }}
           >
-            Warnings:
+            General warnings:
           </Text>
           {vm.warnings.map((w, idx) => (
             <Text key={idx} style={{ color: colors.warn, fontSize: typography.fontSize.xs }}>
