@@ -114,6 +114,8 @@ export type {
   EvidenceContextualClaimViewModel,
   EvidenceFamilyCardRowViewModel,
   EvidenceResearchBriefViewModel,
+  EvidenceDerivationInputViewModel,
+  EvidenceFeatureDerivationViewModel,
 } from './view-models/EvidenceViewModel.js';
 export { buildSynthesisViewModel } from './view-models/SynthesisViewModel.js';
 export type {

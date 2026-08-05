@@ -2,6 +2,7 @@ import type {
   EvidenceBundle,
   EvidenceClaimDirection,
   CoverageStatus,
+  EvidenceSourceReference,
 } from '@clmm/application/public';
 
 export interface EvidenceContextualClaimViewModel {
@@ -12,9 +13,26 @@ export interface EvidenceContextualClaimViewModel {
   expiresAtLabel: string;
 }
 
+export interface EvidenceDerivationInputViewModel {
+  locator: string;
+  observedAtLabel: string;
+}
+
+export interface EvidenceFeatureDerivationViewModel {
+  inputCount: number;
+  timeSpanLabel: string;
+  calculatorLabel: string;
+  observedAtLabel: string;
+  freshUntilLabel: string;
+  isStale: boolean;
+  inputs: EvidenceDerivationInputViewModel[];
+}
+
 export interface EvidenceFamilyCardRowViewModel {
   label: string;
   value: string;
+  derivation?: EvidenceFeatureDerivationViewModel;
+  warnings?: string[];
 }
 
 export interface EvidenceFamilyCardViewModel {
@@ -25,6 +43,7 @@ export interface EvidenceFamilyCardViewModel {
   stale: boolean;
   rows: EvidenceFamilyCardRowViewModel[];
   claims: EvidenceContextualClaimViewModel[];
+  warnings?: string[];
 }
 
 export interface EvidenceResearchBriefViewModel {
@@ -63,6 +82,11 @@ const CONTEXTUAL_FAMILIES = [
   { id: 'events', title: 'Events' },
   { id: 'newsRegulatory', title: 'News & regulatory' },
 ] as const;
+
+const KNOWN_FAMILY_IDS = new Set<string>([
+  ...Object.keys(DETERMINISTIC_FAMILY_TITLES),
+  ...CONTEXTUAL_FAMILIES.map((f) => f.id),
+]);
 
 function formatPercentFromBps(bps: number): string {
   const percent = bps / 100;
@@ -130,6 +154,41 @@ function findLastCollectedTimestamp(bundle: EvidenceBundle): string {
   return formatDateLabel(latestStr);
 }
 
+function formatTimeSpanLabel(resolvedReferences: EvidenceSourceReference[]): string {
+  const timestamps: number[] = [];
+  for (const ref of resolvedReferences) {
+    if (ref.observedAt) {
+      const ms = Date.parse(ref.observedAt);
+      if (!Number.isNaN(ms)) {
+        timestamps.push(ms);
+      }
+    }
+  }
+
+  if (timestamps.length === 0) {
+    return 'Unknown time span';
+  }
+
+  const minMs = Math.min(...timestamps);
+  const maxMs = Math.max(...timestamps);
+  const diffMs = Math.max(0, maxMs - minMs);
+  const minutes = Math.round(diffMs / 60000);
+
+  if (minutes === 0) {
+    return '0 minutes';
+  }
+  if (minutes === 1) {
+    return '1 minute';
+  }
+  return `${minutes} minutes`;
+}
+
+function addMessage(targetArray: string[], message: string): void {
+  if (!targetArray.includes(message)) {
+    targetArray.push(message);
+  }
+}
+
 export function buildEvidenceViewModel(
   bundle: EvidenceBundle,
   now: number,
@@ -137,6 +196,64 @@ export function buildEvidenceViewModel(
   const bundleFreshUntilMs = Date.parse(bundle.freshUntil);
   const bundleExpiresAtMs = Date.parse(bundle.expiresAt);
   const isBundleExpired = bundleFreshUntilMs <= now || bundleExpiresAtMs <= now;
+
+  const sourceReferenceById = new Map<string, EvidenceSourceReference>();
+  for (const ref of bundle.sourceReferences || []) {
+    sourceReferenceById.set(ref.referenceId, ref);
+  }
+
+  const knownFeatureIds = new Set<string>();
+  const renderedDeterministicFamilyIds = new Set<string>();
+  for (const feature of bundle.deterministicFeatures || []) {
+    knownFeatureIds.add(feature.featureId);
+    if (feature.family in DETERMINISTIC_FAMILY_TITLES) {
+      renderedDeterministicFamilyIds.add(feature.family);
+    }
+  }
+
+  const familyCardWarnings = new Map<string, string[]>();
+  const featureRowWarnings = new Map<string, string[]>();
+  const fallbackWarnings: string[] = [];
+
+  for (const warning of bundle.assessment?.warnings || []) {
+    const msg = warning.message;
+    const targets = warning.affectedFamilies || [];
+
+    const hasKnownTarget = targets.some(
+      (t) => KNOWN_FAMILY_IDS.has(t) || knownFeatureIds.has(t) || t === 'deterministic',
+    );
+
+    if (!hasKnownTarget) {
+      addMessage(fallbackWarnings, msg);
+    } else {
+      for (const target of targets) {
+        if (KNOWN_FAMILY_IDS.has(target)) {
+          let list = familyCardWarnings.get(target);
+          if (!list) {
+            list = [];
+            familyCardWarnings.set(target, list);
+          }
+          addMessage(list, msg);
+        } else if (knownFeatureIds.has(target)) {
+          let list = featureRowWarnings.get(target);
+          if (!list) {
+            list = [];
+            featureRowWarnings.set(target, list);
+          }
+          addMessage(list, msg);
+        } else if (target === 'deterministic') {
+          for (const familyId of renderedDeterministicFamilyIds) {
+            let list = familyCardWarnings.get(familyId);
+            if (!list) {
+              list = [];
+              familyCardWarnings.set(familyId, list);
+            }
+            addMessage(list, msg);
+          }
+        }
+      }
+    }
+  }
 
   const cards: EvidenceFamilyCardViewModel[] = [];
 
@@ -163,15 +280,57 @@ export function buildEvidenceViewModel(
     const isStale = isBundleExpired || isFeatureStale;
 
     const rows: EvidenceFamilyCardRowViewModel[] = features.map((feature) => {
+      const resolvedReferences: EvidenceSourceReference[] = [];
+      const inputs: EvidenceDerivationInputViewModel[] = (feature.inputLineage || []).map(
+        (referenceId) => {
+          const reference = sourceReferenceById.get(referenceId);
+          if (reference) {
+            resolvedReferences.push(reference);
+            return {
+              locator: reference.locator,
+              observedAtLabel: formatDateLabel(reference.observedAt),
+            };
+          }
+          return {
+            locator: `Unresolved reference (${referenceId})`,
+            observedAtLabel: '—',
+          };
+        },
+      );
+
+      const derivation: EvidenceFeatureDerivationViewModel = {
+        inputCount: (feature.inputLineage || []).length,
+        timeSpanLabel: formatTimeSpanLabel(resolvedReferences),
+        calculatorLabel: `${feature.calculator.name} v${feature.calculator.version}`,
+        observedAtLabel: formatDateLabel(feature.observedAt),
+        freshUntilLabel: formatDateLabel(feature.freshUntil),
+        isStale: feature.freshUntil !== null && Date.parse(feature.freshUntil) <= now,
+        inputs,
+      };
+
+      const rowWarnings: string[] = [];
+      for (const w of feature.warnings || []) {
+        addMessage(rowWarnings, w);
+      }
+      for (const w of featureRowWarnings.get(feature.featureId) || []) {
+        addMessage(rowWarnings, w);
+      }
+
+      let valueLabel = '—';
       if (feature.status === 'available') {
         const value = (feature as { value: unknown }).value;
         const unit = (feature as { unit?: unknown }).unit;
         if (value !== null && value !== undefined) {
-          const valueLabel = unit ? `${String(value)} ${String(unit)}` : `${String(value)}`;
-          return { label: feature.featureId, value: valueLabel };
+          valueLabel = unit ? `${String(value)} ${String(unit)}` : `${String(value)}`;
         }
       }
-      return { label: feature.featureId, value: '—' };
+
+      return {
+        label: feature.featureId,
+        value: valueLabel,
+        derivation,
+        warnings: rowWarnings,
+      };
     });
 
     cards.push({
@@ -182,6 +341,7 @@ export function buildEvidenceViewModel(
       stale: isStale,
       rows,
       claims: [],
+      warnings: familyCardWarnings.get(id) || [],
     });
   }
 
@@ -198,8 +358,9 @@ export function buildEvidenceViewModel(
         availability,
         freshnessLabel: '—',
         stale: false,
-        rows: [{ label: 'Claims', value: '—' }],
+        rows: [{ label: 'Claims', value: '—', warnings: [] }],
         claims: [],
+        warnings: familyCardWarnings.get(fam.id) || [],
       });
       continue;
     }
@@ -223,8 +384,9 @@ export function buildEvidenceViewModel(
       availability,
       freshnessLabel: isStale ? 'Stale' : 'Fresh',
       stale: isStale,
-      rows: [{ label: 'Claims count', value: `${claimsArray.length}` }],
+      rows: [{ label: 'Claims count', value: `${claimsArray.length}`, warnings: [] }],
       claims: mappedClaims,
+      warnings: familyCardWarnings.get(fam.id) || [],
     });
   }
 
@@ -239,8 +401,6 @@ export function buildEvidenceViewModel(
       }
     : null;
 
-  const warnings = (bundle.assessment.warnings || []).map((w) => w.message);
-
   return {
     asOfLabel: formatDateLabel(bundle.asOf),
     freshUntilLabel: formatDateLabel(bundle.freshUntil),
@@ -251,6 +411,6 @@ export function buildEvidenceViewModel(
     isStale,
     cards,
     brief,
-    warnings,
+    warnings: fallbackWarnings,
   };
 }

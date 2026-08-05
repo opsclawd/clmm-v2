@@ -265,4 +265,295 @@ describe('buildEvidenceViewModel', () => {
       modelLabel: 'openai / gpt-4 (v1.0.0)',
     });
   });
+
+  it('projects derivation breadth, lineage timestamps, calculator, and per-feature freshness', () => {
+    const bundle = JSON.parse(
+      JSON.stringify(deterministicOnlyFixture),
+    ) as unknown as EvidenceBundle;
+    const HASH_A = 'a'.repeat(64);
+    const HASH_B = 'b'.repeat(64);
+
+    bundle.sourceReferences = [
+      {
+        referenceId: 'ref-a',
+        sourceType: 'api',
+        locator: HASH_A,
+        publishedAt: null,
+        observedAt: '2024-01-15T03:59:00.000Z',
+        contentHash: null,
+      },
+      {
+        referenceId: 'ref-b',
+        sourceType: 'api',
+        locator: HASH_B,
+        publishedAt: null,
+        observedAt: '2024-01-15T05:00:00.000Z',
+        contentHash: null,
+      },
+    ];
+
+    bundle.deterministicFeatures = [
+      {
+        featureId: 'realized_volatility_1h',
+        family: 'market_state',
+        featureKind: 'number',
+        status: 'available',
+        value: 19,
+        unit: 'basis_points',
+        observedAt: '2024-01-15T05:00:00.000Z',
+        freshUntil: '2024-01-15T05:03:00.000Z',
+        confidenceBps: 9500,
+        calculator: {
+          name: 'mvp-calculator',
+          version: '1.0',
+        },
+        inputLineage: ['ref-a', 'ref-b'],
+        warnings: [],
+      },
+    ];
+
+    const NOW = Date.parse('2024-01-15T05:01:00.000Z');
+    const vm = buildEvidenceViewModel(bundle, NOW);
+    const card = vm.cards.find((c) => c.id === 'market_state');
+    const row = card?.rows.find((r) => r.label === 'realized_volatility_1h');
+
+    expect(row).toMatchObject({
+      label: 'realized_volatility_1h',
+      value: '19 basis_points',
+      warnings: [],
+      derivation: {
+        inputCount: 2,
+        timeSpanLabel: '61 minutes',
+        calculatorLabel: 'mvp-calculator v1.0',
+        observedAtLabel: '2024-01-15T05:00:00Z',
+        freshUntilLabel: '2024-01-15T05:03:00Z',
+        isStale: false,
+        inputs: [
+          { locator: HASH_A, observedAtLabel: '2024-01-15T03:59:00Z' },
+          { locator: HASH_B, observedAtLabel: '2024-01-15T05:00:00Z' },
+        ],
+      },
+    });
+  });
+
+  it('uses safe derivation fallbacks for empty or unparseable matched lineage timestamps', () => {
+    const bundle = JSON.parse(
+      JSON.stringify(deterministicOnlyFixture),
+    ) as unknown as EvidenceBundle;
+    bundle.sourceReferences = [
+      {
+        referenceId: 'ref-unparseable',
+        sourceType: 'api',
+        locator: 'https://example.com/unparseable',
+        publishedAt: null,
+        observedAt: 'not-a-date',
+        contentHash: null,
+      },
+      {
+        referenceId: 'ref-valid-1',
+        sourceType: 'api',
+        locator: 'https://example.com/valid1',
+        publishedAt: null,
+        observedAt: '2024-01-15T05:00:00.000Z',
+        contentHash: null,
+      },
+      {
+        referenceId: 'ref-valid-2',
+        sourceType: 'api',
+        locator: 'https://example.com/valid2',
+        publishedAt: null,
+        observedAt: '2024-01-15T05:00:00.000Z',
+        contentHash: null,
+      },
+    ];
+
+    bundle.deterministicFeatures = [
+      {
+        featureId: 'feat_empty_lineage',
+        family: 'market_state',
+        featureKind: 'number',
+        status: 'available',
+        value: 10,
+        unit: 'usd',
+        observedAt: '2024-01-15T05:00:00.000Z',
+        freshUntil: '2024-01-15T05:10:00.000Z',
+        confidenceBps: 9000,
+        calculator: { name: 'calc', version: '1.0.0' },
+        inputLineage: [],
+        warnings: [],
+      },
+      {
+        featureId: 'feat_unresolved_ref',
+        family: 'market_state',
+        featureKind: 'number',
+        status: 'available',
+        value: 20,
+        unit: 'usd',
+        observedAt: '2024-01-15T05:00:00.000Z',
+        freshUntil: '2024-01-15T05:10:00.000Z',
+        confidenceBps: 9000,
+        calculator: { name: 'calc', version: '1.0.0' },
+        inputLineage: ['missing-ref-id'],
+        warnings: [],
+      },
+      {
+        featureId: 'feat_unparseable_ref',
+        family: 'market_state',
+        featureKind: 'number',
+        status: 'available',
+        value: 30,
+        unit: 'usd',
+        observedAt: '2024-01-15T05:00:00.000Z',
+        freshUntil: '2024-01-15T05:10:00.000Z',
+        confidenceBps: 9000,
+        calculator: { name: 'calc', version: '1.0.0' },
+        inputLineage: ['ref-unparseable'],
+        warnings: [],
+      },
+      {
+        featureId: 'feat_zero_span',
+        family: 'market_state',
+        featureKind: 'number',
+        status: 'available',
+        value: 40,
+        unit: 'usd',
+        observedAt: '2024-01-15T05:00:00.000Z',
+        freshUntil: '2024-01-15T05:10:00.000Z',
+        confidenceBps: 9000,
+        calculator: { name: 'calc', version: '1.0.0' },
+        inputLineage: ['ref-valid-1', 'ref-valid-2'],
+        warnings: [],
+      },
+      {
+        featureId: 'feat_unavailable_nulls',
+        family: 'market_state',
+        featureKind: 'number',
+        status: 'unavailable',
+        value: null,
+        unit: null,
+        observedAt: null,
+        freshUntil: null,
+        confidenceBps: 0,
+        calculator: { name: 'calc', version: '1.0.0' },
+        inputLineage: [],
+        warnings: [],
+      },
+    ];
+
+    const NOW = Date.parse('2024-01-15T05:01:00.000Z');
+    const vm = buildEvidenceViewModel(bundle, NOW);
+    const card = vm.cards.find((c) => c.id === 'market_state');
+
+    const emptyRow = card?.rows.find((r) => r.label === 'feat_empty_lineage');
+    expect(emptyRow?.derivation).toMatchObject({
+      inputCount: 0,
+      inputs: [],
+      timeSpanLabel: 'Unknown time span',
+    });
+
+    const unresolvedRow = card?.rows.find((r) => r.label === 'feat_unresolved_ref');
+    expect(unresolvedRow?.derivation).toMatchObject({
+      inputCount: 1,
+      inputs: [{ locator: 'Unresolved reference (missing-ref-id)', observedAtLabel: '—' }],
+      timeSpanLabel: 'Unknown time span',
+    });
+
+    const unparseableRow = card?.rows.find((r) => r.label === 'feat_unparseable_ref');
+    expect(unparseableRow?.derivation).toMatchObject({
+      inputCount: 1,
+      inputs: [{ locator: 'https://example.com/unparseable', observedAtLabel: 'not-a-date' }],
+      timeSpanLabel: 'Unknown time span',
+    });
+
+    const zeroSpanRow = card?.rows.find((r) => r.label === 'feat_zero_span');
+    expect(zeroSpanRow?.derivation).toMatchObject({
+      inputCount: 2,
+      timeSpanLabel: '0 minutes',
+    });
+
+    const unavailRow = card?.rows.find((r) => r.label === 'feat_unavailable_nulls');
+    expect(unavailRow?.derivation).toMatchObject({
+      observedAtLabel: '—',
+      freshUntilLabel: '—',
+      isStale: false,
+    });
+  });
+
+  it('associates assessment warnings with known families and feature IDs and retains unknown targets as fallback warnings', () => {
+    const bundle = JSON.parse(JSON.stringify(contextualFixture)) as unknown as EvidenceBundle;
+    bundle.deterministicFeatures[0]!.warnings = ['Native feature warning'];
+
+    bundle.assessment.warnings = [
+      {
+        code: 'WARN_SR',
+        message: 'Warning for SR family',
+        affectedFamilies: ['supportResistance'],
+      },
+      {
+        code: 'WARN_MARKET',
+        message: 'Warning for market state',
+        affectedFamilies: ['market_state'],
+      },
+      {
+        code: 'WARN_FEATURE',
+        message: 'Warning for price feature',
+        affectedFamilies: ['feat-price-001'],
+      },
+      {
+        code: 'WARN_TARGETLESS',
+        message: 'Targetless warning',
+        affectedFamilies: [],
+      },
+      {
+        code: 'WARN_BRIEF',
+        message: 'Research brief warning',
+        affectedFamilies: ['researchBrief'],
+      },
+      {
+        code: 'WARN_MIXED',
+        message: 'Mixed target warning',
+        affectedFamilies: ['market_state', 'unknown_target_xyz'],
+      },
+      {
+        code: 'WARN_DUPLICATE',
+        message: 'Warning for market state',
+        affectedFamilies: ['market_state'],
+      },
+    ];
+
+    const vm = buildEvidenceViewModel(bundle, FIXED_NOW);
+
+    const srCard = vm.cards.find((c) => c.id === 'supportResistance');
+    expect(srCard?.warnings).toEqual(['Warning for SR family']);
+
+    const msCard = vm.cards.find((c) => c.id === 'market_state');
+    expect(msCard?.warnings).toEqual(['Warning for market state', 'Mixed target warning']);
+
+    const row = msCard?.rows.find((r) => r.label === 'feat-price-001');
+    expect(row?.warnings).toEqual(['Native feature warning', 'Warning for price feature']);
+
+    expect(vm.warnings).toEqual(['Targetless warning', 'Research brief warning']);
+  });
+
+  it('maps deterministic umbrella warnings to every deterministic family without duplicating fallback', () => {
+    const bundle = JSON.parse(JSON.stringify(contextualFixture)) as unknown as EvidenceBundle;
+    bundle.assessment.warnings = [
+      {
+        code: 'DETERMINISTIC_DEGRADED',
+        message: 'Deterministic pipeline degraded',
+        affectedFamilies: ['deterministic'],
+      },
+    ];
+
+    const vm = buildEvidenceViewModel(bundle, FIXED_NOW);
+
+    const marketStateCard = vm.cards.find((c) => c.id === 'market_state');
+    const liquidityCard = vm.cards.find((c) => c.id === 'liquidity');
+    const srCard = vm.cards.find((c) => c.id === 'supportResistance');
+
+    expect(marketStateCard?.warnings).toEqual(['Deterministic pipeline degraded']);
+    expect(liquidityCard?.warnings).toEqual(['Deterministic pipeline degraded']);
+    expect(srCard?.warnings).toEqual([]);
+    expect(vm.warnings).toEqual([]);
+  });
 });
