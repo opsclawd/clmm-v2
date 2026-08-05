@@ -211,7 +211,7 @@ describe('EvidenceFamilyCard', () => {
     expect(screen.getByText('Row warning: single source')).toBeDefined();
   });
 
-  it('resets expanded rows to collapsed state when card prop changes', () => {
+  it('preserves expanded rows state when card prop changes', () => {
     const { rerender } = render(<EvidenceFamilyCard card={derivationCapableCard} />);
 
     const togglePrice = screen.getByRole('button', {
@@ -228,8 +228,8 @@ describe('EvidenceFamilyCard', () => {
     rerender(<EvidenceFamilyCard card={updatedCard} />);
 
     const togglePriceRefreshed = screen.getByRole('button', {
-      name: 'Expand derivation for feat-price-001',
+      name: 'Collapse derivation for feat-price-001',
     });
-    expect(togglePriceRefreshed.getAttribute('aria-expanded')).toBe('false');
+    expect(togglePriceRefreshed.getAttribute('aria-expanded')).toBe('true');
   });
 });

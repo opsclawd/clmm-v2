@@ -268,4 +268,111 @@ describe('EvidenceScreen', () => {
     );
     expect(screen.queryByTestId('raw-telemetry-slot')).toBeNull();
   });
+
+  it('renders associated warnings inside family cards and only unmatched warnings in the screen fallback', () => {
+    const bundle = JSON.parse(
+      JSON.stringify(deterministicOnlyFixture),
+    ) as unknown as EvidenceBundle;
+    bundle.assessment.warnings = [
+      {
+        code: 'WARN_MARKET',
+        message: 'Market state warning',
+        affectedFamilies: ['market_state'],
+      },
+      {
+        code: 'WARN_SUPPRES',
+        message: 'Support resistance warning',
+        affectedFamilies: ['supportResistance'],
+      },
+      {
+        code: 'WARN_MIXED',
+        message: 'Mixed warning',
+        affectedFamilies: ['market_state', 'unknown_target'],
+      },
+      {
+        code: 'WARN_UNKNOWN',
+        message: 'Unknown target warning',
+        affectedFamilies: ['unknown_target_only'],
+      },
+    ];
+
+    render(<EvidenceScreen evidence={bundle} now={FIXED_NOW} />);
+
+    const marketStateCard = screen.getByTestId('evidence-family-card-market_state');
+    expect(marketStateCard).toBeDefined();
+    expect(marketStateCard.textContent).toContain('Market state warning');
+    expect(marketStateCard.textContent).toContain('Mixed warning');
+
+    const supportResistanceCard = screen.getByTestId('evidence-family-card-supportResistance');
+    expect(supportResistanceCard).toBeDefined();
+    expect(supportResistanceCard.textContent).toContain('Support resistance warning');
+
+    const fallbackBox = screen.getByTestId('evidence-general-warnings');
+    expect(fallbackBox).toBeDefined();
+    expect(fallbackBox.textContent).toContain('Unknown target warning');
+    expect(fallbackBox.textContent).not.toContain('Market state warning');
+    expect(fallbackBox.textContent).not.toContain('Support resistance warning');
+    expect(fallbackBox.textContent).not.toContain('Mixed warning');
+  });
+
+  it('expands a deterministic feature to explain a canonical bundle derivation end to end', () => {
+    const bundle = JSON.parse(
+      JSON.stringify(deterministicOnlyFixture),
+    ) as unknown as EvidenceBundle;
+
+    const hash1 = '0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef';
+    const hash2 = '1123456789abcdef1123456789abcdef1123456789abcdef1123456789abcdef';
+
+    bundle.sourceReferences = [
+      {
+        referenceId: 'ref-1',
+        sourceType: 'api',
+        locator: hash1,
+        publishedAt: null,
+        observedAt: '2024-01-15T09:59:00.000Z',
+        contentHash: null,
+      },
+      {
+        referenceId: 'ref-2',
+        sourceType: 'api',
+        locator: hash2,
+        publishedAt: null,
+        observedAt: '2024-01-15T11:00:00.000Z',
+        contentHash: null,
+      },
+    ];
+
+    bundle.deterministicFeatures = [
+      {
+        featureId: 'feat-price-001',
+        family: 'market_state',
+        featureKind: 'number',
+        status: 'available',
+        value: 150.25,
+        unit: 'usd',
+        observedAt: '2024-01-15T10:00:00.000Z',
+        freshUntil: '2024-01-15T11:00:00.000Z',
+        confidenceBps: 9500,
+        calculator: {
+          name: 'price-aggregator',
+          version: '1.0.0',
+        },
+        inputLineage: ['ref-1', 'ref-2'],
+        warnings: [],
+      },
+    ];
+
+    render(<EvidenceScreen evidence={bundle} now={FIXED_NOW} />);
+
+    const toggleButton = screen.getByTestId('evidence-derivation-toggle-feat-price-001');
+    fireEvent.click(toggleButton);
+
+    const expectedExplanation =
+      'feat-price-001 = 150.25 usd, from 2 observations spanning 61 minutes, computed by price-aggregator v1.0.0, observed 2024-01-15T10:00:00Z, fresh until 2024-01-15T11:00:00Z.';
+
+    expect(screen.getByText(expectedExplanation)).toBeDefined();
+    expect(screen.getByText(hash1)).toBeDefined();
+    expect(screen.getByText(hash2)).toBeDefined();
+    expect(screen.queryAllByRole('link')).toEqual([]);
+  });
 });

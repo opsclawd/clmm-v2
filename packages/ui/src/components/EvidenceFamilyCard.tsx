@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import { View, Text, TouchableOpacity } from 'react-native';
 import { colors, typography } from '../design-system/index.js';
 import type { EvidenceFamilyCardViewModel } from '../view-models/EvidenceViewModel.js';
@@ -32,10 +32,6 @@ function availabilityColor(availability: EvidenceFamilyCardViewModel['availabili
 
 export function EvidenceFamilyCard({ card }: EvidenceFamilyCardProps): JSX.Element {
   const [expandedRows, setExpandedRows] = useState<Record<string, boolean>>({});
-
-  useEffect(() => {
-    setExpandedRows({});
-  }, [card]);
 
   function toggleRow(rowId: string): void {
     setExpandedRows((current) => ({ ...current, [rowId]: !current[rowId] }));
