@@ -122,8 +122,8 @@ export interface DeterministicFeatureInvalid {
   status: 'invalid';
   value: null;
   unit: null;
-  observedAt: string | null;
-  freshUntil: string | null;
+  observedAt?: string | null;
+  freshUntil?: string | null;
   confidenceBps: 0;
   calculator: EvidenceCalculator;
   inputLineage: string[];
@@ -229,9 +229,9 @@ export interface EvidenceSourceReference {
   referenceId: string;
   sourceType: 'api' | 'database' | 'chain' | 'document' | 'internal_bundle';
   locator: string;
-  publishedAt: string | null;
+  publishedAt?: string | null;
   observedAt: string;
-  contentHash: string | null;
+  contentHash?: string | null;
 }
 
 export type CoverageStatus = 'available' | 'partial' | 'unavailable' | 'not_applicable';

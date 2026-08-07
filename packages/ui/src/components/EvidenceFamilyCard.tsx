@@ -1,7 +1,10 @@
 import React, { useState } from 'react';
 import { View, Text, TouchableOpacity } from 'react-native';
 import { colors, typography } from '../design-system/index.js';
-import type { EvidenceFamilyCardViewModel } from '../view-models/EvidenceViewModel.js';
+import type {
+  EvidenceFamilyAvailability,
+  EvidenceFamilyCardViewModel,
+} from '../view-models/EvidenceViewModel.js';
 
 export interface EvidenceFamilyCardProps {
   card: EvidenceFamilyCardViewModel;
@@ -16,17 +19,48 @@ const cardStyle = {
   marginBottom: 12,
 } as const;
 
-function availabilityColor(availability: EvidenceFamilyCardViewModel['availability']): string {
+function availabilityDisplayLabel(availability: EvidenceFamilyAvailability): string {
+  switch (availability) {
+    case 'not_configured':
+      return 'Not configured';
+    case 'no_data':
+      return 'No qualifying data';
+    case 'collection_stopped':
+      return 'Collection stopped';
+    case 'available':
+      return 'available';
+    case 'partial':
+      return 'partial';
+    case 'invalid':
+      return 'invalid';
+    case 'unavailable':
+    case 'not_applicable':
+      return 'unavailable';
+    default: {
+      const _exhaustiveCheck: never = availability;
+      throw new Error(`Unhandled availability state: ${JSON.stringify(_exhaustiveCheck)}`);
+    }
+  }
+}
+
+function availabilityColor(availability: EvidenceFamilyAvailability): string {
   switch (availability) {
     case 'available':
       return colors.safe;
     case 'partial':
       return colors.warn;
     case 'invalid':
+    case 'collection_stopped':
       return colors.breachAccent;
+    case 'not_configured':
+    case 'no_data':
     case 'unavailable':
-    default:
+    case 'not_applicable':
       return colors.textTertiary;
+    default: {
+      const _exhaustiveCheck: never = availability;
+      throw new Error(`Unhandled availability state: ${JSON.stringify(_exhaustiveCheck)}`);
+    }
   }
 }
 
@@ -37,7 +71,8 @@ export function EvidenceFamilyCard({ card }: EvidenceFamilyCardProps): JSX.Eleme
     setExpandedRows((current) => ({ ...current, [rowId]: !current[rowId] }));
   }
 
-  const accessibleLabel = `${card.title}, ${card.availability}, ${card.freshnessLabel}`;
+  const statusDisplay = availabilityDisplayLabel(card.availability);
+  const accessibleLabel = `${card.title}, ${statusDisplay}, ${card.lastCollectedLabel}, ${card.freshnessLabel}`;
 
   return (
     <View
@@ -74,13 +109,20 @@ export function EvidenceFamilyCard({ card }: EvidenceFamilyCardProps): JSX.Eleme
           </Text>
           <Text
             style={{
+              color: colors.textTertiary,
+              fontSize: typography.fontSize.xs,
+            }}
+          >
+            {card.lastCollectedLabel}
+          </Text>
+          <Text
+            style={{
               color: availabilityColor(card.availability),
               fontSize: typography.fontSize.xs,
               fontWeight: typography.fontWeight.semibold,
-              textTransform: 'lowercase',
             }}
           >
-            {card.availability}
+            {statusDisplay}
           </Text>
         </View>
       </View>

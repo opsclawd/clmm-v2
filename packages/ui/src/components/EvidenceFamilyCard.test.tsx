@@ -12,6 +12,7 @@ const derivationCapableCard: EvidenceFamilyCardViewModel = {
   id: 'market_state',
   title: 'Market state',
   availability: 'available',
+  lastCollectedLabel: 'Last run 30m ago',
   freshnessLabel: 'Fresh',
   stale: false,
   warnings: ['Family warning: stale source'],
@@ -71,6 +72,7 @@ describe('EvidenceFamilyCard', () => {
       id: 'supportResistance',
       title: 'Support & resistance',
       availability: 'unavailable',
+      lastCollectedLabel: 'No collector configured',
       freshnessLabel: '—',
       stale: false,
       rows: [{ label: 'Claims', value: '—' }],
@@ -86,7 +88,9 @@ describe('EvidenceFamilyCard', () => {
 
     const cardElement = screen.getByTestId('evidence-family-card-supportResistance');
     expect(cardElement).toBeDefined();
-    expect(cardElement.getAttribute('aria-label')).toBe('Support & resistance, unavailable, —');
+    expect(cardElement.getAttribute('aria-label')).toBe(
+      'Support & resistance, unavailable, No collector configured, —',
+    );
   });
 
   it('renders available badge, fresh status, and deterministic rows', () => {
@@ -94,6 +98,7 @@ describe('EvidenceFamilyCard', () => {
       id: 'market_state',
       title: 'Market state',
       availability: 'available',
+      lastCollectedLabel: 'Last run 30m ago',
       freshnessLabel: 'Fresh',
       stale: false,
       rows: [
@@ -119,6 +124,7 @@ describe('EvidenceFamilyCard', () => {
       id: 'supportResistance',
       title: 'Support & resistance',
       availability: 'available',
+      lastCollectedLabel: 'Last run 30m ago',
       freshnessLabel: 'Stale',
       stale: true,
       rows: [{ label: 'Claims count', value: '1' }],

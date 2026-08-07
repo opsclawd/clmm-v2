@@ -109,6 +109,7 @@ export { buildEvidenceViewModel } from './view-models/EvidenceViewModel.js';
 export type {
   EvidenceScreenViewModel,
   EvidenceFamilyCardViewModel,
+  EvidenceFamilyAvailability,
   EvidenceContextualClaimViewModel,
   EvidenceFamilyCardRowViewModel,
   EvidenceResearchBriefViewModel,

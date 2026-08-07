@@ -6,6 +6,7 @@ import type {
   EvidenceScope,
   EvidenceSourceIdentity,
   DeterministicFeature,
+  DeterministicFeatureInvalid,
   ContextualEvidence,
   ResearchBrief,
   EvidenceSourceReference,
@@ -51,5 +52,30 @@ describe('Public Evidence API exports', () => {
       'upstream-error',
     ];
     expect(reasons.length).toBe(5);
+  });
+
+  it('allows optional fields on EvidenceSourceReference and DeterministicFeatureInvalid', () => {
+    const refWithoutOptionals: EvidenceSourceReference = {
+      referenceId: 'ref-1',
+      sourceType: 'api',
+      locator: 'https://example.com',
+      observedAt: '2026-01-01T00:00:00.000Z',
+    };
+
+    const invalidFeatureWithoutOptionals: DeterministicFeatureInvalid = {
+      featureId: 'feat-1',
+      family: 'market_state',
+      featureKind: 'number',
+      status: 'invalid',
+      value: null,
+      unit: null,
+      confidenceBps: 0,
+      calculator: { name: 'calc', version: '1.0' },
+      inputLineage: ['lineage-1'],
+      warnings: ['warning-1'],
+    };
+
+    expect(refWithoutOptionals.publishedAt).toBeUndefined();
+    expect(invalidFeatureWithoutOptionals.observedAt).toBeUndefined();
   });
 });
