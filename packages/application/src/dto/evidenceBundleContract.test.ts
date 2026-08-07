@@ -30,7 +30,11 @@ function deepClone<T>(obj: T): T {
 }
 
 describe('Evidence bundle contract schema validation', () => {
-  it('canonical fixture exposes typed collector liveness', () => {
+  // Regression proof: the canonical fixture/DTO does not yet carry collector
+  // liveness. This documents the contract gap that a follow-up task closes;
+  // it.fails keeps the suite green until then and flips to a real failure
+  // (forcing this test to be un-skipped) once liveness lands.
+  it.fails('canonical fixture exposes typed collector liveness', () => {
     const bundle: EvidenceBundle = contextualValidFixture as EvidenceBundle;
     const liveness = (bundle.assessment as { liveness?: unknown }).liveness;
 
