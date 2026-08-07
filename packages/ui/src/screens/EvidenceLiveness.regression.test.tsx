@@ -29,9 +29,9 @@ function createSimulatedOutageBundle(): EvidenceBundle {
       featureKind: 'number',
       status: 'unavailable',
       value: null,
-      unit: 'usd',
-      observedAt: '2024-01-15T10:00:00.000Z',
-      freshUntil: '2024-01-15T11:00:00.000Z',
+      unit: null,
+      observedAt: null,
+      freshUntil: null,
       confidenceBps: 0,
       calculator: { name: 'risk-calc', version: '1.0.0' },
       inputLineage: [],
@@ -49,8 +49,6 @@ function createSimulatedOutageBundle(): EvidenceBundle {
 
   bundle.assessment.coverage = {
     deterministic: 'unavailable',
-    risk: 'unavailable',
-    market_state: 'unavailable',
     supportResistance: 'unavailable',
     flows: 'unavailable',
     derivatives: 'unavailable',
@@ -59,7 +57,11 @@ function createSimulatedOutageBundle(): EvidenceBundle {
     researchBrief: 'unavailable',
   };
 
-  (bundle.assessment as unknown as Record<string, unknown>).liveness = liveness;
+  const coverageRecord = bundle.assessment.coverage as unknown as Record<string, string>;
+  coverageRecord['risk'] = 'unavailable';
+  coverageRecord['market_state'] = 'unavailable';
+
+  (bundle.assessment as unknown as Record<string, unknown>)['liveness'] = liveness;
 
   return bundle;
 }
