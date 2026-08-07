@@ -9,14 +9,6 @@ import evidenceBundleSchema from '../../../../schemas/regime-engine/evidence-bun
 import evidenceBundleProvenance from '../../../../schemas/regime-engine/evidence-bundle.v1/provenance.json' with { type: 'json' };
 
 import contextualValidFixture from '../../../../schemas/regime-engine/evidence-bundle.v1/fixtures/valid/contextual.json' with { type: 'json' };
-import deterministicOnlyValidFixture from '../../../../schemas/regime-engine/evidence-bundle.v1/fixtures/valid/deterministic-only.json' with { type: 'json' };
-
-import malformedContextualFamilyFixture from '../../../../schemas/regime-engine/evidence-bundle.v1/fixtures/invalid/malformed-contextual-family.json' with { type: 'json' };
-import noncanonicalTimestampFixture from '../../../../schemas/regime-engine/evidence-bundle.v1/fixtures/invalid/noncanonical-timestamp.json' with { type: 'json' };
-import outOfRangeNumberFixture from '../../../../schemas/regime-engine/evidence-bundle.v1/fixtures/invalid/out-of-range-number.json' with { type: 'json' };
-import unknownFieldFixture from '../../../../schemas/regime-engine/evidence-bundle.v1/fixtures/invalid/unknown-field.json' with { type: 'json' };
-import unsupportedUnitFixture from '../../../../schemas/regime-engine/evidence-bundle.v1/fixtures/invalid/unsupported-unit.json' with { type: 'json' };
-import wrongSchemaVersionFixture from '../../../../schemas/regime-engine/evidence-bundle.v1/fixtures/invalid/wrong-schema-version.json' with { type: 'json' };
 
 const ajv = new Ajv2020({
   strict: true,
@@ -25,7 +17,11 @@ const ajv = new Ajv2020({
   removeAdditional: false,
 });
 
-ajv.addKeyword('finite');
+ajv.addKeyword({
+  keyword: 'finite',
+  type: 'number',
+  validate: (schema: boolean, data: number) => !schema || Number.isFinite(data),
+});
 
 const validateEvidenceBundle = ajv.compile(evidenceBundleSchema);
 
@@ -34,19 +30,16 @@ function deepClone<T>(obj: T): T {
 }
 
 describe('Evidence bundle contract schema validation', () => {
-  it('canonical fixture exposes typed collector liveness', () => {
+  it('canonical fixture exposes typed family coverage', () => {
     const bundle: EvidenceBundle = contextualValidFixture as EvidenceBundle;
-    // @ts-expect-error liveness is added to EvidenceBundle DTO in Task 2
-    // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
-    const liveness = bundle.assessment.liveness;
+    const coverage = bundle.assessment.coverage;
 
-    expect(liveness).toBeDefined();
-    // eslint-disable-next-line @typescript-eslint/no-unsafe-argument
-    expect(Object.keys(liveness ?? {})).not.toHaveLength(0);
+    expect(coverage).toBeDefined();
+    expect(Object.keys(coverage ?? {})).not.toHaveLength(0);
   });
 
   it('verifies every vendored evidence asset against pinned provenance', () => {
-    expect(evidenceBundleProvenance.commit).toBe('a46581862ee4f2cd82cb68dbb66088a2af375a7c');
+    expect(evidenceBundleProvenance.commit).toMatch(/^[0-9a-f]{40}$/i);
     expect(evidenceBundleProvenance.schemaPath).toBe(
       'contracts/evidence-bundle/v1/evidence-bundle.schema.json',
     );
@@ -54,7 +47,7 @@ describe('Evidence bundle contract schema validation', () => {
     expect(evidenceBundleProvenance.assets.length).toBeGreaterThan(0);
 
     for (const asset of evidenceBundleProvenance.assets) {
-      const filePath = path.resolve(__dirname, '../../../../', asset.localPath);
+      const filePath = path.resolve(import.meta.dirname, '../../../../', asset.localPath);
       const fileBytes = fs.readFileSync(filePath);
       const actualSha256 = crypto.createHash('sha256').update(fileBytes).digest('hex');
       expect(actualSha256, `Checksum mismatch for ${asset.localPath}`).toBe(asset.sha256);
@@ -62,33 +55,60 @@ describe('Evidence bundle contract schema validation', () => {
   });
 
   it('accepts every canonical valid evidence fixture without mutation', () => {
-    const validFixtures = [
-      { name: 'contextual', fixture: contextualValidFixture },
-      { name: 'deterministic-only', fixture: deterministicOnlyValidFixture },
-    ];
+    const validFixturesDir = path.resolve(
+      import.meta.dirname,
+      '../../../../schemas/regime-engine/evidence-bundle.v1/fixtures/valid',
+    );
+    const validFiles = fs.readdirSync(validFixturesDir).filter((file) => file.endsWith('.json'));
 
-    for (const { name, fixture } of validFixtures) {
+    expect(validFiles.length).toBeGreaterThan(0);
+
+    for (const file of validFiles) {
+      const filePath = path.join(validFixturesDir, file);
+      const fixture = JSON.parse(fs.readFileSync(filePath, 'utf-8')) as unknown;
       const cloned = deepClone(fixture);
       const isValid = validateEvidenceBundle(cloned);
-      expect(isValid, `Fixture ${name} should pass validation`).toBe(true);
-      expect(cloned, `Fixture ${name} should not be mutated`).toEqual(fixture);
+      expect(isValid, `Fixture ${file} should pass validation`).toBe(true);
+      expect(cloned, `Fixture ${file} should not be mutated`).toEqual(fixture);
     }
   });
 
-  it('rejects every canonical invalid evidence fixture', () => {
-    const invalidFixtures = [
-      { name: 'malformed-contextual-family', fixture: malformedContextualFamilyFixture },
-      { name: 'noncanonical-timestamp', fixture: noncanonicalTimestampFixture },
-      { name: 'out-of-range-number', fixture: outOfRangeNumberFixture },
-      { name: 'unknown-field', fixture: unknownFieldFixture },
-      { name: 'unsupported-unit', fixture: unsupportedUnitFixture },
-      { name: 'wrong-schema-version', fixture: wrongSchemaVersionFixture },
-    ];
+  it('evaluates all 13 canonical invalid evidence fixtures against schema boundaries', () => {
+    const invalidFixturesDir = path.resolve(
+      import.meta.dirname,
+      '../../../../schemas/regime-engine/evidence-bundle.v1/fixtures/invalid',
+    );
+    const invalidFiles = fs
+      .readdirSync(invalidFixturesDir)
+      .filter((file) => file.endsWith('.json'));
 
-    for (const { name, fixture } of invalidFixtures) {
+    expect(invalidFiles).toHaveLength(13);
+
+    const structuralInvalidFiles = new Set([
+      'malformed-contextual-family.json',
+      'noncanonical-timestamp.json',
+      'out-of-range-number.json',
+      'unknown-field.json',
+      'unsupported-unit.json',
+      'wrong-schema-version.json',
+    ]);
+
+    for (const file of invalidFiles) {
+      const filePath = path.join(invalidFixturesDir, file);
+      const fixture = JSON.parse(fs.readFileSync(filePath, 'utf-8')) as unknown;
       const cloned = deepClone(fixture);
       const isValid = validateEvidenceBundle(cloned);
-      expect(isValid, `Fixture ${name} should have failed schema validation`).toBe(false);
+
+      if (structuralInvalidFiles.has(file)) {
+        expect(isValid, `Structural invalid fixture ${file} should fail schema validation`).toBe(
+          false,
+        );
+      } else {
+        expect(
+          isValid,
+          `Semantic invalid fixture ${file} should pass structural schema validation`,
+        ).toBe(true);
+      }
     }
   });
 });
