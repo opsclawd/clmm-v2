@@ -94,7 +94,7 @@ function formatPercentFromBps(bps: number): string {
   return `${percent}%`;
 }
 
-function formatDateLabel(isoTimestamp: string | null): string {
+function formatDateLabel(isoTimestamp: string | null | undefined): string {
   if (!isoTimestamp) return '—';
   return isoTimestamp.replace(/\.\d{3}Z$/, 'Z');
 }
@@ -304,7 +304,7 @@ export function buildEvidenceViewModel(
         calculatorLabel: `${feature.calculator.name} v${feature.calculator.version}`,
         observedAtLabel: formatDateLabel(feature.observedAt),
         freshUntilLabel: formatDateLabel(feature.freshUntil),
-        isStale: feature.freshUntil !== null && Date.parse(feature.freshUntil) <= now,
+        isStale: feature.freshUntil != null && Date.parse(feature.freshUntil) <= now,
         inputs,
       };
 
