@@ -30,6 +30,14 @@ function deepClone<T>(obj: T): T {
 }
 
 describe('Evidence bundle contract schema validation', () => {
+  it('canonical fixture exposes typed collector liveness', () => {
+    const bundle: EvidenceBundle = contextualValidFixture as EvidenceBundle;
+    const liveness = (bundle.assessment as { liveness?: unknown }).liveness;
+
+    expect(liveness).toBeDefined();
+    expect(Object.keys((liveness as Record<string, unknown>) ?? {})).not.toHaveLength(0);
+  });
+
   it('canonical fixture exposes typed family coverage', () => {
     const bundle: EvidenceBundle = contextualValidFixture as EvidenceBundle;
     const coverage = bundle.assessment.coverage;
