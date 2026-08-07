@@ -4,6 +4,7 @@ import path from 'path';
 import crypto from 'crypto';
 import { Ajv2020 } from 'ajv/dist/2020.js';
 
+import type { EvidenceBundle } from './evidence.js';
 import evidenceBundleSchema from '../../../../schemas/regime-engine/evidence-bundle.v1/schema.json' with { type: 'json' };
 import evidenceBundleProvenance from '../../../../schemas/regime-engine/evidence-bundle.v1/provenance.json' with { type: 'json' };
 
@@ -33,6 +34,17 @@ function deepClone<T>(obj: T): T {
 }
 
 describe('Evidence bundle contract schema validation', () => {
+  it('canonical fixture exposes typed collector liveness', () => {
+    const bundle: EvidenceBundle = contextualValidFixture as EvidenceBundle;
+    // @ts-expect-error liveness is added to EvidenceBundle DTO in Task 2
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
+    const liveness = bundle.assessment.liveness;
+
+    expect(liveness).toBeDefined();
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-argument
+    expect(Object.keys(liveness ?? {})).not.toHaveLength(0);
+  });
+
   it('verifies every vendored evidence asset against pinned provenance', () => {
     expect(evidenceBundleProvenance.commit).toBe('a46581862ee4f2cd82cb68dbb66088a2af375a7c');
     expect(evidenceBundleProvenance.schemaPath).toBe(
