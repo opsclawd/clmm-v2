@@ -9,16 +9,14 @@ import { buildEvidenceViewModel } from '../view-models/EvidenceViewModel.js';
 afterEach(cleanup);
 
 function createLegacyUnavailableBundle() {
-  const payload = JSON.parse(JSON.stringify(contextualFixture)) as typeof contextualFixture & {
-    assessment: {
-      liveness?: unknown;
-      coverage: Record<string, unknown>;
-    };
-    contextualEvidence: Record<string, unknown>;
+  const payload = JSON.parse(JSON.stringify(contextualFixture)) as typeof contextualFixture;
+  const assessment = payload.assessment as {
+    liveness?: unknown;
+    coverage: { supportResistance?: string };
   };
-  delete payload.assessment.liveness;
-  payload.contextualEvidence.supportResistance = [];
-  payload.assessment.coverage.supportResistance = 'unavailable';
+  delete assessment.liveness;
+  (payload.contextualEvidence as { supportResistance?: unknown[] }).supportResistance = [];
+  assessment.coverage.supportResistance = 'unavailable';
   const parsed = parseEvidenceBundle(payload);
   if (!parsed) throw new Error('Legacy-compatible canonical evidence fixture must validate');
   return parsed;
