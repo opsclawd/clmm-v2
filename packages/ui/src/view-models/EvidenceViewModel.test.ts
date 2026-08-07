@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import contextualFixture from '../../../../schemas/regime-engine/evidence-bundle.v1/fixtures/valid/contextual.json' with { type: 'json' };
 import deterministicOnlyFixture from '../../../../schemas/regime-engine/evidence-bundle.v1/fixtures/valid/deterministic-only.json' with { type: 'json' };
 import type { EvidenceBundle } from '@clmm/application/public';
-import { buildEvidenceViewModel } from './EvidenceViewModel.js';
+import { buildEvidenceViewModel, formatLastCollectedLabel } from './EvidenceViewModel.js';
 
 describe('buildEvidenceViewModel', () => {
   const FIXED_NOW = Date.parse('2024-01-15T10:30:00.000Z');
@@ -555,5 +555,48 @@ describe('buildEvidenceViewModel', () => {
     expect(liquidityCard?.warnings).toEqual(['Deterministic pipeline degraded']);
     expect(srCard?.warnings).toEqual([]);
     expect(vm.warnings).toEqual([]);
+  });
+});
+
+describe('formatLastCollectedLabel', () => {
+  const NOW = Date.parse('2024-01-15T18:00:00.000Z');
+
+  it('formats unconfigured liveness as No collector configured', () => {
+    expect(formatLastCollectedLabel(undefined, NOW)).toBe('No collector configured');
+    expect(formatLastCollectedLabel({ isConfigured: false, lastCollectedAt: null }, NOW)).toBe(
+      'No collector configured',
+    );
+  });
+
+  it('formats null lastCollectedAt as No successful run recorded', () => {
+    expect(formatLastCollectedLabel({ isConfigured: true, lastCollectedAt: null }, NOW)).toBe(
+      'No successful run recorded',
+    );
+  });
+
+  it('formats minutes under 60 with a minimum of 1m', () => {
+    expect(
+      formatLastCollectedLabel(
+        { isConfigured: true, lastCollectedAt: '2024-01-15T17:15:00.000Z' },
+        NOW,
+      ),
+    ).toBe('Last run 45m ago');
+
+    // Future clock skew
+    expect(
+      formatLastCollectedLabel(
+        { isConfigured: true, lastCollectedAt: '2024-01-15T18:05:00.000Z' },
+        NOW,
+      ),
+    ).toBe('Last run 1m ago');
+  });
+
+  it('formats whole hours for 60 minutes or more', () => {
+    expect(
+      formatLastCollectedLabel(
+        { isConfigured: true, lastCollectedAt: '2024-01-15T10:00:00.000Z' },
+        NOW,
+      ),
+    ).toBe('Last run 8h ago');
   });
 });
