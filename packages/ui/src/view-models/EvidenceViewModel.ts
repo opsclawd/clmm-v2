@@ -20,15 +20,13 @@ export type EvidenceFamilyAvailability =
 // its collector's cron interval in sol-usdc-clmm-intelligence/cron/jobs.yaml
 // (a family is "stopped" only once it has missed three cycles), floored at 30
 // minutes so short-cadence families tolerate ordinary scheduling jitter.
-// Keyed by the contract's contextual family ids only. The deterministic cards
-// (risk, market_state, liquidity, clmm_economics, position_state, price_quality)
-// have no entry on purpose: the contract carries a single `deterministic`
-// liveness value reduced with Math.max() across five sources, one of which
-// (clmm-v2-bundle) runs every minute. Mapping that onto those cards would
-// report "Last run 1m ago" while their features sat hours stale, so they
-// deliberately render `liveness_unknown` until per-sub-family liveness exists.
-// See clmm-v2#155.
 const FAMILY_COLLECTION_STALE_AFTER_MS: Record<string, number> = {
+  risk: 30 * 60 * 1_000, // binance-fapi + drift-api: */5
+  market_state: 30 * 60 * 1_000, // pyth-hermes + jupiter-quote: */5
+  price_quality: 30 * 60 * 1_000, // pyth-hermes + jupiter-quote: */5
+  clmm_economics: 30 * 60 * 1_000, // clmm-v2-bundle + solana-rpc: * * * * *
+  position_state: 30 * 60 * 1_000, // clmm-v2-bundle: * * * * *
+  liquidity: 30 * 60 * 1_000, // clmm-v2-bundle + orca-public-api: * * * * *
   derivatives: 30 * 60 * 1_000, // perp-liquidation: */5
   flows: 45 * 60 * 1_000, // on-chain-flow: */15
   newsRegulatory: 6 * 60 * 60 * 1_000, // news-evidence: 0 */2
@@ -126,7 +124,7 @@ export interface EvidenceFamilyCardViewModel {
   id: string;
   title: string;
   availability: EvidenceFamilyAvailability;
-  lastCollectedLabel: string;
+  lastCollectedLabel: string | null;
   freshnessLabel: string;
   stale: boolean;
   rows: EvidenceFamilyCardRowViewModel[];
@@ -429,7 +427,8 @@ export function buildEvidenceViewModel(
       id,
       title,
       availability,
-      lastCollectedLabel: formatLastCollectedLabel(livenessRecord, now),
+      lastCollectedLabel:
+        availability === 'available' ? null : formatLastCollectedLabel(livenessRecord, now),
       freshnessLabel: isStale ? 'Stale' : 'Fresh',
       stale: isStale,
       rows,

@@ -75,7 +75,12 @@ export function EvidenceFamilyCard({ card }: EvidenceFamilyCardProps): JSX.Eleme
   }
 
   const statusDisplay = availabilityDisplayLabel(card.availability);
-  const accessibleLabel = `${card.title}, ${statusDisplay}, ${card.lastCollectedLabel}, ${card.freshnessLabel}`;
+  const accessibilitySegments: string[] = [card.title, statusDisplay];
+  if (card.lastCollectedLabel !== null) {
+    accessibilitySegments.push(card.lastCollectedLabel);
+  }
+  accessibilitySegments.push(card.freshnessLabel);
+  const accessibleLabel = accessibilitySegments.join(', ');
 
   return (
     <View
@@ -110,14 +115,16 @@ export function EvidenceFamilyCard({ card }: EvidenceFamilyCardProps): JSX.Eleme
           >
             {card.freshnessLabel}
           </Text>
-          <Text
-            style={{
-              color: colors.textTertiary,
-              fontSize: typography.fontSize.xs,
-            }}
-          >
-            {card.lastCollectedLabel}
-          </Text>
+          {card.lastCollectedLabel !== null ? (
+            <Text
+              style={{
+                color: colors.textTertiary,
+                fontSize: typography.fontSize.xs,
+              }}
+            >
+              {card.lastCollectedLabel}
+            </Text>
+          ) : null}
           <Text
             style={{
               color: availabilityColor(card.availability),
