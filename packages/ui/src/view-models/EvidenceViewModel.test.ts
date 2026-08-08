@@ -183,7 +183,7 @@ describe('buildEvidenceViewModel', () => {
     expect(srCard?.availability).toBe('available');
     expect(srCard?.lastCollectedLabel).toBeNull();
 
-    bundle.contextualEvidence!.supportResistance = [];
+    bundle.contextualEvidence.supportResistance = [];
     const vmEmpty = buildEvidenceViewModel(bundle, FIXED_NOW);
     const srCardEmpty = vmEmpty.cards.find((c) => c.id === 'supportResistance');
     expect(srCardEmpty?.availability).toBe('available');
