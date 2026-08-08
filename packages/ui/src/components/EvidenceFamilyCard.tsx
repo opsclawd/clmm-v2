@@ -27,6 +27,8 @@ function availabilityDisplayLabel(availability: EvidenceFamilyAvailability): str
       return 'No qualifying data';
     case 'collection_stopped':
       return 'Collection stopped';
+    case 'liveness_unknown':
+      return 'Collector status unavailable';
     case 'available':
       return 'available';
     case 'partial':
@@ -48,6 +50,7 @@ function availabilityColor(availability: EvidenceFamilyAvailability): string {
     case 'available':
       return colors.safe;
     case 'partial':
+    case 'liveness_unknown':
       return colors.warn;
     case 'invalid':
     case 'collection_stopped':

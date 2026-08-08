@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import contextualFixture from '../../../../schemas/regime-engine/evidence-bundle.v1/fixtures/valid/contextual.json' with { type: 'json' };
+import livenessFixture from '../../../../schemas/regime-engine/evidence-bundle.v1/fixtures/valid/liveness.json' with { type: 'json' };
 import type {
   EvidenceBundle,
   EvidenceUnavailableReason,
@@ -12,6 +13,7 @@ import type {
   EvidenceSourceReference,
   BundleAssessment,
   BundleProvenance,
+  EvidenceCollectorLiveness,
 } from './index.js';
 import { parseEvidenceBundle } from './index.js';
 
@@ -27,6 +29,11 @@ describe('Public Evidence API exports', () => {
     const _refs: EvidenceSourceReference[] = sample.sourceReferences;
     const _assessment: BundleAssessment = sample.assessment;
     const _provenance: BundleProvenance = sample.provenance;
+    // liveness is exercised against the canonical liveness fixture; contextual.json
+    // deliberately has no liveness map, and vendored fixtures must not be edited.
+    const livenessSample = livenessFixture as unknown as EvidenceBundle;
+    const _liveness: Record<string, EvidenceCollectorLiveness> | undefined =
+      livenessSample.assessment.liveness;
 
     expect(sample.schemaVersion).toBe('evidence-bundle.v1');
     expect(sample.pair).toBe('SOL/USDC');
@@ -38,6 +45,7 @@ describe('Public Evidence API exports', () => {
     expect(_refs.length).toBeGreaterThan(0);
     expect(_assessment).toBeDefined();
     expect(_provenance).toBeDefined();
+    expect(_liveness).toBeDefined();
 
     const parsed = parseEvidenceBundle(sample);
     expect(parsed).toBe(sample);

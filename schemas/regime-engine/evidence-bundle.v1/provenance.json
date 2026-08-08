@@ -1,9 +1,9 @@
 {
   "repository": "https://github.com/opsclawd/regime-engine",
-  "commit": "a46581862ee4f2cd82cb68dbb66088a2af375a7c",
+  "commit": "c0d233f61d0f15343bf4824a6fe5eb682843ecd2",
   "schemaPath": "contracts/evidence-bundle/v1/evidence-bundle.schema.json",
   "schemaVersion": "v1",
-  "copiedAt": "2026-08-02T20:45:00Z",
+  "copiedAt": "2026-08-08T01:14:52Z",
   "assets": [
     {
       "sourcePath": "contracts/evidence-bundle/v1/fixtures/invalid/duplicate-lineage.json",
@@ -83,12 +83,17 @@
     {
       "sourcePath": "contracts/evidence-bundle/v1/evidence-bundle.schema.json",
       "localPath": "schemas/regime-engine/evidence-bundle.v1/schema.json",
-      "sha256": "0146b073cc607b47e52c615f6299294b1fd8f133d8a4b128bd2a95dc20f77b17"
+      "sha256": "08c32eb2afda78be55d5c59417b3cd1ceaa693ff0bcd98baa66417af8c469be9"
     },
     {
       "sourcePath": "contracts/evidence-bundle/v1/schema.sha256",
       "localPath": "schemas/regime-engine/evidence-bundle.v1/schema.sha256",
-      "sha256": "1b82f810fe3a875cc7e0d91e3d554240978b740092c89ed06da0d8c451a8c7aa"
+      "sha256": "a4507b8059a8b36717846676051bf6a31bc6c59c0a9bfc863a0669f449dfc37d"
+    },
+    {
+      "sourcePath": "contracts/evidence-bundle/v1/fixtures/valid/liveness.json",
+      "localPath": "schemas/regime-engine/evidence-bundle.v1/fixtures/valid/liveness.json",
+      "sha256": "31ea43c527f635ae8dffb900065b62cfb169ebafc94ba9f52da7b4533826c320"
     }
   ]
 }

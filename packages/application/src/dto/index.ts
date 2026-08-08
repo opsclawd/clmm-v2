@@ -499,6 +499,7 @@ export type {
   FamilyCoverage,
   BundleWarning,
   QualityLevel,
+  EvidenceCollectorLiveness,
   BundleAssessment,
   BundleProvenance,
 } from './evidence.js';

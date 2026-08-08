@@ -35,7 +35,7 @@ describe('Evidence liveness contract regression', () => {
     });
 
     render(<EvidenceFamilyCard card={card!} />);
-    expect(screen.getByText('Collector status unavailable')).toBeDefined();
+    expect(screen.getAllByText('Collector status unavailable').length).toBeGreaterThan(0);
   });
 
   it('announces unknown liveness in the family card accessibility label', () => {

@@ -9,6 +9,7 @@ import evidenceBundleSchema from '../../../../schemas/regime-engine/evidence-bun
 import evidenceBundleProvenance from '../../../../schemas/regime-engine/evidence-bundle.v1/provenance.json' with { type: 'json' };
 
 import contextualValidFixture from '../../../../schemas/regime-engine/evidence-bundle.v1/fixtures/valid/contextual.json' with { type: 'json' };
+import livenessValidFixture from '../../../../schemas/regime-engine/evidence-bundle.v1/fixtures/valid/liveness.json' with { type: 'json' };
 
 const ajv = new Ajv2020({
   strict: true,
@@ -34,12 +35,14 @@ describe('Evidence bundle contract schema validation', () => {
   // liveness. This documents the contract gap that a follow-up task closes;
   // it.fails keeps the suite green until then and flips to a real failure
   // (forcing this test to be un-skipped) once liveness lands.
-  it.fails('canonical fixture exposes typed collector liveness', () => {
-    const bundle: EvidenceBundle = contextualValidFixture as EvidenceBundle;
-    const liveness = (bundle.assessment as { liveness?: unknown }).liveness;
+  it('canonical fixture exposes typed collector liveness', () => {
+    // liveness lives on its own canonical fixture; contextual.json has none and
+    // vendored fixtures must not be edited to add it.
+    const bundle: EvidenceBundle = livenessValidFixture as unknown as EvidenceBundle;
+    const liveness = bundle.assessment.liveness;
 
     expect(liveness).toBeDefined();
-    expect(Object.keys((liveness as Record<string, unknown>) ?? {})).not.toHaveLength(0);
+    expect(Object.keys(liveness ?? {})).not.toHaveLength(0);
   });
 
   it('canonical fixture exposes typed family coverage', () => {
