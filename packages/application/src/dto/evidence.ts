@@ -254,11 +254,17 @@ export interface BundleWarning {
 
 export type QualityLevel = 'complete' | 'partial' | 'degraded';
 
+export interface EvidenceCollectorLiveness {
+  isConfigured: boolean;
+  lastCollectedAt: string | null;
+}
+
 export interface BundleAssessment {
   overallConfidenceBps: number;
   quality: QualityLevel;
   coverage: FamilyCoverage;
   warnings: BundleWarning[];
+  liveness?: Record<string, EvidenceCollectorLiveness>;
 }
 
 export interface BundleProvenance {

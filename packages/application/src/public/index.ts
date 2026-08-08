@@ -94,6 +94,7 @@ export type {
   FamilyCoverage,
   BundleWarning,
   QualityLevel,
+  EvidenceCollectorLiveness,
   BundleAssessment,
   BundleProvenance,
 } from '../dto/index.js';

@@ -3,6 +3,7 @@ import type {
   EvidenceClaimDirection,
   CoverageStatus,
   EvidenceSourceReference,
+  EvidenceCollectorLiveness,
 } from '@clmm/application/public';
 
 export type EvidenceFamilyAvailability =
@@ -10,12 +11,8 @@ export type EvidenceFamilyAvailability =
   | 'invalid'
   | 'not_configured'
   | 'no_data'
-  | 'collection_stopped';
-
-export interface FamilyLiveness {
-  isConfigured: boolean;
-  lastCollectedAt: string | null;
-}
+  | 'collection_stopped'
+  | 'liveness_unknown';
 
 // Collector cadences differ by two orders of magnitude — perp-liquidation runs
 // every 5 minutes, support-resistance every 4 hours — so a single global
@@ -23,10 +20,15 @@ export interface FamilyLiveness {
 // its collector's cron interval in sol-usdc-clmm-intelligence/cron/jobs.yaml
 // (a family is "stopped" only once it has missed three cycles), floored at 30
 // minutes so short-cadence families tolerate ordinary scheduling jitter.
+// Keyed by the contract's contextual family ids only. The deterministic cards
+// (risk, market_state, liquidity, clmm_economics, position_state, price_quality)
+// have no entry on purpose: the contract carries a single `deterministic`
+// liveness value reduced with Math.max() across five sources, one of which
+// (clmm-v2-bundle) runs every minute. Mapping that onto those cards would
+// report "Last run 1m ago" while their features sat hours stale, so they
+// deliberately render `liveness_unknown` until per-sub-family liveness exists.
+// See clmm-v2#155.
 const FAMILY_COLLECTION_STALE_AFTER_MS: Record<string, number> = {
-  // risk and market_state derive from the 5-minute price/perp samplers
-  risk: 30 * 60 * 1_000,
-  market_state: 30 * 60 * 1_000,
   derivatives: 30 * 60 * 1_000, // perp-liquidation: */5
   flows: 45 * 60 * 1_000, // on-chain-flow: */15
   newsRegulatory: 6 * 60 * 60 * 1_000, // news-evidence: 0 */2
@@ -42,7 +44,7 @@ export function collectionStaleAfterMs(familyId: string): number {
 
 function classifyUnavailableFamily(
   familyId: string,
-  liveness: FamilyLiveness,
+  liveness: EvidenceCollectorLiveness,
   now: number,
 ): 'not_configured' | 'no_data' | 'collection_stopped' {
   if (!liveness.isConfigured) return 'not_configured';
@@ -52,11 +54,25 @@ function classifyUnavailableFamily(
     : 'no_data';
 }
 
+function resolveUnavailableFamily(
+  familyId: string,
+  availability: EvidenceFamilyAvailability,
+  liveness: EvidenceCollectorLiveness | undefined,
+  now: number,
+): EvidenceFamilyAvailability {
+  if (availability !== 'unavailable') return availability;
+  if (!liveness) return 'liveness_unknown';
+  return classifyUnavailableFamily(familyId, liveness, now);
+}
+
 export function formatLastCollectedLabel(
-  liveness: FamilyLiveness | undefined,
+  liveness: EvidenceCollectorLiveness | undefined,
   now: number,
 ): string {
-  if (!liveness || !liveness.isConfigured) {
+  if (!liveness) {
+    return 'Collector status unavailable';
+  }
+  if (!liveness.isConfigured) {
     return 'No collector configured';
   }
   if (liveness.lastCollectedAt === null) {
@@ -327,7 +343,7 @@ export function buildEvidenceViewModel(
     }
   }
 
-  const livenessMap = (bundle.assessment as { liveness?: Record<string, FamilyLiveness> }).liveness;
+  const livenessMap = bundle.assessment.liveness;
   const cards: EvidenceFamilyCardViewModel[] = [];
 
   // 1. Build deterministic family cards (in canonical order)
@@ -348,9 +364,7 @@ export function buildEvidenceViewModel(
     else if (allAvailable) availability = 'available';
     else if (allUnavailable) availability = 'unavailable';
 
-    if (availability === 'unavailable' && livenessRecord) {
-      availability = classifyUnavailableFamily(id, livenessRecord, now);
-    }
+    availability = resolveUnavailableFamily(id, availability, livenessRecord, now);
 
     const isFeatureStale = features.some(
       (feature) => Boolean(feature.freshUntil) && Date.parse(feature.freshUntil!) <= now,
@@ -431,9 +445,7 @@ export function buildEvidenceViewModel(
     const livenessRecord = livenessMap?.[fam.id];
     let availability: EvidenceFamilyAvailability = bundle.assessment.coverage[fam.id];
 
-    if (availability === 'unavailable' && livenessRecord) {
-      availability = classifyUnavailableFamily(fam.id, livenessRecord, now);
-    }
+    availability = resolveUnavailableFamily(fam.id, availability, livenessRecord, now);
 
     if (claimsArray.length === 0) {
       const isStale = isBundleExpired || availability === 'collection_stopped';

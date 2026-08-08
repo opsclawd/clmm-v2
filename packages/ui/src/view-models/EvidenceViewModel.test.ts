@@ -60,7 +60,7 @@ describe('buildEvidenceViewModel', () => {
 
     const srCard = vm.cards.find((card) => card.id === 'supportResistance');
     expect(srCard).toMatchObject({
-      availability: 'unavailable',
+      availability: 'liveness_unknown',
       claims: [],
       rows: [{ label: 'Claims', value: '—' }],
     });
@@ -106,7 +106,7 @@ describe('buildEvidenceViewModel', () => {
 
     expect(riskCard).toMatchObject({
       title: 'Risk',
-      availability: 'unavailable',
+      availability: 'liveness_unknown',
       freshnessLabel: 'Fresh',
       stale: false,
       rows: [
@@ -144,7 +144,7 @@ describe('buildEvidenceViewModel', () => {
     bundle.deterministicFeatures[0]!.status = 'unavailable';
     const vm = buildEvidenceViewModel(bundle, FIXED_NOW);
     const msCard = vm.cards.find((c) => c.id === 'market_state');
-    expect(msCard?.availability).toBe('unavailable');
+    expect(msCard?.availability).toBe('liveness_unknown');
     expect(msCard?.stale).toBe(false);
   });
 
@@ -561,8 +561,8 @@ describe('buildEvidenceViewModel', () => {
 describe('formatLastCollectedLabel', () => {
   const NOW = Date.parse('2024-01-15T18:00:00.000Z');
 
-  it('formats unconfigured liveness as No collector configured', () => {
-    expect(formatLastCollectedLabel(undefined, NOW)).toBe('No collector configured');
+  it('formats missing or unconfigured liveness correctly', () => {
+    expect(formatLastCollectedLabel(undefined, NOW)).toBe('Collector status unavailable');
     expect(formatLastCollectedLabel({ isConfigured: false, lastCollectedAt: null }, NOW)).toBe(
       'No collector configured',
     );

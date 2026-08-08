@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import contextualFixture from '../../../../schemas/regime-engine/evidence-bundle.v1/fixtures/valid/contextual.json' with { type: 'json' };
 import deterministicOnlyFixture from '../../../../schemas/regime-engine/evidence-bundle.v1/fixtures/valid/deterministic-only.json' with { type: 'json' };
+import livenessFixture from '../../../../schemas/regime-engine/evidence-bundle.v1/fixtures/valid/liveness.json' with { type: 'json' };
 import { parseEvidenceBundle } from './evidenceBundleValidator.js';
 
 function deepClone<T>(obj: T): T {
@@ -12,8 +13,21 @@ describe('parseEvidenceBundle', () => {
     const parsedContextual = parseEvidenceBundle(contextualFixture);
     expect(parsedContextual).toBe(contextualFixture);
 
+    // liveness identity is checked against the canonical liveness fixture —
+    // contextual.json carries no liveness map and must not be edited to add one.
+    const parsedLiveness = parseEvidenceBundle(livenessFixture);
+    expect(parsedLiveness).toBe(livenessFixture);
+    expect(parsedLiveness?.assessment.liveness).toBe(livenessFixture.assessment.liveness);
+
     const parsedDeterministic = parseEvidenceBundle(deterministicOnlyFixture);
     expect(parsedDeterministic).toBe(deterministicOnlyFixture);
+  });
+
+  it('accepts a valid legacy bundle without collector liveness', () => {
+    const { liveness: _omitted, ...assessment } = livenessFixture.assessment;
+    const legacyBundle = { ...livenessFixture, assessment };
+
+    expect(parseEvidenceBundle(legacyBundle)).toBe(legacyBundle);
   });
 
   it('returns null when a required field is removed', () => {

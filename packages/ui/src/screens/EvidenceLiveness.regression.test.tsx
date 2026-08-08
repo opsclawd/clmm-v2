@@ -1,7 +1,11 @@
 import React from 'react';
 import { afterEach, describe, expect, it } from 'vitest';
 import { cleanup, render, screen } from '@testing-library/react';
-import type { EvidenceBundle } from '@clmm/application/public';
+import {
+  parseEvidenceBundle,
+  type BundleAssessment,
+  type EvidenceBundle,
+} from '@clmm/application/public';
 import deterministicOnlyFixture from '../../../../schemas/regime-engine/evidence-bundle.v1/fixtures/valid/deterministic-only.json' with { type: 'json' };
 import {
   buildEvidenceViewModel,
@@ -15,15 +19,19 @@ afterEach(() => {
 
 const NOW = Date.parse('2024-01-15T18:00:00.000Z');
 
+type LivenessMap = NonNullable<BundleAssessment['liveness']>;
+
 const liveness = {
   market_state: { isConfigured: true, lastCollectedAt: '2024-01-15T10:00:00.000Z' },
   risk: { isConfigured: true, lastCollectedAt: '2024-01-15T10:00:00.000Z' },
   flows: { isConfigured: true, lastCollectedAt: '2024-01-15T17:30:00.000Z' },
   supportResistance: { isConfigured: false, lastCollectedAt: null },
-};
+} satisfies LivenessMap;
 
 function createSimulatedOutageBundle(): EvidenceBundle {
-  const bundle = JSON.parse(JSON.stringify(deterministicOnlyFixture)) as unknown as EvidenceBundle;
+  const parsed = parseEvidenceBundle(JSON.parse(JSON.stringify(deterministicOnlyFixture)));
+  if (!parsed) throw new Error('Canonical evidence fixture must validate');
+  const bundle = parsed;
 
   bundle.deterministicFeatures = [
     {
@@ -60,17 +68,13 @@ function createSimulatedOutageBundle(): EvidenceBundle {
     researchBrief: 'unavailable',
   };
 
-  const coverageRecord = bundle.assessment.coverage as unknown as Record<string, string>;
-  coverageRecord['risk'] = 'unavailable';
-  coverageRecord['market_state'] = 'unavailable';
-
-  (bundle.assessment as unknown as Record<string, unknown>)['liveness'] = liveness;
+  bundle.assessment.liveness = liveness;
 
   return bundle;
 }
 
 describe('EvidenceLiveness regression', () => {
-  it('configured stale unavailable family is rendered as Collection stopped with its last run', () => {
+  it('uses canonical liveness records without fixture injection', () => {
     const bundle = createSimulatedOutageBundle();
     const vm = buildEvidenceViewModel(bundle, NOW);
 
@@ -120,10 +124,10 @@ describe('EvidenceLiveness regression', () => {
 
   it('configured unavailable family with no successful run is rendered as Collection stopped', () => {
     const bundle = createSimulatedOutageBundle();
-    (bundle.assessment as unknown as Record<string, unknown>)['liveness'] = {
+    bundle.assessment.liveness = {
       ...liveness,
       derivatives: { isConfigured: true, lastCollectedAt: null },
-    };
+    } satisfies LivenessMap;
 
     const vm = buildEvidenceViewModel(bundle, NOW);
     const card = vm.cards.find((c) => c.id === 'derivatives');
@@ -144,16 +148,16 @@ describe('EvidenceLiveness regression', () => {
     const atBoundary = new Date(NOW - threshold).toISOString();
     const oneMsInsideBoundary = new Date(NOW - threshold + 1).toISOString();
 
-    (bundle.assessment as unknown as Record<string, unknown>)['liveness'] = {
+    bundle.assessment.liveness = {
       flows: { isConfigured: true, lastCollectedAt: oneMsInsideBoundary },
-    };
+    } satisfies LivenessMap;
     expect(
       buildEvidenceViewModel(bundle, NOW).cards.find((c) => c.id === 'flows')?.availability,
     ).toBe('no_data');
 
-    (bundle.assessment as unknown as Record<string, unknown>)['liveness'] = {
+    bundle.assessment.liveness = {
       flows: { isConfigured: true, lastCollectedAt: atBoundary },
-    };
+    } satisfies LivenessMap;
     expect(
       buildEvidenceViewModel(bundle, NOW).cards.find((c) => c.id === 'flows')?.availability,
     ).toBe('collection_stopped');
@@ -163,10 +167,10 @@ describe('EvidenceLiveness regression', () => {
     const bundle = createSimulatedOutageBundle();
     const threeHoursAgo = new Date(NOW - 3 * 60 * 60 * 1_000).toISOString();
 
-    (bundle.assessment as unknown as Record<string, unknown>)['liveness'] = {
+    bundle.assessment.liveness = {
       derivatives: { isConfigured: true, lastCollectedAt: threeHoursAgo },
       events: { isConfigured: true, lastCollectedAt: threeHoursAgo },
-    };
+    } satisfies LivenessMap;
 
     const vm = buildEvidenceViewModel(bundle, NOW);
 
@@ -182,9 +186,9 @@ describe('EvidenceLiveness regression', () => {
     bundle.deterministicFeatures[0]!.status = 'available';
     bundle.deterministicFeatures[0]!.value = 42;
 
-    (bundle.assessment as unknown as Record<string, unknown>)['liveness'] = {
-      risk: { isConfigured: true, lastCollectedAt: '2024-01-15T10:00:00.000Z' }, // 8h ago
-    };
+    bundle.assessment.liveness = {
+      risk: { isConfigured: true, lastCollectedAt: '2024-01-15T10:00:00.000Z' },
+    } satisfies LivenessMap;
 
     let vm = buildEvidenceViewModel(bundle, NOW);
     let card = vm.cards.find((c) => c.id === 'risk');
