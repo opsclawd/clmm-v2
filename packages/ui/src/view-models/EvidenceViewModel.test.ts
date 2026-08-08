@@ -172,6 +172,35 @@ describe('buildEvidenceViewModel', () => {
     expect(claim).not.toHaveProperty('recommendation');
   });
 
+  it('suppresses lastCollectedLabel for contextual families when availability is available', () => {
+    const bundle = JSON.parse(JSON.stringify(contextualFixture)) as unknown as EvidenceBundle;
+    bundle.assessment.coverage.supportResistance = 'available';
+    bundle.assessment.liveness = {
+      supportResistance: { isConfigured: true, lastCollectedAt: '2024-01-15T10:00:00.000Z' },
+    };
+    const vm = buildEvidenceViewModel(bundle, FIXED_NOW);
+    const srCard = vm.cards.find((c) => c.id === 'supportResistance');
+    expect(srCard?.availability).toBe('available');
+    expect(srCard?.lastCollectedLabel).toBeNull();
+
+    bundle.contextualEvidence.supportResistance = [];
+    const vmEmpty = buildEvidenceViewModel(bundle, FIXED_NOW);
+    const srCardEmpty = vmEmpty.cards.find((c) => c.id === 'supportResistance');
+    expect(srCardEmpty?.availability).toBe('available');
+    expect(srCardEmpty?.lastCollectedLabel).toBeNull();
+  });
+
+  it('classifies unavailable family as collection_stopped if lastCollectedAt is unparseable (NaN)', () => {
+    const bundle = JSON.parse(JSON.stringify(contextualFixture)) as unknown as EvidenceBundle;
+    bundle.assessment.coverage.supportResistance = 'unavailable';
+    bundle.assessment.liveness = {
+      supportResistance: { isConfigured: true, lastCollectedAt: 'invalid-date-string' },
+    };
+    const vm = buildEvidenceViewModel(bundle, FIXED_NOW);
+    const srCard = vm.cards.find((c) => c.id === 'supportResistance');
+    expect(srCard?.availability).toBe('collection_stopped');
+  });
+
   it('formats last-collected timestamp accurately', () => {
     const bundle = contextualFixture as unknown as EvidenceBundle;
     const vm = buildEvidenceViewModel(bundle, FIXED_NOW);
