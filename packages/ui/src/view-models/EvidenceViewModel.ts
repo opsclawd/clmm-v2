@@ -47,7 +47,8 @@ function classifyUnavailableFamily(
 ): 'not_configured' | 'no_data' | 'collection_stopped' {
   if (!liveness.isConfigured) return 'not_configured';
   if (liveness.lastCollectedAt === null) return 'collection_stopped';
-  return now - Date.parse(liveness.lastCollectedAt) >= collectionStaleAfterMs(familyId)
+  const lastMs = Date.parse(liveness.lastCollectedAt);
+  return Number.isNaN(lastMs) || now - lastMs >= collectionStaleAfterMs(familyId)
     ? 'collection_stopped'
     : 'no_data';
 }
@@ -452,7 +453,8 @@ export function buildEvidenceViewModel(
         id: fam.id,
         title: fam.title,
         availability,
-        lastCollectedLabel: formatLastCollectedLabel(livenessRecord, now),
+        lastCollectedLabel:
+          availability === 'available' ? null : formatLastCollectedLabel(livenessRecord, now),
         freshnessLabel: isStale ? 'Stale' : '—',
         stale: isStale,
         rows: [{ label: 'Claims', value: '—', warnings: [] }],
@@ -479,7 +481,8 @@ export function buildEvidenceViewModel(
       id: fam.id,
       title: fam.title,
       availability,
-      lastCollectedLabel: formatLastCollectedLabel(livenessRecord, now),
+      lastCollectedLabel:
+        availability === 'available' ? null : formatLastCollectedLabel(livenessRecord, now),
       freshnessLabel: isStale ? 'Stale' : 'Fresh',
       stale: isStale,
       rows: [{ label: 'Claims count', value: `${claimsArray.length}`, warnings: [] }],
