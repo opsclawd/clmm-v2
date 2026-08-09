@@ -75,7 +75,11 @@ export function EvidenceFamilyCard({ card }: EvidenceFamilyCardProps): JSX.Eleme
   }
 
   const statusDisplay = availabilityDisplayLabel(card.availability);
-  const accessibilitySegments: string[] = [card.title, statusDisplay];
+  const accessibilitySegments: string[] = [card.title];
+  if (card.contributed) {
+    accessibilitySegments.push('Contributed');
+  }
+  accessibilitySegments.push(statusDisplay);
   if (card.lastCollectedLabel !== null) {
     accessibilitySegments.push(card.lastCollectedLabel);
   }
@@ -107,6 +111,29 @@ export function EvidenceFamilyCard({ card }: EvidenceFamilyCardProps): JSX.Eleme
           {card.title}
         </Text>
         <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+          {card.contributed ? (
+            <View
+              testID={`evidence-family-contributed-${card.id}`}
+              style={{
+                paddingHorizontal: 8,
+                paddingVertical: 3,
+                borderRadius: 999,
+                backgroundColor: colors.safeMuted,
+                borderWidth: 1,
+                borderColor: colors.primary,
+              }}
+            >
+              <Text
+                style={{
+                  color: colors.primary,
+                  fontSize: typography.fontSize.xs,
+                  fontWeight: typography.fontWeight.bold,
+                }}
+              >
+                Contributed
+              </Text>
+            </View>
+          ) : null}
           <Text
             style={{
               color: card.stale ? colors.warn : colors.textTertiary,
