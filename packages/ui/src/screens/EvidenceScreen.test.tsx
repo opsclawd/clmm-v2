@@ -362,4 +362,54 @@ describe('EvidenceScreen', () => {
     expect(screen.getByText('Market state')).toBeDefined();
     expect(screen.queryByText('SECRET_DEGRADED_REASONING_STRING_DO_NOT_RENDER')).toBeNull();
   });
+
+  it('passes the current insight selected source references into family contribution state', () => {
+    const bundle = JSON.parse(
+      JSON.stringify(deterministicOnlyFixture),
+    ) as unknown as EvidenceBundle;
+    const policyInsight = JSON.parse(
+      JSON.stringify(currentPositionFixture),
+    ) as unknown as PolicyInsightBlock;
+    policyInsight.evidence.selectedBundleRefs = policyInsight.evidence.selectedBundleRefs.map(
+      (reference, index) => (index === 0 ? { ...reference, runId: bundle.runId } : reference),
+    );
+    policyInsight.evidence.selectedSourceRefs = [
+      {
+        referenceId: 'ref-price-source',
+        sourceType: 'api',
+        locator: 'a'.repeat(64),
+        observedAt: '2024-01-15T10:00:00.000Z',
+      },
+    ];
+
+    render(<EvidenceScreen evidence={bundle} now={FIXED_NOW} policyInsight={policyInsight} />);
+
+    expect(screen.getByTestId('evidence-family-card-market_state').textContent).toContain(
+      'Contributed',
+    );
+    expect(screen.getByTestId('evidence-family-card-flows').textContent).not.toContain(
+      'Contributed',
+    );
+  });
+
+  it('renders the pipeline explainer after policy reasons and before family cards', () => {
+    const bundle = JSON.parse(
+      JSON.stringify(deterministicOnlyFixture),
+    ) as unknown as EvidenceBundle;
+    const policyInsight = JSON.parse(
+      JSON.stringify(currentPositionFixture),
+    ) as unknown as PolicyInsightBlock;
+
+    const { container } = render(
+      <EvidenceScreen evidence={bundle} now={FIXED_NOW} policyInsight={policyInsight} />,
+    );
+    const text = container.textContent ?? '';
+    const policyIndex = text.indexOf('Policy Recommendation');
+    const pipelineIndex = text.indexOf('How evidence becomes policy');
+    const familyIndex = text.indexOf('Market state');
+
+    expect(policyIndex).toBeGreaterThanOrEqual(0);
+    expect(pipelineIndex).toBeGreaterThan(policyIndex);
+    expect(familyIndex).toBeGreaterThan(pipelineIndex);
+  });
 });
