@@ -11,6 +11,7 @@ afterEach(() => {
 const derivationCapableCard: EvidenceFamilyCardViewModel = {
   id: 'market_state',
   title: 'Market state',
+  contributed: false,
   availability: 'available',
   lastCollectedLabel: 'Last run 30m ago',
   freshnessLabel: 'Fresh',
@@ -77,6 +78,7 @@ describe('EvidenceFamilyCard', () => {
     const card: EvidenceFamilyCardViewModel = {
       id: 'supportResistance',
       title: 'Support & resistance',
+      contributed: false,
       availability: 'unavailable',
       lastCollectedLabel: 'No collector configured',
       freshnessLabel: '—',
@@ -103,6 +105,7 @@ describe('EvidenceFamilyCard', () => {
     const card: EvidenceFamilyCardViewModel = {
       id: 'market_state',
       title: 'Market state',
+      contributed: false,
       availability: 'available',
       lastCollectedLabel: 'Last run 30m ago',
       freshnessLabel: 'Fresh',
@@ -129,6 +132,7 @@ describe('EvidenceFamilyCard', () => {
     const card: EvidenceFamilyCardViewModel = {
       id: 'supportResistance',
       title: 'Support & resistance',
+      contributed: false,
       availability: 'available',
       lastCollectedLabel: 'Last run 30m ago',
       freshnessLabel: 'Stale',

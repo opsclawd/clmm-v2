@@ -10,6 +10,7 @@ import { colors, typography } from '../design-system/index.js';
 import { buildEvidenceViewModel } from '../view-models/EvidenceViewModel.js';
 import { EvidenceFamilyCard } from '../components/EvidenceFamilyCard.js';
 import { ReasonCodesExplainer } from '../components/ReasonCodesExplainer.js';
+import { PipelineExplainer } from '../components/PipelineExplainer.js';
 
 export interface EvidenceScreenProps {
   evidence?: EvidenceBundle | null;
@@ -225,7 +226,10 @@ export function EvidenceScreen({
   }
 
   // 4. Canonical data state
-  const vm = buildEvidenceViewModel(evidence, now);
+  const selectedReferenceIds = new Set(
+    (policyInsight?.evidence.selectedSourceRefs ?? []).map((reference) => reference.referenceId),
+  );
+  const vm = buildEvidenceViewModel(evidence, now, selectedReferenceIds);
   const displayPair = pair ?? evidence.pair ?? 'SOL/USDC';
 
   return (
@@ -252,6 +256,9 @@ export function EvidenceScreen({
         unavailableReason={policyInsightUnavailableReason}
         evidenceRunId={evidence.runId}
       />
+
+      {/* Pipeline Explainer */}
+      <PipelineExplainer />
 
       {/* Header */}
       <View style={{ marginBottom: 16 }}>
