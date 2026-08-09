@@ -281,24 +281,43 @@ export function EvidenceFamilyCard({ card }: EvidenceFamilyCardProps): JSX.Eleme
                         </Text>
                         {derivation.inputs.map((input, inputIdx) => (
                           <View
-                            key={`${input.locator}-${inputIdx}`}
+                            key={`${input.referenceId}-${inputIdx}`}
                             style={{
                               flexDirection: 'row',
                               justifyContent: 'space-between',
+                              alignItems: 'center',
                               flexWrap: 'wrap',
                               gap: 4,
                             }}
                           >
-                            <Text
+                            <View
                               style={{
-                                color: colors.textSecondary,
-                                fontSize: typography.fontSize.xs,
-                                fontFamily: 'monospace',
+                                flexDirection: 'row',
+                                alignItems: 'center',
+                                gap: 6,
                                 flexShrink: 1,
                               }}
                             >
-                              {input.locator}
-                            </Text>
+                              <Text
+                                style={{
+                                  color: colors.textSecondary,
+                                  fontSize: typography.fontSize.xs,
+                                  fontFamily: 'monospace',
+                                }}
+                              >
+                                {input.referenceId}
+                              </Text>
+                              <Text
+                                style={{
+                                  color: input.isResolved ? colors.textTertiary : colors.warn,
+                                  fontSize: typography.fontSize.xs,
+                                }}
+                              >
+                                {input.isResolved
+                                  ? input.sourceTypeLabel
+                                  : 'Unresolved source reference'}
+                              </Text>
+                            </View>
                             <Text
                               style={{
                                 color: colors.textTertiary,
@@ -390,6 +409,68 @@ export function EvidenceFamilyCard({ card }: EvidenceFamilyCardProps): JSX.Eleme
                   Expires: {claim.expiresAtLabel}
                 </Text>
               </View>
+              {claim.sources && claim.sources.length > 0 ? (
+                <View style={{ marginTop: 4, gap: 4 }}>
+                  <Text
+                    style={{
+                      color: colors.textSecondary,
+                      fontSize: typography.fontSize.xs,
+                      fontWeight: typography.fontWeight.semibold,
+                    }}
+                  >
+                    Sources
+                  </Text>
+                  {claim.sources.map((source, sourceIdx) => (
+                    <View
+                      key={`${source.referenceId}-${sourceIdx}`}
+                      style={{
+                        flexDirection: 'row',
+                        justifyContent: 'space-between',
+                        alignItems: 'center',
+                        flexWrap: 'wrap',
+                        gap: 4,
+                      }}
+                    >
+                      <View
+                        style={{
+                          flexDirection: 'row',
+                          alignItems: 'center',
+                          gap: 6,
+                          flexShrink: 1,
+                        }}
+                      >
+                        <Text
+                          style={{
+                            color: colors.textSecondary,
+                            fontSize: typography.fontSize.xs,
+                            fontFamily: 'monospace',
+                          }}
+                        >
+                          {source.referenceId}
+                        </Text>
+                        <Text
+                          style={{
+                            color: source.isResolved ? colors.textTertiary : colors.warn,
+                            fontSize: typography.fontSize.xs,
+                          }}
+                        >
+                          {source.isResolved
+                            ? source.sourceTypeLabel
+                            : 'Unresolved source reference'}
+                        </Text>
+                      </View>
+                      <Text
+                        style={{
+                          color: colors.textTertiary,
+                          fontSize: typography.fontSize.xs,
+                        }}
+                      >
+                        {source.observedAtLabel}
+                      </Text>
+                    </View>
+                  ))}
+                </View>
+              ) : null}
             </View>
           ))}
         </View>

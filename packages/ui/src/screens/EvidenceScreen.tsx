@@ -1,15 +1,25 @@
 import React from 'react';
 import { View, Text, ScrollView, TouchableOpacity, ActivityIndicator } from 'react-native';
-import type { EvidenceBundle, EvidenceUnavailableReason } from '@clmm/application/public';
+import type {
+  EvidenceBundle,
+  EvidenceUnavailableReason,
+  PolicyInsightBlock,
+  PolicyInsightsUnavailableReason,
+} from '@clmm/application/public';
 import { colors, typography } from '../design-system/index.js';
 import { buildEvidenceViewModel } from '../view-models/EvidenceViewModel.js';
 import { EvidenceFamilyCard } from '../components/EvidenceFamilyCard.js';
+import { ReasonCodesExplainer } from '../components/ReasonCodesExplainer.js';
 
 export interface EvidenceScreenProps {
   evidence?: EvidenceBundle | null;
   isLoading?: boolean;
   isError?: boolean;
   unavailableReason?: EvidenceUnavailableReason | null;
+  policyInsight?: PolicyInsightBlock | null;
+  isPolicyInsightLoading?: boolean;
+  isPolicyInsightError?: boolean;
+  policyInsightUnavailableReason?: PolicyInsightsUnavailableReason | null;
   now: number;
   pair?: string;
   onBack?: () => void;
@@ -37,6 +47,10 @@ export function EvidenceScreen({
   isLoading = false,
   isError = false,
   unavailableReason = null,
+  policyInsight = null,
+  isPolicyInsightLoading = false,
+  isPolicyInsightError = false,
+  policyInsightUnavailableReason = null,
   now,
   pair,
   onBack,
@@ -229,6 +243,15 @@ export function EvidenceScreen({
           <Text style={{ color: colors.primary, fontSize: typography.fontSize.sm }}>← Back</Text>
         </TouchableOpacity>
       ) : null}
+
+      {/* Policy Insight Reason Codes Explainer */}
+      <ReasonCodesExplainer
+        policyInsight={policyInsight}
+        isLoading={isPolicyInsightLoading}
+        isError={isPolicyInsightError}
+        unavailableReason={policyInsightUnavailableReason}
+        evidenceRunId={evidence.runId}
+      />
 
       {/* Header */}
       <View style={{ marginBottom: 16 }}>

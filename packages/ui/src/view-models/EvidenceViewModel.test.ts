@@ -358,8 +358,18 @@ describe('buildEvidenceViewModel', () => {
         freshUntilLabel: '2024-01-15T05:03:00Z',
         isStale: false,
         inputs: [
-          { locator: HASH_A, observedAtLabel: '2024-01-15T03:59:00Z' },
-          { locator: HASH_B, observedAtLabel: '2024-01-15T05:00:00Z' },
+          {
+            referenceId: 'ref-a',
+            sourceTypeLabel: 'API',
+            observedAtLabel: '2024-01-15T03:59:00Z',
+            isResolved: true,
+          },
+          {
+            referenceId: 'ref-b',
+            sourceTypeLabel: 'API',
+            observedAtLabel: '2024-01-15T05:00:00Z',
+            isResolved: true,
+          },
         ],
       },
     });
@@ -483,14 +493,28 @@ describe('buildEvidenceViewModel', () => {
     const unresolvedRow = card?.rows.find((r) => r.label === 'feat_unresolved_ref');
     expect(unresolvedRow?.derivation).toMatchObject({
       inputCount: 1,
-      inputs: [{ locator: 'Unresolved reference (missing-ref-id)', observedAtLabel: '—' }],
+      inputs: [
+        {
+          referenceId: 'missing-ref-id',
+          sourceTypeLabel: 'Unknown source type',
+          observedAtLabel: '—',
+          isResolved: false,
+        },
+      ],
       timeSpanLabel: 'Unknown time span',
     });
 
     const unparseableRow = card?.rows.find((r) => r.label === 'feat_unparseable_ref');
     expect(unparseableRow?.derivation).toMatchObject({
       inputCount: 1,
-      inputs: [{ locator: 'https://example.com/unparseable', observedAtLabel: 'not-a-date' }],
+      inputs: [
+        {
+          referenceId: 'ref-unparseable',
+          sourceTypeLabel: 'API',
+          observedAtLabel: 'not-a-date',
+          isResolved: true,
+        },
+      ],
       timeSpanLabel: 'Unknown time span',
     });
 
