@@ -117,6 +117,7 @@ export type {
   EvidenceResearchBriefViewModel,
   EvidenceDerivationInputViewModel,
   EvidenceFeatureDerivationViewModel,
+  EvidenceSourceRefViewModel,
 } from './view-models/EvidenceViewModel.js';
 export { buildSynthesisViewModel } from './view-models/SynthesisViewModel.js';
 export type {

@@ -30,12 +30,16 @@ const derivationCapableCard: EvidenceFamilyCardViewModel = {
         isStale: false,
         inputs: [
           {
-            locator: 'https://api.orca.so/v1/whirlpool/sol-usdc',
+            referenceId: 'ref-orca-001',
+            sourceTypeLabel: 'API',
             observedAtLabel: '2024-01-15T10:00:00Z',
+            isResolved: true,
           },
           {
-            locator: 'pyth:SOL/USD',
+            referenceId: 'ref-pyth-001',
+            sourceTypeLabel: 'API',
             observedAtLabel: '2024-01-15T09:59:00Z',
+            isResolved: true,
           },
         ],
       },
@@ -52,8 +56,10 @@ const derivationCapableCard: EvidenceFamilyCardViewModel = {
         isStale: true,
         inputs: [
           {
-            locator: 'rpc:getAccountInfo',
+            referenceId: 'ref-rpc-001',
+            sourceTypeLabel: 'On-Chain',
             observedAtLabel: '2024-01-15T10:00:00Z',
+            isResolved: true,
           },
         ],
       },
@@ -135,6 +141,14 @@ describe('EvidenceFamilyCard', () => {
           confidenceLabel: '85%',
           observedAtLabel: '2024-01-15T10:00:00Z',
           expiresAtLabel: '2024-01-15T12:00:00Z',
+          sources: [
+            {
+              referenceId: 'ref-claim-001',
+              sourceTypeLabel: 'API',
+              observedAtLabel: '2024-01-15T10:00:00Z',
+              isResolved: true,
+            },
+          ],
         },
       ],
     };
@@ -147,7 +161,7 @@ describe('EvidenceFamilyCard', () => {
     expect(screen.getByText('bullish')).toBeDefined();
 
     expect(screen.getByText(/85%/)).toBeDefined();
-    expect(screen.getByText(/2024-01-15T10:00:00Z/)).toBeDefined();
+    expect(screen.getAllByText(/2024-01-15T10:00:00Z/).length).toBeGreaterThan(0);
     expect(screen.getByText(/2024-01-15T12:00:00Z/)).toBeDefined();
   });
 
@@ -198,7 +212,7 @@ describe('EvidenceFamilyCard', () => {
     expect(screen.queryByTestId('evidence-freshness-status-feat-price-001')).toBeNull();
   });
 
-  it('renders input locators as wrapping text rather than links', () => {
+  it('renders input references as wrapping text rather than links', () => {
     render(<EvidenceFamilyCard card={derivationCapableCard} />);
 
     const togglePrice = screen.getByRole('button', {
@@ -206,7 +220,7 @@ describe('EvidenceFamilyCard', () => {
     });
     fireEvent.click(togglePrice);
 
-    expect(screen.getByText('https://api.orca.so/v1/whirlpool/sol-usdc')).toBeDefined();
+    expect(screen.getByText('ref-orca-001')).toBeDefined();
     expect(screen.queryByRole('link')).toBeNull();
   });
 

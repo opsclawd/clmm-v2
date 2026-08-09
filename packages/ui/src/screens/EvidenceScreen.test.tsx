@@ -319,8 +319,10 @@ describe('EvidenceScreen', () => {
       'feat-price-001 = 150.25 usd, from 2 observations spanning 61 minutes, computed by price-aggregator v1.0.0, observed 2024-01-15T10:00:00Z, fresh until 2024-01-15T11:00:00Z.';
 
     expect(screen.getByText(expectedExplanation)).toBeDefined();
-    expect(screen.getByText(hash1)).toBeDefined();
-    expect(screen.getByText(hash2)).toBeDefined();
+    expect(screen.getByText('ref-1')).toBeDefined();
+    expect(screen.getByText('ref-2')).toBeDefined();
+    expect(screen.queryByText(hash1)).toBeNull();
+    expect(screen.queryByText(hash2)).toBeNull();
     expect(screen.queryAllByRole('link')).toEqual([]);
   });
 

@@ -91,17 +91,30 @@ export function formatLastCollectedLabel(
   return `Last run ${hours}h ago`;
 }
 
+const SOURCE_TYPE_LABELS: Record<string, string> = {
+  api: 'API',
+  database: 'Database',
+  chain: 'On-Chain',
+  document: 'Document',
+  internal_bundle: 'Internal Bundle',
+};
+
+export interface EvidenceSourceRefViewModel {
+  referenceId: string;
+  sourceTypeLabel: string;
+  observedAtLabel: string;
+  isResolved: boolean;
+}
+
+export interface EvidenceDerivationInputViewModel extends EvidenceSourceRefViewModel {}
+
 export interface EvidenceContextualClaimViewModel {
   claim: string;
   direction: EvidenceClaimDirection;
   confidenceLabel: string;
   observedAtLabel: string;
   expiresAtLabel: string;
-}
-
-export interface EvidenceDerivationInputViewModel {
-  locator: string;
-  observedAtLabel: string;
+  sources: EvidenceSourceRefViewModel[];
 }
 
 export interface EvidenceFeatureDerivationViewModel {
@@ -378,13 +391,17 @@ export function buildEvidenceViewModel(
           if (reference) {
             resolvedReferences.push(reference);
             return {
-              locator: reference.locator,
+              referenceId: reference.referenceId,
+              sourceTypeLabel: SOURCE_TYPE_LABELS[reference.sourceType] ?? reference.sourceType,
               observedAtLabel: formatDateLabel(reference.observedAt),
+              isResolved: true,
             };
           }
           return {
-            locator: `Unresolved reference (${referenceId})`,
+            referenceId,
+            sourceTypeLabel: 'Unknown source type',
             observedAtLabel: '—',
+            isResolved: false,
           };
         },
       );
@@ -469,13 +486,36 @@ export function buildEvidenceViewModel(
     );
     const isStale = isBundleExpired || hasExpiredClaim || availability === 'collection_stopped';
 
-    const mappedClaims: EvidenceContextualClaimViewModel[] = claimsArray.map((c) => ({
-      claim: c.claim,
-      direction: c.direction,
-      confidenceLabel: formatPercentFromBps(c.confidenceBps),
-      observedAtLabel: formatDateLabel(c.observedAt),
-      expiresAtLabel: formatDateLabel(c.expiresAt),
-    }));
+    const mappedClaims: EvidenceContextualClaimViewModel[] = claimsArray.map((c) => {
+      const sources: EvidenceSourceRefViewModel[] = (c.sourceReferenceIds || []).map(
+        (referenceId) => {
+          const reference = sourceReferenceById.get(referenceId);
+          if (reference) {
+            return {
+              referenceId: reference.referenceId,
+              sourceTypeLabel: SOURCE_TYPE_LABELS[reference.sourceType] ?? reference.sourceType,
+              observedAtLabel: formatDateLabel(reference.observedAt),
+              isResolved: true,
+            };
+          }
+          return {
+            referenceId,
+            sourceTypeLabel: 'Unknown source type',
+            observedAtLabel: '—',
+            isResolved: false,
+          };
+        },
+      );
+
+      return {
+        claim: c.claim,
+        direction: c.direction,
+        confidenceLabel: formatPercentFromBps(c.confidenceBps),
+        observedAtLabel: formatDateLabel(c.observedAt),
+        expiresAtLabel: formatDateLabel(c.expiresAt),
+        sources,
+      };
+    });
 
     cards.push({
       id: fam.id,
