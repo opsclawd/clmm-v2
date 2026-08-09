@@ -137,6 +137,7 @@ export interface EvidenceFamilyCardRowViewModel {
 export interface EvidenceFamilyCardViewModel {
   id: string;
   title: string;
+  contributed: boolean;
   availability: EvidenceFamilyAvailability;
   lastCollectedLabel: string | null;
   freshnessLabel: string;
@@ -292,6 +293,7 @@ function addMessage(targetArray: string[], message: string): void {
 export function buildEvidenceViewModel(
   bundle: EvidenceBundle,
   now: number,
+  selectedReferenceIds: ReadonlySet<string> = new Set<string>(),
 ): EvidenceScreenViewModel {
   const bundleFreshUntilMs = Date.parse(bundle.freshUntil);
   const bundleExpiresAtMs = Date.parse(bundle.expiresAt);
@@ -365,6 +367,10 @@ export function buildEvidenceViewModel(
     if (features.length === 0) {
       continue;
     }
+
+    const contributed = features.some((feature) =>
+      (feature.inputLineage || []).some((referenceId) => selectedReferenceIds.has(referenceId)),
+    );
 
     const livenessRecord = livenessMap?.[id];
     const hasInvalid = features.some((feature) => feature.status === 'invalid');
@@ -444,6 +450,7 @@ export function buildEvidenceViewModel(
     cards.push({
       id,
       title,
+      contributed,
       availability,
       lastCollectedLabel:
         availability === 'available' ? null : formatLastCollectedLabel(livenessRecord, now),
@@ -464,11 +471,16 @@ export function buildEvidenceViewModel(
 
     availability = resolveUnavailableFamily(fam.id, availability, livenessRecord, now);
 
+    const contributed = claimsArray.some((claim) =>
+      (claim.sourceReferenceIds || []).some((referenceId) => selectedReferenceIds.has(referenceId)),
+    );
+
     if (claimsArray.length === 0) {
       const isStale = isBundleExpired || availability === 'collection_stopped';
       cards.push({
         id: fam.id,
         title: fam.title,
+        contributed,
         availability,
         lastCollectedLabel:
           availability === 'available' ? null : formatLastCollectedLabel(livenessRecord, now),
@@ -520,6 +532,7 @@ export function buildEvidenceViewModel(
     cards.push({
       id: fam.id,
       title: fam.title,
+      contributed,
       availability,
       lastCollectedLabel:
         availability === 'available' ? null : formatLastCollectedLabel(livenessRecord, now),

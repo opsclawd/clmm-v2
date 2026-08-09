@@ -13,6 +13,7 @@ describe('EvidenceFamilyCard lineage drill-down and privacy', () => {
     const card: EvidenceFamilyCardViewModel = {
       id: 'market_state',
       title: 'Market state',
+      contributed: false,
       availability: 'available',
       lastCollectedLabel: 'Last run 30m ago',
       freshnessLabel: 'Fresh',
@@ -75,6 +76,7 @@ describe('EvidenceFamilyCard lineage drill-down and privacy', () => {
     const card: EvidenceFamilyCardViewModel = {
       id: 'supportResistance',
       title: 'Support & resistance',
+      contributed: false,
       availability: 'available',
       lastCollectedLabel: 'Last run 30m ago',
       freshnessLabel: 'Fresh',
