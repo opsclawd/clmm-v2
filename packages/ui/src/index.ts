@@ -42,6 +42,8 @@ export { PolicyInsightsSection } from './components/PolicyInsightsSection.js';
 export { PositionPlanCard } from './components/PositionPlanCard.js';
 export { EvidenceFamilyCard } from './components/EvidenceFamilyCard.js';
 export type { EvidenceFamilyCardProps } from './components/EvidenceFamilyCard.js';
+export { ReasonCodesExplainer } from './components/ReasonCodesExplainer.js';
+export type { ReasonCodesExplainerProps } from './components/ReasonCodesExplainer.js';
 
 // Wallet connection utils
 export {

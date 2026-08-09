@@ -2,7 +2,12 @@ import React from 'react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { cleanup, fireEvent, render, screen } from '@testing-library/react';
 import deterministicOnlyFixture from '../../../../schemas/regime-engine/evidence-bundle.v1/fixtures/valid/deterministic-only.json' with { type: 'json' };
-import type { EvidenceBundle, EvidenceUnavailableReason } from '@clmm/application/public';
+import currentPositionFixture from '../../../../schemas/regime-engine/policy-insight.v1/fixtures/valid/current-position.json' with { type: 'json' };
+import type {
+  EvidenceBundle,
+  EvidenceUnavailableReason,
+  PolicyInsightBlock,
+} from '@clmm/application/public';
 import { EvidenceScreen } from './EvidenceScreen.js';
 
 afterEach(() => {
@@ -317,5 +322,42 @@ describe('EvidenceScreen', () => {
     expect(screen.getByText(hash1)).toBeDefined();
     expect(screen.getByText(hash2)).toBeDefined();
     expect(screen.queryAllByRole('link')).toEqual([]);
+  });
+
+  it('keeps evidence visible when the policy insight query is unavailable', () => {
+    const bundle = JSON.parse(
+      JSON.stringify(deterministicOnlyFixture),
+    ) as unknown as EvidenceBundle;
+
+    render(
+      <EvidenceScreen
+        evidence={bundle}
+        now={FIXED_NOW}
+        policyInsight={null}
+        isPolicyInsightError={true}
+        policyInsightUnavailableReason="store-unavailable"
+      />,
+    );
+
+    expect(screen.getByTestId('evidence-screen-canonical')).toBeDefined();
+    expect(screen.getByText('Market state')).toBeDefined();
+    expect(screen.getByTestId('reason-codes-explainer-unavailable')).toBeDefined();
+  });
+
+  it('renders ReasonCodesExplainer when policy insight is provided and omits raw reasoning', () => {
+    const bundle = JSON.parse(
+      JSON.stringify(deterministicOnlyFixture),
+    ) as unknown as EvidenceBundle;
+    const policyInsight = JSON.parse(
+      JSON.stringify(currentPositionFixture),
+    ) as unknown as PolicyInsightBlock;
+    policyInsight.reasoning = 'SECRET_DEGRADED_REASONING_STRING_DO_NOT_RENDER';
+
+    render(<EvidenceScreen evidence={bundle} now={FIXED_NOW} policyInsight={policyInsight} />);
+
+    expect(screen.getByTestId('evidence-screen-canonical')).toBeDefined();
+    expect(screen.getByTestId('reason-codes-explainer')).toBeDefined();
+    expect(screen.getByText('Market state')).toBeDefined();
+    expect(screen.queryByText('SECRET_DEGRADED_REASONING_STRING_DO_NOT_RENDER')).toBeNull();
   });
 });

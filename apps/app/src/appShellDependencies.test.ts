@@ -86,11 +86,24 @@ describe('app shell wallet dependency guard', () => {
     expect(routeSource).toContain("import { EvidenceScreen } from '@clmm/ui'");
     expect(routeSource).toContain('fetchCurrentEvidence');
     expect(routeSource).toContain("from '../src/api/evidence'");
+    expect(routeSource).toContain('fetchCurrentPolicyInsight');
+    expect(routeSource).toContain("from '../src/api/policyInsights'");
     expect(routeSource).toContain(
-      "['evidence-current', 'SOL/USDC', 'position', walletAddress, positionId]",
+      "['evidence-current', pair, 'position', walletAddress, positionId]",
     );
-    expect(routeSource).toContain("['evidence-current', 'SOL/USDC', 'pair']");
+    expect(routeSource).toContain("['evidence-current', pair, 'pair']");
+    expect(routeSource).toContain(
+      "['policy-insights-current', pair, 'position', walletAddress, positionId]",
+    );
+    expect(routeSource).toContain("['policy-insights-current', pair, 'pair']");
     expect(routeSource).toContain('fetchCurrentEvidence(signal, positionScope)');
+    expect(routeSource).toContain('fetchCurrentPolicyInsight(signal)');
+    expect(routeSource).toContain('policyInsight={policyInsight}');
+    expect(routeSource).toContain('isPolicyInsightLoading={isPolicyInsightLoading}');
+    expect(routeSource).toContain('isPolicyInsightError={isPolicyInsightError}');
+    expect(routeSource).toContain(
+      'policyInsightUnavailableReason={policyInsightUnavailableReason}',
+    );
     expect(routeSource).toContain('retry: false');
     expect(routeSource).toContain('staleTime: 5 * 60 * 1000');
     expect(routeSource).toContain('refetchOnWindowFocus: false');
